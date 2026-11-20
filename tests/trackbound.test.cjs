@@ -165,7 +165,8 @@ function autopilot(page, index, options = {}) {
   const brakeAngle = options.brakeAngle || 0.4;
   const liftAngle = options.liftAngle || 0;
   const T = page.sandbox.__test;
-  T.startCampaign(index);
+  if (options.track) T.useTrack(options.track);
+  else T.startCampaign(index);
   const car = T.car();
   const points = T.centerline(T.world());
   let nearest = 0;
@@ -869,6 +870,56 @@ test('Trackbound flares a narrow piece into its wide neighbours instead of a wal
   // Halfway along it has pinched back in to its own width.
   assert.equal(T.raycast(track.mesh, probe(0.5, 5.2), [0, -1, 0], 40), null,
     'and narrows to its own width once inside');
+});
+
+test('Trackbound lifts the start of a long descent so no road reaches the ground', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const result = T.validateCustom(['sprint', 'down', 'down', 'down', 'down', 'down', 'down']);
+  assert.equal(result.ok, true, result.error);
+  const track = result.track;
+  let lowest = Infinity;
+  for (let i = 1; i < track.mesh.pos.length; i += 3) lowest = Math.min(lowest, track.mesh.pos[i]);
+  assert.ok(lowest > T.GROUND_Y + 1,
+    'the lowest tarmac sits above the ground (' + lowest.toFixed(1) + ')');
+  assert.ok(track.spawn.p[1] > 40, 'the start is high enough to clear the whole descent');
+  // It is the start that moves, not the ground: a level course still starts at 0.
+  const flat = T.buildTrack(['start', 'sprint', 'straight', 'finish'], { id: 'flat', name: 'Flat' });
+  assert.equal(flat.spawn.p[1], 0);
+});
+
+test('Trackbound bridges a course that crosses itself instead of refusing it', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  // Out, a hairpin back, and a second hairpin, so the return leg runs over the
+  // outbound one. This used to come back as 'the road crosses itself'.
+  const result = T.validateCustom(['sprint', 'hairpinR', 'sprint', 'hairpinR']);
+  assert.equal(result.ok, true, result.error);
+  const track = result.track;
+  assert.equal(T.trackFolds(track), false, 'the bridge is clear of the road under it');
+  // The two legs meet in plan; the later one is a deck with air and road under it.
+  const chain = track.chain;
+  let closest = null;
+  for (let i = 0; i < chain.length; i++) {
+    for (let j = i + 2; j < chain.length; j++) {
+      for (const a of chain[i].samples) {
+        for (const b of chain[j].samples) {
+          const plan = Math.hypot(a[0] - b[0], a[2] - b[2]);
+          if (plan < 5 && (!closest || plan < closest.plan)) closest = { plan, a, b };
+        }
+      }
+    }
+  }
+  assert.ok(closest, 'the legs run over each other somewhere');
+  assert.ok(Math.abs(closest.a[1] - closest.b[1]) >= 6,
+    'one leg passes clear above the other (' + Math.abs(closest.a[1] - closest.b[1]).toFixed(1) + ')');
+  const high = closest.a[1] > closest.b[1] ? closest.a : closest.b;
+  const low = high === closest.a ? closest.b : closest.a;
+  assert.ok(T.raycast(track.mesh, [high[0], high[1] + 4, high[2]], [0, -1, 0], 12), 'there is road on the deck');
+  assert.ok(T.raycast(track.mesh, [low[0], low[1] + 3, low[2]], [0, -1, 0], 8), 'and road underneath it');
+  // A bridged crossing is a road someone can actually drive.
+  const driven = autopilot(page, 0, { track, lookahead: 16, brakeSpeed: 30 });
+  assert.equal(driven.race.state, 'finished', 'the bridged course can be completed');
 });
 
 test('Trackbound shows a course board as a small box by the pointer', () => {

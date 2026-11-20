@@ -1130,11 +1130,31 @@ function localCurveFrame(def, t) {
   return frame(c.p, c.f, c.u);
 }
 function blockExit(def) { return localCurveFrame(def, 1); }
+// Raise a frame onto a bridge deck and tilt it with the ramp, so the slab, the
+// kerbs and the walls ride up the deck instead of standing vertically through
+// it. `lift` is a deck profile: at(distance) is the height, slope(distance) the
+// climb per unit of ribbon.
+function liftFrame(w, lift, distance) {
+  if (!lift) return w;
+  const height = lift.at(distance);
+  if (!(height > 0)) return w;
+  const slope = lift.slope(distance);
+  return {
+    p: [w.p[0], w.p[1] + height, w.p[2]],
+    x: w.x,
+    y: norm(add(w.y, mul(w.z, -slope))),
+    z: norm(add(w.z, mul(w.y, slope)))
+  };
+}
+function linkFrame(link, t) {
+  const w = compose(link.entry, localCurveFrame(link.def, t));
+  return link.lift ? liftFrame(w, link.lift, link.lift.start + t * link.lift.span) : w;
+}
 
 // Bake one block into the road mesh (and its legs into the scenery mesh).
 // Wall collision panels go into `walls`; prevHw/nextHw are the neighbours'
 // half widths, used to cap wall ends where the road narrows.
-function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw) {
+function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw, deck) {
   legs = legs || [];      // callers that only want the geometry pass nothing
   const segments = def.samples || 12;
   const hw = def.hw || 6;
@@ -1161,6 +1181,9 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
     }
     return h;
   };
+  // A bridge deck is a height added along the ribbon, so it is sampled at the
+  // same distance in every block and the seams meet without a step.
+  const place = (w, t) => liftFrame(w, deck, deck ? deck.start + t * span : 0);
   const columns = h => [-h, -h + 0.55, -0.18, 0.18, h - 0.55, h];
   const rows = [];
   const box = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
@@ -1170,7 +1193,7 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
 
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const w = compose(entry, localCurveFrame(def, t));
+    const w = place(compose(entry, localCurveFrame(def, t)), t);
     const rowHw = halfAt(t);
     const pts = columns(rowHw).map(offset => madd(w.p, w.x, offset));
     const low = pts.map(p => madd(p, w.y, -base));
@@ -1278,7 +1301,7 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
   // no wall across the seam for a car to hit. See halfAt above.
 
   // painted details: start line, finish chequer, boost chevrons, gates
-  const paintFrame = t => compose(entry, localCurveFrame(def, t));
+  const paintFrame = t => place(compose(entry, localCurveFrame(def, t)), t);
   const paintQuad = (t0, t1, color, lift) => {
     const f0 = paintFrame(t0), f1 = paintFrame(t1);
     const up0 = lift === undefined ? 0.02 : lift;
@@ -1503,6 +1526,104 @@ const boxOverlap = (a, b, slack) => {
 
 /* ── track assembly ───────────────────────────────────────────────────────── */
 
+const ROAD_BASE = 0.65;          // slab thickness under the tarmac
+const ROAD_GROUND = GROUND_Y + 2;    // the lowest the tarmac may ever sit
+const BRIDGE_CLEAR = 9;          // how far the upper road clears the one below
+const BRIDGE_RAMP = 30;          // ribbon length the upper road takes to climb
+const ROAD_TOUCH_XZ = 11.5;      // plan distance at which two roads are on each other
+const ROAD_TOUCH_Y = 6;          // a gap this big already passes clear
+
+// A cheap pass over a layout: the same centreline frames emitBlock composes,
+// without any mesh. The start height and the bridges are decided from it before
+// a single triangle is baked.
+function planTrack(typeIds, baseY) {
+  let entry = Object.assign({}, FRAME0, { p: [0, baseY, 0] });
+  const links = [];
+  let travelled = 0;
+  for (const id of typeIds) {
+    const def = pieceDef(id);
+    if (!def) continue;
+    const span = def.len || 16;
+    const samples = [];
+    for (let s = 0; s < 12; s++) samples.push(compose(entry, localCurveFrame(def, (s + 0.5) / 12)).p);
+    links.push({ def, entry, samples, start: travelled, span, distance: travelled + span });
+    travelled += span;
+    entry = compose(entry, blockExit(def));
+  }
+  return links;
+}
+function humpHeight(humps, distance) {
+  let height = 0;
+  for (const hump of humps) {
+    const u = (distance - hump.at) / hump.ramp;
+    if (u > -1 && u < 1) height = Math.max(height, hump.height * 0.5 * (1 + Math.cos(Math.PI * u)));
+  }
+  return height;
+}
+function humpSlope(humps, distance) {
+  let height = 0, slope = 0;
+  for (const hump of humps) {
+    const u = (distance - hump.at) / hump.ramp;
+    if (u > -1 && u < 1) {
+      const h = hump.height * 0.5 * (1 + Math.cos(Math.PI * u));
+      if (h > height) {
+        height = h;
+        slope = -hump.height * 0.5 * Math.PI / hump.ramp * Math.sin(Math.PI * u);
+      }
+    }
+  }
+  return slope;
+}
+// Where the course arrives on top of itself, the later leg climbs onto a deck
+// and the road that was laid first keeps the ground, which is what a circuit
+// does at a crossing. The old rule refused the layout outright; a deck is put
+// at every sample that would fold, so a shallow crossing is carried over its
+// whole overlap instead of at one point. A few passes settle the case where
+// lifting one leg closes a gap with a third.
+function bridgeDeck(links) {
+  const humps = [];
+  let spent = false;
+  for (let pass = 0; pass < 12 && !spent; pass++) {
+    let added = false;
+    for (let lowerIndex = 0; lowerIndex < links.length && !spent; lowerIndex++) {
+      for (let upperIndex = lowerIndex + 2; upperIndex < links.length && !spent; upperIndex++) {
+        if (lowerIndex === 0 && upperIndex === links.length - 1) continue;
+        // Road next to itself in order is a tight sequence, not a crossing.
+        if (Math.abs(links[upperIndex].distance - links[lowerIndex].distance) < 45) continue;
+        const lower = links[lowerIndex], upper = links[upperIndex];
+        for (let s = 0; s < upper.samples.length && !spent; s++) {
+          const b = upper.samples[s];
+          const bAt = upper.start + (s + 0.5) / 12 * upper.span;
+          const bY = b[1] + humpHeight(humps, bAt);
+          for (let k = 0; k < lower.samples.length; k++) {
+            const a = lower.samples[k];
+            const dx = a[0] - b[0], dz = a[2] - b[2];
+            if (dx * dx + dz * dz > ROAD_TOUCH_XZ * ROAD_TOUCH_XZ) continue;
+            const aAt = lower.start + (k + 0.5) / 12 * lower.span;
+            const aY = a[1] + humpHeight(humps, aAt);
+            if (Math.abs(aY - bY) >= ROAD_TOUCH_Y) continue;
+            // Climb the later leg until it clears the one it crosses, which can
+            // mean climbing out from under a higher road as well as over a
+            // level one. The ramp grows with the height so the deck never gets
+            // steeper than the climb blocks.
+            if (humps.length >= 240) { spent = true; break; }   // too much road on decks already
+            const height = humpHeight(humps, bAt) + Math.max(1, aY + BRIDGE_CLEAR - bY);
+            humps.push({ at: bAt, height, ramp: BRIDGE_RAMP * height / BRIDGE_CLEAR });
+            added = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!added) break;
+  }
+  if (!humps.length) return null;
+  return {
+    at: distance => humpHeight(humps, distance),
+    slope: distance => humpSlope(humps, distance)
+  };
+}
+
 // Author times are the author-medal target: a tidy lap, not a finished one.
 // The first eight were set from a clean line at about two thirds of the car's
 // top speed; the long five were re-set from real player data, where a player's
@@ -1520,7 +1641,6 @@ const DAILY_PACE = 36; // ribbon units per second
 function buildTrack(typeIds, meta) {
   const road = meshNew(), scenery = meshNew();
   const triggers = [], boxes = [], chain = [];
-  let entry = FRAME0;
   let finish = null, spawn = null, travelled = 0;
   const legs = [];
   const walls = [];
@@ -1529,6 +1649,31 @@ function buildTrack(typeIds, meta) {
   // including the start, the checkpoints and the finish, so the whole ribbon is
   // one surface rather than a few blocks named after it.
   const ice = !!(meta && meta.ice);
+
+  // Plan the ribbon before any of it is baked, because the road is built as it
+  // goes. How high the start sits depends on the whole descent: a course that
+  // drops a long way starts high enough that no tarmac ever reaches the ground.
+  const outline = planTrack(typeIds, 0);
+  let lowest = Infinity;
+  for (const link of outline) {
+    const base = link.def.base === undefined ? ROAD_BASE : link.def.base;
+    const hw = link.def.hw || 6;
+    const wall = link.def.wall === undefined ? 0.95 : link.def.wall;
+    // The lowest point of a cross-section is not its centre: a banked or
+    // sloped piece hangs its kerb below the line, and a piece that has been
+    // rolled over hangs its walls there, so both are measured against the
+    // ground as well.
+    for (let s = 0; s <= 24; s++) {
+      const w = compose(link.entry, localCurveFrame(link.def, s / 24));
+      const hang = base * Math.abs(w.y[1]) + Math.max(0, -wall * w.y[1]) + hw * Math.abs(w.x[1]);
+      lowest = Math.min(lowest, w.p[1] - hang);
+    }
+  }
+  const foot = lowest === Infinity ? 0 : Math.max(0, ROAD_GROUND - lowest);
+  const plan = planTrack(typeIds, foot);
+  const bridge = bridgeDeck(plan);
+  let entry = Object.assign({}, FRAME0, { p: [0, foot, 0] });
+
   for (let i = 0; i < typeIds.length; i++) {
     const source = pieceDef(typeIds[i]);
     if (!source) continue;
@@ -1536,24 +1681,32 @@ function buildTrack(typeIds, meta) {
     // ribbon, so the trick points banked in the air are part of the run.
     const surface = open ? Object.assign({}, source, { wall: 0 }) : source;
     const def = ice ? Object.assign({}, surface, { grip: ICE_GRIP, paint: ICE_KERB, top: ICE_PAINT }) : surface;
+    const span = def.len || 16;
+    const startAt = travelled;
+    const lift = bridge ? { at: bridge.at, slope: bridge.slope, start: startAt, span } : null;
     const exit = compose(entry, blockExit(def));
     const prevDef = pieceDef(typeIds[i - 1]), nextDef = pieceDef(typeIds[i + 1]);
     const box = emitBlock(road, scenery, entry, def, i, legs, walls,
-      prevDef ? (prevDef.hw || 6) : 0, nextDef ? (nextDef.hw || 6) : 0);
+      prevDef ? (prevDef.hw || 6) : 0, nextDef ? (nextDef.hw || 6) : 0, lift);
+    const frameAt = t => liftFrame(compose(entry, localCurveFrame(def, t)), lift, startAt + t * span);
     boxes.push(box);
     if (def.trigger === 'checkpoint' || def.trigger === 'finish') {
-      const gate = compose(entry, localCurveFrame(def, 0.2));
+      const gate = frameAt(0.2);
       const trigger = { type: def.trigger, frame: gate, hw: def.hw || 6, halfLen: 1.6 };
       triggers.push(trigger);
       if (def.trigger === 'finish') finish = trigger;
     }
-    if (def.boost) triggers.push({ type: 'boost', frame: compose(entry, localCurveFrame(def, 0.5)), hw: def.hw || 6, halfLen: (def.len || 16) * 0.42 });
-    if (def.grip) triggers.push({ type: 'surface', grip: def.grip, frame: compose(entry, localCurveFrame(def, 0.5)), hw: def.hw || 6, halfLen: (def.len || 16) * 0.55 });
-    if (def.start) spawn = compose(entry, localCurveFrame(def, 0.06));
+    if (def.boost) triggers.push({ type: 'boost', frame: frameAt(0.5), hw: def.hw || 6, halfLen: span * 0.42 });
+    if (def.grip) triggers.push({ type: 'surface', grip: def.grip, frame: frameAt(0.5), hw: def.hw || 6, halfLen: span * 0.55 });
+    if (def.start) spawn = frameAt(0.06);
     const samples = [];
-    for (let s = 0; s < 12; s++) samples.push(compose(entry, localCurveFrame(def, (s + 0.5) / 12)).p);
-    travelled += def.len || 16;
-    chain.push({ id: typeIds[i], entry, exit, def, box, samples, distance: travelled });
+    for (let s = 0; s < 12; s++) {
+      const t = (s + 0.5) / 12;
+      const point = compose(entry, localCurveFrame(def, t)).p;
+      samples.push(lift ? [point[0], point[1] + lift.at(startAt + t * span), point[2]] : point);
+    }
+    travelled += span;
+    chain.push({ id: typeIds[i], entry, exit, def, box, samples, distance: travelled, lift });
     entry = exit;
   }
   indexMesh(road);
@@ -1661,8 +1814,13 @@ function trackFolds(track) {
       if (Math.abs(links[j].distance - links[i].distance) < 45) continue;
       for (const a of links[i].samples) {
         for (const b of links[j].samples) {
-          const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
-          if (dx * dx + dy * dy + dz * dz < 12 * 12) return true;
+          // A road that has been carried over on a bridge deck is clear of the
+          // one below it, so the plan distance has to be close *and* the deck
+          // close in height before this is a real overlap.
+          const dx = a[0] - b[0], dz = a[2] - b[2];
+          if (dx * dx + dz * dz > ROAD_TOUCH_XZ * ROAD_TOUCH_XZ) continue;
+          if (Math.abs(a[1] - b[1]) >= ROAD_TOUCH_Y) continue;
+          return true;
         }
       }
     }
@@ -3796,7 +3954,7 @@ function editorPreviewGeometry(track) {
   if (!track || !track.chain) return { faces, samples };
   const put = (corners, color, index, order, kind) =>
     faces.push({ corners, color, index, order, kind });
-  const from = (link, t) => compose(link.entry, localCurveFrame(link.def, t));
+  const from = (link, t) => linkFrame(link, t);
   track.chain.forEach((link, linkIndex) => {
     const {def, id} = link;
     const index = linkIndex - 1; // start = -1; player blocks = 0..N-1
@@ -4845,7 +5003,7 @@ function centerline(track) {
     const def = link.def;
     const samples = def.samples || 12;
     for (let i = 0; i < samples; i++) {
-      const w = compose(link.entry, localCurveFrame(def, i / samples));
+      const w = linkFrame(link, i / samples);
       points.push({ p: w.p, f: w.z, u: w.y });
     }
   }
@@ -5002,7 +5160,7 @@ $('resMenu').addEventListener('click', () => openMenu());
 
 /* ── test surface: the suite drives the real functions, not copies ────────── */
 window.__test = {
-  CAMPAIGN, BLOCKS, CAR, MEDALS, HITBOX,
+  CAMPAIGN, BLOCKS, CAR, MEDALS, HITBOX, GROUND_Y,
   buildTrack, trackFolds, raycast, stepCar, collideWalls, makeCar, stepRace, compose, localCurveFrame,
   medalTimes, medalFor, dailyTrack, ghostAt, goldCount, centerline, nearestCenterline,
   car: () => car,
