@@ -1580,16 +1580,17 @@ window.ImposterCore = (function () {
       winner: state.winner,
       over: state.over,
       settings: state.settings,
-      map: { w: WORLD.w, h: WORLD.h, view: VIEW },
-      button: BUTTON,
-      vents: VENTS.map(vent => ({ x: vent[0], y: vent[1] })),
       tasks: { done: totals.done, total: totals.total },
-      stations: TASKS.map(task => ({
-        id: task.id, label: task.label, x: task.x, y: task.y, range: task.range, room: task.room,
-        done: myDone.includes(task.id),
-        mine: mine.includes(task.id),
-      })),
-      gas: GASCAN,
+      // Ids only. The page already holds the task table, the rooms, the vents
+      // and the camera list, so none of that belongs in a 10 Hz message.
+      stations: { mine, done: myDone },
+      // A cheap signature of everything in `players` that is not a position.
+      // publish() leaves `roster` out while it is unchanged.
+      rosterKey: state.players
+        .map(player => [player.id, player.name, player.color, player.host ? 1 : 0,
+          player.ready ? 1 : 0, player.alive ? 1 : 0, player.revealed ? 1 : 0,
+          player.role, player.teammate ? 1 : 0].join(','))
+        .join('|'),
       fix: state.sabotage
         ? { ...(sabotageDef(state.sabotage.kind)?.fixes[0] || null), pads: sabotageDef(state.sabotage.kind)?.fixes || [] }
         : null,
@@ -1600,11 +1601,8 @@ window.ImposterCore = (function () {
         ? { room: state.doors.room, msLeft: Math.max(0, Math.round(state.doors.msLeft)), rects: doorRects(state.doors.room) }
         : null,
       sabotageCooldown: Math.ceil(state.sabotageCooldown),
-      rooms: ROOMS,
-      cams: CAMS,
       vision: visionFor(state, viewer),
-      chat: state.chat.slice(-24),
-      ghostChat: viewer && !viewer.alive ? state.ghostChat.slice(-24) : [],
+      ghostChat: viewer && !viewer.alive ? state.ghostChat.slice(-12) : [],
       you: viewer
         ? {
             id: viewer.id,
@@ -1615,10 +1613,8 @@ window.ImposterCore = (function () {
             gas: viewer.gas,
             done: myDone.length,
             total: mine.length,
-            tasks: mine.map(id => {
-              const task = stationById(id);
-              return { id, label: task?.label || id, room: task?.room || '', done: myDone.includes(id) };
-            }),
+            tasks: mine.slice(),
+            doneIds: myDone.slice(),
             cooldown: Math.ceil(viewer.cooldown),
             ventCooldown: Math.ceil(viewer.ventCooldown),
             emergencyUsed: viewer.emergencyUsed,
@@ -1631,10 +1627,8 @@ window.ImposterCore = (function () {
         host: player.host,
         ready: player.ready,
         alive: player.alive,
-        x: round(player.x),
-        y: round(player.y),
-        taskCount: (player.tasks || []).length,
-        taskDone: (player.tasksDone || []).length,
+        x: Math.round(player.x),
+        y: Math.round(player.y),
         role: state.phase === 'over' || player.revealed ? player.role : undefined,
         teammate: viewer && viewer.role === 'impostor' && player.role === 'impostor' && player.id !== viewer.id ? true : undefined,
       })),
@@ -1648,7 +1642,7 @@ window.ImposterCore = (function () {
             msLeft: Math.max(0, Math.round(meeting.msLeft)),
             voted: Object.keys(meeting.votes),
             total: meeting.voters.length,
-            chat: meeting.chat || state.chat.slice(-24),
+            chat: (meeting.chat || []).slice(-12),
             canVote: viewer ? meeting.voters.includes(viewer.id) : false,
           }
         : null,
@@ -1792,6 +1786,43 @@ window.ImposterCore = (function () {
         Math.ceil(((state.over && state.over.msLeft) || 0) / 1000)].join('|');
     }
 
+    // What each seat already holds, so a snapshot only carries what changed.
+    const wireCache = new Map();
+
+    function wireSnapshot(seatId, force = false) {
+      const full = snapshotFor(state, seatId);
+      const viewer = getPlayer(state, seatId);
+      const taskKey = viewer ? (viewer.tasks || []).join(',') + '/' + (viewer.tasksDone || []).join(',') : '';
+      const cache = wireCache.get(seatId) || {};
+      const out = Object.assign({}, full);
+      out.pos = full.players.map(player => [player.id, player.x, player.y]);
+      if (force || cache.roster !== full.rosterKey) {
+        out.roster = full.players.map(player => {
+          const copy = Object.assign({}, player);
+          delete copy.x;
+          delete copy.y;
+          return copy;
+        });
+        cache.roster = full.rosterKey;
+      }
+      if (force || cache.tasks !== taskKey) {
+        cache.tasks = taskKey;
+      } else {
+        delete out.stations;
+        if (out.you) {
+          delete out.you.tasks;
+          delete out.you.doneIds;
+        }
+      }
+      const settingsKey = JSON.stringify(state.settings);
+      if (!force && cache.settings === settingsKey) delete out.settings;
+      else cache.settings = settingsKey;
+      delete out.players;
+      delete out.rosterKey;
+      wireCache.set(seatId, cache);
+      return out;
+    }
+
     function publish(force = false) {
       if (!force && sinceSnapshot < SNAPSHOT_MS) return;
       sinceSnapshot = 0;
@@ -1802,7 +1833,7 @@ window.ImposterCore = (function () {
       }
       const next = successor();
       fire('snapshot', stamp(snapshotFor(state, hostId), hostId, next));
-      for (const [id, send] of links) send({ t: 'snap', s: stamp(snapshotFor(state, id), id, next) });
+      for (const [id, send] of links) send({ t: 'snap', s: stamp(wireSnapshot(id, force), id, next) });
     }
 
     function sendMirror(force = false) {
@@ -1849,7 +1880,7 @@ window.ImposterCore = (function () {
       connections.set(connectionId, seatId);
       owners.set(seatId, connectionId);
       links.set(seatId, send);
-      send({ t: 'welcome', protocol: 'bored-imposter/3', s: stamp(snapshotFor(state, seatId), seatId) });
+      send({ t: 'welcome', protocol: 'bored-imposter/3', s: stamp(wireSnapshot(seatId, true), seatId) });
       if (state.settings.auto) maybeAutoStart(state, rng);
       flushEvents();
       publish(true);
@@ -2247,6 +2278,10 @@ window.ImposterNet = (function () {
     function channelWriter(channel) {
       return message => {
         if (!channel || channel.readyState !== 'open') return;
+        // Snapshots are disposable: if the link is backed up, sending another
+        // one only adds delay, so drop it and let the next frame be current.
+        if (message.t === 'snap' && channel.bufferedAmount > 192 * 1024
+          && !message.s.roster && !message.s.stations && !message.s.settings) return;
         try {
           channel.send(JSON.stringify(message));
         } catch { /* it closed between the check and the send */ }
@@ -2716,6 +2751,7 @@ window.ImposterNet = (function () {
           return;
         }
         if (link && link.channel && link.channel.readyState === 'open') {
+          if (link.channel.bufferedAmount > 96 * 1024) return;
           try {
             link.channel.send(JSON.stringify({ t: 'input', m: message }));
           } catch { /* the close handler follows */ }
@@ -2939,6 +2975,11 @@ window.ImposterNet = (function () {
     $('host-settings').hidden = true;
     $('start').hidden = true;
     snap = null;
+    rosterCache = [];
+    stationCache = { mine: [], done: [] };
+    youCache.tasks = [];
+    youCache.doneIds = [];
+    settingsCache = null;
     $('lobby-bar').hidden = false;
     $('hud').hidden = true;
     $('actions').hidden = true;
@@ -3006,8 +3047,41 @@ window.ImposterNet = (function () {
 
   /* ── snapshots ───────────────────────────────────────────────────────── */
 
+  // Roster and task list only travel when they change; the rest of the page
+  // reads them from these caches, rebuilt into the shape it already expects.
+  let rosterCache = [];
+  const youCache = { tasks: [], doneIds: [] };
+  let stationCache = { mine: [], done: [] };
+  let settingsCache = null;
+
+  function mergeSnapshot(next) {
+    if (next.roster) rosterCache = next.roster;
+    if (next.pos) {
+      const known = new Map(rosterCache.map(player => [player.id, player]));
+      next.players = next.pos.map(([id, x, y]) => Object.assign(
+        { id, name: id, color: 'white', alive: true, host: false, ready: false },
+        known.get(id),
+        { x, y },
+      ));
+    } else if (!next.players) {
+      next.players = rosterCache.slice();
+    }
+    if (next.stations) stationCache = next.stations;
+    next.stations = stationCache;
+    if (next.settings) settingsCache = next.settings;
+    next.settings = settingsCache || { speed: 1, crewVision: 1, killDistance: 'medium' };
+    if (next.you) {
+      if (next.you.tasks) youCache.tasks = next.you.tasks;
+      if (next.you.doneIds) youCache.doneIds = next.you.doneIds;
+      next.you.tasks = youCache.tasks;
+      next.you.doneIds = youCache.doneIds;
+    }
+    return next;
+  }
+
   function setSnapshot(next) {
     if (!next) return;
+    next = mergeSnapshot(next);
     snap = next;
     if (next.you?.id) selfId = next.you.id;
     seedView(next);
@@ -3117,10 +3191,12 @@ window.ImposterNet = (function () {
     const names = { reactor: 'reactor', o2: 'O2', lights: 'lights', comms: 'comms' };
     if (s.sabotage) parts.push(`${names[s.sabotage.kind] || s.sabotage.kind} ${Math.ceil(s.sabotage.msLeft / 1000)}s`);
     else if (s.doors) parts.push(`doors ${Math.ceil(s.doors.msLeft / 1000)}s`);
-    $('hud').textContent = parts.join(' · ');
+    const hudText = parts.join(' · ');
+    if ($('hud').textContent !== hudText) $('hud').textContent = hudText;
 
     const fill = $('task-bar').firstElementChild;
-    fill.style.width = `${s.tasks.total ? Math.round((s.tasks.done / s.tasks.total) * 100) : 0}%`;
+    const pct = `${s.tasks.total ? Math.round((s.tasks.done / s.tasks.total) * 100) : 0}%`;
+    if (fill.style.width !== pct) fill.style.width = pct;
     $('task-bar').hidden = you.role === 'impostor' || s.phase !== 'play';
 
     const actions = s.actions;
@@ -3492,9 +3568,22 @@ window.ImposterNet = (function () {
     return true;
   }
 
+  // Everything drawn is in ship coordinates, so one rectangle test keeps the
+  // per-frame work proportional to what is visible instead of to the map.
+  let cullL = 0;
+  let cullT = 0;
+  let cullR = 0;
+  let cullB = 0;
+  const inView = (x, y, pad = 80) => x > cullL - pad && x < cullR + pad && y > cullT - pad && y < cullB + pad;
+
+  let labelFont = '';
   function label(ctx, text, x, y, color, size) {
     const px = size || 30;
-    ctx.font = `600 ${px}px ui-monospace, Menlo, monospace`;
+    const font = `600 ${px}px ui-monospace, Menlo, monospace`;
+    if (font !== labelFont) {
+      ctx.font = font;
+      labelFont = font;
+    }
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(0,0,0,.72)';
     ctx.fillText(text, x + px * 0.05, y + px * 0.05);
@@ -3504,6 +3593,8 @@ window.ImposterNet = (function () {
 
   let viewW = C.VIEW.w;
   let viewH = C.VIEW.h;
+  let fogGlow = 0;
+  let fogGradient = null;
 
   function draw() {
     requestAnimationFrame(draw);
@@ -3548,9 +3639,22 @@ window.ImposterNet = (function () {
     const camX = C.WORLD.w <= viewW ? (C.WORLD.w - viewW) / 2 : Math.min(Math.max(0, centreX - viewW / 2), C.WORLD.w - viewW);
     const camY = C.WORLD.h <= viewH ? (C.WORLD.h - viewH) / 2 : Math.min(Math.max(0, centreY - viewH / 2), C.WORLD.h - viewH);
     ctx.translate(-camX, -camY);
+    cullL = camX;
+    cullT = camY;
+    cullR = camX + viewW;
+    cullB = camY + viewH;
 
     if (MAP_ART.complete && MAP_ART.naturalWidth) {
-      ctx.drawImage(MAP_ART, 0, 0, C.WORLD.w, C.WORLD.h);
+      // Blit only the slice of the ship that is on screen. Painting the whole
+      // 5792x3168 image and clipping it made the GPU work about ten times
+      // harder every frame.
+      const artX = MAP_ART.naturalWidth / C.WORLD.w;
+      const artY = MAP_ART.naturalHeight / C.WORLD.h;
+      ctx.drawImage(
+        MAP_ART,
+        camX * artX, camY * artY, viewW * artX, viewH * artY,
+        camX, camY, viewW, viewH,
+      );
     } else {
       ctx.fillStyle = '#15171a';
       ctx.fillRect(0, 0, C.WORLD.w, C.WORLD.h);
@@ -3559,7 +3663,7 @@ window.ImposterNet = (function () {
     const you = snap.you;
 
     // Emergency button.
-    if (BUTTON_ART.complete && BUTTON_ART.naturalWidth) {
+    if (BUTTON_ART.complete && BUTTON_ART.naturalWidth && inView(C.BUTTON.x, C.BUTTON.y, 120)) {
       const bw = 110;
       const bh = bw * (BUTTON_ART.naturalHeight / BUTTON_ART.naturalWidth);
       ctx.drawImage(BUTTON_ART, C.BUTTON.x - bw / 2, C.BUTTON.y - bh / 2, bw, bh);
@@ -3567,6 +3671,7 @@ window.ImposterNet = (function () {
 
     // Vents.
     for (const vent of C.VENTS) {
+      if (!inView(vent[0], vent[1], 60)) continue;
       ctx.fillStyle = 'rgba(10,11,12,.72)';
       ctx.strokeStyle = you?.role === 'impostor' ? 'rgba(192,57,43,.85)' : 'rgba(20,21,24,.9)';
       ctx.lineWidth = 2;
@@ -3584,9 +3689,11 @@ window.ImposterNet = (function () {
       }
     }
 
-    // Task marks: yellow diamonds for the crew, faded once done.
-    for (const station of snap.stations) {
-      if (station.done || !station.mine) continue;
+    // Task marks: yellow diamonds for the jobs on your own list.
+    for (const id of snap.stations.mine) {
+      if (snap.stations.done.includes(id)) continue;
+      const station = C.stationById(id);
+      if (!station || !inView(station.x, station.y, 40)) continue;
       const crew = you?.role === 'crew';
       ctx.globalAlpha = crew ? 1 : 0.5;
       ctx.fillStyle = crew ? '#f2df6a' : '#8b8e94';
@@ -3601,25 +3708,27 @@ window.ImposterNet = (function () {
       ctx.fill();
       ctx.stroke();
       ctx.globalAlpha = 1;
-      const near = Math.hypot(centreX - station.x, centreY - station.y) < 520;
+      const reach = 520 * 520;
+      const near = (centreX - station.x) ** 2 + (centreY - station.y) ** 2 < reach;
       if (near) label(ctx, station.label, station.x, station.y - 28, crew ? '#f7efc2' : '#b9bcc2', 28);
     }
 
     // Gas can, only while the crew still needs it.
-    if (you && !you.gas && (you.tasks || []).some(task => task.id === 'fuel' && !task.done)) {
-      const gas = snap.gas;
+    if (you && !you.gas && you.tasks.includes('fuel') && !you.doneIds.includes('fuel') && inView(C.GASCAN.x, C.GASCAN.y, 60)) {
+      const gas = C.GASCAN;
       if (GAS_ART.complete && GAS_ART.naturalWidth) ctx.drawImage(GAS_ART, gas.x - 26, gas.y - 34, 52, 52);
       else {
         ctx.fillStyle = '#f2df6a';
         ctx.fillRect(gas.x - 14, gas.y - 18, 28, 30);
       }
-      if (Math.hypot(centreX - gas.x, centreY - gas.y) < 520) label(ctx, 'Gas can', gas.x, gas.y - 44, '#f7efc2', 28);
+      if ((centreX - gas.x) ** 2 + (centreY - gas.y) ** 2 < 520 * 520) label(ctx, 'Gas can', gas.x, gas.y - 44, '#f7efc2', 28);
     }
 
     // Sabotage repair pads. The reactor and O2 both have two.
     if (snap.fix && snap.fix.pads) {
       const held = snap.sabotage?.held || [];
       for (const pad of snap.fix.pads) {
+        if (!inView(pad.x, pad.y, 70)) continue;
         const done = held.includes(pad.pad);
         ctx.strokeStyle = done ? '#8fd69a' : '#e8dfa0';
         ctx.lineWidth = 4;
@@ -3632,6 +3741,7 @@ window.ImposterNet = (function () {
 
     // Bodies.
     for (const body of snap.bodies) {
+      if (!inView(body.x, body.y, 90)) continue;
       const owner = snap.players.find(player => player.id === body.of);
       ctx.save();
       ctx.translate(body.x + C.PLAYER_W / 2, body.y + C.PLAYER_H / 2);
@@ -3661,6 +3771,7 @@ window.ImposterNet = (function () {
     for (const player of snap.players) {
       const isSelf = player.id === selfId;
       if (!player.alive && !isSelf && you?.alive) continue;
+      if (!isSelf && !inView(player.x, player.y, 140)) continue;
       const entry = view.get(player.id) || { x: player.x, y: player.y, tx: player.x, ty: player.y, dir: 0 };
       let px;
       let py;
@@ -3717,12 +3828,18 @@ window.ImposterNet = (function () {
     // ghosts get 0, which means the whole ship.
     if (snap.vision > 0) {
       const glow = snap.vision;
-      const gradient = ctx.createRadialGradient(centreX, centreY, glow * 0.5, centreX, centreY, glow);
-      gradient.addColorStop(0, 'rgba(0,0,0,0)');
-      gradient.addColorStop(0.55, 'rgba(0,0,0,0.5)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.985)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(camX - 10, camY - 10, viewW + 20, viewH + 20);
+      if (fogGlow !== glow || !fogGradient) {
+        fogGlow = glow;
+        fogGradient = ctx.createRadialGradient(0, 0, glow * 0.5, 0, 0, glow);
+        fogGradient.addColorStop(0, 'rgba(0,0,0,0)');
+        fogGradient.addColorStop(0.55, 'rgba(0,0,0,0.5)');
+        fogGradient.addColorStop(1, 'rgba(0,0,0,0.985)');
+      }
+      ctx.save();
+      ctx.translate(centreX, centreY);
+      ctx.fillStyle = fogGradient;
+      ctx.fillRect(camX - centreX - 10, camY - centreY - 10, viewW + 20, viewH + 20);
+      ctx.restore();
     }
 
     // Critical sabotages: a red wash and the countdown.
@@ -4282,16 +4399,19 @@ window.ImposterNet = (function () {
     if (!you || !you.tasks || !you.tasks.length) {
       list.append(el('li', 'row-item', you?.role === 'impostor' ? 'Fake tasks. Sabotage, vent, kill.' : 'No tasks dealt.'));
     } else {
-      for (const task of you.tasks) {
+      for (const id of you.tasks) {
+        const task = C.stationById(id);
+        if (!task) continue;
+        const done = you.doneIds.includes(id);
         const row = el('li', 'row-item');
-        row.append(el('span', 'dot', task.done ? '✓' : '·'));
-        row.firstElementChild.style.background = task.done ? '#4f8f4f' : 'transparent';
+        row.append(el('span', 'dot', done ? '✓' : '·'));
+        row.firstElementChild.style.background = done ? '#4f8f4f' : 'transparent';
         row.append(el('span', 'name', task.label));
         row.append(el('span', 'tail', task.room));
         list.append(row);
       }
     }
-    if (you?.alive && you?.tasks?.some(task => task.id === 'fuel' && !task.done) && !you.gas) {
+    if (you?.alive && you?.tasks?.includes('fuel') && !you.doneIds.includes('fuel') && !you.gas) {
       const row = el('li', 'row-item');
       row.append(el('span', 'dot'));
       row.append(el('span', 'name', 'Find a gas can'));
@@ -4316,9 +4436,9 @@ window.ImposterNet = (function () {
     const sx = canvas.width / C.WORLD.w;
     const sy = canvas.height / C.WORLD.h;
     const you = snap?.you;
-    for (const task of you?.tasks || []) {
-      if (task.done) continue;
-      const station = C.stationById(task.id);
+    for (const id of you?.tasks || []) {
+      if (you.doneIds.includes(id)) continue;
+      const station = C.stationById(id);
       if (!station) continue;
       ctx.fillStyle = '#f2df6a';
       ctx.beginPath();
