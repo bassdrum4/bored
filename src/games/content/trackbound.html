@@ -3420,7 +3420,7 @@ function validateCustom(blocks) {
     if (!track.spawn || !track.finish || !track.mesh || !track.mesh.grid.size ||
         track.chain.some(link => !link.exit.p.every(Number.isFinite)))
       return { ok: false, error: 'This layout does not make a complete drivable road.' };
-    if (trackFolds(track)) return { ok: false, error: 'The road crosses itself. Move or replace a bend.' };
+    if (trackFolds(track)) return { ok: false, error: 'The road crosses itself. Move or replace a bend.', track };
     track.author = Math.max(4000, Math.round(track.length / DAILY_PACE * 1000));
     return { ok: true, track };
   } catch (error) {
@@ -3557,11 +3557,13 @@ function refreshCustomList() {
     const action = (label, handler) => {
       const button = el('button', 'quiet', label);
       button.type = 'button'; button.addEventListener('click', handler); li.appendChild(button);
+      return button;
     };
     action('Drive', () => { editor.slot = index; startCustomTrack(track); });
     action('Edit', () => openEditor(track, index));
-    action('Delete', () => {
-      if (typeof window.confirm === 'function' && !window.confirm('Delete this saved custom track?')) return;
+    // Two clicks rather than window.confirm: Google Sites embeds may block modals.
+    const remove = action('Delete', () => {
+      if (remove.textContent !== 'Confirm?') { remove.textContent = 'Confirm?'; return; }
       saved.custom.splice(index, 1);
       if (editor.slot === index) editor.slot = null;
       else if (Number.isInteger(editor.slot) && editor.slot > index) editor.slot--;
