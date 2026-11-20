@@ -88,6 +88,15 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Crossword ranks the clock on the day's grid. Two archive puzzles are not
+  // the same test — a random Wednesday is nothing like a Sunday — so only a
+  // solved daily posts, and anything under a minute is not a solve. The clock
+  // starts when the grid appears and stops on the last letter.
+  highScore("crossword", "Crossword", "seconds", {
+    metric: "seconds", lower: true, min: 60, max: 86400,
+    when: snapshot => snapshot.solved === true && snapshot.daily === true,
+    key: 'bored.high.crossword-daily-v1'
+  }),
   // Sudoku ranks the clock, nothing else: whoever finishes a board fastest holds
   // the seat, whatever they picked on the selector — Easy is the default and we
   // are not going to pretend difficulty levels are comparable. Nothing is dealt

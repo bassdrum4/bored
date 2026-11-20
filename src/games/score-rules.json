@@ -70,6 +70,12 @@
     "better": "high",
     "max_value": 100000
   },
+  "crossword": {
+    "label": "Seconds to solve the daily grid",
+    "better": "low",
+    "min_value": 60,
+    "max_value": 86400
+  },
   "deep": {
     "label": "Score",
     "better": "high",

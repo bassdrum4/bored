@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Crossword</title>
+<meta name="description" content="The New York Times crossword archive, one grid at a time.">
+<style>
+  :root {
+    --bg: #f5f2ea;
+    --ink: #191713;
+    --muted: #6b6558;
+    --hair: #d8d2c4;
+    --paper: #fffdf7;
+    --accent: #2f5d7a;
+    --hl: #e4eaee;
+    --sel: #bdd0dc;
+    --warn: #b0453a;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.45 var(--sans);
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #app {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 980px;
+    height: 100vh;
+    height: 100dvh;
+    padding: 10px 12px 12px;
+    gap: 8px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--hair);
+  }
+  #hud {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font: 600 11px/1 var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  #time { color: var(--accent); }
+  #byline {
+    flex: 1 1 120px;
+    min-width: 0;
+    font: 11px/1.3 var(--sans);
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #tools { display: flex; gap: 6px; margin-left: auto; }
+  .tool {
+    font: 11px/1 var(--mono);
+    letter-spacing: .04em;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--hair);
+    border-radius: 2px;
+    padding: 6px 9px;
+    cursor: pointer;
+  }
+  .tool:hover:enabled { border-color: var(--ink); }
+  .tool:disabled { color: var(--muted); cursor: default; }
+  .tool[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  #board { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; gap: 12px; }
+  #gridWrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #note {
+    max-width: 260px;
+    padding: 0 8px;
+    text-align: center;
+    font: 12px/1.5 var(--sans);
+    color: var(--muted);
+  }
+  #grid {
+    display: grid;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    touch-action: manipulation;
+  }
+  .cell {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--cell, 20px);
+    height: var(--cell, 20px);
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .cell.black { background: var(--ink); border-color: var(--ink); cursor: default; }
+  .cell.word { background: var(--hl); }
+  .cell.sel { background: var(--sel); }
+  .cell:focus { outline: none; }
+  .cell:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+  .cell .num {
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    font-family: var(--mono);
+    font-size: clamp(7px, calc(var(--cell, 20px) * .26), 11px);
+    line-height: 1;
+    color: var(--muted);
+  }
+  .cell .ltr {
+    font-family: var(--mono);
+    font-size: calc(var(--cell, 20px) * .58);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .cell.bad .ltr { color: var(--warn); }
+  #clues {
+    flex: 0 0 min(46%, 380px);
+    min-width: 0;
+    display: flex;
+    gap: 14px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+  #clues .col { flex: 1 1 0; min-width: 0; }
+  #clues h2 {
+    position: sticky;
+    top: 0;
+    margin-bottom: 5px;
+    padding: 2px 0;
+    background: var(--bg);
+    font: 600 10px/1 var(--sans);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  #clues ol { list-style: none; }
+  .clue {
+    display: flex;
+    gap: 5px;
+    padding: 3px 4px;
+    border-radius: 2px;
+    font: 12px/1.35 var(--sans);
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+  .clue b { flex: 0 0 16px; font: 600 11px/1.35 var(--mono); color: var(--muted); text-align: right; }
+  .clue.active { background: var(--hl); }
+  .clue.active b { color: var(--ink); }
+  #typing {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 2px;
+    height: 2px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    font-size: 16px;
+  }
+  @media (max-width: 700px) {
+    #app { padding: 8px 10px 10px; }
+    #board { flex-direction: column; gap: 8px; }
+    #clues { flex: 0 0 38%; width: 100%; gap: 10px; }
+    .clue { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <p id="hud">Crossword <span id="time">0:00</span></p>
+    <p id="byline">New York Times archive</p>
+    <div id="tools">
+      <button class="tool" id="check" type="button">Check</button>
+      <button class="tool" id="today" type="button" aria-pressed="true">Today</button>
+      <button class="tool" id="another" type="button">Another</button>
+    </div>
+  </header>
+  <div id="board">
+    <div id="gridWrap">
+      <div id="grid" hidden></div>
+      <p id="note">Fetching today&rsquo;s grid&hellip;</p>
+    </div>
+    <aside id="clues" hidden>
+      <section class="col"><h2>Across</h2><ol id="across"></ol></section>
+      <section class="col"><h2>Down</h2><ol id="down"></ol></section>
+    </aside>
+  </div>
+  <input id="typing" type="text" inputmode="text" autocomplete="off" autocorrect="off"
+         autocapitalize="characters" spellcheck="false" aria-label="Crossword letters">
+</div>
+<script>
+/* Crossword: every New York Times puzzle from 1977 to 2014, read from the
+   archive at github.com/doshea/nyt_crosswords. That repository publishes one
+   raw JSON file per date, which is its documented API:
+     raw.githubusercontent.com/doshea/nyt_crosswords/master/YYYY/MM/DD.json
+   raw.githubusercontent answers with `access-control-allow-origin: *`, so the
+   game fetches it straight from the browser. Internet is required; there is no
+   bundled grid.
+
+   The first grid of the day comes from the hub's shared seed, so every player
+   opening Crossword that morning solves the same puzzle. "Another" pulls a
+   random date from the archive. Only the daily grid posts a time to the shared
+   board, because two archive grids are not the same test. */
+
+const ARCHIVE = 'https://raw.githubusercontent.com/doshea/nyt_crosswords/master/';
+// The archive is dense through 2014 and full of multi-week holes after that, so
+// the picker stays inside the dense stretch. A candidate that 404s, lands on a
+// Sunday (21x21), or disagrees with its own answer list is skipped backwards, so
+// a given seed always resolves to the same grid for everybody.
+const FIRST_DAY = Date.UTC(1977, 0, 1);
+const LAST_DAY = Date.UTC(2014, 11, 31);
+const DAY = 86400000;
+const SPAN = Math.round((LAST_DAY - FIRST_DAY) / DAY) + 1;
+const ATTEMPTS = 16;
+
+const $ = selector => document.querySelector(selector);
+const gridEl = $('#grid');
+const noteEl = $('#note');
+const cluesEl = $('#clues');
+const acrossEl = $('#across');
+const downEl = $('#down');
+const timeEl = $('#time');
+const bylineEl = $('#byline');
+const typingEl = $('#typing');
+const tools = [$('#check'), $('#today'), $('#another')];
+
+let puzzle = null;
+let cells = [];
+let letters = [];
+let clueItems = { across: [], down: [] };
+let fill = [];
+let sel = 0;
+let dir = 'across';
+let solved = false;
+let daily = true;
+let startedAt = 0;
+let solvedSeconds = 0;
+let wrong = new Set();
+let loading = false;
+
+/* ── Archive ──────────────────────────────────────────────────────────────── */
+
+function hash(text) {
+  let value = 2166136261 >>> 0;
+  for (let i = 0; i < text.length; i++) {
+    value ^= text.charCodeAt(i);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value >>> 0;
+}
+
+// The hub's seed when embedded; today's date when the document is opened alone.
+function dailySeed() {
+  const injected = window.__boredSeed;
+  if (injected && Number.isFinite(injected.seed)) return injected.seed >>> 0;
+  const today = injected && typeof injected.date === 'string'
+    ? injected.date
+    : new Date().toISOString().slice(0, 10);
+  return hash(today);
+}
+
+function dailyStart() {
+  return FIRST_DAY + (dailySeed() % SPAN) * DAY;
+}
+
+function urlFor(ms) {
+  const date = new Date(ms);
+  return ARCHIVE + date.getUTCFullYear() + '/' +
+    String(date.getUTCMonth() + 1).padStart(2, '0') + '/' +
+    String(date.getUTCDate()).padStart(2, '0') + '.json';
+}
+
+function dateLabel(ms) {
+  return new Date(ms).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC'
+  });
+}
+
+// Clues arrive as "17. Some clue" or "17 Some clue"; the number is drawn from
+// the grid instead, so the prefix is dropped. The archive HTML-escapes a few
+// ampersands, which the browser decodes for us when the text is assigned.
+function cleanClue(text) {
+  return String(text == null ? '' : text)
+    // The archive prefixes every clue with "17."; the number is drawn from the
+    // grid instead. The dot is required so a clue that opens with a figure
+    // ("9 to 5, e.g.") keeps it.
+    .replace(/^\s*\d+\s*[.)]\s*/, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* ── The grid ─────────────────────────────────────────────────────────────── */
+
+// Turns one archive file into a playable board, or null when the file is not a
+// grid this game can render honestly (an odd size, or answers that do not match
+// the letters in the grid).
+function buildPuzzle(data, ms) {
+  const rows = Number(data && data.size && data.size.rows);
+  const cols = Number(data && data.size && data.size.cols);
+  if (!rows || !cols || rows > 16 || cols > 16) return null;
+  if (!Array.isArray(data.grid) || data.grid.length !== rows * cols) return null;
+
+  const black = data.grid.map(ch => ch === '.' || ch === '');
+  const solution = data.grid.map(ch => (ch === '.' ? '' : String(ch).toUpperCase()));
+  const numbers = new Array(rows * cols).fill(0);
+  const words = { across: [], down: [] };
+  const cellWord = {
+    across: new Array(rows * cols).fill(-1),
+    down: new Array(rows * cols).fill(-1)
+  };
+  let number = 0;
+
+  // Standard crossword numbering: every cell that opens a slot is numbered in
+  // reading order, which is exactly how the archive orders its clue lists.
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const index = row * cols + col;
+      if (black[index]) continue;
+      const opensAcross = (col === 0 || black[index - 1]) && col + 1 < cols && !black[index + 1];
+      const opensDown = (row === 0 || black[index - cols]) && row + 1 < rows && !black[index + cols];
+      if (!opensAcross && !opensDown) continue;
+      numbers[index] = ++number;
+      if (opensAcross) {
+        const list = [];
+        for (let at = index; at < (row + 1) * cols && !black[at]; at++) list.push(at);
+        words.across.push({ dir: 'across', number, cells: list });
+      }
+      if (opensDown) {
+        const list = [];
+        for (let at = index; at < rows * cols && !black[at]; at += cols) list.push(at);
+        words.down.push({ dir: 'down', number, cells: list });
+      }
+    }
+  }
+
+  const answers = data.answers || {};
+  const clues = data.clues || {};
+  for (const name of ['across', 'down']) {
+    const given = Array.isArray(answers[name]) ? answers[name] : [];
+    const texts = Array.isArray(clues[name]) ? clues[name] : [];
+    if (given.length !== words[name].length) return null;
+    for (let i = 0; i < words[name].length; i++) {
+      const word = words[name][i];
+      const answer = String(given[i] || '').toUpperCase();
+      const lettersInGrid = word.cells.map(cell => solution[cell]).join('');
+      // A rebus or a shaded anniversary grid can disagree with its own answer
+      // list; those are skipped rather than handed out unsolvable.
+      if (answer !== lettersInGrid) return null;
+      word.answer = answer;
+      word.clue = cleanClue(texts[i]);
+      word.cells.forEach(cell => { cellWord[name][cell] = i; });
+    }
+  }
+  if (!words.across.length && !words.down.length) return null;
+
+  let total = 0;
+  for (let i = 0; i < solution.length; i++) if (solution[i]) total++;
+
+  return {
+    rows, cols, black, solution, numbers, words, cellWord, total, ms,
+    author: typeof data.author === 'string' ? data.author : '',
+    label: dateLabel(ms) + (typeof data.author === 'string' && data.author ? ' \u00b7 ' + data.author : '')
+  };
+}
+
+async function fetchPuzzle(startMs) {
+  let ms = startMs;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (ms < FIRST_DAY) ms = LAST_DAY;
+    if (new Date(ms).getUTCDay() !== 0) {
+      let response = null;
+      try {
+        response = await fetch(urlFor(ms));
+      } catch (error) {
+        throw new Error('offline');
+      }
+      if (response.ok) {
+        let data = null;
+        try { data = await response.json(); } catch (error) { data = null; }
+        const built = data && buildPuzzle(data, ms);
+        if (built) return built;
+      }
+    }
+    ms -= DAY;
+  }
+  throw new Error('empty');
+}
+
+/* ── Board state ──────────────────────────────────────────────────────────── */
+
+function clock(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+}
+
+function secondsNow() {
+  if (solved) return solvedSeconds;
+  return startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+}
+
+function currentWord() {
+  if (!puzzle) return null;
+  const index = puzzle.cellWord[dir][sel];
+  if (index >= 0) return puzzle.words[dir][index];
+  const other = dir === 'across' ? 'down' : 'across';
+  const fallback = puzzle.cellWord[other][sel];
+  return fallback >= 0 ? puzzle.words[other][fallback] : null;
+}
+
+function paint() {
+  if (!puzzle) return;
+  const word = currentWord();
+  const inWord = new Set(word ? word.cells : []);
+  for (let i = 0; i < cells.length; i++) {
+    // Black squares have a cell but no letter span.
+    if (!letters[i]) continue;
+    cells[i].classList.toggle('word', inWord.has(i));
+    cells[i].classList.toggle('sel', i === sel);
+    cells[i].classList.toggle('bad', wrong.has(i));
+    letters[i].textContent = fill[i] || '';
+  }
+  for (const name of ['across', 'down']) {
+    const active = word && word.dir === name ? puzzle.words[name].indexOf(word) : -1;
+    clueItems[name].forEach((item, index) => item.classList.toggle('active', index === active));
+    if (active >= 0 && clueItems[name][active]) {
+      clueItems[name][active].scrollIntoView({ block: 'nearest' });
+    }
+  }
+  $('#today').setAttribute('aria-pressed', String(daily));
+}
+
+function selectCell(index, wantDir, focus = true) {
+  if (!puzzle || puzzle.black[index]) return;
+  const canAcross = puzzle.cellWord.across[index] >= 0;
+  const canDown = puzzle.cellWord.down[index] >= 0;
+  let next = wantDir || dir;
+  if ((next === 'across' && !canAcross) || (next === 'down' && !canDown)) {
+    const other = next === 'across' ? 'down' : 'across';
+    if (other === 'across' ? canAcross : canDown) next = other;
+    else return;
+  }
+  dir = next;
+  sel = index;
+  paint();
+  if (focus) typingEl.focus({ preventScroll: true });
+}
+
+function typeLetter(letter) {
+  if (!puzzle || solved) return;
+  fill[sel] = letter;
+  wrong.delete(sel);
+  const word = currentWord();
+  let moved = false;
+  if (word) {
+    const at = word.cells.indexOf(sel);
+    for (let k = at + 1; k < word.cells.length; k++) {
+      if (!fill[word.cells[k]]) { sel = word.cells[k]; moved = true; break; }
+    }
+    if (!moved) {
+      for (let k = 0; k < at; k++) {
+        if (!fill[word.cells[k]]) { sel = word.cells[k]; moved = true; break; }
+      }
+    }
+  }
+  // A finished word hands the cursor to the next clue; otherwise it stays put.
+  if (moved) paint();
+  else nextClue(1);
+  checkSolved();
+}
+
+function erase() {
+  if (!puzzle || solved) return;
+  if (fill[sel]) {
+    fill[sel] = '';
+    wrong.delete(sel);
+    paint();
+    return;
+  }
+  const word = currentWord();
+  if (!word) return;
+  const at = word.cells.indexOf(sel);
+  if (at > 0) {
+    sel = word.cells[at - 1];
+    fill[sel] = '';
+    wrong.delete(sel);
+    paint();
+  }
+}
+
+function move(dRow, dCol) {
+  if (!puzzle) return;
+  let row = Math.floor(sel / puzzle.cols);
+  let col = sel % puzzle.cols;
+  for (let step = 0; step < Math.max(puzzle.rows, puzzle.cols); step++) {
+    row += dRow;
+    col += dCol;
+    if (row < 0 || col < 0 || row >= puzzle.rows || col >= puzzle.cols) return;
+    const index = row * puzzle.cols + col;
+    if (!puzzle.black[index]) {
+      selectCell(index, dRow ? 'down' : 'across');
+      return;
+    }
+  }
+}
+
+function toggleDir() {
+  if (!puzzle) return;
+  selectCell(sel, dir === 'across' ? 'down' : 'across');
+}
+
+function nextClue(step) {
+  if (!puzzle) return;
+  const order = [...puzzle.words.across, ...puzzle.words.down]
+    .sort((a, b) => a.number - b.number || (a.dir === 'across' ? -1 : 1));
+  const word = currentWord();
+  const at = word ? order.indexOf(word) : -1;
+  const next = order[(at + step + order.length) % order.length];
+  if (!next) return;
+  dir = next.dir;
+  const empty = next.cells.find(cell => !fill[cell]);
+  sel = empty === undefined ? next.cells[0] : empty;
+  paint();
+  typingEl.focus({ preventScroll: true });
+}
+
+function checkSolved() {
+  if (!puzzle || solved) return;
+  for (let i = 0; i < puzzle.solution.length; i++) {
+    if (puzzle.black[i]) continue;
+    if (fill[i] !== puzzle.solution[i]) return;
+  }
+  solved = true;
+  solvedSeconds = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 1000)) : 0;
+  timeEl.textContent = clock(solvedSeconds);
+  bylineEl.textContent = 'Solved in ' + clock(solvedSeconds) + ' \u00b7 ' + puzzle.label;
+  paint();
+}
+
+function flagWrong() {
+  if (!puzzle) return;
+  wrong = new Set();
+  for (let i = 0; i < puzzle.solution.length; i++) {
+    if (!puzzle.black[i] && fill[i] && fill[i] !== puzzle.solution[i]) wrong.add(i);
+  }
+  paint();
+  setTimeout(() => {
+    wrong = new Set();
+    paint();
+  }, 2400);
+}
+
+/* ── Rendering ────────────────────────────────────────────────────────────── */
+
+function fitGrid() {
+  if (!puzzle) return;
+  const wrap = gridEl.parentElement;
+  const width = wrap.clientWidth - 2;
+  const height = wrap.clientHeight - 2;
+  if (width <= 0 || height <= 0) return;
+  const size = Math.max(12, Math.min(44, Math.floor(Math.min(width / puzzle.cols, height / puzzle.rows))));
+  gridEl.style.setProperty('--cell', size + 'px');
+  gridEl.style.gridTemplateColumns = 'repeat(' + puzzle.cols + ', ' + size + 'px)';
+}
+
+function renderGrid(built) {
+  gridEl.textContent = '';
+  gridEl.style.gridTemplateColumns = 'repeat(' + built.cols + ', var(--cell, 20px))';
+  cells = new Array(built.rows * built.cols).fill(null);
+  letters = new Array(built.rows * built.cols).fill(null);
+  for (let i = 0; i < built.rows * built.cols; i++) {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'cell' + (built.black[i] ? ' black' : '');
+    if (built.black[i]) {
+      cell.disabled = true;
+      cell.setAttribute('aria-hidden', 'true');
+    } else {
+      if (built.numbers[i]) {
+        const number = document.createElement('span');
+        number.className = 'num';
+        number.textContent = built.numbers[i];
+        cell.appendChild(number);
+      }
+      const letter = document.createElement('span');
+      letter.className = 'ltr';
+      cell.appendChild(letter);
+      letters[i] = letter;
+      cell.setAttribute('aria-label', 'Row ' + (Math.floor(i / built.cols) + 1) +
+        ', column ' + (i % built.cols + 1));
+      cell.addEventListener('click', () => {
+        if (i === sel) toggleDir();
+        else selectCell(i, dir);
+      });
+    }
+    cells[i] = cell;
+    gridEl.appendChild(cell);
+  }
+}
+
+function renderClues(built) {
+  clueItems = { across: [], down: [] };
+  for (const name of ['across', 'down']) {
+    const list = name === 'across' ? acrossEl : downEl;
+    list.textContent = '';
+    built.words[name].forEach((word, index) => {
+      const item = document.createElement('li');
+      item.className = 'clue';
+      const number = document.createElement('b');
+      number.textContent = word.number;
+      const text = document.createElement('span');
+      text.textContent = word.clue || '\u2014';
+      item.append(number, text);
+      item.addEventListener('click', () => {
+        dir = word.dir;
+        const empty = word.cells.find(cell => !fill[cell]);
+        sel = empty === undefined ? word.cells[0] : empty;
+        paint();
+        typingEl.focus({ preventScroll: true });
+      });
+      list.appendChild(item);
+      clueItems[name][index] = item;
+    });
+  }
+}
+
+function renderPuzzle(built, isDaily) {
+  puzzle = built;
+  daily = isDaily;
+  fill = new Array(built.rows * built.cols).fill('');
+  wrong = new Set();
+  solved = false;
+  solvedSeconds = 0;
+  startedAt = Date.now();
+  dir = 'across';
+  sel = built.words.across.length ? built.words.across[0].cells[0] : built.words.down[0].cells[0];
+  renderGrid(built);
+  renderClues(built);
+  bylineEl.textContent = built.label;
+  timeEl.textContent = '0:00';
+  noteEl.hidden = true;
+  gridEl.hidden = false;
+  cluesEl.hidden = false;
+  fitGrid();
+  paint();
+  // The opening cell is highlighted without stealing focus, so a phone does not
+  // raise its keyboard before the player has touched the grid.
+  selectCell(sel, 'across', false);
+}
+
+function showNote(text) {
+  noteEl.textContent = text;
+  noteEl.hidden = false;
+  gridEl.hidden = true;
+  cluesEl.hidden = true;
+}
+
+function setBusy(busy) {
+  loading = busy;
+  tools.forEach(button => { button.disabled = busy; });
+}
+
+async function load(isDaily, startMs) {
+  if (loading) return;
+  setBusy(true);
+  if (!puzzle) {
+    showNote(isDaily ? 'Fetching today\u2019s grid\u2026' : 'Fetching a grid\u2026');
+    bylineEl.textContent = 'New York Times archive';
+  }
+  try {
+    const built = await fetchPuzzle(startMs);
+    renderPuzzle(built, isDaily);
+  } catch (error) {
+    const offline = error && error.message === 'offline';
+    if (puzzle) {
+      bylineEl.textContent = offline
+        ? 'Archive unreachable \u2014 still showing the last grid.'
+        : 'No usable grid near that date \u2014 still showing the last one.';
+    } else {
+      showNote(offline
+        ? 'The archive could not be reached. This game reads the New York Times crossword archive over the internet.'
+        : 'No usable grid turned up near that date. Try Today or Another.');
+    }
+  } finally {
+    setBusy(false);
+  }
+}
+
+/* ── Input ────────────────────────────────────────────────────────────────── */
+
+document.addEventListener('keydown', event => {
+  if (!puzzle || event.metaKey || event.ctrlKey || event.altKey) return;
+  const key = event.key;
+  if (key === 'Backspace' || key === 'Delete') { event.preventDefault(); erase(); return; }
+  if (key === 'Tab') { event.preventDefault(); nextClue(event.shiftKey ? -1 : 1); return; }
+  if (key === ' ' || key === 'Enter') { event.preventDefault(); toggleDir(); return; }
+  if (key === 'ArrowLeft') { event.preventDefault(); move(0, -1); return; }
+  if (key === 'ArrowRight') { event.preventDefault(); move(0, 1); return; }
+  if (key === 'ArrowUp') { event.preventDefault(); move(-1, 0); return; }
+  if (key === 'ArrowDown') { event.preventDefault(); move(1, 0); }
+});
+
+typingEl.addEventListener('input', () => {
+  const text = typingEl.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  typingEl.value = '';
+  if (!text) return;
+  for (const letter of text) typeLetter(letter);
+});
+
+$('#check').addEventListener('click', () => { if (puzzle) flagWrong(); });
+$('#today').addEventListener('click', () => load(true, dailyStart()));
+$('#another').addEventListener('click', () => {
+  load(false, FIRST_DAY + Math.floor(Math.random() * SPAN) * DAY);
+});
+
+setInterval(() => {
+  if (!puzzle || solved) return;
+  timeEl.textContent = clock(secondsNow());
+}, 500);
+
+if (window.ResizeObserver) new ResizeObserver(() => fitGrid()).observe(gridEl.parentElement);
+addEventListener('resize', fitGrid);
+
+/* The hub reads this: the current grid, never null, integers only. Only the
+   daily grid is a comparable time, so the shared board takes `daily` runs. */
+window.__boredSnapshot = () => {
+  let filled = 0;
+  for (let i = 0; i < fill.length; i++) if (fill[i]) filled++;
+  return {
+    slug: 'crossword',
+    seconds: secondsNow(),
+    filled,
+    total: puzzle ? puzzle.total : 0,
+    daily: daily === true,
+    solved,
+    finished: solved
+  };
+};
+
+load(true, dailyStart());
+</script>
+</body>
+</html>
