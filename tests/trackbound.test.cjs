@@ -513,7 +513,22 @@ test('Trackbound freeplay is an open procedural world, not a ribbon', () => {
   assert.equal(world.chain.length, 0, 'no road ribbon');
   assert.equal(world.blocks.length, 0, 'no blocks');
   assert.ok(world.mesh.tris.length > 6000, 'the ground is a real surface');
-  assert.ok(world.ramps >= 6, 'the world has kickers to launch off (' + world.ramps + ')');
+  assert.ok(world.ramps >= 16, 'the world has a kicker for every gate (' + world.ramps + ')');
+  assert.equal(world.rings.length, 16, 'sixteen gold rings');
+  assert.equal(world.gates, 16, 'sixteen gates on the road');
+  assert.ok(world.rings.every(ring => ring.p.every(Number.isFinite) && ring.r > 4),
+    'every ring is a real hoop');
+  // The gates are spaced evenly along one closed road, all the way round.
+  const road = T.parkRoad(4242);
+  assert.ok(T.PARK_GATES === 16, 'the park holds sixteen gates');
+  const step = road.length / T.PARK_GATES;
+  for (let i = 0; i < T.PARK_GATES; i++) {
+    const a = road.at(i * step), b = road.at((i + 1) * step);
+    assert.ok(road.distance(a.x, a.z) < 1, 'every gate stands on the road');
+    assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 40,
+      'gates are spaced far enough apart to land between (' + Math.hypot(a.x - b.x, a.z - b.z).toFixed(1) + ')');
+  }
+  assert.ok(road.distance(0, 0) > 60, 'the road leaves the infield open');
   assert.equal(T.freeplayWorld(4242).mesh.tris.length, world.mesh.tris.length, 'the seed decides the world');
   assert.notEqual(T.parkHeight(40, 40, 4242), T.parkHeight(40, 40, 99), 'another seed is another landscape');
 
@@ -696,6 +711,22 @@ test('Trackbound public list shows the leader and lists the next three on hover'
   assert.equal(T.nextTimesLabel([times[0]]), 'Only time on this course so far.');
 });
 
+test('Trackbound offers the editor only for a test drive and drops next track on a custom course', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const draft = { name: 'Straight dash', blocks: ['sprint', 'checkpoint', 'sprint'] };
+  assert.equal(T.startCustomTrack(draft, null, true), true);
+  assert.equal(T.current().testDrive, true, 'the editor says where the drive came from');
+  assert.equal(page.element('resEdit').hidden, false, 'a test drive can go back to the editor');
+  assert.equal(page.element('pauseEdit').hidden, false, 'and from the pause screen');
+  assert.equal(page.element('resNext').hidden, true, 'a custom course has no next track');
+  assert.equal(T.startCustomTrack(draft), true);
+  assert.equal(T.current().testDrive, false);
+  assert.equal(page.element('resEdit').hidden, true, 'a course from the list is not an edit session');
+  assert.equal(page.element('pauseEdit').hidden, true);
+  assert.equal(page.element('resNext').hidden, true);
+});
+
 test('Trackbound reports a finished public course to its board', async () => {
   const page = load();
   const T = page.sandbox.__test;
@@ -708,10 +739,11 @@ test('Trackbound reports a finished public course to its board', async () => {
   }
   assert.equal(T.race.state, 'finished');
   for (let i = 0; i < 3; i++) await page.flush();
-  assert.equal(calls.length, 1, 'one report per finished run');
+  assert.equal(calls.filter(call => call.op === 'run').length, 1, 'one report per finished run');
   assert.equal(calls[0].op, 'run');
   assert.equal(calls[0].payload.track, track);
   assert.ok(calls[0].payload.ms > 0, 'the run clock is reported');
+  assert.ok(calls.some(call => call.op === 'list'), 'the course board is read back for the result screen');
 });
 
 test('Trackbound reports times from My tracks when the saved copy is the posted version', async () => {
@@ -732,7 +764,7 @@ test('Trackbound reports times from My tracks when the saved copy is the posted 
   }
   assert.equal(T.race.state, 'finished');
   for (let i = 0; i < 3; i++) await page.flush();
-  assert.equal(calls.length, 1, 'a saved copy of the posted course reports its run');
+  assert.equal(calls.filter(call => call.op === 'run').length, 1, 'a saved copy of the posted course reports its run');
   assert.equal(calls[0].op, 'run');
   assert.equal(calls[0].payload.track, trackId);
   record.blocks.push('sprint');

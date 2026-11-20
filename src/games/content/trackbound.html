@@ -130,6 +130,26 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 .namePopupBox .editorField{margin-bottom:2px}
 #namePopupNote{min-height:18px;margin:0;color:#9b332a}
 
+/* The course board on a public track: the leader in the row, and the rest of
+   the top four in a panel that opens under it on hover or keyboard focus. It
+   is a real block, not a title bubble, and it cannot be clipped by the list. */
+#publicTrackList li{flex-wrap:wrap}
+.track-board{flex:1 0 100%;display:none;padding:3px 0 5px 22px;color:var(--dim);text-align:left}
+#publicTrackList li:hover .track-board,#publicTrackList li:focus-within .track-board{display:block}
+.track-board-head{display:block;letter-spacing:.05em;margin-bottom:3px}
+#publicTrackList li .track-board-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;
+  gap:8px;align-items:baseline;line-height:1.55}
+#publicTrackList li .track-board-row span{flex:none;font-size:10px;overflow-wrap:normal}
+.track-board-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track-board-value{color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.medalTable.courseBoard{display:flex;flex-direction:column;gap:0;font-size:11px}
+.courseBoard .courseHead{display:block;color:var(--dim);letter-spacing:.08em;padding:4px 0 5px}
+.courseBoard .courseRow{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:8px;
+  align-items:baseline;border-top:1px solid var(--rule);padding:4px 0;color:var(--dim)}
+.courseBoard .courseRow b{color:var(--ink);font-size:11px}
+.courseBoard .courseRow i{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.courseBoard .courseTime{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+
 /* Track editor — everything is local; posting to the public list is the only thing that leaves the device. */
 #screenEditor .panel{width:min(100%,940px)}
 .editorGrid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(250px,1fr);gap:16px;margin-top:12px}
@@ -1718,19 +1738,21 @@ function dailyTrack(seed) {
   return buildTrack(CAMPAIGN[0].blocks, CAMPAIGN[0]);
 }
 
-/* ── freeplay: a stunt park built to be flown ───────────────────────────────
+/* ── freeplay: a ring road through the hills ───────────────────────────────
    No ribbon and no rails: this is a heightfield the car drives anywhere on,
-   laid out as a stunt park. A flat plaza faces a steep launch ramp; sixteen
-   gold rings hang over the field, each with a kicker and a boost pad in front
-   of it; and a vertical loop stands on its own approach out back. The terrain
-   mesh is also what the wheels raycast against, so every slope you can see is
-   a slope you can land on, and the raised rim is the edge of the field. */
+   laid out as a stunt park. The park is one closed road — a rounded square,
+   lapped counter-clockwise — with sixteen kickers set evenly along it. Each
+   gate is a wedge facing down the road with a gold ring in the air past its
+   lip, so a lap of the road is a lap of the gates. The infield holds a vertical
+   loop, two mesas and a sheet of ice, and the raised rim is the edge of the
+   field. The terrain mesh is also what the wheels raycast against, so every
+   slope you can see is a slope you can land on. */
 
 const PARK_HALF = 200;     // the field is 400 units across
 const PARK_STEP = 5;       // terrain grid spacing
 const PARK_EDGE = 58;      // the raised rim that keeps the car in
 const PAD_BLEND = 10;      // how far a ramp's flat pad feathers into the hills
-const PARK_GATES = 16;     // gold rings in the route
+const PARK_GATES = 16;     // kickers, and gold rings, around the road
 
 // Integer hash in [0,1): the same seed makes the same hills everywhere.
 function parkHash(x, z, seed) {
@@ -1749,21 +1771,66 @@ function parkNoise(x, z, seed, scale) {
   return (a + (b - a) * sx) * (1 - sz) + (c + (d - c) * sx) * sz;
 }
 
-// Rolling ground with a flat plaza at the spawn and a steep rim at the edge.
-// The seed also digs a crater out behind the park: its flanks are shallow
-// enough to drive across and the far wall is a launch if you arrive with speed.
+// Rolling ground with a steep rim at the edge. The road is cut into the hills
+// by the pads under its gates, so the ground decides how a lap feels but never
+// the angle of a ramp.
 function parkHeight(x, z, seed) {
   const d = Math.hypot(x, z);
-  const open = clamp((d - 28) / 40, 0.06, 1);
+  const open = clamp((d - 24) / 46, 0.05, 1);
   const rim = clamp((d - (PARK_HALF - PARK_EDGE)) / PARK_EDGE, 0, 1);
-  const hills = parkNoise(x, z, seed, 96) * 15 +
-    parkNoise(x + 41, z - 27, seed + 9, 34) * 5.4 +
-    parkNoise(x - 17, z + 63, seed + 21, 14) * 1.6 - 11.3;
-  let way = parkHash(3, 9, seed) * TAU;
-  if (Math.sin(way) > 0.2) way += Math.PI;    // the front of the park stays clear
-  const bowl = Math.hypot(x - Math.cos(way) * 100, z - Math.sin(way) * 100);
-  const crater = bowl < 52 ? -13 * Math.pow(Math.cos(bowl / 52 * Math.PI / 2), 1.4) : 0;
-  return (hills + crater) * open + rim * rim * 46;
+  const hills = parkNoise(x, z, seed, 110) * 9 +
+    parkNoise(x + 41, z - 27, seed + 9, 38) * 3.2 +
+    parkNoise(x - 17, z + 63, seed + 21, 16) * 1.1 - 6.2;
+  return hills * open + rim * rim * 46;
+}
+
+// The road: a rounded square, counter-clockwise, turned by a seeded heading.
+// `at(d)` walks it by distance to a point and its tangent, and `distance(x, z)`
+// is the distance to its centreline, so gates can be spaced along it and the
+// infield can be kept off it without sampling the whole length.
+function parkRoad(seed) {
+  const random = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  const half = 106 + random() * 10;      // the road's half-extent
+  const turn = 34 + random() * 10;       // corner radius
+  const spin = random() * TAU;
+  const straight = 2 * (half - turn);
+  const arc = turn * Math.PI / 2;
+  const length = 4 * (straight + arc);
+  const cos = Math.cos(spin), sin = Math.sin(spin);
+  const place = (x, z, tx, tz) => ({
+    x: x * cos - z * sin, z: x * sin + z * cos,
+    tx: tx * cos - tz * sin, tz: tx * sin + tz * cos
+  });
+  const corner = (cx, cz, a) => place(cx + Math.cos(a) * turn, cz + Math.sin(a) * turn,
+    -Math.sin(a), Math.cos(a));
+  const at = distance => {
+    let d = ((distance % length) + length) % length;
+    if (d < straight) return place(half, -(half - turn) + d, 0, 1);
+    d -= straight;
+    if (d < arc) return corner(half - turn, half - turn, d / turn);
+    d -= arc;
+    if (d < straight) return place(half - turn - d, half, -1, 0);
+    d -= straight;
+    if (d < arc) return corner(-(half - turn), half - turn, Math.PI / 2 + d / turn);
+    d -= arc;
+    if (d < straight) return place(-half, half - turn - d, 0, -1);
+    d -= straight;
+    if (d < arc) return corner(-(half - turn), -(half - turn), Math.PI + d / turn);
+    d -= arc;
+    if (d < straight) return place(-(half - turn) + d, -half, 1, 0);
+    d -= straight;
+    return corner(half - turn, -(half - turn), Math.PI * 1.5 + d / turn);
+  };
+  // The distance to a rounded square is the distance to a box whose corners are
+  // `turn` wide, so the outline is the absolute value of that signed distance.
+  const distance = (x, z) => {
+    const lx = Math.abs(x * cos + z * sin) - (half - turn);
+    const lz = Math.abs(-x * sin + z * cos) - (half - turn);
+    const outside = Math.hypot(Math.max(lx, 0), Math.max(lz, 0));
+    const inside = Math.min(Math.max(lx, lz), 0);
+    return Math.abs(outside + inside - turn);
+  };
+  return { half, turn, spin, length, at, distance };
 }
 
 // A kicker: a wedge with a lip, built on its own level pad. The pad is the
@@ -1908,23 +1975,6 @@ function parkSpot(random, s, minR, maxR, size, tries) {
   return best;
 }
 
-// The flat spot nearest a given point, for placing a ramp inside a chosen slot
-// of the route rather than anywhere in the field.
-function parkNear(random, x, z, s, size) {
-  let best = null;
-  for (let i = 0; i < 12; i++) {
-    const sx = x + (random() - 0.5) * 30, sz = z + (random() - 0.5) * 30;
-    if (Math.abs(sx) > PARK_HALF - 60 || Math.abs(sz) > PARK_HALF - 60) continue;
-    const ground = parkHeight(sx, sz, s);
-    let spread = 0;
-    for (const [dx, dz] of [[size, 0], [-size, 0], [0, size], [0, -size], [size, size], [-size, -size]]) {
-      spread = Math.max(spread, Math.abs(parkHeight(sx + dx, sz + dz, s) - ground));
-    }
-    if (!best || spread < best.spread) best = { x: sx, z: sz, ground, spread };
-  }
-  return best;
-}
-
 // A gold gate: sixteen panels laid into a hoop. pushBox already winds its faces
 // outward, so a ring can face any way without a culling surprise.
 function pushRing(mesh, ring, next) {
@@ -1978,11 +2028,11 @@ function freeplayWorld(seed) {
   const mesh = meshNew(), scenery = meshNew();
   const triggers = [], placed = [], rings = [], walls = [];
   // The real ramp decks, for checking that no two ramps are laid through each
-  // other. A gate-only slot reserves ground too, but has no deck.
+  // other.
   const rampFeet = [];
-  // Flat pads under the ramps, as [x, z, radius, y]. The ground is pulled to
-  // each one, so a ramp stands on ground of its own height instead of on
-  // whichever side of a slope it happened to land.
+  // Flat pads under the wedges, rinks and the loop, as [x, z, radius, y]. The
+  // ground is pulled to each one, so a ramp stands on ground of its own height
+  // instead of on whichever side of a slope it happened to land.
   const pads = [];
   const padHeight = (x, z) => {
     const base = parkHeight(x, z, s);
@@ -1998,13 +2048,13 @@ function freeplayWorld(seed) {
     if (weight > 1) { sum /= weight; weight = 1; }
     return base * (1 - weight) + sum;
   };
-  // How much ground a ramp reserves. It has to cover the pad and its feather,
-  // or the next feature that checks the gap would sit in the flattened edge.
-  const RAMP_GAP = 27;
+  const road = parkRoad(s);
+  const gateStep = road.length / PARK_GATES;
   const cells = Math.round(PARK_HALF * 2 / PARK_STEP);
   const heights = [];
   // The hills are painted last, once every pad is known, so the ground under a
-  // ramp is the ramp's own and nothing laid on the ground can float.
+  // ramp is the ramp's own and nothing laid on the ground can float. The road
+  // is painted into that same terrain, so a lap is a line you can see.
   const paintGround = () => {
     for (let ix = 0; ix <= cells; ix++) {
       heights[ix] = new Float64Array(cells + 1);
@@ -2014,7 +2064,7 @@ function freeplayWorld(seed) {
     }
 
     const grass = [0.43, 0.49, 0.32], dust = [0.59, 0.54, 0.41], rock = [0.5, 0.47, 0.43];
-    const slab = [0.62, 0.6, 0.55];
+    const tarmac = [0.55, 0.54, 0.5];
     for (let ix = 0; ix < cells; ix++) {
       for (let iz = 0; iz < cells; iz++) {
         const x0 = -PARK_HALF + ix * PARK_STEP, z0 = -PARK_HALF + iz * PARK_STEP;
@@ -2023,9 +2073,8 @@ function freeplayWorld(seed) {
         const h01 = heights[ix][iz + 1], h11 = heights[ix + 1][iz + 1];
         const a = [x0, h00, z0], b = [x0, h01, z1], c = [x1, h11, z1], d = [x1, h10, z0];
         const slope = Math.max(Math.abs(h10 - h00), Math.abs(h01 - h00)) / PARK_STEP;
-        // The spawn is a poured concrete plaza, then the field takes over.
-        const away = Math.hypot((x0 + x1) / 2, (z0 + z1) / 2);
-        const tone = away < 26 ? slab : away < 32 ? shade(slab, 0.86)
+        const lane = road.distance((x0 + x1) / 2, (z0 + z1) / 2);
+        const tone = lane < 10 ? tarmac : lane < 13 ? shade(dust, 0.98)
           : slope > 0.8 ? rock : slope > 0.4 ? dust : grass;
         const color = shade(tone, 0.9 + parkHash(ix, iz, s) * 0.18);
         pushQuad(mesh, a, b, c, d, norm(cross(sub(b, a), sub(c, a))), color);
@@ -2034,76 +2083,82 @@ function freeplayWorld(seed) {
   };
 
   const ramp = [0.68, 0.54, 0.34], gold = [0.86, 0.68, 0.3], concrete = [0.64, 0.62, 0.57];
-  // Every feature reserves the ground it covers, as a centre and a radius: a
-  // ramp is long, a mesa is wide and an ice rink is a disc, so two features are
-  // kept apart by their footprints instead of one shared gap that was always
-  // too small for the longest ramp.
   const remember = (x, z, radius) => placed.push([x, z, radius]);
   const clearOf = (x, z, radius) => placed.every(p => Math.hypot(p[0] - x, p[1] - z) > radius + (p[2] || 0));
-  const insideField = (x, z, margin) => Math.abs(x) < PARK_HALF - margin && Math.abs(z) < PARK_HALF - margin;
+  // An infield spot with room for a prop and a shoulder off the road.
+  const infield = (radius, minR, maxR, size, tries) => {
+    const spot = parkSpot(random, s, minR, maxR, size, tries);
+    return !spot || road.distance(spot.x, spot.z) < radius + 16 ? null : spot;
+  };
 
-  // The launcher: straight ahead of the spawn, steep, with a boost pad at its
-  // foot and an arch around the lip. The first thing a player sees is the thing
-  // they are meant to hit.
-  const launchZ = 30, launchLen = 34, launchRise = 13;
-  const launchGround = parkHeight(0, launchZ, s);
-  const launchRamp = pushKicker(mesh, 0, launchZ, 0, 23, launchLen, launchRise, launchGround,
-    shade(ramp, 1.08), heightAt, walls, pads);
-  rampFeet.push([0, launchZ + launchLen / 2, Math.hypot(launchLen / 2, 23 / 2)]);
-  const runUp = frame([0, padHeight(0, launchZ - 17), launchZ - 17], [0, 0, 1], [0, 1, 0]);
-  pushPad(mesh, runUp, PALETTE.boost);
-  triggers.push({ type: 'boost', frame: runUp, hw: 5, halfLen: 8 });
-  const archZ = launchZ + launchLen + 5;
-  pushArch(scenery, walls, 0, archZ, 0, 34, 22, padHeight(0, archZ), shade(concrete, 1.02));
-  remember(0, launchZ + launchLen / 2, Math.hypot(launchLen / 2, 23 / 2) + 4 + PAD_BLEND);
-  remember(0, launchZ - 17, 10);
-
-  const lipZ = launchZ + launchLen, lipY = launchGround + launchRise;
-  const mouthY = Math.max(launchRamp.lipY + 8, padHeight(0, lipZ + 30) + 10);
-  rings.push({ p: [0, mouthY, lipZ + 30], axis: [0, 0, 1], r: 7.4, got: false });
-
-  // The loop: the one place the car goes upside down, so it gets a ring of its
-  // own at the top. It goes on the flattest ground the seed can find, well
-  // clear of the launcher, and a boost pad and two runs of kerbs lead into it.
-  let loopSpot = null;
-  for (let tries = 0; tries < 40 && !loopSpot; tries++) {
-    const spot = parkSpot(random, s, 92, PARK_HALF - 92, 34, 3);
-    if (!spot || spot.spread > 2.4) continue;
-    if (Math.hypot(spot.x, spot.z - launchZ) < 78) continue;
-    if (Math.hypot(spot.x, spot.z - (lipZ + 30)) < 62) continue;   // the launcher's gate
-    loopSpot = spot;
+  /* The road is one lap. Gate zero is the launcher — wider, taller and set a
+     short run from the spawn — so the first thing in front of the car is a
+     gate, and every gate after it stands on the same line. */
+  for (let i = 0; i < PARK_GATES; i++) {
+    const launch = 26 + i * gateStep;
+    const at = road.at(launch);
+    const launcher = i === 0;
+    const width = launcher ? 20 : 14;
+    const length = launcher ? 24 : 16;
+    const rise = launcher ? 10 : 6;
+    // Aim the wedge at the road where its ring will hang, not down the local
+    // tangent: on a corner the tangent leaves the road, and a gate that fires
+    // you off the outside of a bend is a gate you cannot take.
+    const travel = length + 13;
+    const ahead = road.at(launch + travel);
+    const dx = ahead.x - at.x, dz = ahead.z - at.z;
+    const reach = Math.hypot(dx, dz) || 1;
+    const forward = [dx / reach, 0, dz / reach];
+    const yaw = Math.atan2(forward[0], forward[2]);
+    const kicker = pushKicker(mesh, at.x, at.z, yaw, width, length, rise,
+      heightAt(at.x, at.z), shade(ramp, launcher ? 1.08 : 0.9 + random() * 0.18),
+      heightAt, walls, pads);
+    const cx = at.x + forward[0] * length / 2, cz = at.z + forward[2] * length / 2;
+    rampFeet.push([cx, cz, Math.hypot(length / 2, width / 2)]);
+    remember(cx, cz, Math.hypot(length / 2, width / 2) + 4);
+    // Only the launcher gets a boost: the road's own speed is the right speed
+    // for its gates, and a boosted gate flies so far that it skips the next
+    // ring altogether. The loop keeps one too.
+    if (launcher) {
+      const boostX = at.x - forward[0] * 13, boostZ = at.z - forward[2] * 13;
+      const boostFrame = frame([boostX, padHeight(boostX, boostZ), boostZ], forward, [0, 1, 0]);
+      pushPad(mesh, boostFrame, PALETTE.boost);
+      triggers.push({ type: 'boost', frame: boostFrame, hw: 5, halfLen: 8 });
+    }
+    // The ring hangs past the lip, low enough that a gate taken at road speed
+    // passes through it, and high enough to see coming.
+    const r = launcher ? 7.4 : 7;
+    const ringX = at.x + forward[0] * travel, ringZ = at.z + forward[2] * travel;
+    const ringY = Math.max(kicker.lipY + r * 0.7, padHeight(ringX, ringZ) + r + 0.6);
+    rings.push({ p: [ringX, ringY, ringZ], axis: forward, r, got: false });
   }
-  if (!loopSpot) {
-    // The spare spot still has to keep the launcher clear: the loop's body is
-    // 26 across, and it used to be able to sit on the launcher's lip.
-    const spare = parkSpot(random, s, 80, PARK_HALF - 80, 30, 12);
-    loopSpot = spare && Math.hypot(spare.x, spare.z - launchZ) > 70 ? spare
-      : { x: -104, z: -10, ground: parkHeight(-104, -10, s) };
-  }
+
+  // The loop stands in the infield on its own pad, with a boost pad at its
+  // foot: the one place the car goes upside down. It is a landmark rather than
+  // a gate, so all sixteen rings stay on the road.
   const loopYaw = random() * TAU;
   const loopForward = [Math.sin(loopYaw), 0, Math.cos(loopYaw)];
-  const loopEntry = frame([loopSpot.x, loopSpot.ground + 0.08, loopSpot.z], loopForward, [0, 1, 0]);
+  const loopGroundY = parkHeight(0, 0, s);
+  pads.push([loopForward[0] * 8, loopForward[2] * 8, 18, loopGroundY]);
+  const loopEntry = frame([0, loopGroundY + 0.08, 0], loopForward, [0, 1, 0]);
   const parkLoop = Object.assign({}, loopDef, { wall: 0.7, samples: 64 });
   const legTops = [];
   emitBlock(mesh, scenery, loopEntry, parkLoop, 0, legTops, walls, 0, 0);
-  const loopGround = legTops.map(top => ({ x: top[0], z: top[2], top: top[1] }));
+  const loopProps = legTops.map(top => ({ x: top[0], z: top[2], top: top[1] }));
   for (const side of [-1, 1]) {
     for (let i = 0; i < 7; i++) {
       const along = 10 + i * 7;
-      loopGround.push({
-        x: loopSpot.x - loopForward[0] * along + Math.cos(loopYaw) * side * 8.4,
-        z: loopSpot.z - loopForward[2] * along - Math.sin(loopYaw) * side * 8.4
+      loopProps.push({
+        x: -loopForward[0] * along + Math.cos(loopYaw) * side * 8.4,
+        z: -loopForward[2] * along - Math.sin(loopYaw) * side * 8.4
       });
     }
   }
-  const padX = loopSpot.x - loopForward[0] * 16, padZ = loopSpot.z - loopForward[2] * 16;
-  remember(loopSpot.x, loopSpot.z, 24);
-  const loopMid = compose(loopEntry, localCurveFrame(parkLoop, 0.5));
-  rings.push({ p: madd(loopMid.p, loopMid.y, 0.9), axis: loopMid.z, r: 4.6, got: false });
-
-  // The loop runs from its entry to its exit, 26 across and 18 deep, so a
-  // single centre point is not its footprint. Everything else must clear the
-  // whole segment: the loop's own body plus the width of what is being placed.
+  const approachX = -loopForward[0] * 18, approachZ = -loopForward[2] * 18;
+  const loopPad = frame([approachX, padHeight(approachX, approachZ), approachZ], loopForward, [0, 1, 0]);
+  pushPad(mesh, loopPad, PALETTE.boost);
+  triggers.push({ type: 'boost', frame: loopPad, hw: 5, halfLen: 8 });
+  remember(loopForward[0] * 9, loopForward[2] * 9, 24);
   const loopExit = compose(loopEntry, localCurveFrame(parkLoop, 1));
   const loopSeg = { ax: loopEntry.p[0], az: loopEntry.p[2], bx: loopExit.p[0], bz: loopExit.p[2] };
   const loopDist = (x, z) => {
@@ -2111,160 +2166,29 @@ function freeplayWorld(seed) {
     const t = clamp(((x - loopSeg.ax) * vx + (z - loopSeg.az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
     return Math.hypot(x - (loopSeg.ax + vx * t), z - (loopSeg.az + vz * t));
   };
-  const loopClear = (x, z, gap) => loopDist(x, z) >= gap;
-  // A route ramp is a 20-long kicker with its gate another 28 past the lip, so
-  // the whole 48-unit corridor has to miss the loop, not just the ramp base.
-  const rampClear = (x, z, fx, fz) => {
-    let best = Infinity;
-    for (let s = 0; s <= 48; s += 6) best = Math.min(best, loopDist(x + fx * s, z + fz * s));
-    return best >= 44;
-  };
 
-  // The route: a ring in every slot around the field, each with a steep kicker
-  // and a boost pad on its run-up so the gate can actually be flown through.
-  // Slots alternate between an inner and an outer ring and leave the strip in
-  // front of the launcher alone, so every ramp has room and the course reads as
-  // one lap of the park.
-  const routeSlots = PARK_GATES - 2;
-  const routeArc = TAU - 1.15;
-  for (let i = 0; i < routeSlots; i++) {
-    const angle = Math.PI / 2 + 0.575 + (i / (routeSlots - 1)) * routeArc;
-    const radius = 82 + (i % 2) * 34;
-    let spot = null, yaw = -angle, hasRamp = true;
-    for (const shift of [0, 0.2, -0.2, 0.4, -0.4]) {
-      const slot = angle + shift, reach = radius + (random() - 0.5) * 8;
-      const x = Math.cos(slot) * reach, z = Math.sin(slot) * reach;
-      if (!insideField(x, z, 58)) continue;
-      if (!loopClear(x, z, 56)) continue;
-      const found = parkNear(random, x, z, s, 15);
-      if (!found) continue;
-      const dir = -angle + (random() - 0.5) * 0.5;
-      // The deck runs 20 units forward of its base, so the footprint is what has
-      // to be clear, not the base point.
-      if (!clearOf(found.x + Math.sin(dir) * 10, found.z + Math.cos(dir) * 10, RAMP_GAP)) continue;
-      if (!rampClear(found.x, found.z, Math.sin(dir), Math.cos(dir))) continue;
-      spot = found; yaw = dir;
-      break;
-    }
-    // A slot the loop or another building has crowded out searches a wider
-    // arc before it gives up on a ramp. Placing the kicker at the raw slot was
-    // what used to drop ramps across the loop.
-    for (let k = 0; k < 36 && !spot; k++) {
-      const a2 = angle + (k % 2 ? 1 : -1) * (0.22 + 0.11 * k);
-      const r2 = radius + (random() - 0.5) * 30;
-      const x = Math.cos(a2) * r2, z = Math.sin(a2) * r2;
-      if (!insideField(x, z, 58) || !loopClear(x, z, 56)) continue;
-      const found = parkNear(random, x, z, s, 15);
-      if (!found) continue;
-      const dir = Math.atan2(found.x, found.z) + (random() - 0.5) * 0.4;
-      if (!clearOf(found.x + Math.sin(dir) * 10, found.z + Math.cos(dir) * 10, RAMP_GAP)) continue;
-      if (!rampClear(found.x, found.z, Math.sin(dir), Math.cos(dir))) continue;
-      spot = found; yaw = dir;
-    }
-    if (!spot) {
-      // Still nothing: hang the gate alone, facing out of the loop's way.
-      const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
-      spot = { x, z, ground: parkHeight(x, z, s) };
-      yaw = Math.atan2(x, z);
-      hasRamp = false;
-    }
-    const forward = [Math.sin(yaw), 0, Math.cos(yaw)];
-    const length = 20, rise = 8;
-    const kicker = hasRamp
-      ? pushKicker(mesh, spot.x, spot.z, yaw, 15, length, rise, spot.ground,
-        shade(ramp, 0.92 + random() * 0.18), heightAt, walls, pads)
-      : { lipY: spot.ground };
-    if (hasRamp) rampFeet.push([spot.x + forward[0] * length / 2, spot.z + forward[2] * length / 2,
-      Math.hypot(length / 2, 7.5)]);
-    const lipX = spot.x + forward[0] * length, lipZ2 = spot.z + forward[2] * length;
-    const ringX = lipX + forward[0] * 28, ringZ = lipZ2 + forward[2] * 28;
-    // Height comes from the ramp lip and the ground under the gate, so an
-    // uphill landing never swallows the hoop.
-    const ringY = Math.max(kicker.lipY + 7, padHeight(ringX, ringZ) + 8.5);
-    rings.push({ p: [ringX, ringY, ringZ], axis: forward, r: 6.8, got: false });
-    if (hasRamp) {
-      const boostX = spot.x - forward[0] * 15, boostZ = spot.z - forward[2] * 15;
-      const boostFrame = frame([boostX, padHeight(boostX, boostZ), boostZ], forward, [0, 1, 0]);
-      pushPad(mesh, boostFrame, PALETTE.boost);
-      triggers.push({ type: 'boost', frame: boostFrame, hw: 5, halfLen: 8 });
-    }
-    remember(spot.x + forward[0] * length / 2, spot.z + forward[2] * length / 2, RAMP_GAP);
-  }
-
-  // Mesas: something to land on after a jump.
-  for (let tries = 0, count = 0; tries < 90 && count < 3; tries++) {
-    const spot = parkSpot(random, s, 52, PARK_HALF - 82, 12, 8);
+  // Mesas: something to climb onto and land on inside the road.
+  for (let tries = 0, count = 0; tries < 90 && count < 2; tries++) {
     const width = 13 + random() * 8, length = 13 + random() * 8;
     const radius = Math.hypot(width / 2, length / 2) + 2;
-    if (!spot || !clearOf(spot.x, spot.z, radius) || !loopClear(spot.x, spot.z, 46)) continue;
+    const spot = infield(radius, 26, 60, Math.max(width, length) / 2, 8);
+    if (!spot || !clearOf(spot.x, spot.z, radius) || loopDist(spot.x, spot.z) < radius + 18) continue;
     pushMesa(mesh, spot.x, spot.z, width, length,
       3.4 + random() * 3.2, padHeight(spot.x, spot.z), shade(concrete, 0.96), heightAt);
     remember(spot.x, spot.z, radius); count += 1;
   }
 
-  // Ice rinks: long slides with almost no grip, laid on the flattest ground.
-  for (let tries = 0, count = 0; tries < 70 && count < 2; tries++) {
-    const spot = parkSpot(random, s, 40, PARK_HALF - 92, 6, 6);
-    const radius = 12 + random() * 5;
-    if (!spot || !clearOf(spot.x, spot.z, radius + 2) || !loopClear(spot.x, spot.z, 34)) continue;
+  // A sheet of ice: a long slide, laid on a pad of its own so the disc is flat.
+  for (let tries = 0, count = 0; tries < 70 && count < 1; tries++) {
+    const radius = 11 + random() * 5;
+    const spot = infield(radius + 2, 28, 62, radius, 6);
+    if (!spot || !clearOf(spot.x, spot.z, radius + 2) || loopDist(spot.x, spot.z) < radius + 16) continue;
     const iceY = padHeight(spot.x, spot.z);
+    pads.push([spot.x, spot.z, radius + 2, iceY]);
     pushIce(mesh, spot.x, spot.z, radius, iceY, shade([0.72, 0.8, 0.89], 0.96));
     triggers.push({ type: 'surface', grip: 1.3, hw: radius, halfLen: radius,
       frame: frame([spot.x, iceY, spot.z], [0, 0, 1], [0, 1, 0]) });
     remember(spot.x, spot.z, radius + 2); count += 1;
-  }
-
-  // Loose kickers, for when the player would rather find their own line.
-  for (let tries = 0, count = 0; tries < 60 && count < 6; tries++) {
-    const spot = parkSpot(random, s, 44, PARK_HALF - 78, 12, 8);
-    const yaw = random() * TAU, width = 12 + random() * 6, length = 14 + random() * 6;
-    const forward = [Math.sin(yaw), 0, Math.cos(yaw)];
-    const radius = Math.hypot(length / 2, width / 2) + 4 + PAD_BLEND;
-    if (!spot) continue;
-    const cx = spot.x + forward[0] * length / 2, cz = spot.z + forward[2] * length / 2;
-    if (!clearOf(cx, cz, radius) || !loopClear(cx, cz, 44)) continue;
-    // A jump you can aim at, not a wall: about 20 degrees.
-    pushKicker(mesh, spot.x, spot.z, yaw, width, length, length * 0.36, spot.ground,
-      shade(ramp, 0.9 + random() * 0.2), heightAt, walls, pads);
-    rampFeet.push([cx, cz, Math.hypot(length / 2, width / 2)]);
-    remember(cx, cz, radius); count += 1;
-  }
-
-  // Rhythm strips: three kickers in a line, spaced so the ramps do not overlap.
-  for (let strip = 0, tries = 0; strip < 2 && tries < 50; tries++) {
-    const spot = parkSpot(random, s, 52, PARK_HALF - 96, 22, 8);
-    if (!spot || !clearOf(spot.x, spot.z, 34) || !loopClear(spot.x, spot.z, 60)) continue;
-    const yaw = random() * TAU, forward = [Math.sin(yaw), 0, Math.cos(yaw)];
-    const width = 11, length = 12, spacing = 26;
-    const parts = [];
-    for (let i = 0; i < 3; i++) {
-      const x = spot.x + forward[0] * i * spacing, z = spot.z + forward[2] * i * spacing;
-      const cx = x + forward[0] * length / 2, cz = z + forward[2] * length / 2;
-      const radius = Math.hypot(length / 2, width / 2) + 4 + PAD_BLEND;
-      if (!clearOf(cx, cz, radius)) { parts.length = 0; break; }
-      parts.push({ x, z, cx, cz, radius });
-    }
-    if (parts.length !== 3) continue;
-    for (let i = 0; i < 3; i++) {
-      const part = parts[i];
-      pushKicker(mesh, part.x, part.z, yaw, width, length, length * (0.3 + i * 0.05),
-        parkHeight(part.x, part.z, s), shade(ramp, 0.98), heightAt, walls, pads);
-      rampFeet.push([part.cx, part.cz, Math.hypot(length / 2, width / 2)]);
-      remember(part.cx, part.cz, part.radius);
-    }
-    strip += 1;
-  }
-
-  // Concrete arches out in the field: scale, landmarks, and something to fly
-  // under.
-  for (let i = 0; i < 3; i++) {
-    const angle = random() * TAU, radius = 70 + random() * 80;
-    const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
-    const span = 24 + random() * 14;
-    if (!insideField(x, z, 50) || !loopClear(x, z, 40) || !clearOf(x, z, span / 2 + 4)) continue;
-    pushArch(scenery, walls, x, z, random() * TAU, span, 15 + random() * 9,
-      padHeight(x, z), shade(concrete, 0.9 + random() * 0.2));
-    remember(x, z, span / 2 + 4);
   }
 
   // Rocks and brush on the rim, out of the driving area, to frame the view.
@@ -2284,9 +2208,9 @@ function freeplayWorld(seed) {
     }
   }
 
-  // The loop's legs, kerbs and boost pad stand on the ground, so they are laid
-  // once every pad is cut: a kerb is never left hanging in a flattened hollow.
-  for (const prop of loopGround) {
+  // The loop's legs and kerbs stand on the ground, so they are laid once every
+  // pad is cut: a kerb is never left hanging in a flattened hollow.
+  for (const prop of loopProps) {
     const ground = padHeight(prop.x, prop.z);
     if (prop.top !== undefined) {
       const height = (prop.top - ground) / 2;
@@ -2297,16 +2221,18 @@ function freeplayWorld(seed) {
       pushBox(scenery, kerb, [prop.x, ground + 0.2, prop.z], [0.3, 0.42, 2.6], shade(gold, 0.9));
     }
   }
-  const loopPad = frame([padX, padHeight(padX, padZ), padZ], loopForward, [0, 1, 0]);
-  pushPad(mesh, loopPad, PALETTE.boost);
-  triggers.push({ type: 'boost', frame: loopPad, hw: 5, halfLen: 8 });
+
+  // The spawn is the start of the road, facing the launcher, on level ground.
+  const spawnAt = road.at(0);
+  pads.push([spawnAt.x, spawnAt.z, 11, parkHeight(spawnAt.x, spawnAt.z, s)]);
   paintGround();
   indexMesh(mesh);
   if (walls.length) mesh.walls = indexWalls(walls);
-  const spawn = frame([0, padHeight(0, 0) + 0.1, 0], [0, 0, 1], [0, 1, 0]);
+  const spawn = frame([spawnAt.x, padHeight(spawnAt.x, spawnAt.z) + 0.1, spawnAt.z],
+    [spawnAt.tx, 0, spawnAt.tz], [0, 1, 0]);
   return {
     id: 'freeplay', name: 'Freeplay', author: 0, layout: 'open', blocks: [],
-    ramps: placed.length, spots: placed.slice(), rampFeet,
+    ramps: placed.length, spots: placed.slice(), rampFeet, gates: PARK_GATES,
     loop: { a: [loopEntry.p[0], loopEntry.p[2]], b: [loopExit.p[0], loopExit.p[2]] },
     mesh, scenery, rings, ringMesh: ringMeshFor(rings),
     triggers, checkpoints: [], finish: null, spawn, end: spawn, chain: [], boxes: []
@@ -2678,7 +2604,8 @@ function loadRace(kind, value) {
     track.name = cleanTrackName(value.name);
     current = { kind: 'custom', index: 0,
       draft: { name: track.name, blocks: value.blocks.slice() },
-      publicTrack: typeof value.publicTrack === 'string' ? value.publicTrack : null, track };
+      publicTrack: typeof value.publicTrack === 'string' ? value.publicTrack : null,
+      testDrive: value.testDrive === true, track };
   } else if (kind === 'daily') {
     const seed = (window.__boredSeed && window.__boredSeed.seed) || 1;
     track = dailyTrack(seed);
@@ -3618,8 +3545,12 @@ function setScreens() {
   $('btnMenu').hidden = mode !== 'race';
   $('pauseNewPark').hidden = !isFreeplay();
   if ($('pauseGhost')) $('pauseGhost').hidden = isFreeplay();
-  $('pauseEdit').hidden = !isCustom();
-  $('resEdit').hidden = !isCustom();
+  // Editing is only offered back to a driver who is testing their own draft;
+  // a course played from the list is someone else's run, not an edit session.
+  const ownDraft = isCustom() && current.testDrive === true;
+  $('pauseEdit').hidden = !ownDraft;
+  $('resEdit').hidden = !ownDraft;
+  $('resNext').hidden = isCustom();
 }
 
 function el(tag, className, text) {
@@ -4138,12 +4069,13 @@ function saveCustomTrack() {
   refreshMenu();
   return true;
 }
-function startCustomTrack(draft, publicTrack) {
+function startCustomTrack(draft, publicTrack, testDrive) {
   const validation = validateCustom(draft.blocks);
   if (!validation.ok) { $('editorStatus').textContent = validation.error; return false; }
   mode = 'race'; paused = false;
   loadRace('custom', { name: cleanTrackName(draft.name), blocks: draft.blocks.slice(),
-    publicTrack: typeof publicTrack === 'string' ? publicTrack : null });
+    publicTrack: typeof publicTrack === 'string' ? publicTrack : null,
+    testDrive: testDrive === true });
   setScreens();
   return true;
 }
@@ -4219,17 +4151,30 @@ function renderPublicList(rows) {
   rows.forEach(row => {
     const li = el('li');
     li.appendChild(el('span', '', row.name + ' · ' + row.handle));
-    // The board for this course: the leader in the row, the next three on hover.
+    // The board for this course: the leader in the row, the rest of the top
+    // four in a panel under it, opened by hover or by focusing the row's
+    // buttons. A title bubble cannot carry a board and gets clipped here.
     const times = (Array.isArray(row.best) ? row.best : [])
       .filter(entry => entry && Number.isFinite(Number(entry.ms)));
     const leader = times[0] || null;
     const time = el('span', 'time', leader ? timeLabel(leader) : '—');
-    if (leader) {
-      time.title = nextTimesLabel(times);
-      time.setAttribute('aria-label', 'Best: ' + timeLabel(leader) +
-        (times.length > 1 ? '. Next: ' + times.slice(1, 4).map(timeLabel).join(', ') : ''));
-    }
+    if (leader) time.setAttribute('aria-label', 'Best: ' + timeLabel(leader));
     li.appendChild(time);
+    let board = null;
+    if (times.length > 1) {
+      board = el('div', 'track-board');
+      board.setAttribute('role', 'group');
+      board.setAttribute('aria-label', nextTimesLabel(times));
+      board.appendChild(el('span', 'track-board-head',
+        'Top ' + Math.min(times.length, 4) + ' · ' + row.name));
+      times.slice(0, 4).forEach((entry, index) => {
+        const line = el('div', 'track-board-row');
+        line.append(el('span', '', String(index + 1)),
+          el('span', 'track-board-name', String(entry.handle || 'Bored player')),
+          el('span', 'track-board-value', clock(entry.ms)));
+        board.appendChild(line);
+      });
+    }
     const drive = el('button', 'quiet', 'Drive');
     drive.type = 'button';
     drive.addEventListener('click', () => drivePublic(row));
@@ -4245,6 +4190,8 @@ function renderPublicList(rows) {
       });
       li.appendChild(remove);
     }
+    // The board is a full row under the course's own line and buttons.
+    if (board) li.appendChild(board);
     list.appendChild(li);
   });
 }
@@ -4386,6 +4333,37 @@ async function postPublicRun(track, ms) {
   if (!api) return;
   try { await api.call('run', { track, ms }); publicTracks = null; }
   catch (error) { /* the run is still saved on this device */ }
+  await paintCourseBoard(track);
+}
+// The board for the course you just drove. It is read after the run is
+// reported, because that run may have just changed it; signed out, the public
+// times still arrive. A failure leaves the result screen as it was.
+async function paintCourseBoard(track) {
+  const api = tracksAPI();
+  if (!api) return;
+  let rows = [];
+  try {
+    const data = await api.call('list');
+    rows = Array.isArray(data && data.tracks) ? data.tracks : [];
+  } catch (error) { return; }
+  // The player may have left the result screen while the list was out.
+  if (race.state !== 'finished' || !current || current.publicTrack !== track) return;
+  const board = $('resBoard');
+  if (!board || !isCustom()) return;
+  const row = rows.find(entry => entry && entry.id === track);
+  const times = ((row && Array.isArray(row.best) ? row.best : [])
+    .filter(entry => entry && Number.isFinite(Number(entry.ms)))).slice(0, 4);
+  board.replaceChildren();
+  board.hidden = !times.length;
+  if (!times.length) return;
+  board.appendChild(el('span', 'courseHead', 'Course board · top ' + times.length));
+  times.forEach((entry, index) => {
+    const line = el('span', 'courseRow');
+    line.append(el('b', '', String(index + 1)),
+      el('i', '', String(entry.handle || 'Bored player')),
+      el('span', 'courseTime', clock(entry.ms)));
+    board.appendChild(line);
+  });
 }
 async function postPublicTrack() {
   const validation = refreshEditor();
@@ -4523,11 +4501,22 @@ function showResult(isBest, ms) {
   }
   const board = $('resBoard');
   board.replaceChildren();
-  for (const medal of (isCustom() ? [] : medalTimes(world.author))) {
-    const cell = el('span');
-    cell.appendChild(el('b', '', clock(medal.ms)));
-    cell.appendChild(el('i', '', medal.name));
-    board.appendChild(cell);
+  board.className = 'medalTable';
+  if (isCustom()) {
+    // A course from the public list has a board of its own; a local draft has
+    // none to show.
+    // The rows arrive after this run has been reported, so the board starts
+    // hidden and paintCourseBoard() fills it in.
+    board.classList.add('courseBoard');
+    board.hidden = true;
+  } else {
+    board.hidden = false;
+    for (const medal of medalTimes(world.author)) {
+      const cell = el('span');
+      cell.appendChild(el('b', '', clock(medal.ms)));
+      cell.appendChild(el('i', '', medal.name));
+      board.appendChild(cell);
+    }
   }
   setScreens();
   refreshMenu();
@@ -4749,7 +4738,7 @@ $('menuNewTrack').addEventListener('click', () => openEditor({ name: 'My track',
 $('editorNew').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorBack').addEventListener('click', () => openMenu());
 $('editorTest').addEventListener('click', () =>
-  startCustomTrack({ name: $('editorName').value, blocks: editor.blocks }));
+  startCustomTrack({ name: $('editorName').value, blocks: editor.blocks }, null, true));
 $('editorSave').addEventListener('click', () => saveCustomTrack());
 $('editorPost').addEventListener('click', () => { void postPublicTrack(); });
 $('namePopupPost').addEventListener('click', () => { submitNamePopup(); });
@@ -4806,7 +4795,7 @@ window.__test = {
   layoutOf,
   snapshot: () => window.__boredSnapshot(),
   startCampaign, startDaily, loadRace, restartRace, respawnCar, useTrack,
-  startFreeplay, freeplayWorld, parkHeight, isFreeplay, trackTricks, signedAngle,
+  startFreeplay, freeplayWorld, parkHeight, parkRoad, PARK_GATES, isFreeplay, trackTricks, signedAngle,
   freeplayGates, collectRing, nextRing, ringMeshFor, pushRing,
   landFreeplay, bailed, freeplayBest, careerPoints,
   seedDate, dailyRecord, dailyStreak, saveDaily, packGhost, unpackGhost, paintCrowd,
