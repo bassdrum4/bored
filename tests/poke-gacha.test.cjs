@@ -1946,9 +1946,9 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   if (!hub) return t.skip('the hub has no starter pick yet');
   await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
   await key(tab, 'Enter'); await key(tab, 'Enter');
-  // The loop, in six boxes, each framing something on screen, read with Enter.
+  // The loop, in seven boxes (the last points at the Wiki), each framing something on screen, read with Enter.
   await game.waitForFunction(() => tutor && tutor.id === 'loop');
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     assert.equal((await tutorUp(game)).id, 'loop');
     assert.ok(await game.evaluate(() => !!tutorStep().at()), 'loop box ' + i + ' frames its target');
     await key(tab, 'Enter');
@@ -1962,8 +1962,8 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   await game.evaluate(() => go('story'));
   await key(tab, 'Enter');
   await game.waitForFunction(() => tutor && tutor.id === 'squad');
-  // The classes on the path, up high, the bars, then the foes' types.
-  await key(tab, 'Enter', 4);
+  // The classes on the path, up high, the bars, the foes' types, then the foe icons and shields.
+  await key(tab, 'Enter', 5);
   // The guided first battle.
   await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
   await key(tab, 'Enter');
@@ -1984,14 +1984,18 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   await key(tab, 'Enter');
   await game.waitForFunction(() => tutor.i === 4, { timeout: 30000 });
   assert.ok(await game.evaluate(() => battle.b.enemies.some(e => e.blockedBy)));
-  // 5-6: the sniper on high ground.
-  await key(tab, '2');
+  // 5: the red shield means blocked, with a link to the Wiki's shield entry, read with Enter.
+  assert.match(await game.$eval('#tutor-box', n => n.textContent), /red shield.*More in the Wiki/);
+  await key(tab, 'Enter');
   await game.waitForFunction(() => tutor.i === 5);
-  await clickHole(tab, game);
+  // 6-7: the sniper on high ground.
+  await key(tab, '2');
   await game.waitForFunction(() => tutor.i === 6);
-  // 7: the skill charges, about 3s in the tutorial (not the skill's full charge), then 8: ready, read with Enter.
+  await clickHole(tab, game);
+  await game.waitForFunction(() => tutor.i === 7);
+  // 8: the skill charges, about 3s in the tutorial (not the skill's full charge), then 9: ready, read with Enter.
   const t0 = Date.now();
-  await game.waitForFunction(() => tutor.i === 7, { timeout: 10000 });
+  await game.waitForFunction(() => tutor.i === 8, { timeout: 10000 });
   assert.ok(Date.now() - t0 < 6000, 'the charging step is a short watch, not a long wait');
   await key(tab, 'Enter');
   // Then the card for the first kind of foe met (the Rattata walking in): what it does, the counter.
