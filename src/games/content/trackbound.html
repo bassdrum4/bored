@@ -3782,6 +3782,15 @@ function drawEditorMap(track) {
     ctx.fillStyle = color; ctx.fill();
     ctx.lineWidth = 1.5; ctx.strokeStyle = '#fffdf7'; ctx.stroke();
   };
+  if (editorView.selected != null && track.chain[editorView.selected + 1]) {
+    const selected = track.chain[editorView.selected + 1];
+    ctx.beginPath();
+    selected.samples.forEach((p,i) => {
+      const xyPoint = xy(p);
+      if (!i) ctx.moveTo(...xyPoint); else ctx.lineTo(...xyPoint);
+    });
+    ctx.lineWidth = 7; ctx.strokeStyle = '#d38a2f'; ctx.stroke();
+  }
   mark(points[0], '#47835f');
   mark(points[points.length - 1], '#b45309');
 }
@@ -3789,9 +3798,14 @@ function refreshEditor() {
   const list = $('editorPieces');
   list.replaceChildren();
   editor.blocks.forEach((id, index) => {
-    const li = el('li');
+    const li = el('li', editorView.selected === index ? 'selected' : '');
     li.appendChild(el('span', 'partNumber', String(index + 1).padStart(2, '0')));
-    li.appendChild(el('span', '', BLOCKS[id].name));
+    const select = el('button', 'editorSelect', BLOCKS[id].name);
+    select.type = 'button';
+    select.setAttribute('aria-label', 'Select ' + BLOCKS[id].name + ' block ' + (index + 1));
+    select.setAttribute('aria-pressed', String(editorView.selected === index));
+    select.addEventListener('click', () => selectEditorPiece(index));
+    li.appendChild(select);
     const action = (label, desc, allowed, change) => {
       const button = el('button', 'quiet', label);
       button.type = 'button'; button.disabled = !allowed;
@@ -3800,14 +3814,19 @@ function refreshEditor() {
       li.appendChild(button);
     };
     action('+', 'Insert selected piece after block', editor.blocks.length < EDITOR_MAX,
-      () => editor.blocks.splice(index + 1, 0, $('editorPiece').value));
+      () => { editor.blocks.splice(index + 1, 0, $('editorPiece').value); editorView.selected = index + 1; });
     action('↑', 'Move block up', index > 0, () => {
       [editor.blocks[index - 1], editor.blocks[index]] = [editor.blocks[index], editor.blocks[index - 1]];
+      editorView.selected = index - 1;
     });
     action('↓', 'Move block down', index < editor.blocks.length - 1, () => {
       [editor.blocks[index + 1], editor.blocks[index]] = [editor.blocks[index], editor.blocks[index + 1]];
+      editorView.selected = index + 1;
     });
-    action('×', 'Remove block', true, () => editor.blocks.splice(index, 1));
+    action('×', 'Remove block', true, () => {
+      editor.blocks.splice(index, 1);
+      editorView.selected = editor.blocks.length ? Math.min(index, editor.blocks.length - 1) : null;
+    });
     list.appendChild(li);
   });
   $('editorCount').textContent = editor.blocks.length + '/' + EDITOR_MAX +
@@ -3823,13 +3842,21 @@ function refreshEditor() {
   $('editorSave').disabled = !validation.ok;
   $('editorCopy').disabled = !validation.ok;
   $('editorCode').value = validation.ok ? encodeTrackCode(editor.blocks) : '';
-  drawEditorMap(validation.track || null);
+  let previewTrack = validation.track || null;
+  // Incomplete or intersecting courses still need a visual preview to fix them.
+  if (!previewTrack && editor.blocks.every(id => EDITOR_PIECES.includes(id))) {
+    try { previewTrack = buildTrack(['start', ...editor.blocks, 'finish'],
+      { id: 'preview', name: editor.name, author: 30000 }); } catch (error) {}
+  }
+  drawEditorPreview(previewTrack);
+  drawEditorMap(previewTrack);
   return validation;
 }
 function openEditor(draft, slot) {
   if (draft) {
     editor = { name: cleanTrackName(draft.name), blocks: draft.blocks.slice(),
       slot: Number.isInteger(slot) ? slot : null };
+    editorView.selected = null;
   }
   mode = 'editor'; paused = false;
   $('editorName').value = editor.name;
@@ -3870,6 +3897,7 @@ function refreshCustomList() {
   const list = $('customTrackList');
   list.replaceChildren();
   const tracks = Array.isArray(saved.custom) ? saved.custom : [];
+  $('menuCustomTab').textContent = 'My tracks · ' + tracks.length;
   if (!tracks.length) {
     const empty = el('li');
     empty.appendChild(el('span', 'empty', 'No saved tracks yet. Build the first.'));
@@ -3903,6 +3931,7 @@ function importCustomCode() {
     const validation = validateCustom(blocks);
     if (!validation.ok) throw new Error(validation.error);
     editor = { name: 'Shared track', blocks, slot: null };
+    editorView.selected = null;
     $('editorName').value = editor.name;
     $('editorImport').value = '';
     refreshEditor();
@@ -3927,10 +3956,23 @@ async function copyCustomCode() {
   }
 }
 
+let menuLibraryTab = 'campaign';
+function showMenuLibrary(tab) {
+  menuLibraryTab = tab === 'custom' ? 'custom' : 'campaign';
+  const campaign = menuLibraryTab === 'campaign';
+  $('menuCampaignPanel').hidden = !campaign;
+  $('menuCustomPanel').hidden = campaign;
+  $('menuCampaignTab').className = campaign ? 'active' : 'quiet';
+  $('menuCustomTab').className = campaign ? 'quiet' : 'active';
+  $('menuCampaignTab').setAttribute('aria-pressed', String(campaign));
+  $('menuCustomTab').setAttribute('aria-pressed', String(!campaign));
+}
 function refreshMenu() {
   const storedMedals = saved.medals;
+  $('menuCampaignTab').textContent = 'Campaign · ' + CAMPAIGN.length;
   const bests = saved.best;
   refreshCustomList();
+  showMenuLibrary(menuLibraryTab);
   const list = $('trackList');
   list.replaceChildren();
   CAMPAIGN.forEach((entry, index) => {
@@ -4016,7 +4058,7 @@ function openMenu() {
   current = { kind: 'campaign', index: 0, track: world };
   rebuildRender();
   camera.init = false;
-  $('barTrack').textContent = 'campaign · ' + CAMPAIGN.length + ' tracks';
+  $('barTrack').textContent = 'choose a mode';
   refreshMenu();
   setScreens();
   paintMedals();
@@ -4204,8 +4246,16 @@ $('editorName').addEventListener('input', () => { editor.name = $('editorName').
 $('editorAdd').addEventListener('click', () => {
   if (editor.blocks.length >= EDITOR_MAX) return;
   editor.blocks.push($('editorPiece').value);
+  editorView.selected = editor.blocks.length - 1;
   refreshEditor();
 });
+wireEditorPreview();
+$('previewZoomIn').addEventListener('click', () => changeEditorZoom(1.25));
+$('previewZoomOut').addEventListener('click', () => changeEditorZoom(1 / 1.25));
+$('previewReset').addEventListener('click', resetEditorCamera);
+$('menuCampaignTab').addEventListener('click', () => showMenuLibrary('campaign'));
+$('menuCustomTab').addEventListener('click', () => showMenuLibrary('custom'));
+$('menuNewTrack').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorNew').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorBack').addEventListener('click', () => openMenu());
 $('editorTest').addEventListener('click', () =>
@@ -4267,7 +4317,9 @@ window.__test = {
   openMenu, toggleMute,
   EDITOR_PIECES, EDITOR_MIN, EDITOR_MAX, validateCustom, encodeTrackCode, decodeTrackCode,
   customTrackId, openEditor, refreshEditor, importCustomCode, saveCustomTrack, startCustomTrack,
-  editorDraft: () => editor, customTracks: () => saved.custom,
+  editorDraft: () => editor, customTracks: () => saved.custom, showMenuLibrary,
+  editorView, previewCameraLayout, editorPreviewGeometry, previewPick, selectEditorPiece,
+  renderEditorPreview, changeEditorZoom, resetEditorCamera,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }
 };
 
