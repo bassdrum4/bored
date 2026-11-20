@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 686,
+  "count": 688,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3584fa9","date":"2026-11-20","author":"Codebuff","subject":"Give public Trackbound courses a board, in-place reposts and draggable pieces."},
+  {"sha":"c21283a","date":"2026-11-20","author":"Codebuff","subject":"Keep the host's buttons away from everybody else."},
   {"sha":"5e9bbd4","date":"2026-11-20","author":"Codebuff","subject":"Fix the Among Us room problems the review turned up."},
   {"sha":"d2ac00b","date":"2026-11-20","author":"Codebuff","subject":"Remove Trackbound's share-by-code editor controls."},
   {"sha":"c32d822","date":"2026-11-20","author":"Codebuff","subject":"Read invites once per page and account, and let Trackbound share custom tracks."},
