@@ -3210,7 +3210,8 @@ window.ImposterNet = (function () {
       : `${players.length} / ${C.MAX_PLAYERS} · ` + (need ? `${need} more to start` : 'ready when you are');
 
     $('host-settings').hidden = publicRoom;
-    $('start').hidden = publicRoom;
+    // Starting is the host's call; a guest only gets told to wait.
+    $('start').hidden = publicRoom || !hosting;
     $('start').disabled = players.length < C.MIN_PLAYERS;
     if (!publicRoom) applySettingsToForm(s.settings);
   }
@@ -3520,7 +3521,8 @@ window.ImposterNet = (function () {
       }
     });
 
-    $('back-lobby').hidden = publicRoom;
+    // Same for the way out of an ended round.
+    $('back-lobby').hidden = publicRoom || !hosting;
     const seconds = Math.max(0, Math.ceil((s.over?.msLeft || 0) / 1000));
     $('over-note').textContent = publicRoom
       ? `The public room reshuffles in ${seconds}s. Stay in and you are dealt the next round.`
