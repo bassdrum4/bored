@@ -4689,9 +4689,34 @@ window.ImposterNet = (function () {
     } catch {}
   });
 
-  try {
-    $('name').value = localStorage.getItem('bored.imposter.name') || '';
-  } catch {}
+  // Start the name field from the name this player uses across Bored: the hub
+  // publishes it for games that run in its frame. A crew name they picked here
+  // before is kept, and the field stays editable either way.
+  const sitePlayerName = () => {
+    try {
+      if (window.parent === window) return '';
+      const name = window.parent.__boredPlayer?.name;
+      return typeof name === 'string' ? name.trim().slice(0, 12) : '';
+    } catch {
+      return '';
+    }
+  };
+  const rememberedName = () => {
+    try {
+      return localStorage.getItem('bored.imposter.name') || '';
+    } catch {
+      return '';
+    }
+  };
+  const prefillName = () => {
+    const field = $('name');
+    if (!field || field.value.trim()) return;
+    const name = rememberedName().slice(0, 12) || sitePlayerName();
+    if (name) field.value = name;
+  };
+  prefillName();
+  // The handle can finish loading after this document does; fill a still-empty field.
+  setTimeout(prefillName, 1500);
 
   // Test hooks: the snapshot is read-only, and the task windows can be opened
   // on their own so a suite can check the ported screens without a round.

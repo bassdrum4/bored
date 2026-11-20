@@ -1077,6 +1077,15 @@ const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, ca
   const player = createLivePlayer({ game, owner, frame: gameFrame, ...callbacks, close: closeGame, back: () => openGame(game.game, null, document.querySelector('#together-nav')), notify: showHint });
   openGame(game.game, null, document.querySelector('#together-nav'), player);
 } });
+// A game runs same-origin inside its frame, so the name this player goes by
+// across Bored is published for it instead of every game asking again. It is
+// cleared with the session, because a handle belongs to one account.
+function publishPlayerName() {
+  window.__boredPlayer = { name: getHandle() || '' };
+}
+window.addEventListener('bored:identity', publishPlayerName);
+publishPlayerName();
+
 window.addEventListener('bored:identity', () => {
   if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true });
   if (activeLobby) activeLobby.accountChanged();
