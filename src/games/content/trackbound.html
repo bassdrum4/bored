@@ -1213,34 +1213,87 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
   return box;
 }
 
-// Uniform spatial hash so a ray only tests nearby triangles.
-const CELL = 4;
-const cellKey = (x, y, z) => Math.floor(x / CELL) + ',' + Math.floor(y / CELL) + ',' + Math.floor(z / CELL);
+// Uniform spatial hash so a ray only tests nearby triangles. Cells are packed
+// into one integer per axis triple: a string key for every one of a long
+// course's triangles was ~700 ms of hashing and garbage per rebuild, and the
+// editor rebuilds a course on every edit.
+// 8-unit cells rather than 4: a course's road triangles straddle fewer of them,
+// and indexing a 22k-triangle course fell from ~250 ms of main-thread work to
+// ~35 ms. Rays test a few more triangles per cell and still came out faster.
+const CELL = 8;
+const CELL_BITS = 32768, CELL_HALF = 16384;
+const cellKey = (x, y, z) =>
+  (Math.floor(x / CELL) + CELL_HALF) * CELL_BITS * CELL_BITS +
+  (Math.floor(y / CELL) + CELL_HALF) * CELL_BITS +
+  (Math.floor(z / CELL) + CELL_HALF);
 function indexMesh(mesh) {
   const grid = new Map();
+  const counts = [];
   const bounds = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
   const t = mesh.tris;
-  for (let i = 0; i < t.length; i += 9) {
-    const tri = i / 9;
-    const lo = [0, 0, 0], hi = [0, 0, 0];
-    for (let a = 0; a < 3; a++) {
-      lo[a] = Math.min(t[i + a], t[i + 3 + a], t[i + 6 + a]);
-      hi[a] = Math.max(t[i + a], t[i + 3 + a], t[i + 6 + a]);
-      bounds.min[a] = Math.min(bounds.min[a], lo[a]);
-      bounds.max[a] = Math.max(bounds.max[a], hi[a]);
+  const tris = Math.floor(t.length / 9);
+  // Each triangle's cell range is kept for the filling pass, so the bounds are
+  // only worked out once.
+  const ranges = new Int32Array(tris * 6);
+  for (let tri = 0; tri < tris; tri++) {
+    const i = tri * 9;
+    const x0 = t[i], y0 = t[i + 1], z0 = t[i + 2];
+    const x1 = t[i + 3], y1 = t[i + 4], z1 = t[i + 5];
+    const x2 = t[i + 6], y2 = t[i + 7], z2 = t[i + 8];
+    const loX = x0 < x1 ? (x0 < x2 ? x0 : x2) : (x1 < x2 ? x1 : x2);
+    const hiX = x0 > x1 ? (x0 > x2 ? x0 : x2) : (x1 > x2 ? x1 : x2);
+    const loY = y0 < y1 ? (y0 < y2 ? y0 : y2) : (y1 < y2 ? y1 : y2);
+    const hiY = y0 > y1 ? (y0 > y2 ? y0 : y2) : (y1 > y2 ? y1 : y2);
+    const loZ = z0 < z1 ? (z0 < z2 ? z0 : z2) : (z1 < z2 ? z1 : z2);
+    const hiZ = z0 > z1 ? (z0 > z2 ? z0 : z2) : (z1 > z2 ? z1 : z2);
+    if (loX < bounds.min[0]) bounds.min[0] = loX;
+    if (loY < bounds.min[1]) bounds.min[1] = loY;
+    if (loZ < bounds.min[2]) bounds.min[2] = loZ;
+    if (hiX > bounds.max[0]) bounds.max[0] = hiX;
+    if (hiY > bounds.max[1]) bounds.max[1] = hiY;
+    if (hiZ > bounds.max[2]) bounds.max[2] = hiZ;
+    const to = Math.floor(loZ / CELL), tz = Math.floor(hiZ / CELL);
+    const ro = Math.floor(loY / CELL), ry = Math.floor(hiY / CELL);
+    const fo = Math.floor(loX / CELL), fx = Math.floor(hiX / CELL);
+    const r = tri * 6;
+    ranges[r] = fo; ranges[r + 1] = fx;
+    ranges[r + 2] = ro; ranges[r + 3] = ry;
+    ranges[r + 4] = to; ranges[r + 5] = tz;
+    for (let x = fo; x <= fx; x++) {
+      const xk = (x + CELL_HALF) * CELL_BITS * CELL_BITS;
+      for (let y = ro; y <= ry; y++) {
+        const yk = xk + (y + CELL_HALF) * CELL_BITS;
+        for (let z = to; z <= tz; z++) {
+          const key = yk + z + CELL_HALF;
+          let slot = grid.get(key);
+          if (slot === undefined) { slot = counts.length; grid.set(key, slot); counts.push(0); }
+          counts[slot]++;
+        }
+      }
     }
-    for (let x = Math.floor(lo[0] / CELL); x <= Math.floor(hi[0] / CELL); x++) {
-      for (let y = Math.floor(lo[1] / CELL); y <= Math.floor(hi[1] / CELL); y++) {
-        for (let z = Math.floor(lo[2] / CELL); z <= Math.floor(hi[2] / CELL); z++) {
-          const key = x + ',' + y + ',' + z;
-          let list = grid.get(key);
-          if (!list) grid.set(key, list = []);
-          list.push(tri);
+  }
+  // One flat array per cell would hand the collector a million small arrays on
+  // a long course, so the cells are filled once into two typed arrays instead:
+  // cell `slot` owns cells from starts[slot] to starts[slot + 1].
+  const starts = new Int32Array(counts.length + 1);
+  for (let slot = 0; slot < counts.length; slot++) starts[slot + 1] = starts[slot] + counts[slot];
+  const cells = new Int32Array(starts[counts.length]);
+  const cursor = starts.slice(0, counts.length);
+  for (let tri = 0; tri < tris; tri++) {
+    const r = tri * 6;
+    for (let x = ranges[r]; x <= ranges[r + 1]; x++) {
+      const xk = (x + CELL_HALF) * CELL_BITS * CELL_BITS;
+      for (let y = ranges[r + 2]; y <= ranges[r + 3]; y++) {
+        const yk = xk + (y + CELL_HALF) * CELL_BITS;
+        for (let z = ranges[r + 4]; z <= ranges[r + 5]; z++) {
+          cells[cursor[grid.get(yk + z + CELL_HALF)]++] = tri;
         }
       }
     }
   }
   mesh.grid = grid;
+  mesh.gridStarts = starts;
+  mesh.gridCells = cells;
   mesh.bounds = bounds;
   return mesh;
 }
@@ -1261,7 +1314,8 @@ function indexWalls(list) {
     for (let x = lo[0]; x <= hi[0]; x++)
       for (let y = lo[1]; y <= hi[1]; y++)
         for (let z = lo[2]; z <= hi[2]; z++) {
-          const key = x + ',' + y + ',' + z;
+          const key = (x + CELL_HALF) * CELL_BITS * CELL_BITS +
+            (y + CELL_HALF) * CELL_BITS + z + CELL_HALF;
           let cell = grid.get(key);
           if (!cell) grid.set(key, cell = []);
           cell.push(k);
@@ -1274,16 +1328,16 @@ function indexWalls(list) {
 function raycast(mesh, origin, dir, maxT) {
   if (!mesh || !mesh.grid) return null;
   let best = maxT, bestTri = -1;
-  let last = '';
+  let last = NaN;
   for (let s = 0; s <= maxT + 0.0001; s += 1) {
     const key = cellKey(origin[0] + dir[0] * s, origin[1] + dir[1] * s, origin[2] + dir[2] * s);
     if (key === last) continue;
     last = key;
-    const list = mesh.grid.get(key);
-    if (!list) continue;
-    const t = mesh.tris;
-    for (let k = 0; k < list.length; k++) {
-      const i = list[k] * 9;
+    const slot = mesh.grid.get(key);
+    if (slot === undefined) continue;
+    const t = mesh.tris, cells = mesh.gridCells, starts = mesh.gridStarts;
+    for (let k = starts[slot]; k < starts[slot + 1]; k++) {
+      const i = cells[k] * 9;
       const ax = t[i], ay = t[i + 1], az = t[i + 2];
       const e1x = t[i + 3] - ax, e1y = t[i + 4] - ay, e1z = t[i + 5] - az;
       const e2x = t[i + 6] - ax, e2y = t[i + 7] - ay, e2z = t[i + 8] - az;
@@ -1298,7 +1352,7 @@ function raycast(mesh, origin, dir, maxT) {
       const v = (dir[0] * qx + dir[1] * qy + dir[2] * qz) * inv;
       if (v < 0 || u + v > 1) continue;
       const dist = (e2x * qx + e2y * qy + e2z * qz) * inv;
-      if (dist > 0.002 && dist < best) { best = dist; bestTri = list[k]; }
+      if (dist > 0.002 && dist < best) { best = dist; bestTri = cells[k]; }
     }
   }
   if (bestTri < 0) return null;
@@ -1442,7 +1496,9 @@ function buildTrack(typeIds, meta) {
       shade([0.45, 0.5, 0.58], 0.6 + 0.45 * rand(i * 43 + 23)));          // hazy ridge
   }
 
-  indexMesh(scenery);
+  // Scenery is drawn, never queried: only the road is raycast for contacts and
+  // legs. Indexing it cost more than the road, because a distant hill's cone
+  // spans thousands of cells for a handful of triangles.
   const checkpoints = triggers.filter(trigger => trigger.type === 'checkpoint');
   return {
     id: (meta && meta.id) || 'track',
@@ -2134,7 +2190,6 @@ function freeplayWorld(seed) {
   }
 
   indexMesh(mesh);
-  indexMesh(scenery);
   if (walls.length) mesh.walls = indexWalls(walls);
   const spawn = frame([0, parkHeight(0, 0, s) + 0.1, 0], [0, 0, 1], [0, 1, 0]);
   return {
@@ -3636,6 +3691,16 @@ function previewCameraLayout(points, view, width, height) {
     }
   };
 }
+// A drag fires several pointer events per frame; drawing on the next frame
+// rather than inside each event keeps a long course's orbit smooth.
+let previewFrame = 0;
+function scheduleEditorPreview() {
+  if (previewFrame) return;
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = 0;
+    renderEditorPreview();
+  });
+}
 function renderEditorPreview() {
   const canvas = $('editorPreview');
   if (!canvas || typeof canvas.getContext !== 'function') return;
@@ -3741,7 +3806,7 @@ function wireEditorPreview() {
     if (drag.moved > 3) {
       editorView.yaw += dx * 0.009;
       editorView.pitch = clamp(editorView.pitch + dy * 0.008, 0.13, 1.48);
-      renderEditorPreview();
+      scheduleEditorPreview();
     }
     event.preventDefault();
   });
@@ -3750,6 +3815,12 @@ function wireEditorPreview() {
     if (!drag || drag.pointerId !== event.pointerId) return;
     editorView.drag = null;
     canvas.classList.remove('dragging');
+    // Land the last rotation even if its frame has not run yet.
+    if (drag.moved > 3 && previewFrame) {
+      cancelAnimationFrame(previewFrame);
+      previewFrame = 0;
+      renderEditorPreview();
+    }
     if (event.type === 'pointerup' && drag.moved < 5) {
       const p = location(event);
       const chosen = previewPick(p.x,p.y);
