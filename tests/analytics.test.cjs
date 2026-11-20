@@ -264,9 +264,14 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
       ui_events: [{ kind:'card_impression',game:'snake',surface:'library',action_name:null,events:2,browsers:2 }],
       site: { visits:5,browsers:2 }
     };
+    const popularityFixture = { games: [
+      {game:'snake',standalone_launches:1,standalone_browsers:1,together_opens:11,matches_started:2,turns_played:35},
+      {game:'memory',standalone_launches:0,standalone_browsers:0,together_opens:3,matches_started:1,turns_played:4}
+    ] };
     const cohortFixture = [{ first_day:'2026-10-29',cohort:2,d1_returned:1,d7_returned:null,
       next_school:'2026-10-30',school_returned:1 }];
-    const body = req.url().includes('/rpc/analytics_rollup_v1') ? aggregateFixture :
+    const body = req.url().includes('/rpc/analytics_game_popularity_v1') ? popularityFixture :
+      req.url().includes('/rpc/analytics_rollup_v1') ? aggregateFixture :
       req.url().includes('/rpc/analytics_retention_cohorts_v1') ? cohortFixture :
       req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? req.url().includes('game=eq.f-14') ? [] : fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
     return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
@@ -307,12 +312,16 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   assert.match(await page.$eval('#engagement-together', n => n.textContent), /Organic matches/);
   assert.match(await page.$eval('#engagement-feedback', n => n.textContent), /Responses/);
   await page.click('[data-view="history"]');
-  assert.match(await page.$eval('#history-totals', n => n.textContent), /Game launches/);
+  assert.match(await page.$eval('#history-totals', n => n.textContent), /Standalone launches/);
   assert.match(await page.$eval('#history-games', n => n.textContent), /snake/i);
   assert.match(await page.$eval('#history-ui', n => n.textContent), /card_impression/);
   assert.match(await page.$eval('#history-cohorts', n => n.textContent), /2026-10-30/);
   await page.click('[data-view="overview"]');
   assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),2);
+  assert.equal(await page.$eval('#game-popularity tbody tr:first-child td:nth-child(2)',n=>n.textContent), '1');
+  assert.equal(await page.$eval('#game-popularity tbody tr:first-child td:nth-child(4)',n=>n.textContent), '11');
+  assert.equal(await page.$eval('#game-popularity tbody tr:first-child td:nth-child(5)',n=>n.textContent), '2');
+  assert.equal(await page.$eval('#game-popularity tbody tr:first-child td:nth-child(6)',n=>n.textContent), '35');
   assert.doesNotMatch(await page.$eval('#players-table',n=>n.textContent), /Daniel/);
   fs.mkdirSync(path.join(root, '_build/shots'), { recursive:true });
   await page.setViewport({width:1100,height:900});
