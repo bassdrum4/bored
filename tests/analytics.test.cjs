@@ -137,16 +137,21 @@ test('QA browser mode survives navigation and can be explicitly switched off', a
   const browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
   t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
-  await page.goto(site.origin + '/?bored_qa=1');
-  await page.waitForFunction(() => !!window.openGame);
+  // Exercise only the QA guard on a static, same-origin page. Requiring the
+  // entire hub to boot makes this test depend on unrelated backend startup.
+  const session = () => page.evaluate(async () => (await import('/hub/analytics.js')).qaSession());
+  await page.goto(site.origin + '/changelog.html?bored_qa=1');
+  assert.equal(await session(), true);
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.analytics.qa-browser')), '1');
-  await page.goto(site.origin + '/');
-  await page.waitForFunction(() => !!window.openGame);
+  await page.goto(site.origin + '/changelog.html');
+  assert.equal(await session(), true);
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.analytics.qa-browser')), '1');
-  await page.goto(site.origin + '/?bored_qa=off');
-  await page.waitForFunction(() => !!window.openGame);
+  await page.goto(site.origin + '/changelog.html?bored_qa=off');
+  assert.equal(await session(), true);
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.analytics.qa-browser')), null);
   assert.equal(await page.evaluate(() => sessionStorage.getItem('bored.analytics.qa-session')), null);
+  await page.goto(site.origin + '/changelog.html');
+  assert.equal(await session(), false);
 });
 
 test('Imposter exposes a safe snapshot so analytics can detect loading and active play', async t => {
