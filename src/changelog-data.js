@@ -2,13 +2,18 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 700,
+  "count": 705,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"16cdf90","date":"2026-11-20","author":"Daniel Lowe","subject":"test: exercise QA browser exclusion without full hub startup"},
+  {"sha":"2a44bbb","date":"2026-11-20","author":"Daniel Lowe","subject":"testability: expose QA session state without initializing hub"},
+  {"sha":"3d37762","date":"2026-11-20","author":"Daniel Lowe","subject":"test: cover Imposter telemetry contract and persistent QA mode"},
+  {"sha":"93dc98c","date":"2026-11-20","author":"Daniel Lowe","subject":"fix(analytics): persist explicit QA browser opt-out across tabs"},
+  {"sha":"9cfda09","date":"2026-11-20","author":"Daniel Lowe","subject":"fix(imposter): expose snapshot so hub can track playtime"},
   {"sha":"edb1e4b","date":"2026-11-20","author":"Codebuff","subject":"Start Trackbound descents above the ground and bridge courses that cross themselves"},
   {"sha":"b275bdb","date":"2026-11-20","author":"PenguinV360","subject":"Poké Gacha: Wiki tab, bars off other mons, ranged units face targets, item sprites","pr":271},
   {"sha":"c67b9fe","date":"2026-11-20","author":"Codebuff","subject":"Let Trackbound pieces take extras, join smoothly and name their bends right"},
