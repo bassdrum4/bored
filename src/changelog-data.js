@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 683,
+  "count": 684,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c32d822","date":"2026-11-20","author":"Codebuff","subject":"Read invites once per page and account, and let Trackbound share custom tracks."},
   {"sha":"fcdfab8","date":"2026-11-20","author":"Codebuff","subject":"Start Imposter's name field with the name the player already uses."},
   {"sha":"393d394","date":"2026-11-20","author":"Codebuff","subject":"Raise Imposter's snapshot rate to the host's full 20 Hz."},
   {"sha":"bfff9bb","date":"2026-11-20","author":"Codebuff","subject":"Show Together invites as soon as the site opens, and open the invited game on the invitee's first turn."},
