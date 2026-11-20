@@ -571,11 +571,11 @@ test('Trackbound editor saves drafts, imports codes and keeps custom races out o
   assert.equal(T.customTracks().length, 1);
   const code = T.encodeTrackCode(draft.blocks);
   assert.equal(page.storage.get('bored.trackbound.custom').includes('Straight dash'), true);
-  page.nodes.get('editorImport').value = code;
+  page.sandbox.document.getElementById('editorImport').value = code;
   T.importCustomCode();
   assert.deepEqual(Array.from(T.editorDraft().blocks), draft.blocks);
   assert.equal(T.editorDraft().slot, null, 'an import does not silently overwrite a saved track');
-  page.nodes.get('editorImport').value = 'TB1-invalid-0000';
+  page.sandbox.document.getElementById('editorImport').value = 'TB1-invalid-0000';
   T.importCustomCode();
   assert.deepEqual(Array.from(T.editorDraft().blocks), draft.blocks, 'a bad code leaves the draft untouched');
   assert.equal(T.startCustomTrack(draft), true);
