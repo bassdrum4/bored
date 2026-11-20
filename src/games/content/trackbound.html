@@ -3558,7 +3558,7 @@ function refreshCustomList() {
       const button = el('button', 'quiet', label);
       button.type = 'button'; button.addEventListener('click', handler); li.appendChild(button);
     };
-    action('Drive', () => startCustomTrack(track));
+    action('Drive', () => { editor.slot = index; startCustomTrack(track); });
     action('Edit', () => openEditor(track, index));
     action('Delete', () => {
       if (typeof window.confirm === 'function' && !window.confirm('Delete this saved custom track?')) return;
