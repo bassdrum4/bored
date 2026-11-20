@@ -131,6 +131,8 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #editorPieces li span{flex:1;min-width:0;font-size:11px}
 #editorPieces li button{padding:4px 7px;min-width:27px}
 #editorPieces li .partNumber{flex:none;width:25px;color:var(--dim);font-size:10px}
+#editorPieces li{cursor:grab}
+#editorPieces li.dragging{opacity:.45}
 #editorMap{position:static;display:block;width:100%;height:auto;aspect-ratio:440/260;background:#e7e4da;border:1px solid var(--rule);border-radius:3px}
 #editorPiece{font:inherit;font-size:11px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px}
 #editorStatus{min-height:24px}
@@ -279,7 +281,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       <div class="panel">
         <header class="panelHead">
           <h2>Track editor</h2>
-          <p>Build a ribbon one block at a time. Start and finish are automatic. Make a course, test-drive it, then post it for others.</p>
+          <p>Build a ribbon one block at a time. Drag a piece to move it. Start and finish are automatic. Make a course, test-drive it, then post it for others.</p>
         </header>
         <div class="editorGrid">
           <div>
@@ -2505,7 +2507,9 @@ function loadRace(kind, value) {
     track = layout.track;
     track.id = customTrackId(value.blocks);
     track.name = cleanTrackName(value.name);
-    current = { kind: 'custom', index: 0, draft: { name: track.name, blocks: value.blocks.slice() }, track };
+    current = { kind: 'custom', index: 0,
+      draft: { name: track.name, blocks: value.blocks.slice() },
+      publicTrack: typeof value.publicTrack === 'string' ? value.publicTrack : null, track };
   } else if (kind === 'daily') {
     const seed = (window.__boredSeed && window.__boredSeed.seed) || 1;
     track = dailyTrack(seed);
@@ -2554,6 +2558,7 @@ function useTrack(track) {
   race.laps = 0;
   race.ringClock = 0;
   race.clean = 0;
+  race.publicSent = false;
   const best = track.id === 'daily' ? dailyRecord(seedDate()) : saved.best[track.id];
   // Ghosts only line up if the track still looks the way it did on that day.
   const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(track.blocks));
@@ -2854,6 +2859,11 @@ function finishRun() {
   // The daily is the same road for everyone, so once it is finished ask where
   // this time sits, and whether there is a ghost worth chasing next run.
   if (daily) void reportDaily(ms, race.medal);
+  // A course driven from the public list also reports this run to its board.
+  if (!daily && isCustom() && current.publicTrack && !race.publicSent) {
+    race.publicSent = true;
+    void postPublicRun(current.publicTrack, ms);
+  }
 }
 
 function showMessage(text, seconds) {
@@ -3447,7 +3457,10 @@ const EDITOR_PIECES = [
 ];
 const EDITOR_MIN = 3, EDITOR_MAX = 36, EDITOR_LIMIT = 30;
 const EDITOR_STARTER = ['sprint', 'curveR', 'straight', 'checkpoint', 'curveL', 'sprint'];
-let editor = { name: 'My track', blocks: EDITOR_STARTER.slice(), slot: null };
+const DEFAULT_TRACK_NAME = 'My track';
+let editor = { name: DEFAULT_TRACK_NAME, blocks: EDITOR_STARTER.slice(), slot: null, posted: null };
+let editorValidation = null;
+let draggingPiece = null;
 const editorView = {
   yaw: 0.72, pitch: 0.68, zoom: 1,
   selected: null, track: null, faces: [], samples: [],
@@ -3799,6 +3812,29 @@ function refreshEditor() {
   list.replaceChildren();
   editor.blocks.forEach((id, index) => {
     const li = el('li', editorView.selected === index ? 'selected' : '');
+    // Dropping a piece onto another moves it there. The arrows stay for touch
+    // and keyboard, where a drag is not available.
+    li.draggable = true;
+    li.addEventListener('dragstart', event => {
+      draggingPiece = index;
+      li.className = (editorView.selected === index ? 'selected ' : '') + 'dragging';
+      if (event.dataTransfer) { try {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(index));
+      } catch (error) { /* some embeds expose no data store */ } }
+    });
+    li.addEventListener('dragend', () => { draggingPiece = null; refreshEditor(); });
+    li.addEventListener('dragover', event => {
+      if (draggingPiece === null || draggingPiece === index) return;
+      event.preventDefault();
+      if (event.dataTransfer) { try { event.dataTransfer.dropEffect = 'move'; } catch (error) {} }
+    });
+    li.addEventListener('drop', event => {
+      event.preventDefault();
+      let from = draggingPiece;
+      if (from === null && event.dataTransfer) from = Number(event.dataTransfer.getData('text/plain'));
+      moveBlockTo(from, index);
+    });
     li.appendChild(el('span', 'partNumber', String(index + 1).padStart(2, '0')));
     const select = el('button', 'editorSelect', BLOCKS[id].name);
     select.type = 'button';
@@ -3832,6 +3868,7 @@ function refreshEditor() {
   $('editorCount').textContent = editor.blocks.length + '/' + EDITOR_MAX +
     ' road pieces · Start and Finish are automatic';
   const validation = validateCustom(editor.blocks);
+  editorValidation = validation;
   const status = $('editorStatus');
   status.className = 'note' + (validation.ok ? '' : ' invalid');
   status.textContent = validation.ok
@@ -3840,7 +3877,7 @@ function refreshEditor() {
     : validation.error;
   $('editorTest').disabled = !validation.ok;
   $('editorSave').disabled = !validation.ok;
-  $('editorPost').disabled = !validation.ok;
+  paintPostButton(validation);
   let previewTrack = validation.track || null;
   // Incomplete or intersecting courses still need a visual preview to fix them.
   if (!previewTrack && editor.blocks.every(id => EDITOR_PIECES.includes(id))) {
@@ -3851,10 +3888,25 @@ function refreshEditor() {
   drawEditorMap(previewTrack);
   return validation;
 }
+// The drag-and-drop reorder: take the piece out and put it back where it was
+// dropped. Same result as the arrows, one gesture.
+function moveBlockTo(from, to) {
+  if (!Number.isInteger(from) || from < 0 || from >= editor.blocks.length ||
+      !Number.isInteger(to) || to < 0 || to >= editor.blocks.length) { draggingPiece = null; refreshEditor(); return; }
+  if (from !== to) {
+    const [piece] = editor.blocks.splice(from, 1);
+    editor.blocks.splice(to, 0, piece);
+    editorView.selected = to;
+  }
+  draggingPiece = null;
+  refreshEditor();
+}
 function openEditor(draft, slot) {
   if (draft) {
     editor = { name: cleanTrackName(draft.name), blocks: draft.blocks.slice(),
-      slot: Number.isInteger(slot) ? slot : null };
+      slot: Number.isInteger(slot) ? slot : null,
+      posted: draft.posted && typeof draft.posted.code === 'string'
+        ? { id: draft.posted.id || null, code: draft.posted.code } : null };
     editorView.selected = null;
   }
   mode = 'editor'; paused = false;
@@ -3870,6 +3922,9 @@ function saveCustomTrack() {
   $('editorName').value = editor.name;
   if (!Array.isArray(saved.custom)) saved.custom = [];
   const record = { name: editor.name, blocks: editor.blocks.slice() };
+  // Which published version this draft is, so reopening it knows whether the
+  // editor still matches the public list.
+  if (editor.posted && editor.posted.code) record.posted = { id: editor.posted.id || null, code: editor.posted.code };
   if (Number.isInteger(editor.slot) && saved.custom[editor.slot]) {
     saved.custom[editor.slot] = record;
   } else {
@@ -3884,11 +3939,12 @@ function saveCustomTrack() {
   refreshMenu();
   return true;
 }
-function startCustomTrack(draft) {
+function startCustomTrack(draft, publicTrack) {
   const validation = validateCustom(draft.blocks);
   if (!validation.ok) { $('editorStatus').textContent = validation.error; return false; }
   mode = 'race'; paused = false;
-  loadRace('custom', { name: cleanTrackName(draft.name), blocks: draft.blocks.slice() });
+  loadRace('custom', { name: cleanTrackName(draft.name), blocks: draft.blocks.slice(),
+    publicTrack: typeof publicTrack === 'string' ? publicTrack : null });
   setScreens();
   return true;
 }
@@ -3957,6 +4013,17 @@ function renderPublicList(rows) {
   rows.forEach(row => {
     const li = el('li');
     li.appendChild(el('span', '', row.name + ' · ' + row.handle));
+    // The board for this course: the leader in the row, the next three on hover.
+    const times = (Array.isArray(row.best) ? row.best : [])
+      .filter(entry => entry && Number.isFinite(Number(entry.ms)));
+    const leader = times[0] || null;
+    const time = el('span', 'time', leader ? timeLabel(leader) : '—');
+    if (leader) {
+      time.title = nextTimesLabel(times);
+      time.setAttribute('aria-label', 'Best: ' + timeLabel(leader) +
+        (times.length > 1 ? '. Next: ' + times.slice(1, 4).map(timeLabel).join(', ') : ''));
+    }
+    li.appendChild(time);
     const drive = el('button', 'quiet', 'Drive');
     drive.type = 'button';
     drive.addEventListener('click', () => drivePublic(row));
@@ -3994,25 +4061,79 @@ function drivePublic(row) {
   catch (error) { publicStatus(error.message, true); return false; }
   const validation = validateCustom(blocks);
   if (!validation.ok) { publicStatus(validation.error, true); return false; }
-  return startCustomTrack({ name: row.name, blocks });
+  return startCustomTrack({ name: row.name, blocks }, row.id);
+}
+function postedVersion() {
+  return editor.posted && typeof editor.posted.code === 'string' ? editor.posted : null;
+}
+// What the post button can do right now. A track needs a name of its own, a
+// complete road, and something that is not already the published version.
+function postState(validation) {
+  const checked = validation || editorValidation || validateCustom(editor.blocks);
+  const name = cleanTrackName($('editorName').value);
+  const code = checked.ok ? encodeTrackCode(editor.blocks) : '';
+  const posted = postedVersion();
+  const named = name.toLowerCase() !== DEFAULT_TRACK_NAME.toLowerCase();
+  const changed = !!code && (!posted || code !== posted.code);
+  return { validation: checked, name, code, posted, named, changed,
+    blocked: !checked.ok || !code || !named || !changed };
+}
+// One button, three jobs: publish, republish an edited track, or nothing at all
+// while what is in the editor is already the published version.
+function paintPostButton(validation) {
+  const button = $('editorPost');
+  if (!button) return;
+  const state = postState(validation);
+  button.disabled = state.blocked;
+  button.textContent = state.posted && state.changed ? 'Repost changes' : 'Post for others';
+  const hint = !state.named ? 'Give the track a name of its own first.'
+    : state.posted && !state.changed ? 'This version is already posted.'
+      : state.posted ? 'Post the edited track again.' : 'Share this track in the public list.';
+  button.title = hint;
+  button.setAttribute('aria-label', hint);
+}
+const timeLabel = entry => String(entry.handle || 'Bored player') + ' ' + clock(entry.ms);
+// The row carries the leader; hovering it lists the next three.
+function nextTimesLabel(times) {
+  const next = (Array.isArray(times) ? times : []).slice(1, 4)
+    .filter(entry => entry && Number.isFinite(Number(entry.ms)));
+  return next.length
+    ? next.map((entry, i) => (i + 2) + '. ' + timeLabel(entry)).join('\n')
+    : 'Only time on this course so far.';
+}
+// A finished public course reports its time to that course's board. The board is
+// a bonus: a failure leaves the local best alone and says nothing over a result.
+async function postPublicRun(track, ms) {
+  const api = tracksAPI();
+  if (!api) return;
+  try { await api.call('run', { track, ms }); publicTracks = null; }
+  catch (error) { /* the run is still saved on this device */ }
 }
 async function postPublicTrack() {
   const validation = refreshEditor();
-  if (!validation.ok) return false;
+  const state = postState(validation);
   const note = $('editorStatus');
+  if (!state.named) {
+    note.className = 'note invalid';
+    note.textContent = 'Give the track a name of its own before posting.';
+    return false;
+  }
+  if (!validation.ok) return false;
   const api = tracksAPI();
   if (!api) {
     note.className = 'note invalid';
     note.textContent = 'Posting needs Bored: open the game from the arcade.';
     return false;
   }
-  const name = cleanTrackName($('editorName').value);
-  const code = encodeTrackCode(editor.blocks);
-  if (!code) { note.className = 'note invalid'; note.textContent = 'Only a complete track can be posted.'; return false; }
+  if (state.posted && !state.changed) {
+    note.className = 'note';
+    note.textContent = 'This version is already posted.';
+    return false;
+  }
   const button = $('editorPost');
   if (button) button.disabled = true;
   note.className = 'note';
-  note.textContent = 'Posting…';
+  note.textContent = state.posted ? 'Reposting…' : 'Posting…';
   try {
     const who = await api.call('status');
     if (!who || !who.signedIn) {
@@ -4020,17 +4141,26 @@ async function postPublicTrack() {
       note.textContent = 'Sign in to Bored to post a track.';
       return false;
     }
-    await api.call('post', { name, code });
-    editor.name = name;
-    $('editorName').value = name;
+    const result = await api.call('post', { name: state.name, code: state.code,
+      id: state.posted ? state.posted.id : null });
+    editor.name = state.name;
+    $('editorName').value = state.name;
+    editor.posted = { id: result && result.id ? result.id : (state.posted && state.posted.id) || null, code: state.code };
+    // A saved copy remembers the published version, so reopening it offers a
+    // repost only once it has been changed again.
+    if (Number.isInteger(editor.slot) && saved.custom[editor.slot]) {
+      saved.custom[editor.slot].posted = { id: editor.posted.id, code: editor.posted.code };
+      persist('custom');
+    }
     publicTracks = null;
-    note.textContent = 'Posted · other players can drive ' + name + ' from the public list.';
+    note.textContent = (state.posted ? 'Reposted · ' : 'Posted · ') +
+      'other players can drive ' + state.name + ' from the public list.';
     return true;
   } catch (error) {
     note.className = 'note invalid';
     note.textContent = error.message || 'The track could not be posted.';
     return false;
-  } finally { if (button) button.disabled = false; }
+  } finally { paintPostButton(); }
 }
 
 let menuLibraryTab = 'campaign';
@@ -4167,7 +4297,7 @@ function startFreeplay(seed) {
 function restartRace() {
   if (current.kind === 'campaign') loadRace('campaign', current.index);
   else if (current.kind === 'freeplay') loadRace('freeplay', current.seed);
-  else if (current.kind === 'custom') loadRace('custom', current.draft);
+  else if (current.kind === 'custom') loadRace('custom', Object.assign({}, current.draft, { publicTrack: current.publicTrack }));
   else loadRace('daily');
   paused = false;
   setScreens();
@@ -4323,7 +4453,7 @@ for (const id of EDITOR_PIECES) {
   $('editorPiece').appendChild(option);
 }
 $('editorPiece').value = 'straight';
-$('editorName').addEventListener('input', () => { editor.name = $('editorName').value; });
+$('editorName').addEventListener('input', () => { editor.name = $('editorName').value; paintPostButton(); });
 $('editorAdd').addEventListener('click', () => {
   if (editor.blocks.length >= EDITOR_MAX) return;
   editor.blocks.push($('editorPiece').value);
@@ -4403,7 +4533,9 @@ window.__test = {
   EDITOR_PIECES, EDITOR_MIN, EDITOR_MAX, validateCustom, encodeTrackCode, decodeTrackCode,
   customTrackId, openEditor, refreshEditor, saveCustomTrack, startCustomTrack,
   editorDraft: () => editor, customTracks: () => saved.custom, showMenuLibrary,
-  refreshPublicList, drivePublic, postPublicTrack, publicTracks: () => publicTracks,
+  refreshPublicList, drivePublic, postPublicTrack, postState, paintPostButton, moveBlockTo,
+  timeLabel, nextTimesLabel,
+  publicTracks: () => publicTracks,
   editorView, previewCameraLayout, editorPreviewGeometry, previewPick, selectEditorPiece,
   renderEditorPreview, changeEditorZoom, resetEditorCamera,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }

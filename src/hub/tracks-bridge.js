@@ -6,8 +6,10 @@ import { hasIdentity, getSession, request, freshSession } from './backend.js';
 // trackbound_track* functions with the player's session. No token, email or
 // account id ever enters the page.
 //
-// What the game is given: a list of { id, name, handle, code, at }, whether the
-// player is signed in, and the answer to a post. Nothing else about the account.
+// What the game is given: a list of { id, name, handle, code, at, best } (best
+// being that course's fastest four players), whether the player is signed in,
+// and the answers to a post and to a finished run. Nothing else about the
+// account.
 
 // Serialized into the game's document before its script runs, like the other
 // bridges: call(op, payload) answers with the hub's result.
@@ -36,6 +38,9 @@ function tracksBridge(channel) {
 const LIST_LIMIT = 60;
 const refuse = message => { const error = new Error(message); error.permanent = true; return error; };
 const TRACK_CODE = /^TB1-([0-9a-z]{3,36})-([0-9a-z]{4})$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const cleanTrackId = value => (UUID.test(String(value || '').trim()) ? String(value).trim() : null);
+const RUN_MIN_MS = 4000, RUN_MAX_MS = 600000;
 
 function cleanName(value) {
   const name = String(value || '').trim().slice(0, 32);
@@ -65,7 +70,14 @@ async function listTracks() {
         name: String(row.name).slice(0, 32),
         handle: String(row.handle || 'Bored player').slice(0, 32),
         code: String(row.code).slice(0, 90),
-        at: Number(row.at) || 0
+        at: Number(row.at) || 0,
+        best: (Array.isArray(row.best) ? row.best : [])
+          .filter(entry => entry && Number.isFinite(Number(entry.ms)))
+          .slice(0, 4)
+          .map(entry => ({
+            handle: String(entry.handle || 'Bored player').slice(0, 32),
+            ms: Math.round(Number(entry.ms))
+          }))
       }))
   };
 }
@@ -77,16 +89,39 @@ async function postTrack(payload) {
   const owner = getSession()?.user?.id;
   const session = await freshSession();
   if (!session || session.user.id !== owner) throw refuse('Sign in again to post a track.');
+  // A repost names the row it replaces, so an edited course keeps one entry.
+  const id = cleanTrackId(payload.id);
   const result = await request('/rest/v1/rpc/trackbound_track_post', {
-    method: 'POST', body: { p_name: name, p_code: code }, token: session.access_token
+    method: 'POST',
+    body: id ? { p_name: name, p_code: code, p_id: id } : { p_name: name, p_code: code },
+    token: session.access_token
   });
   if (getSession()?.user?.id !== owner) throw refuse('Your account changed. Please try again.');
-  return { posted: true, updated: !!(result && result.updated) };
+  return { posted: true, updated: !!(result && result.updated),
+    id: result && result.id ? String(result.id) : id };
+}
+
+// A finished public course reports its time. The server keeps the best one, so
+// sending every run is cheap and a slower run changes nothing.
+async function postTrackRun(payload) {
+  if (!hasIdentity()) throw refuse('Sign in to Bored to post a time.');
+  const track = cleanTrackId(payload.track);
+  if (!track) throw refuse('That track is not shared.');
+  const ms = Math.round(Number(payload.ms));
+  if (!Number.isFinite(ms) || ms < RUN_MIN_MS || ms > RUN_MAX_MS) throw refuse('That is not a finished lap.');
+  const owner = getSession()?.user?.id;
+  const session = await freshSession();
+  if (!session || session.user.id !== owner) throw refuse('Sign in again to post a time.');
+  await request('/rest/v1/rpc/trackbound_track_run_post', {
+    method: 'POST', body: { p_track: track, p_ms: ms }, token: session.access_token
+  });
+  if (getSession()?.user?.id !== owner) throw refuse('Your account changed. Please try again.');
+  return { ok: true };
 }
 
 export function createTracksBridge({ frame, deps = {} }) {
   const channel = crypto.randomUUID();
-  const list = deps.list || listTracks, post = deps.post || postTrack;
+  const list = deps.list || listTracks, post = deps.post || postTrack, run = deps.run || postTrackRun;
   const signedIn = deps.signedIn || (() => hasIdentity());
   let disposed = false;
   const send = message => { try { frame.contentWindow?.postMessage(Object.assign({ channel }, message), '*'); } catch (error) { /* the frame is gone */ } };
@@ -95,6 +130,7 @@ export function createTracksBridge({ frame, deps = {} }) {
     if (op === 'status') return { signedIn: signedIn() };
     if (op === 'list') return list();
     if (op === 'post') return post(payload || {});
+    if (op === 'run') return run(payload || {});
     throw refuse('Unknown operation.');
   }
 

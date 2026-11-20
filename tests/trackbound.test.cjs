@@ -650,3 +650,66 @@ test('Trackbound home screen gives campaign and saved courses separate, persiste
   T.showMenuLibrary('campaign');
   assert.equal(page.element('menuCampaignPanel').hidden, false);
 });
+
+test('Trackbound needs a name of its own and a change before a track can be posted', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  T.openEditor({ name: 'My track', blocks: ['sprint', 'checkpoint', 'sprint'] });
+  assert.equal(T.postState().named, false);
+  assert.equal(T.postState().blocked, true, 'the placeholder name cannot be posted');
+  page.element('editorName').value = 'Sky road';
+  assert.equal(T.postState().named, true);
+  assert.equal(T.postState().blocked, false, 'a named, never-posted track can be posted');
+  T.editorDraft().posted = { id: null, code: T.encodeTrackCode(T.editorDraft().blocks) };
+  assert.equal(T.postState().changed, false);
+  assert.equal(T.postState().blocked, true, 'an unchanged posted track cannot be posted again');
+  T.editorDraft().blocks.push('sprint');
+  assert.equal(T.postState().changed, true);
+  assert.equal(T.postState().blocked, false, 'editing a posted track offers a repost');
+});
+
+test('Trackbound road pieces can be dragged into a new place', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  T.openEditor({ name: 'Drag road', blocks: ['sprint', 'straight', 'checkpoint', 'curveL'] });
+  T.moveBlockTo(3, 0);
+  assert.deepEqual(Array.from(T.editorDraft().blocks), ['curveL', 'sprint', 'straight', 'checkpoint']);
+  T.moveBlockTo(0, 2);
+  assert.deepEqual(Array.from(T.editorDraft().blocks), ['sprint', 'straight', 'curveL', 'checkpoint']);
+  T.moveBlockTo(9, 0);
+  assert.deepEqual(Array.from(T.editorDraft().blocks), ['sprint', 'straight', 'curveL', 'checkpoint'],
+    'a drop outside the list changes nothing');
+  assert.equal(T.editorView.selected, 2, 'the moved piece stays selected');
+});
+
+test('Trackbound public list shows the leader and lists the next three on hover', () => {
+  const T = load().sandbox.__test;
+  const times = [
+    { handle: 'Ash', ms: 42310 }, { handle: 'Wren', ms: 43120 }, { handle: 'Bo', ms: 44000 },
+    { handle: 'Cy', ms: 45999 }, { handle: 'Dee', ms: 60000 }
+  ];
+  assert.match(T.timeLabel(times[0]), /^Ash /);
+  const hover = T.nextTimesLabel(times);
+  assert.equal(hover.split('\n').length, 3, 'only the next three are listed');
+  assert.match(hover, /^2\. Wren /);
+  assert.match(hover, /4\. Cy /);
+  assert.equal(T.nextTimesLabel([times[0]]), 'Only time on this course so far.');
+});
+
+test('Trackbound reports a finished public course to its board', async () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const calls = [];
+  page.sandbox.__boredTracks = { call: (op, payload) => { calls.push({ op, payload }); return Promise.resolve({ ok: true }); } };
+  const track = '11111111-1111-4111-8111-111111111111';
+  assert.equal(T.startCustomTrack({ name: 'Sky road', blocks: ['sprint', 'checkpoint', 'sprint'] }, track), true);
+  for (let i = 0; i < 120 * 14 && T.race.state !== 'finished'; i++) {
+    T.stepRace(1 / 120, { gas: true, brake: false, steer: 0, handbrake: false });
+  }
+  assert.equal(T.race.state, 'finished');
+  for (let i = 0; i < 3; i++) await page.flush();
+  assert.equal(calls.length, 1, 'one report per finished run');
+  assert.equal(calls[0].op, 'run');
+  assert.equal(calls[0].payload.track, track);
+  assert.ok(calls[0].payload.ms > 0, 'the run clock is reported');
+});
