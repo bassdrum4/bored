@@ -21,7 +21,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   let noticeDismissed = '';
   // An invite is an ordinary game for later: the recipient has not joined yet.
   const invited = new Map();
-  let invite = null, inviteAccepted = false, inviteBusy = false;
+  let invite = null, inviteBusy = false;
   const dismissedInvites = new Set();
   const inviteDialog = $('#invite-dialog');
   const resultDialog = $('#result-dialog');
@@ -50,6 +50,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     if (!dialog) return;
     if (dialog.close) dialog.close(); else dialog.removeAttribute('open');
   }
+  // Another dialog on screen owns the page: an invite waits for it rather than
+  // stacking a second modal on top of it.
+  const dialogBusy = () => !!document.querySelector('dialog[open]');
   /* ── Finished games ──────────────────────────────────────────────────────── */
 
   // A game can end on the other player's turn, while you are nowhere near
@@ -150,7 +153,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     resultsSeen = null;
     if (resultDialog?.open) dialogClose(resultDialog);
     noticeDismissed = '';
-    invite = null; inviteAccepted = false;
+    invite = null;
     if (inviteDialog?.open) dialogClose(inviteDialog);
     updateBadge(); render();
   }
@@ -236,54 +239,74 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   }
   /* ── Invitations ────────────────────────────────────────────────────────── */
 
-  // Shown to a signed-in Bored account that is not in Bored Together, the next
-  // time it opens a game. Closing only dismisses it for this page; accepting
-  // holds the challenge on the server until the account joins.
+  // Shown to a signed-in Bored account that is not in Bored Together as soon as
+  // the site opens, and again after a sign-in. Closing only dismisses it for
+  // this page; accepting joins Bored Together and opens the game it promised.
   function inviteCopy() {
     const who = invite?.inviter || 'A Bored Together member';
     $('#invite-title').textContent = who + ' invited you to ' + name(invite.game);
-    $('#invite-blurb').textContent = inviteAccepted
-      ? 'Saved. The game stays with your account and will be in Your Games as soon as you join Bored Together.'
-      : who + ' would like to play ' + name(invite.game) + ' with you on Bored Together, the arcade\u2019s two-player side. Take a turn, then come back whenever.';
-    $('#invite-how').textContent = 'To join, open Bored Together and choose Join Bored Together. ' +
-      name(invite.game) + ' will be waiting in Your Games.';
-    $('#invite-accept').textContent = inviteAccepted ? 'Join Bored Together' : 'Accept invite';
+    $('#invite-blurb').textContent = who + ' would like to play ' + name(invite.game) +
+      ' with you on Bored Together, the arcade\u2019s two-player side. Accept and it opens on your first move.';
+    $('#invite-how').textContent = 'Joining puts your display name and email in the member list; leaving takes them out. ' +
+      'Your turn saves automatically, so you can come back whenever.';
+    $('#invite-accept').textContent = 'Accept and play';
   }
   function inviteTone(text, error) {
     const el = $('#invite-status');
     el.textContent = text; el.dataset.tone = error ? 'error' : '';
   }
   async function checkInvites() {
-    if (!hasIdentity() || inviteBusy || inviteDialog?.open) return;
-    if (!document.body.classList.contains('playing')) return;
+    if (!hasIdentity() || inviteBusy || data?.enrolled || dialogBusy()) return;
     try {
       const result = await inviteRPC('list');
       if (!result || result.enrolled) return;
       const next = (result.invites || []).find(item => item?.id && !dismissedInvites.has(item.id));
-      if (!next) return;
-      invite = next; inviteAccepted = next.status === 'accepted';
+      if (!next || data?.enrolled) return;
+      invite = next;
       inviteTone('', false); inviteCopy(); dialogOpen(inviteDialog);
       $('#invite-close').focus();
     } catch {
       // An invitation is never worth interrupting a game with an error.
     }
   }
+  // Accepting is one action: it takes the invitation, joins Bored Together under
+  // the notice the enrollment screen shows, and opens the promised game with the
+  // new member to move. That is the one game whose first seat is not the member
+  // who started the match. The page is opened before the game so leaving it
+  // lands on Bored Together, where the game waits for the next turn.
   async function acceptInvite() {
     if (!invite || inviteBusy) return;
-    if (inviteAccepted) { dialogClose(inviteDialog); invite = null; open(); return; }
+    if (!hasIdentity()) {
+      // No invitation can be taken without an account. The notice comes back
+      // after the sign-in rather than being spent on a dialog that could not act.
+      invite = null; dialogClose(inviteDialog); openAuthDialog('signin'); return;
+    }
     inviteBusy = true; const accept = $('#invite-accept'); accept.disabled = true;
-    inviteTone('Saving\u2026', false);
+    inviteTone('Joining Bored Together\u2026', false);
     try {
-      await inviteRPC('accept', { id: invite.id });
-      inviteAccepted = true; inviteCopy();
-      inviteTone('Accepted. Join Bored Together and the game will be waiting for you.', false);
-    } catch (error) { inviteTone(error.message, true); }
-    finally { inviteBusy = false; accept.disabled = false; }
+      if (invite.status !== 'accepted') await inviteRPC('accept', { id: invite.id });
+      // Taken but not joined yet: a second try goes straight to joining.
+      invite = { ...invite, status: 'accepted' };
+      await ensureProfile();
+      await togetherRPC('enroll', { consent_version: CONSENT_VERSION });
+      const claimed = await inviteRPC('claim');
+      const match = (claimed?.matches || [])[0];
+      dismissedInvites.add(invite.id);
+      invite = null; dialogClose(inviteDialog); inviteTone('', false);
+      open();
+      if (match?.id) await launch(match.id);
+    } catch (error) {
+      if (inviteDialog?.open) inviteTone(error.message, true);
+      else status.textContent = error.message;
+    } finally { inviteBusy = false; accept.disabled = false; }
   }
   if (inviteDialog) {
     $('#invite-accept').onclick = acceptInvite;
     $('#invite-close').onclick = () => { if (invite) dismissedInvites.add(invite.id); dialogClose(inviteDialog); };
     inviteDialog.addEventListener('close', () => { if (invite) dismissedInvites.add(invite.id); });
+    // A sign-in or a finished-game popup may have been in the way when an
+    // invitation was waiting; look again once it is gone.
+    document.addEventListener('close', () => { if (!dialogBusy()) setTimeout(checkInvites, 300); }, true);
   }
   function intro() {
     // A member who joined under the older notice is shown the new one once
@@ -721,8 +744,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   for (const link of document.querySelectorAll('.site-nav a:not(#together-nav)')) link.addEventListener('click', close);
   window.addEventListener('bored:identity', () => {
     resetIdentity(); refresh(true);
-    // A game already on screen gets the invite notice for the new account.
-    if (document.body.classList.contains('playing')) setTimeout(checkInvites, 400);
+    // The notice belongs to the site, not to a game: it shows on the first page
+    // load, and again for whichever account just signed in.
+    setTimeout(checkInvites, 400);
   });
   window.addEventListener('bored:together-open', event => {
     if (TOGETHER_ADAPTERS[event.detail?.game]) selectedGame = event.detail.game;

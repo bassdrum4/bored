@@ -21,11 +21,12 @@ list. Rematches work the same way.
 Under the member list, the picker shows a short second list: Bored accounts that
 have not joined Together yet, by their public display name. Their row has one
 **Invite** button, which uses the game selected above. The invitee sees a modal
-the next time they open any game, naming the inviter, the game and how to join.
-Closing it dismisses the notice for that page; **Accept** keeps the invitation on
-the server until they enrol, so joining Bored Together turns it into the game
-they were promised. That game is revealed at once, with the inviter to move, so
-it is already in the new member's list instead of waiting for a first turn.
+as soon as the site opens, with one button: **Accept and play**. That takes the
+invitation, joins Bored Together under the notice the enrollment screen shows,
+and opens the promised game with the new member to move — the one time the seat
+that starts a game is not the member who started the match. Closing it dismisses
+the notice for that page. Leaving the game lands back on Bored Together, where it
+waits in Your Games for the next turn.
 
 The list contains every game, with the ones waiting on you first. The latest
 three completed matches remain at the bottom with a result and Rematch action;

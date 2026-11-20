@@ -351,7 +351,8 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
 
   playerPanel.hidden = false;
   document.body.classList.add('playing');
-  // The invitation notice belongs to the game, so it waits for one to open.
+  // Opening a game is still a moment an invitation can appear (a guest who signed in on the hub,
+  // say), though the page itself checks for one as soon as it loads.
   setTimeout(() => togetherUI.checkInvites(), 500);
   clearTimeout(focusTimer);
   // Do not steal focus back while the player menu is open, or Esc and the

@@ -251,7 +251,7 @@ test('Together production SQL: consent, directory, blocks, moves, new turn games
     assert.equal((await db.query('select count(*) n from bored_together.queue where user_id=$1',[d])).rows[0].n,0);
     await enroll(db,d);assert.equal((await dashboard(db,d)).enrolled,true);
   });
-  await t.test('a member invites a nonmember from the picker; it waits for them to join',async()=>{
+  await t.test('a member invites a nonmember from the picker; joining opens the game on their first turn',async()=>{
     // The picker's second list is a short set of accounts outside Together.
     const candidates=await inviteCall(db,a,'candidates',{game:'tank2'});
     assert.deepEqual(candidates.map(p=>p.handle),['NeverJoined']);
@@ -273,7 +273,9 @@ test('Together production SQL: consent, directory, blocks, moves, new turn games
     const claimed=await inviteCall(db,non,'claim');
     assert.equal(claimed.claimed,1);
     assert.equal(claimed.matches[0].game,'tank2');
-    assert.equal(claimed.matches[0].turn_user,a);
+    // The invitation is a promise of a turn: the new member starts.
+    assert.equal(claimed.matches[0].p1,non);
+    assert.equal(claimed.matches[0].turn_user,non);
     const waiting=(await dashboard(db,non)).matches.find(m=>m.id===claimed.matches[0].id);
     assert.ok(waiting,'the accepted invite is in the new member\u2019s games');
     assert.equal(waiting.opponent.handle,'WackyPenguin');
