@@ -4909,6 +4909,13 @@ window.ImposterNet = (function () {
 
   // Test hooks: the snapshot is read-only, and the task windows can be opened
   // on their own so a suite can check the ported screens without a round.
+  // The hub waits for this read-only snapshot before counting active playtime.
+  // Multiplayer has no score, so expose only small public progress flags.
+  window.__boredSnapshot = () => ({
+    slug: 'imposter',
+    joined: shown === 'game' && !!snap,
+    inRound: !!snap && snap.phase !== 'lobby',
+  });
   window.__imposterOpenTask = id => openTask(id);
   window.__imposterOpenMap = () => openList('map');
   window.__imposterTest = () => (snap
