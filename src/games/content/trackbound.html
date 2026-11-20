@@ -119,6 +119,27 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #comboBar i{display:block;height:100%;width:0;background:var(--ink)}
 #noGl{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;
   background:var(--paper);font-size:12px;color:var(--dim)}
+
+/* Track editor — everything is local, including the share-code fallback. */
+#screenEditor .panel{width:min(100%,940px)}
+.editorGrid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(250px,1fr);gap:16px;margin-top:12px}
+@media(max-width:680px){.editorGrid{grid-template-columns:1fr}}
+.editorField{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--dim);letter-spacing:.06em}
+.editorField input,.editorField select{width:100%}
+#editorPieces{list-style:none;padding:0;margin:7px 0;border-top:1px solid var(--rule);max-height:310px;overflow-y:auto}
+#editorPieces li{display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--rule);padding:4px 0}
+#editorPieces li span{flex:1;min-width:0;font-size:11px}
+#editorPieces li button{padding:4px 7px;min-width:27px}
+#editorPieces li .partNumber{flex:none;width:25px;color:var(--dim);font-size:10px}
+#editorMap{position:static;display:block;width:100%;height:auto;aspect-ratio:440/260;background:#e7e4da;border:1px solid var(--rule);border-radius:3px}
+#editorPiece{font:inherit;font-size:11px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px}
+#editorCode{font-size:11px;letter-spacing:.025em}
+#editorStatus{min-height:24px}
+#editorStatus.invalid{color:#9b332a}
+.editorActions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#customTrackList li button{display:inline-flex;width:auto;padding:6px}
+#customTrackList li{display:flex;align-items:center;gap:7px;padding:3px}
+#customTrackList li span{flex:1;font-size:11px}
 </style>
 </head>
 <body>
@@ -163,9 +184,13 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
             <div class="row">
               <button id="btnDaily" type="button">Daily track</button>
               <button id="btnFreeplay" type="button">Freeplay park</button>
+              <button id="btnEditor" type="button">Track editor</button>
             </div>
             <p id="dailyNote" class="note"></p>
             <p class="note">Freeplay is a stunt park: gold rings, a vertical loop, and ramps built to be flown.</p>
+            <h3>My tracks</h3>
+            <ol id="customTrackList" class="list"></ol>
+            <p class="note">Your tracks are saved on this device. Share codes work across devices.</p>
           </div>
           <div>
             <h3>Controls</h3>
@@ -182,6 +207,49 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       </div>
     </section>
 
+
+    <section id="screenEditor" class="screen" hidden>
+      <div class="panel">
+        <header class="panelHead">
+          <h2>Track editor</h2>
+          <p>Build a ribbon one block at a time. Start and finish are automatic. Make a course, test-drive it, then share its code.</p>
+        </header>
+        <div class="editorGrid">
+          <div>
+            <label class="editorField" for="editorName">TRACK NAME
+              <input id="editorName" type="text" maxlength="32" value="My track" autocomplete="off">
+            </label>
+            <div class="row">
+              <select id="editorPiece" aria-label="Road piece to insert"></select>
+              <button id="editorAdd" type="button">Add at end</button>
+              <button id="editorNew" class="quiet" type="button">New</button>
+            </div>
+            <ol id="editorPieces"></ol>
+            <p id="editorCount" class="note"></p>
+          </div>
+          <div>
+            <h3>Course map</h3>
+            <canvas id="editorMap" width="440" height="260" aria-label="Top-down map of your custom course"></canvas>
+            <p id="editorStatus" class="note" role="status" aria-live="polite"></p>
+            <div class="editorActions">
+              <button id="editorTest" type="button">Test drive</button>
+              <button id="editorSave" type="button">Save track</button>
+              <button id="editorBack" class="quiet" type="button">Back to menu</button>
+            </div>
+            <h3>Share</h3>
+            <label class="editorField" for="editorCode">YOUR TRACK CODE
+              <input id="editorCode" type="text" readonly aria-label="Shareable track code">
+            </label>
+            <div class="editorActions"><button id="editorCopy" type="button">Copy code</button></div>
+            <label class="editorField" for="editorImport">PASTE A FRIEND'S CODE
+              <input id="editorImport" type="text" spellcheck="false" placeholder="TB1-..." maxlength="90">
+            </label>
+            <div class="editorActions"><button id="editorImportBtn" type="button">Import code</button></div>
+            <p class="note">Codes contain road pieces, not player data. Imported tracks can be edited and saved locally.</p>
+          </div>
+        </div>
+      </div>
+    </section>
     <section id="screenPause" class="screen" hidden>
       <div class="panel">
         <h2>Paused</h2>
@@ -189,6 +257,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <div class="row">
           <button id="pauseResume" type="button">Resume</button>
           <button id="pauseRestart" type="button">Restart</button>
+          <button id="pauseEdit" type="button" hidden>Edit track</button>
           <button id="pauseNewPark" type="button" hidden>New park</button>
           <button id="pauseGhost" type="button">Ghost: on</button>
           <button id="pauseMute" type="button">Sound: on</button>
@@ -210,6 +279,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <div id="resBoard" class="medalTable"></div>
         <div class="row">
           <button id="resRestart" type="button">Race again</button>
+          <button id="resEdit" type="button" hidden>Edit track</button>
           <button id="resRivalBtn" type="button" hidden>Race the rival</button>
           <button id="resNext" type="button">Next track</button>
           <button id="resMenu" type="button">Menu</button>
@@ -277,7 +347,7 @@ const toLocal = (parent, worldPoint) => {
    (some embeds do) the same values are kept through localStorage; if both are
    blocked the game plays without saved data and never complains. */
 const DATA = 'bored.trackbound';
-const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, parkSwept: false, daily: {} };
+const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, parkSwept: false, daily: {}, custom: [] };
 let db = null;
 
 function persist(name) {
@@ -290,9 +360,9 @@ function persist(name) {
 
 function startSaved(onLoaded) {
   // Lift data a previous build kept in localStorage, then prefer what the
-  // database holds. Saved tracks are gone, so that key can go too.
+  // database holds. Old obsolete layouts are still ignored.
   try {
-    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'parkSwept', 'daily']) {
+    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'parkSwept', 'daily', 'custom']) {
       const raw = localStorage.getItem(DATA + '.' + name);
       if (raw) { const parsed = JSON.parse(raw); if (parsed) saved[name] = parsed; }
     }
@@ -2338,6 +2408,7 @@ let world = null;
 let car = null;
 let current = { kind: 'campaign', index: 0, track: null };
 const isFreeplay = () => current.kind === 'freeplay';
+const isCustom = () => current.kind === 'custom';
 const race = {
   state: 'menu', t: 0, cp: 0, cpTotal: 0, finishedAt: null, medal: null,
   respawn: null, record: [], recordClock: 0, best: null, ghost: null, splits: [],
@@ -2355,6 +2426,13 @@ function loadRace(kind, value) {
     const entry = CAMPAIGN[clamp(value, 0, CAMPAIGN.length - 1)];
     track = buildTrack(entry.blocks, entry);
     current = { kind: 'campaign', index: CAMPAIGN.indexOf(entry), track };
+  } else if (kind === 'custom') {
+    const layout = validateCustom(value.blocks);
+    if (!layout.ok) throw new Error(layout.error);
+    track = layout.track;
+    track.id = customTrackId(value.blocks);
+    track.name = cleanTrackName(value.name);
+    current = { kind: 'custom', index: 0, draft: { name: track.name, blocks: value.blocks.slice() }, track };
   } else if (kind === 'daily') {
     const seed = (window.__boredSeed && window.__boredSeed.seed) || 1;
     track = dailyTrack(seed);
@@ -2656,7 +2734,7 @@ function finishRun() {
   race.state = 'finished';
   race.finishedAt = race.t;
   const ms = Math.round(race.t * 1000);
-  race.medal = medalFor(world.author, ms);
+  race.medal = isCustom() ? null : medalFor(world.author, ms);
   // A daily ribbon is filed under its day; a campaign track under its id.
   const daily = world.id === 'daily';
   const day = seedDate();
@@ -2682,7 +2760,7 @@ function finishRun() {
     race.ghost = record.ghost;
   }
   // A daily medal is a fact about one ribbon, not a campaign trophy.
-  if (race.medal && !daily) {
+  if (race.medal && !daily && !isCustom()) {
     const order = m => m ? MEDALS.findIndex(medal => medal.id === m) : 99;
     if (order(race.medal) < order(saved.medals[world.id])) { saved.medals[world.id] = race.medal; persist('medals'); }
   }
@@ -3105,8 +3183,8 @@ function paintMedals() {
   if (!rail || !world) return;
   rail.replaceChildren();
   // A freeplay park has no author time, so medals would all read 0.000.
-  rail.hidden = isFreeplay();
-  if (isFreeplay()) return;
+  rail.hidden = isFreeplay() || isCustom();
+  if (isFreeplay() || isCustom()) return;
   const rows = medalTimes(world.author).map(medal => ({ id: medal.id, label: clock(medal.ms) }));
   for (const entry of rows) {
     const row = el('div', 'm ' + entry.id);
@@ -3267,12 +3345,15 @@ let paused = false;
 
 function setScreens() {
   $('screenMenu').hidden = mode !== 'menu';
+  $('screenEditor').hidden = mode !== 'editor';
   $('screenPause').hidden = !(mode === 'race' && paused);
   $('screenResult').hidden = !(mode === 'race' && race.state === 'finished');
   $('hud').hidden = mode !== 'race';
   $('btnMenu').hidden = mode !== 'race';
   $('pauseNewPark').hidden = !isFreeplay();
   if ($('pauseGhost')) $('pauseGhost').hidden = isFreeplay();
+  $('pauseEdit').hidden = !isCustom();
+  $('resEdit').hidden = !isCustom();
 }
 
 function el(tag, className, text) {
@@ -3325,9 +3406,10 @@ function refreshMenu() {
 function showResult(isBest, ms) {
   $('resTitle').textContent = isBest ? 'New personal best' : 'Track clear';
   $('resTrack').textContent = world.name + ' · ' + world.blocks.length + ' blocks' +
-    (world.open ? ' · no walls' : '') + ' · ' + careerPoints() + ' pts career';
+    (world.open ? ' · no walls' : '') + (isCustom() ? ' · custom time trial' : ' · ' + careerPoints() + ' pts career');
   $('resTime').textContent = clock(ms);
-  $('resMedal').textContent = medalName(race.medal) + (race.medal ? ' · +' + medalPoints(race.medal) : '');
+  $('resMedal').textContent = isCustom() ? 'Custom time trial' :
+    medalName(race.medal) + (race.medal ? ' · +' + medalPoints(race.medal) : '');
   $('resDot').className = 'dot ' + (race.medal || '');
   // A saved best can be missing on a slower run: a layout change prunes the
   // old record, and the result screen must not read through it.
@@ -3349,7 +3431,7 @@ function showResult(isBest, ms) {
   }
   const board = $('resBoard');
   board.replaceChildren();
-  for (const medal of medalTimes(world.author)) {
+  for (const medal of (isCustom() ? [] : medalTimes(world.author))) {
     const cell = el('span');
     cell.appendChild(el('b', '', clock(medal.ms)));
     cell.appendChild(el('i', '', medal.name));
@@ -3397,6 +3479,7 @@ function startFreeplay(seed) {
 function restartRace() {
   if (current.kind === 'campaign') loadRace('campaign', current.index);
   else if (current.kind === 'freeplay') loadRace('freeplay', current.seed);
+  else if (current.kind === 'custom') loadRace('custom', current.draft);
   else loadRace('daily');
   paused = false;
   setScreens();
@@ -3415,10 +3498,14 @@ const DRIVE_KEYS = { arrowup: 'gas', w: 'gas', arrowdown: 'brake', s: 'brake',
 function onKeyDown(event) {
   const key = event.key || '';
   const lower = key.toLowerCase();
-  if (event.target && event.target.tagName === 'INPUT') return;
+  if (event.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
   initAudio();
   if (lower === 'm') { toggleMute(); event.preventDefault(); return; }
-  if (lower === 'escape') { if (mode === 'race') togglePause(); event.preventDefault(); return; }
+  if (lower === 'escape') {
+    if (mode === 'race') togglePause();
+    else if (mode === 'editor') openMenu();
+    event.preventDefault(); return;
+  }
   if (mode === 'race' && paused) return;
   if (lower === 'r') { if (mode === 'race') { restartRace(); event.preventDefault(); } return; }
   if (lower === 'n' && mode === 'race' && isFreeplay()) { startFreeplay(); event.preventDefault(); return; }
@@ -3496,7 +3583,7 @@ window.__boredSnapshot = () => ({
   points: careerPoints(),
   runPoints: race.points | 0,
   open: !!(world && world.open),
-  finished: race.state === 'finished',
+  finished: race.state === 'finished' && !isCustom(),
   timeMs: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt * 1000) : 0,
   seconds: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt) : 0,
   track: world ? String(world.id) : '',
