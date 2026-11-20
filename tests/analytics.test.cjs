@@ -130,6 +130,43 @@ test('only production Pages tracks, and QA URLs disable an entire session', asyn
   assert.equal(isProductionTelemetryUrl('not a URL'), false);
 });
 
+test('QA browser mode survives navigation and can be explicitly switched off', async t => {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
+  assert.ok(executablePath);
+  const site = await serve(path.join(root, 'src'));
+  const browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
+  t.after(async () => { await browser.close(); await site.close(); });
+  const page = await browser.newPage();
+  // Exercise only the QA guard on a static, same-origin page. Requiring the
+  // entire hub to boot makes this test depend on unrelated backend startup.
+  const session = () => page.evaluate(async () => (await import('/hub/analytics.js')).qaSession());
+  await page.goto(site.origin + '/changelog.html?bored_qa=1');
+  assert.equal(await session(), true);
+  assert.equal(await page.evaluate(() => localStorage.getItem('bored.analytics.qa-browser')), '1');
+  await page.goto(site.origin + '/changelog.html');
+  assert.equal(await session(), true);
+  assert.equal(await page.evaluate(() => localStorage.getItem('bored.analytics.qa-browser')), '1');
+  await page.goto(site.origin + '/changelog.html?bored_qa=off');
+  assert.equal(await session(), true);
+  assert.equal(await page.evaluate(() => localStorage.getItem('bored.analytics.qa-browser')), null);
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('bored.analytics.qa-session')), null);
+  await page.goto(site.origin + '/changelog.html');
+  assert.equal(await session(), false);
+});
+
+test('Imposter exposes a safe snapshot so analytics can detect loading and active play', async t => {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
+  assert.ok(executablePath);
+  const site = await serve(path.join(root, 'src'));
+  const browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
+  t.after(async () => { await browser.close(); await site.close(); });
+  const page = await browser.newPage();
+  await page.goto(site.origin + '/games/content/imposter.html');
+  await page.waitForFunction(() => typeof window.__boredSnapshot === 'function');
+  const snapshot = await page.evaluate(() => window.__boredSnapshot());
+  assert.deepEqual(snapshot, { slug:'imposter', joined:false, inRound:false });
+});
+
 test('retention cohorts, meaningful play, and returning visitor calculations', async () => {
   const { summarizeEngagement, excludeAdmins } = await import('../src/hub/analytics-data.js');
   const make = (day, session, kind, active=0, details={}) => ({
