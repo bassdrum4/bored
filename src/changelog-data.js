@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 688,
+  "count": 689,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"0e1984d","date":"2026-11-20","author":"Codebuff","subject":"Let Trackbound authors delete their courses and explain why a name is needed."},
   {"sha":"3584fa9","date":"2026-11-20","author":"Codebuff","subject":"Give public Trackbound courses a board, in-place reposts and draggable pieces."},
   {"sha":"c21283a","date":"2026-11-20","author":"Codebuff","subject":"Keep the host's buttons away from everybody else."},
   {"sha":"5e9bbd4","date":"2026-11-20","author":"Codebuff","subject":"Fix the Among Us room problems the review turned up."},
