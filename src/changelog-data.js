@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 706,
+  "count": 707,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"dd97615","date":"2026-11-20","author":"Daniel Lowe","subject":"Change 'Hello World' to 'Goodbye World'"},
   {"sha":"a45204b","date":"2026-11-20","author":"Codebuff","subject":"feat(crossword): add the NYT archive crossword with a shared daily grid"},
   {"sha":"16cdf90","date":"2026-11-20","author":"Daniel Lowe","subject":"test: exercise QA browser exclusion without full hub startup"},
   {"sha":"2a44bbb","date":"2026-11-20","author":"Daniel Lowe","subject":"testability: expose QA session state without initializing hub"},
