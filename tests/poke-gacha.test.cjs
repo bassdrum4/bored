@@ -525,7 +525,9 @@ test('candy where it is spent: short on candy, the Dex offers exactly the missin
   // A caught line that can evolve, with no candy.
   const setup = await game.evaluate(() => {
     pref.filters = {}; keep(); go('dex');
-    const line = dexList().find(n => S.lines[n] && dexActions(n).some(a => /^Evolve/.test(a.label)));
+    // The seeded wallet hatches at random, so pick a line that really is short of its evolve cost.
+    const evo = n => dexActions(n).find(a => /^Evolve/.test(a.label));
+    const line = dexList().find(n => S.lines[n] && evo(n) && evo(n).cost > S.lines[n].candy);
     dexAt = dexList().indexOf(line); dexFocus = 'acts'; actAt = dexActions(line).findIndex(a => /^Evolve/.test(a.label)); dexUpdate();
     const a = dexActions(line)[actAt]; return { line, cost: a.cost, have: S.lines[line].candy, label: a.label };
   });
