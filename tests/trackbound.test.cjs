@@ -576,7 +576,7 @@ test('Trackbound editor builds valid courses and rejects incomplete or unsupport
   assert.equal(T.validateCustom(Array(37).fill('straight')).ok, false);
 });
 
-test('Trackbound editor saves drafts, imports codes and keeps custom races out of campaign medals', () => {
+test('Trackbound editor saves drafts and keeps custom races out of campaign medals', () => {
   const page = load();
   const T = page.sandbox.__test;
   const draft = { name: 'Straight dash', blocks: ['sprint', 'checkpoint', 'sprint'] };
@@ -584,15 +584,7 @@ test('Trackbound editor saves drafts, imports codes and keeps custom races out o
   assert.equal(T.mode(), 'editor');
   assert.equal(T.saveCustomTrack(), true);
   assert.equal(T.customTracks().length, 1);
-  const code = T.encodeTrackCode(draft.blocks);
   assert.equal(page.storage.get('bored.trackbound.custom').includes('Straight dash'), true);
-  page.sandbox.document.getElementById('editorImport').value = code;
-  T.importCustomCode();
-  assert.deepEqual(Array.from(T.editorDraft().blocks), draft.blocks);
-  assert.equal(T.editorDraft().slot, null, 'an import does not silently overwrite a saved track');
-  page.sandbox.document.getElementById('editorImport').value = 'TB1-invalid-0000';
-  T.importCustomCode();
-  assert.deepEqual(Array.from(T.editorDraft().blocks), draft.blocks, 'a bad code leaves the draft untouched');
   assert.equal(T.startCustomTrack(draft), true);
   assert.equal(T.current().kind, 'custom');
   assert.equal(T.world().id, T.customTrackId(draft.blocks));

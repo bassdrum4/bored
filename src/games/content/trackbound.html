@@ -120,7 +120,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #noGl{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;
   background:var(--paper);font-size:12px;color:var(--dim)}
 
-/* Track editor — everything is local, including the share-code fallback. */
+/* Track editor — everything is local; posting to the public list is the only thing that leaves the device. */
 #screenEditor .panel{width:min(100%,940px)}
 .editorGrid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(250px,1fr);gap:16px;margin-top:12px}
 @media(max-width:680px){.editorGrid{grid-template-columns:1fr}}
@@ -133,7 +133,6 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #editorPieces li .partNumber{flex:none;width:25px;color:var(--dim);font-size:10px}
 #editorMap{position:static;display:block;width:100%;height:auto;aspect-ratio:440/260;background:#e7e4da;border:1px solid var(--rule);border-radius:3px}
 #editorPiece{font:inherit;font-size:11px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px}
-#editorCode{font-size:11px;letter-spacing:.025em}
 #editorStatus{min-height:24px}
 #editorStatus.invalid{color:#9b332a}
 .editorActions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -239,7 +238,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
           </button>
           <button id="btnEditor" type="button">
             <strong>Track editor</strong>
-            <span>Build and share a course</span>
+            <span>Build and post a course</span>
           </button>
         </nav>
         <div class="menuTabs" role="group" aria-label="Track library">
@@ -252,7 +251,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         </div>
         <div id="menuCustomPanel" class="menuLibrary" hidden>
           <div class="menuLibraryIntro">
-            <span>Saved on this device · use codes to share</span>
+            <span>Saved on this device</span>
             <button id="menuNewTrack" type="button" class="quiet">+ Create track</button>
           </div>
           <ol id="customTrackList" class="list"></ol>
@@ -280,7 +279,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       <div class="panel">
         <header class="panelHead">
           <h2>Track editor</h2>
-          <p>Build a ribbon one block at a time. Start and finish are automatic. Make a course, test-drive it, then share its code.</p>
+          <p>Build a ribbon one block at a time. Start and finish are automatic. Make a course, test-drive it, then post it for others.</p>
         </header>
         <div class="editorGrid">
           <div>
@@ -319,17 +318,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
               <button id="editorPost" type="button">Post for others</button>
               <button id="editorBack" class="quiet" type="button">Back to menu</button>
             </div>
-            <p class="note">Posting shares this track's code with everyone in Bored, under your display name. Nothing else is shared.</p>
-            <h3>Share</h3>
-            <label class="editorField" for="editorCode">YOUR TRACK CODE
-              <input id="editorCode" type="text" readonly aria-label="Shareable track code">
-            </label>
-            <div class="editorActions"><button id="editorCopy" type="button">Copy code</button></div>
-            <label class="editorField" for="editorImport">PASTE A FRIEND'S CODE
-              <input id="editorImport" type="text" spellcheck="false" placeholder="TB1-..." maxlength="90">
-            </label>
-            <div class="editorActions"><button id="editorImportBtn" type="button">Import code</button></div>
-            <p class="note">Codes contain road pieces, not player data. Imported tracks can be edited and saved locally.</p>
+            <p class="note">Posting puts this track in the public list for everyone in Bored, under your display name. Nothing else is shared.</p>
           </div>
         </div>
       </div>
@@ -3488,9 +3477,9 @@ function encodeTrackCode(blocks) {
 function decodeTrackCode(code) {
   const normalized = String(code || '').trim().toLowerCase();
   const match = /^tb1-([0-9a-z]{3,36})-([0-9a-z]{4})$/.exec(normalized);
-  if (!match) throw new Error('Invalid code. Paste a complete TB1 track code.');
+  if (!match) throw new Error('That is not a track code.');
   const actual = (hashLayout('TB1:' + match[1]) % (36 ** 4)).toString(36).padStart(4, '0');
-  if (actual !== match[2]) throw new Error('Code checksum does not match. Check the pasted code.');
+  if (actual !== match[2]) throw new Error('Code checksum does not match.');
   const blocks = [...match[1]].map(token => EDITOR_PIECES[parseInt(token, 36)]);
   if (blocks.some(id => !id)) throw new Error('This code uses a road piece this version does not support.');
   return blocks;
@@ -3847,13 +3836,11 @@ function refreshEditor() {
   status.className = 'note' + (validation.ok ? '' : ' invalid');
   status.textContent = validation.ok
     ? 'Road ready · ' + validation.track.checkpoints.length + ' checkpoints · ' +
-      Math.round(validation.track.length) + ' m. Test the drive before sharing.'
+      Math.round(validation.track.length) + ' m. Test the drive before posting.'
     : validation.error;
   $('editorTest').disabled = !validation.ok;
   $('editorSave').disabled = !validation.ok;
   $('editorPost').disabled = !validation.ok;
-  $('editorCopy').disabled = !validation.ok;
-  $('editorCode').value = validation.ok ? encodeTrackCode(editor.blocks) : '';
   let previewTrack = validation.track || null;
   // Incomplete or intersecting courses still need a visual preview to fix them.
   if (!previewTrack && editor.blocks.every(id => EDITOR_PIECES.includes(id))) {
@@ -3937,43 +3924,12 @@ function refreshCustomList() {
     list.appendChild(li);
   });
 }
-function importCustomCode() {
-  try {
-    const blocks = decodeTrackCode($('editorImport').value);
-    const validation = validateCustom(blocks);
-    if (!validation.ok) throw new Error(validation.error);
-    editor = { name: 'Shared track', blocks, slot: null };
-    editorView.selected = null;
-    $('editorName').value = editor.name;
-    $('editorImport').value = '';
-    refreshEditor();
-    $('editorStatus').textContent = 'Imported · test-drive or save this track.';
-  } catch (error) {
-    $('editorStatus').className = 'note invalid';
-    $('editorStatus').textContent = error.message;
-  }
-}
-async function copyCustomCode() {
-  const code = $('editorCode').value;
-  if (!code) return;
-  try {
-    if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText)
-      throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(code);
-    $('editorStatus').textContent = 'Code copied · paste it to share the track.';
-  } catch (error) {
-    const input = $('editorCode');
-    if (typeof input.select === 'function') input.select();
-    $('editorStatus').textContent = 'Select the code above and copy it manually.';
-  }
-}
-
 /* ── public tracks ──────────────────────────────────────────────────────────
    The hub owns the account and the network, so the game asks it for the public
    list and for a post over the channel it injects, and never sees a token. A
    bare copy of this document (the browser suite, a saved page) has no hub and
-   says so instead of failing. A posted track is only a code: driving one goes
-   through the same import path as a pasted code, and is never a campaign run. */
+   says so instead of failing. A posted track is only a code: driving one decodes
+   and validates it like any custom course, and it is never a campaign run. */
 let publicTracks = null, publicBusy = false, publicNote = '';
 function tracksAPI() {
   const api = typeof window === 'undefined' ? null : window.__boredTracks;
@@ -4392,8 +4348,6 @@ $('editorTest').addEventListener('click', () =>
   startCustomTrack({ name: $('editorName').value, blocks: editor.blocks }));
 $('editorSave').addEventListener('click', () => saveCustomTrack());
 $('editorPost').addEventListener('click', () => { void postPublicTrack(); });
-$('editorCopy').addEventListener('click', () => { void copyCustomCode(); });
-$('editorImportBtn').addEventListener('click', () => importCustomCode());
 $('btnEditor').addEventListener('click', () => openEditor());
 $('pauseEdit').addEventListener('click', () => openEditor(current.draft, editor.slot));
 $('resEdit').addEventListener('click', () => openEditor(current.draft, editor.slot));
@@ -4447,7 +4401,7 @@ window.__test = {
   seedDate, dailyRecord, dailyStreak, saveDaily, packGhost, unpackGhost, paintCrowd,
   openMenu, toggleMute,
   EDITOR_PIECES, EDITOR_MIN, EDITOR_MAX, validateCustom, encodeTrackCode, decodeTrackCode,
-  customTrackId, openEditor, refreshEditor, importCustomCode, saveCustomTrack, startCustomTrack,
+  customTrackId, openEditor, refreshEditor, saveCustomTrack, startCustomTrack,
   editorDraft: () => editor, customTracks: () => saved.custom, showMenuLibrary,
   refreshPublicList, drivePublic, postPublicTrack, publicTracks: () => publicTracks,
   editorView, previewCameraLayout, editorPreviewGeometry, previewPick, selectEditorPiece,
