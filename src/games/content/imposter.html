@@ -7,12 +7,15 @@
 <!--
   Among Us — a peer-to-peer social deduction round on the Skeld.
 
-  Rules, ship coordinates, walls, vents, missions, sabotage timings and task
-  screens are ported from AI0702/Among-Us-clone's Python (game.py, sprites.py,
-  settings.py, tasks.py, map.tmx): 5792x3168 ship, 400 px/s walk, the tmx wall
-  rectangles as collision, 15 s kill and sabotage cooldowns, 20 s reactor
-  meltdown, 30 s meetings, eight missions at their original trigger points.
-  The art is that repo's ripped set (artwork is Innersloth's).
+  The ship, its walls and the first mission screens are ported from
+  AI0702/Among-Us-clone's Python (game.py, sprites.py, settings.py, tasks.py,
+  map.tmx): 5792x3168 ship, 400 px/s walk, the tmx wall rectangles as
+  collision. On top of that the round now follows the real game: the sixteen
+  Skeld tasks dealt per player, crew and impostor vision with lights cutting
+  it, quick chat in meetings, discussion before voting, reactor/O2/comms/
+  lights/doors sabotages with two-hand fixes, kills tuned by cooldown and
+  reach, vitals, the Admin table, security cameras, and ghosts that keep doing
+  their tasks. The art is that repo's ripped set (artwork is Innersloth's).
 
   Network: signaling is Supabase Broadcast on the Realtime channel
   "imposter-<CODE>" (see src/hub/realtime.js for the same protocol); the round
@@ -200,7 +203,92 @@ select{padding:8px 10px;font-size:13px}
   .panel.task-panel{padding:8px}
   .lever{width:48px;height:48px}
 }
-</style>
+
+  /* ── chat, rooms, sabotage and the new task boards ─────────────────── */
+  .meeting-panel { max-width: 640px; }
+  .meeting-chat { margin-top: 12px; display: grid; gap: 8px; }
+  .chat-log {
+    display: flex; flex-direction: column; gap: 4px;
+    min-height: 64px; max-height: 160px; overflow-y: auto;
+    padding: 8px 10px; border-radius: 8px;
+    background: rgba(10,12,15,.6); border: 1px solid rgba(255,255,255,.07);
+    font-size: 14px; line-height: 1.35;
+  }
+  .chat-empty { color: #7f8590; font-size: 13px; margin: 0; }
+  .chat-line { margin: 0; color: #dfe2e7; }
+  .chat-who { color: #f2df6a; font-weight: 600; }
+  .phrases { display: flex; flex-wrap: wrap; gap: 6px; }
+  .phrase {
+    border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06);
+    color: #e7e5e0; border-radius: 999px; padding: 5px 11px; font: inherit;
+    font-size: 13px; cursor: pointer;
+  }
+  .phrase:hover { background: rgba(255,255,255,.12); }
+  .phrase:disabled { opacity: .45; cursor: default; }
+  .room-panel { max-width: 820px; }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .admin-table th, .admin-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .admin-table td:last-child, .admin-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .vitals-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+  .vitals-row { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .vitals-pip { width: 10px; height: 10px; border-radius: 50%; background: #4f8f4f; box-shadow: 0 0 8px rgba(79,143,79,.8); }
+  .vitals-row.dead { opacity: .45; }
+  .vitals-row.dead .vitals-pip { background: #6b6f76; box-shadow: none; }
+  .cam-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .cam-cell { position: relative; }
+  .cam-canvas { width: 100%; display: block; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: #05070c; }
+  .cam-tag { position: absolute; left: 8px; top: 6px; font-size: 12px; letter-spacing: .06em; color: #d6dae1; text-shadow: 0 1px 3px #000; }
+
+  .swipe-track {
+    position: relative; width: 460px; max-width: 100%; height: 120px;
+    background: #0c1015; border: 1px solid #2a2d33; border-radius: 10px; overflow: hidden;
+  }
+  .swipe-slot { position: absolute; right: 18px; top: 14px; bottom: 14px; width: 6px; background: #2f343b; border-radius: 3px; }
+  .swipe-card {
+    position: absolute; top: 18px; left: 14px; width: 130px; height: 82px;
+    display: grid; place-items: center; border-radius: 8px; cursor: grab;
+    background: linear-gradient(135deg, #3d6fd6, #2a4fa0); color: #fff;
+    font-weight: 700; letter-spacing: .06em; touch-action: none; user-select: none;
+    box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  }
+  .swipe-card.dragging { cursor: grabbing; }
+  .swipe-card span { font-size: 13px; }
+  .keypad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; max-width: 460px; }
+  .keypad button {
+    aspect-ratio: 1; border-radius: 8px; border: 1px solid #2f343b;
+    background: #151a21; color: #e7e5e0; font: inherit; font-size: 20px; font-weight: 700; cursor: pointer;
+  }
+  .keypad button.done { background: #24422e; border-color: #3f6b4c; color: #9fd6ac; }
+  .leaf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 460px; }
+  .leaf {
+    height: 74px; border-radius: 10px; border: 1px solid #2f343b; background: #1a2a1f;
+    color: #b7d8bd; font-size: 13px; cursor: pointer;
+  }
+  .leaf.cleared { background: #10151a; color: #5d646e; border-color: #24282e; cursor: default; }
+  .gauge-row { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 520px; }
+  .gauge-row input[type=range] { flex: 1; }
+  .gauge-tag { width: 92px; font-size: 13px; color: #aeb4bd; }
+  .gauge-row.aligned .gauge-tag { color: #9fd6ac; }
+  .hexes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 460px; }
+  .hex {
+    aspect-ratio: 1.1; border: 1px solid #33383f; background: #12161c; cursor: pointer;
+    clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+    color: #5d646e; font-size: 12px; letter-spacing: .08em;
+  }
+  .hex.on { background: #2c5b8f; color: #dbeaff; }
+  .samples { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; width: 100%; max-width: 520px; }
+  .sample {
+    aspect-ratio: .8; border-radius: 10px; border: 1px solid #2f343b; background: #101820;
+    color: #b9c6d4; display: grid; place-items: center; gap: 6px; font-size: 12px; cursor: pointer;
+  }
+  .sample .beaker { font-size: 24px; }
+  .sample.odd { border-color: #b05c4f; background: #1d1416; }
+  .scan-bar { width: 100%; max-width: 460px; height: 14px; border-radius: 7px; background: #151a21; overflow: hidden; }
+  .scan-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3d6fd6, #7fc2ff); }
+  .steer { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 420px; }
+  .steer input[type=range] { width: 100%; }
+  .steer-state { font-size: 13px; color: #aeb4bd; }
+  </style>
 </head>
 <body>
 <main id="shell">
@@ -242,6 +330,13 @@ select{padding:8px 10px;font-size:13px}
           <div class="hud-tools">
             <button id="sab-lights" class="chip sab" type="button" hidden>Lights</button>
             <button id="sab-reactor" class="chip sab" type="button" hidden>Reactor</button>
+            <button id="sab-o2" class="chip sab" type="button" hidden>O2</button>
+            <button id="sab-comms" class="chip sab" type="button" hidden>Comms</button>
+            <button id="sab-doors" class="chip sab" type="button" hidden>Doors</button>
+            <button id="open-vitals" class="chip" type="button" hidden>Vitals</button>
+            <button id="open-admin" class="chip" type="button" hidden>Admin</button>
+            <button id="open-cams" class="chip" type="button" hidden>Cameras</button>
+            <button id="open-chat" class="chip" type="button" hidden>Ghost chat</button>
             <button id="open-tasks" class="chip" type="button">Tasks</button>
             <button id="open-map" class="chip" type="button">Map</button>
           </div>
@@ -268,20 +363,88 @@ select{padding:8px 10px;font-size:13px}
           </div>
           <ul id="roster" class="roster chips" aria-label="Players"></ul>
           <div id="host-settings" class="settings" hidden>
-            <label>Impostors
-              <select id="set-impostors">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            </label>
             <label>Kill cooldown
               <select id="set-cooldown">
                 <option value="10">10s</option>
+                <option value="12.5">12.5s</option>
+                <option value="15">15s</option>
+                <option value="17.5">17.5s</option>
+                <option value="20">20s</option>
+                <option value="22.5">22.5s</option>
+                <option value="25" selected>25s</option>
+                <option value="27.5">27.5s</option>
+                <option value="30">30s</option>
+                <option value="32.5">32.5s</option>
+                <option value="35">35s</option>
+                <option value="37.5">37.5s</option>
+                <option value="40">40s</option>
+                <option value="42.5">42.5s</option>
+                <option value="45">45s</option>
+                <option value="47.5">47.5s</option>
+                <option value="50">50s</option>
+                <option value="52.5">52.5s</option>
+                <option value="55">55s</option>
+                <option value="57.5">57.5s</option>
+                <option value="60">60s</option>
+              </select>
+            </label>
+            <label>Kill distance
+              <select id="set-distance">
+                <option value="short">Short</option>
+                <option value="medium" selected>Medium</option>
+                <option value="long">Long</option>
+              </select>
+            </label>
+            <label>Player speed
+              <select id="set-speed">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="1.75">1.75x</option>
+                <option value="2">2x</option>
+                <option value="2.25">2.25x</option>
+                <option value="2.5">2.5x</option>
+                <option value="2.75">2.75x</option>
+                <option value="3">3x</option>
+              </select>
+            </label>
+            <label>Crew vision
+              <select id="set-vision">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="1.75">1.75x</option>
+                <option value="2">2x</option>
+              </select>
+            </label>
+            <label>Discussion
+              <select id="set-discussion">
+                <option value="5">5s</option>
+                <option value="10">10s</option>
                 <option value="15" selected>15s</option>
                 <option value="20">20s</option>
+                <option value="25">25s</option>
                 <option value="30">30s</option>
                 <option value="40">40s</option>
+                <option value="50">50s</option>
+                <option value="60">60s</option>
+              </select>
+            </label>
+            <label>Voting
+              <select id="set-voting">
+                <option value="10">10s</option>
+                <option value="15">15s</option>
+                <option value="20" selected>20s</option>
+                <option value="25">25s</option>
+                <option value="30">30s</option>
+                <option value="40">40s</option>
+                <option value="50">50s</option>
+                <option value="60">60s</option>
               </select>
             </label>
           </div>
@@ -313,13 +476,39 @@ select{padding:8px 10px;font-size:13px}
 </section>
 
 <section id="overlay-meeting" class="overlay" hidden>
-  <div class="panel">
+  <div class="panel meeting-panel">
     <p class="eyebrow" id="meeting-reason"></p>
     <h2 class="meeting-title">Who is the imposter?</h2>
     <p class="meeting-note" id="meeting-note"></p>
     <p class="timer" id="meeting-timer">30s</p>
     <ul id="votes" class="roster"></ul>
     <button id="skip" class="btn" type="button">Skip vote</button>
+    <div class="meeting-chat">
+      <div id="meeting-log" class="chat-log"></div>
+      <div id="meeting-phrases" class="phrases"></div>
+    </div>
+  </div>
+</section>
+
+<section id="overlay-room" class="overlay" hidden>
+  <div class="panel room-panel">
+    <div class="task-head">
+      <h2 id="room-title">Room</h2>
+      <button id="room-close" class="btn btn-secondary" type="button">Close</button>
+    </div>
+    <div id="room-body"></div>
+  </div>
+</section>
+
+<section id="overlay-chat" class="overlay" hidden>
+  <div class="panel">
+    <div class="task-head">
+      <h2>Ghost chat</h2>
+      <button id="chat-close" class="btn btn-secondary" type="button">Close</button>
+    </div>
+    <div id="chat-log" class="chat-log"></div>
+    <div id="chat-phrases" class="phrases"></div>
+    <p class="hint">Only the dead can read this.</p>
   </div>
 </section>
 
@@ -336,12 +525,12 @@ select{padding:8px 10px;font-size:13px}
 <p id="toast" hidden></p>
 
 <script id="imposter-core">
-/* Rules ported from AI0702/Among-Us-clone's Python (game.py, sprites.py, settings.py):
-   the same ship coordinates (5792x3168), the same 400 px/s walk, the same wall
-   rectangles from map.tmx, the same 15 s kill cooldown, 15 s sabotage cooldown,
-   20 s reactor meltdown, 30 s meeting, the same 8 missions at their original
-   trigger points, and the same vent list. The room/election half is this game's
-   own, unchanged from the previous build. Touches no DOM. */
+/* Ship, walls and vents from AI0702/Among-Us-clone's Python (game.py,
+   sprites.py, map.tmx): 5792x3168, 400 px/s walk, the tmx wall rectangles and
+   the vent list. The rules above that are the real game's: sixteen tasks drawn
+   per player, vision, quick chat, discussion then voting, reactor/O2/comms/
+   lights/doors sabotages, tuned kills, ghosts. The room/election half is this
+   game's own, unchanged from the previous build. Touches no DOM. */
 window.ImposterCore = (function () {
   'use strict';
 
@@ -363,40 +552,119 @@ window.ImposterCore = (function () {
   const VENTS = [[3929,863],[4475,435],[4542,1602],[4557,2535],[3725,2016],[2152,1327],[1618,527],[1616,2475],[2252,1786],[962,1695],[832,1230],[1923,1654],[5334,1213],[5335,1595]];
   const BUTTON = { x: 3320, y: 716, label: 'Emergency' };
 
-  // The eight missions in tasks.py, at the exact trigger points game.py polls.
+  // The Skeld's task list, laid on the shipped art: three commons, seven longs
+  // and six shorts. Every crewmate is dealt the commons plus their own random
+  // share of the rest, which is how the real game draws a list.
   const TASKS = [
-    { id: 'navigation', label: 'Stabilize Navigation', game: 'nav', x: 5610, y: 1290, range: 150, room: 'Navigation' },
-    { id: 'garbage', label: 'Empty Garbage', game: 'garbage', x: 3940, y: 321, range: 80, room: 'Cafeteria' },
-    { id: 'wifi', label: 'Reboot Wifi', game: 'wifi', x: 3700, y: 1554, range: 70, room: 'Electrical' },
-    { id: 'wires', label: 'Fix Wiring', game: 'wires', x: 3166, y: 1846, range: 70, room: 'Electrical' },
-    { id: 'divert', label: 'Divert Power', game: 'divert', x: 1031, y: 1216, range: 70, room: 'Reactor' },
-    { id: 'align', label: 'Align Engine', game: 'align', x: 1117, y: 837, range: 70, room: 'Upper Engine' },
-    { id: 'fuel', label: 'Fuel Engines', game: 'fuel', x: 1226, y: 2300, range: 70, room: 'Lower Engine' },
-    { id: 'asteroids', label: 'Clear Asteroids', game: 'asteroids', x: 4513, y: 450, range: 260, room: 'Weapons' },
+    { id: 'wires', label: 'Fix Wiring', game: 'wires', kind: 'common', x: 3166, y: 1846, range: 70, room: 'Electrical' },
+    { id: 'swipe', label: 'Swipe Card', game: 'swipe', kind: 'common', x: 3856, y: 1688, range: 80, room: 'Admin' },
+    { id: 'manifolds', label: 'Unlock Manifolds', game: 'manifolds', kind: 'common', x: 986, y: 1258, range: 80, room: 'Reactor' },
+    { id: 'nav', label: 'Chart Course', game: 'nav', kind: 'short', x: 5610, y: 1290, range: 150, room: 'Navigation' },
+    { id: 'steering', label: 'Stabilize Steering', game: 'steering', kind: 'short', x: 5470, y: 1180, range: 90, room: 'Navigation' },
+    { id: 'o2filter', label: 'Clean O2 Filter', game: 'o2filter', kind: 'short', x: 4210, y: 1210, range: 80, room: 'O2' },
+    { id: 'asteroids', label: 'Clear Asteroids', game: 'asteroids', kind: 'short', x: 4513, y: 450, range: 260, room: 'Weapons' },
+    { id: 'divert', label: 'Divert Power', game: 'divert', kind: 'short', x: 1031, y: 1216, range: 70, room: 'Reactor' },
+    { id: 'shields', label: 'Prime Shields', game: 'shields', kind: 'short', x: 4518, y: 2048, range: 90, room: 'Shields' },
+    { id: 'garbage', label: 'Empty Garbage', game: 'garbage', kind: 'long', x: 3940, y: 321, range: 80, room: 'Cafeteria' },
+    { id: 'chute', label: 'Empty Chute', game: 'chute', kind: 'long', x: 3320, y: 2530, range: 90, room: 'Storage' },
+    { id: 'fuel', label: 'Fuel Engines', game: 'fuel', kind: 'long', x: 1226, y: 2300, range: 70, room: 'Lower Engine' },
+    { id: 'align', label: 'Align Engine Output', game: 'align', kind: 'long', x: 1117, y: 837, range: 70, room: 'Upper Engine' },
+    { id: 'distributor', label: 'Calibrate Distributor', game: 'distributor', kind: 'long', x: 2420, y: 1880, range: 80, room: 'Electrical' },
+    { id: 'scan', label: 'Submit Scan', game: 'scan', kind: 'long', x: 2250, y: 1100, range: 90, room: 'MedBay' },
+    { id: 'sample', label: 'Inspect Sample', game: 'sample', kind: 'long', x: 2470, y: 1450, range: 90, room: 'MedBay' },
   ];
-  // The gas can is a prerequisite, not a mission (game.py does not count it).
+  // The gas can is a prerequisite, not a task (game.py does not count it).
   const GASCAN = { id: 'gascan', label: 'Find a gas can', x: 3056, y: 2433, range: 70, room: 'Storage' };
-  // Sabotage repair points, from game.py's Ctrl / Shift handlers.
-  const FIX = {
-    lights: { x: 2472, y: 1721, range: 70, label: 'Fix lights' },
-    reactor: { x: 889, y: 999, range: 70, label: 'Reset reactor' },
-  };
 
-  const KILL_COOLDOWN = 15;
-  const SABOTAGE_COOLDOWN = 15;
-  const REACTOR_MS = 20_000;
-  const KILL_RANGE = 110;
+  // Rooms for the Admin table, the camera list and the door sabotage. Each
+  // rectangle is the room's floor on map.jpg.
+  const ROOMS = [
+    { name: 'Admin', rect: [3640, 1490, 570, 410] },
+    { name: 'Security', rect: [980, 1415, 400, 110] },
+    { name: 'MedBay', rect: [2060, 820, 640, 820] },
+    { name: 'Electrical', rect: [2140, 1600, 580, 620] },
+    { name: 'Storage', rect: [2710, 1720, 830, 1100] },
+    { name: 'Cafeteria', rect: [2680, 180, 1300, 1030] },
+    { name: 'Weapons', rect: [4220, 320, 580, 580] },
+    { name: 'Navigation', rect: [5220, 1050, 480, 450] },
+    { name: 'O2', rect: [3920, 760, 430, 510] },
+    { name: 'Shields', rect: [4290, 1790, 480, 580] },
+    { name: 'Communications', rect: [3500, 2390, 610, 470] },
+    { name: 'Upper Engine', rect: [1140, 300, 580, 760] },
+    { name: 'Lower Engine', rect: [1140, 2090, 580, 780] },
+    { name: 'Reactor', rect: [590, 940, 520, 1020] },
+  ];
+
+  // Four security feeds, each a rectangle of the ship.
+  const CAMS = [
+    { id: 'cafe', name: 'Cafeteria', rect: [2620, 120, 1420, 1120] },
+    { id: 'hall', name: 'Hallway', rect: [2600, 1280, 1250, 620] },
+    { id: 'store', name: 'Storage', rect: [2680, 1700, 880, 1150] },
+    { id: 'elec', name: 'Electrical', rect: [2100, 1560, 720, 700] },
+  ];
+
+  // Sabotages, straight off the Skeld: reactor needs two handprints at once,
+  // O2 needs a keypad in O2 and another in Admin, lights and comms are one fix.
+  const SABOTAGE = {
+    reactor: {
+      label: 'Reactor meltdown', where: 'Reactor', critical: true, ms: 30_000, simultaneous: true,
+      fixes: [
+        { pad: 'left', x: 860, y: 1000, range: 80, label: 'Left handprint' },
+        { pad: 'right', x: 860, y: 1160, range: 80, label: 'Right handprint' },
+      ],
+    },
+    o2: {
+      label: 'O2 depleted', where: 'O2 and Admin', critical: true, ms: 30_000,
+      fixes: [
+        { pad: 'o2', x: 4050, y: 1230, range: 80, label: 'O2 filter' },
+        { pad: 'admin', x: 3960, y: 1740, range: 80, label: 'Admin keypad' },
+      ],
+    },
+    lights: {
+      label: 'Lights out', where: 'Electrical', critical: false, ms: 0,
+      fixes: [{ pad: 'lights', x: 2472, y: 1721, range: 80, label: 'Breaker' }],
+    },
+    comms: {
+      label: 'Comms down', where: 'Communications', critical: false, ms: 0,
+      fixes: [{ pad: 'comms', x: 3800, y: 2560, range: 80, label: 'Comms dial' }],
+    },
+  };
+  const SABOTAGE_KINDS = ['reactor', 'o2', 'lights', 'comms', 'doors'];
+  // The three wall screens. Standing at the console opens the panel.
+  const CONSOLES = {
+    vitals: { x: 2380, y: 1230, range: 130, room: 'MedBay' },
+    admin: { x: 3925, y: 1695, range: 130, room: 'Admin' },
+    cams: { x: 1300, y: 1470, range: 150, room: 'Security' },
+  };
+  const DOOR_ROOMS = ['Electrical', 'MedBay', 'Storage'];
+  const DOOR_MS = 10_000;
+  const DOOR_THICK = 34;
+
+  // Legacy names, kept because the Python's numbers are still the defaults.
+  const KILL_COOLDOWN = 25;
+  const SABOTAGE_COOLDOWN = 30;
+  const REACTOR_MS = 30_000;
+  const KILL_RANGE = 130;
   const REPORT_RANGE = 110;
   const BUTTON_RANGE = 150;
   const VENT_RANGE = 90;
   const VENT_COOLDOWN = 1.2;
-  const MEETING_MS = 30_000;
   const RESET_MS = 9_000;
   const ABSENT_MS = 12_000;
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 10;
+  const KILL_DISTANCE = { short: 95, medium: 130, long: 165 };
+  const VISION_BASE = 560;
 
-  const DEFAULTS = { impostors: 1, killCooldownSec: 15 };
+  const DEFAULTS = {
+    impostors: 1,
+    killCooldownSec: 25,
+    killDistance: 'medium',
+    speed: 1,
+    crewVision: 1,
+    discussionSec: 15,
+    votingSec: 20,
+  };
 
   const COLORS = [
     { id: 'red', hex: '#c51111' },
@@ -417,10 +685,17 @@ window.ImposterCore = (function () {
   const round = value => Math.round(value * 10) / 10;
   const centreOf = spot => ({ x: spot.x + PLAYER_W / 2, y: spot.y + PLAYER_H / 2 });
 
-  function overlapsWall(x, y) {
+  function overlapsWall(x, y, extra) {
     for (const wall of WALLS) {
       if (x < wall[0] + wall[2] && x + PLAYER_W > wall[0] && y < wall[1] + wall[3] && y + PLAYER_H > wall[1]) {
         return wall;
+      }
+    }
+    if (extra) {
+      for (const wall of extra) {
+        if (x < wall[0] + wall[2] && x + PLAYER_W > wall[0] && y < wall[1] + wall[3] && y + PLAYER_H > wall[1]) {
+          return wall;
+        }
       }
     }
     return null;
@@ -428,6 +703,67 @@ window.ImposterCore = (function () {
 
   function stationById(id) {
     return TASKS.find(task => task.id === id) || null;
+  }
+
+  function roomNamed(name) {
+    return ROOMS.find(room => room.name === name) || null;
+  }
+
+  function roomAt(point) {
+    return ROOMS.find(room => {
+      const r = room.rect;
+      return point.x >= r[0] && point.x <= r[0] + r[2] && point.y >= r[1] && point.y <= r[1] + r[3];
+    }) || null;
+  }
+
+  // A ring of shutters on the room's perimeter. Walls already cover most of it,
+  // so this seals the doorways without touching the floor inside.
+  function doorRects(roomName) {
+    const room = roomNamed(roomName);
+    if (!room) return [];
+    const [x, y, w, h] = room.rect;
+    const t = DOOR_THICK;
+    return [
+      [x - t / 2, y - t / 2, w + t, t],
+      [x - t / 2, y + h - t / 2, w + t, t],
+      [x - t / 2, y - t / 2, t, h + t],
+      [x + w - t / 2, y - t / 2, t, h + t],
+    ];
+  }
+
+  function doorBlocks(state) {
+    return state.doors ? doorRects(state.doors.room) : null;
+  }
+
+  function taskTotals(state) {
+    let total = 0;
+    let done = 0;
+    for (const player of state.players) {
+      if (player.role !== 'crew') continue;
+      const list = player.tasks || [];
+      total += list.length;
+      done += (player.tasksDone || []).length;
+    }
+    return { total, done };
+  }
+
+  function visionFor(state, viewer) {
+    if (!viewer || !viewer.alive) return 0;
+    const mult = clamp(Number(state.settings.crewVision) || 1, 0.25, 2);
+    const base = VISION_BASE * mult * (viewer.role === 'impostor' ? 1.5 : 1);
+    if (state.sabotage && state.sabotage.kind === 'lights' && viewer.role !== 'impostor') {
+      return Math.max(150, base * 0.32);
+    }
+    return base;
+  }
+
+  function sabotageDef(kind) {
+    return SABOTAGE[kind] || null;
+  }
+
+  function sabotageRects(kind) {
+    const def = sabotageDef(kind);
+    return def ? def.fixes : [];
   }
 
   function nearestVent(point) {
@@ -457,6 +793,10 @@ window.ImposterCore = (function () {
     return (text || 'Crewmate').slice(0, 12);
   }
 
+  function cleanChat(text) {
+    return String(text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  }
+
   function emit(state, event) {
     state.events.push(event);
   }
@@ -479,8 +819,10 @@ window.ImposterCore = (function () {
       meeting: null,
       winner: null,
       over: null,
-      tasksDone: [],
+      chat: [],
+      ghostChat: [],
       sabotage: null,
+      doors: null,
       sabotageCooldown: 0,
       time: 0,
       events: [],
@@ -496,6 +838,14 @@ window.ImposterCore = (function () {
     if (wanted && !taken.has(wanted)) return wanted;
     const free = COLORS.find(color => !taken.has(color.id));
     return free ? free.id : COLORS[state.players.length % COLORS.length].id;
+  }
+
+  function drawTasks(rng) {
+    const pick = kind => TASKS.filter(task => task.kind === kind);
+    return shuffle(pick('common'), rng)
+      .map(task => task.id)
+      .concat(shuffle(pick('long'), rng).slice(0, 3).map(task => task.id))
+      .concat(shuffle(pick('short'), rng).slice(0, 4).map(task => task.id));
   }
 
   function spawnSeat(state, running, rng) {
@@ -534,6 +884,9 @@ window.ImposterCore = (function () {
       ventCooldown: 0,
       emergencyUsed: false,
       revealed: false,
+      tasks: [],
+      tasksDone: [],
+      lastChat: -9999,
       seen: state.time,
     };
     state.players.push(player);
@@ -569,10 +922,30 @@ window.ImposterCore = (function () {
   function configure(state, id, patch) {
     const player = getPlayer(state, id);
     if (!player) return { ok: false, error: 'unknown-player' };
+    if (!player.host) return { ok: false, error: 'not-host' };
     if (state.phase !== 'lobby') return { ok: false, error: 'already-started' };
     const next = Object.assign({}, state.settings);
-    if (patch.impostors !== undefined) next.impostors = clamp(Math.round(Number(patch.impostors) || 1), 1, 3);
-    if (patch.killCooldownSec !== undefined) next.killCooldownSec = clamp(Math.round(Number(patch.killCooldownSec) || 15), 5, 60);
+    // One impostor is the house rule; the field is accepted and pinned.
+    next.impostors = 1;
+    if (patch.killCooldownSec !== undefined) {
+      const sec = Number(patch.killCooldownSec);
+      next.killCooldownSec = clamp(Math.round((Number.isFinite(sec) ? sec : DEFAULTS.killCooldownSec) * 2) / 2, 10, 60);
+    }
+    if (patch.killDistance !== undefined) {
+      next.killDistance = KILL_DISTANCE[patch.killDistance] ? patch.killDistance : DEFAULTS.killDistance;
+    }
+    if (patch.speed !== undefined) {
+      next.speed = clamp(Math.round((Number(patch.speed) || 1) * 4) / 4, 0.5, 3);
+    }
+    if (patch.crewVision !== undefined) {
+      next.crewVision = clamp(Math.round((Number(patch.crewVision) || 1) * 4) / 4, 0.25, 2);
+    }
+    if (patch.discussionSec !== undefined) {
+      next.discussionSec = clamp(Math.round(Number(patch.discussionSec) || 15), 5, 60);
+    }
+    if (patch.votingSec !== undefined) {
+      next.votingSec = clamp(Math.round(Number(patch.votingSec) || 20), 10, 60);
+    }
     state.settings = next;
     return { ok: true };
   }
@@ -610,6 +983,9 @@ window.ImposterCore = (function () {
       player.ventCooldown = 0;
       player.emergencyUsed = false;
       player.gas = false;
+      player.tasks = drawTasks(rng);
+      player.tasksDone = [];
+      player.lastChat = -9999;
     }
 
     state.phase = 'play';
@@ -617,9 +993,11 @@ window.ImposterCore = (function () {
     state.meeting = null;
     state.winner = null;
     state.over = null;
-    state.tasksDone = [];
+    state.chat = [];
+    state.ghostChat = [];
     state.sabotage = null;
-    state.sabotageCooldown = 0;
+    state.doors = null;
+    state.sabotageCooldown = 10;
     placeRing(state);
     emit(state, { t: 'start' });
     return { ok: true };
@@ -644,8 +1022,10 @@ window.ImposterCore = (function () {
     state.meeting = null;
     state.winner = null;
     state.over = null;
-    state.tasksDone = [];
+    state.chat = [];
+    state.ghostChat = [];
     state.sabotage = null;
+    state.doors = null;
     state.sabotageCooldown = 0;
     for (const player of state.players) {
       player.alive = true;
@@ -656,6 +1036,8 @@ window.ImposterCore = (function () {
       player.cooldown = 0;
       player.ventCooldown = 0;
       player.emergencyUsed = false;
+      player.tasks = [];
+      player.tasksDone = [];
       player.dir = { x: 0, y: 0 };
       player.goto = null;
     }
@@ -668,12 +1050,18 @@ window.ImposterCore = (function () {
       caller,
       reason,
       bodyOf,
+      phase: 'discussion',
+      msLeft: Math.max(5, Number(state.settings.discussionSec) || 15) * 1000,
       votes: {},
       voters: state.players.filter(player => player.alive).map(player => player.id),
-      msLeft: MEETING_MS,
+      chat: [],
     };
     state.bodies = [];
+    // A report clears every sabotage; the crew never loses to a timer mid-meeting.
     state.sabotage = null;
+    state.doors = null;
+    state.sabotageCooldown = 0;
+    state.chat = [];
     for (const player of state.players) {
       player.dir = { x: 0, y: 0 };
       player.goto = null;
@@ -710,11 +1098,13 @@ window.ImposterCore = (function () {
 
     state.meeting = null;
     state.bodies = [];
+    state.chat = [];
     emit(state, { t: 'eject', id: ejected, role: ejectedRole, tie: tie || choice === 'skip' });
 
     if (!checkWin(state)) {
       state.phase = 'play';
       placeRing(state);
+      state.sabotageCooldown = SABOTAGE_COOLDOWN;
       for (const player of state.players) {
         if (player.role === 'impostor') player.cooldown = state.settings.killCooldownSec;
       }
@@ -729,18 +1119,21 @@ window.ImposterCore = (function () {
     const living = state.players.filter(player => player.alive);
     const impostors = living.filter(player => player.role === 'impostor');
     const crew = living.filter(player => player.role === 'crew');
+    const totals = taskTotals(state);
 
     let winner = null;
     if (!state.players.some(player => player.role === 'impostor')) winner = 'crew';
     else if (impostors.length === 0) winner = 'crew';
     else if (crew.length === 0) winner = 'impostor';
     else if (impostors.length >= crew.length) winner = 'impostor';
-    else if (state.tasksDone.length >= TASKS.length) winner = 'crew';
+    else if (totals.total > 0 && totals.done >= totals.total) winner = 'crew';
 
     if (winner) {
       state.phase = 'over';
       state.winner = winner;
       state.meeting = null;
+      state.sabotage = null;
+      state.doors = null;
       state.over = {
         winner,
         msLeft: RESET_MS,
@@ -757,7 +1150,7 @@ window.ImposterCore = (function () {
 
   /* ── movement, straight out of sprites.py ────────────────────────────── */
 
-  function movePlayer(player, dt) {
+  function movePlayer(player, dt, speed, extra) {
     if (player.goto) {
       const target = centreOf({ x: player.goto.x, y: player.goto.y });
       const dx = target.x - (player.x + PLAYER_W / 2);
@@ -781,12 +1174,12 @@ window.ImposterCore = (function () {
     }
 
     const ghostsWalkThroughWalls = !player.alive;
-    const stepX = dirX * SPEED * dt;
-    const stepY = dirY * SPEED * dt;
+    const stepX = dirX * speed * dt;
+    const stepY = dirY * speed * dt;
 
     if (stepX) {
       const nextX = player.x + stepX;
-      const hit = ghostsWalkThroughWalls ? null : overlapsWall(nextX, player.y);
+      const hit = ghostsWalkThroughWalls ? null : overlapsWall(nextX, player.y, extra);
       if (hit) {
         player.x = stepX > 0 ? hit[0] - PLAYER_W : hit[0] + hit[2];
         player.dir = { x: 0, y: player.dir.y };
@@ -796,7 +1189,7 @@ window.ImposterCore = (function () {
     }
     if (stepY) {
       const nextY = player.y + stepY;
-      const hit = ghostsWalkThroughWalls ? null : overlapsWall(player.x, nextY);
+      const hit = ghostsWalkThroughWalls ? null : overlapsWall(player.x, nextY, extra);
       if (hit) {
         player.y = stepY > 0 ? hit[1] - PLAYER_H : hit[1] + hit[3];
         player.dir = { x: player.dir.x, y: 0 };
@@ -809,34 +1202,53 @@ window.ImposterCore = (function () {
   }
 
   function step(state, dtMs, rng = Math.random) {
-    const dt = clamp(dtMs, 0, 250) / 1000;
-    state.time += clamp(dtMs, 0, 250);
+    const slice = clamp(dtMs, 0, 250);
+    const dt = slice / 1000;
+    state.time += slice;
 
     if (state.sabotageCooldown > 0) state.sabotageCooldown = Math.max(0, state.sabotageCooldown - dt);
 
-    if (state.sabotage && state.sabotage.kind === 'reactor') {
-      state.sabotage.msLeft -= clamp(dtMs, 0, 250);
-      if (state.sabotage.msLeft <= 0) {
-        state.sabotage = null;
-        state.winner = 'impostor';
-        state.phase = 'over';
-        state.over = {
-          winner: 'impostor',
-          msLeft: RESET_MS,
-          roles: state.players.map(player => ({ id: player.id, name: player.name, role: player.role, alive: player.alive })),
-        };
-        emit(state, { t: 'win', winner: 'impostor' });
+    if (state.sabotage) {
+      const def = sabotageDef(state.sabotage.kind);
+      if (def && def.critical) {
+        state.sabotage.msLeft -= slice;
+        if (state.sabotage.msLeft <= 0) {
+          state.sabotage = null;
+          state.winner = 'impostor';
+          state.phase = 'over';
+          state.over = {
+            winner: 'impostor',
+            msLeft: RESET_MS,
+            roles: state.players.map(player => ({ id: player.id, name: player.name, role: player.role, alive: player.alive })),
+          };
+          emit(state, { t: 'win', winner: 'impostor' });
+        }
+      }
+    }
+
+    if (state.doors) {
+      state.doors.msLeft -= slice;
+      if (state.doors.msLeft <= 0) {
+        emit(state, { t: 'doors', room: state.doors.room, open: true });
+        state.doors = null;
       }
     }
 
     if (state.meeting) {
-      state.meeting.msLeft -= clamp(dtMs, 0, 250);
-      if (state.meeting.msLeft <= 0) endMeeting(state);
+      state.meeting.msLeft -= slice;
+      if (state.meeting.msLeft <= 0) {
+        if (state.meeting.phase === 'discussion') {
+          state.meeting.phase = 'voting';
+          state.meeting.msLeft = Math.max(10, Number(state.settings.votingSec) || 20) * 1000;
+        } else {
+          endMeeting(state);
+        }
+      }
     }
 
     if (state.phase === 'over') {
       if (state.settings.auto) {
-        state.over.msLeft = Math.max(0, state.over.msLeft - clamp(dtMs, 0, 250));
+        state.over.msLeft = Math.max(0, state.over.msLeft - slice);
         if (state.over.msLeft <= 0) {
           backToLobby(state);
           emit(state, { t: 'lobby', reason: 'next-round' });
@@ -848,12 +1260,14 @@ window.ImposterCore = (function () {
 
     if (state.phase !== 'play' && state.phase !== 'lobby') return;
 
+    const speed = SPEED * clamp(Number(state.settings.speed) || 1, 0.5, 3);
+    const extra = doorBlocks(state);
     for (const player of state.players) {
       if (state.phase === 'play') {
         if (player.cooldown > 0) player.cooldown = Math.max(0, player.cooldown - dt);
         if (player.ventCooldown > 0) player.ventCooldown = Math.max(0, player.ventCooldown - dt);
       }
-      movePlayer(player, dt);
+      movePlayer(player, dt, speed, extra);
     }
   }
 
@@ -867,33 +1281,65 @@ window.ImposterCore = (function () {
     return player.alive ? player : null;
   }
 
-  function canSabotage(state, kind) {
-    if (!state.sabotage && state.sabotageCooldown <= 0) return true;
-    return Boolean(state.sabotage && state.sabotage.kind === kind);
+  function canSabotage(state) {
+    return !state.sabotage && !state.doors && state.sabotageCooldown <= 0;
   }
 
   function sabotage(state, id, kind) {
-    const actor = alive(state, id);
-    if (!actor) return rejected('dead');
+    const actor = getPlayer(state, id);
+    if (!actor) return rejected('unknown-player');
     if (state.phase !== 'play') return rejected('not-playing');
     if (actor.role !== 'impostor') return rejected('not-impostor');
-    if (state.sabotage) return rejected('already-sabotaged');
+    if (state.sabotage || state.doors) return rejected('already-sabotaged');
     if (state.sabotageCooldown > 0) return rejected('sabotage-cooling');
-    if (kind !== 'lights' && kind !== 'reactor') return rejected('unknown-sabotage');
-    state.sabotage = { kind, by: id, msLeft: kind === 'reactor' ? REACTOR_MS : 0 };
+    if (kind === 'doors') {
+      const at = centre(actor);
+      let room = DOOR_ROOMS[0];
+      let best = Infinity;
+      for (const name of DOOR_ROOMS) {
+        const found = roomNamed(name);
+        if (!found) continue;
+        const [x, y, w, h] = found.rect;
+        const d = Math.hypot(x + w / 2 - at.x, y + h / 2 - at.y);
+        if (d < best) {
+          best = d;
+          room = name;
+        }
+      }
+      state.doors = { by: id, room, msLeft: DOOR_MS };
+      state.sabotageCooldown = SABOTAGE_COOLDOWN;
+      emit(state, { t: 'doors', room });
+      return { ok: true };
+    }
+    const def = sabotageDef(kind);
+    if (!def) return rejected('unknown-sabotage');
+    state.sabotage = { kind, by: id, msLeft: def.ms, held: {} };
     state.sabotageCooldown = SABOTAGE_COOLDOWN;
     emit(state, { t: 'sabotage', kind });
     return { ok: true };
   }
 
-  function fix(state, id) {
-    const actor = alive(state, id);
-    if (!actor) return rejected('dead');
+  function fix(state, id, pad) {
+    const actor = getPlayer(state, id);
+    if (!actor) return rejected('unknown-player');
+    if (!actor.alive) return rejected('dead');
     if (state.phase !== 'play') return rejected('not-playing');
     if (!state.sabotage) return rejected('nothing-to-fix');
-    const point = FIX[state.sabotage.kind];
-    if (!point) return rejected('nothing-to-fix');
-    if (dist(centreOf(actor), point) > point.range) return rejected('too-far');
+    const def = sabotageDef(state.sabotage.kind);
+    if (!def) return rejected('nothing-to-fix');
+    const points = def.fixes;
+    const point = pad ? points.find(candidate => candidate.pad === pad) : points[0];
+    if (!point) return rejected('no-pad');
+    if (dist(centre(actor), point) > point.range) return rejected('too-far');
+    if (!state.sabotage.held) state.sabotage.held = {};
+    if (state.sabotage.held[point.pad]) return rejected('already-held');
+    // The reactor's two handprints want two people standing there at once; the
+    // O2 keypads stay entered, so one crewmate can run between them.
+    if (def.simultaneous && Object.values(state.sabotage.held).includes(id)) return rejected('already-held');
+    state.sabotage.held[point.pad] = id;
+    emit(state, { t: 'hold', kind: state.sabotage.kind, pad: point.pad, id });
+    const done = points.every(candidate => state.sabotage.held[candidate.pad]);
+    if (!done) return { ok: true, waiting: true };
     const kind = state.sabotage.kind;
     state.sabotage = null;
     state.sabotageCooldown = SABOTAGE_COOLDOWN;
@@ -938,25 +1384,42 @@ window.ImposterCore = (function () {
       case 'lobby':
         return backToLobby(state, id);
       case 'use': {
-        const actor = alive(state, id);
-        if (!actor) return rejected('dead');
         if (state.phase !== 'play') return rejected('not-playing');
-        if (actor.role !== 'crew') return rejected('not-crew');
+        if (player.role !== 'crew') return rejected('not-crew');
+        if (!player.tasks || !player.tasks.length) return rejected('no-tasks');
         if (message.station === GASCAN.id) {
-          if (dist(centreOf(actor), GASCAN) > GASCAN.range) return rejected('too-far');
-          actor.gas = true;
+          if (dist(centre(player), GASCAN) > GASCAN.range) return rejected('too-far');
+          player.gas = true;
           emit(state, { t: 'gas', id });
           return { ok: true };
         }
         const task = stationById(message.station);
         if (!task) return rejected('no-station');
-        if (state.tasksDone.includes(task.id)) return rejected('already-done');
-        if (dist(centreOf(actor), task) > task.range) return rejected('too-far');
-        if (task.id === 'fuel' && !actor.gas) return rejected('need-gas');
-        state.tasksDone.push(task.id);
-        actor.gas = false;
+        if (!player.tasks.includes(task.id)) return rejected('not-your-task');
+        if (player.tasksDone.includes(task.id)) return rejected('already-done');
+        if (dist(centre(player), task) > task.range) return rejected('too-far');
+        if (task.id === 'fuel' && !player.gas) return rejected('need-gas');
+        player.tasksDone.push(task.id);
+        player.gas = false;
         emit(state, { t: 'task', id, station: task.id });
         checkWin(state);
+        return { ok: true };
+      }
+      case 'chat': {
+        const text = cleanChat(message.text);
+        if (!text) return rejected('empty-chat');
+        if (state.phase !== 'play' && state.phase !== 'meeting') return rejected('not-chatting');
+        if (state.time - (player.lastChat || -9999) < 1200) return rejected('chat-slow');
+        player.lastChat = state.time;
+        const ghost = !player.alive;
+        // Living crew only talk during a meeting; ghosts chat among themselves
+        // whenever they like, which is exactly the real split.
+        if (!ghost && state.phase !== 'meeting') return rejected('chat-in-meeting');
+        const list = ghost ? state.ghostChat : state.chat;
+        list.push({ seat: player.id, name: player.name, text, at: Math.round(state.time) });
+        if (list.length > 40) list.shift();
+        if (state.meeting) state.meeting.chat = state.chat.slice(-24);
+        emit(state, { t: 'chat', id: player.id, ghost, text });
         return { ok: true };
       }
       case 'kill': {
@@ -969,7 +1432,8 @@ window.ImposterCore = (function () {
         const victim = alive(state, message.target);
         if (!victim) return rejected('no-target');
         if (victim.role === 'impostor') return rejected('teammate');
-        if (dist(centreOf(actor), centreOf(victim)) > KILL_RANGE) return rejected('too-far');
+        const reach = KILL_DISTANCE[state.settings.killDistance] || KILL_RANGE;
+        if (dist(centre(actor), centre(victim)) > reach) return rejected('too-far');
         victim.alive = false;
         victim.dir = { x: 0, y: 0 };
         victim.goto = null;
@@ -985,7 +1449,7 @@ window.ImposterCore = (function () {
         if (state.phase !== 'play') return rejected('not-playing');
         if (actor.role !== 'impostor') return rejected('not-impostor');
         if (actor.ventCooldown > 0) return rejected('venting-cooldown');
-        const here = nearestVent(centreOf(actor));
+        const here = nearestVent(centre(actor));
         if (!here) return rejected('no-vent');
         // game.py hops to random.choice(self.vent); same ship-wide network here.
         const destination = VENTS[Math.floor(Math.random() * VENTS.length)];
@@ -1000,7 +1464,7 @@ window.ImposterCore = (function () {
       case 'sabotage':
         return sabotage(state, id, message.kind);
       case 'fix':
-        return fix(state, id);
+        return fix(state, id, message.pad);
       case 'report': {
         const actor = alive(state, id);
         if (!actor) return rejected('dead');
@@ -1008,7 +1472,7 @@ window.ImposterCore = (function () {
         if (actor.role === 'impostor' && state.sabotage) return rejected('sabotage-running');
         const body = state.bodies.find(candidate => candidate.id === message.body);
         if (!body) return rejected('no-body');
-        if (dist(centreOf(actor), centreOf(body)) > REPORT_RANGE) return rejected('too-far');
+        if (dist(centre(actor), centre(body)) > REPORT_RANGE) return rejected('too-far');
         startMeeting(state, { caller: id, reason: 'body', bodyOf: body.of });
         return { ok: true };
       }
@@ -1017,7 +1481,7 @@ window.ImposterCore = (function () {
         if (!actor) return rejected('dead');
         if (state.phase !== 'play') return rejected('not-playing');
         if (actor.emergencyUsed) return rejected('already-used');
-        if (dist(centreOf(actor), BUTTON) > BUTTON_RANGE) return rejected('too-far');
+        if (dist(centre(actor), BUTTON) > BUTTON_RANGE) return rejected('too-far');
         actor.emergencyUsed = true;
         startMeeting(state, { caller: id, reason: 'button' });
         return { ok: true };
@@ -1025,6 +1489,7 @@ window.ImposterCore = (function () {
       case 'vote': {
         const meeting = state.meeting;
         if (!meeting || state.phase !== 'meeting') return rejected('no-meeting');
+        if (meeting.phase !== 'voting') return rejected('not-voting');
         if (!meeting.voters.includes(id)) return rejected('dead-cannot-vote');
         if (meeting.votes[id] !== undefined) return rejected('already-voted');
         const target = message.target;
@@ -1045,40 +1510,59 @@ window.ImposterCore = (function () {
   function actionHints(state, viewer) {
     const hints = {
       use: null, gas: false, kill: null, vent: null, report: null,
-      button: false, fix: false,
-      sabotage: { lights: false, reactor: false },
+      button: false, fix: [], room: null,
+      sabotage: { reactor: false, o2: false, lights: false, comms: false, doors: false },
     };
-    if (state.phase !== 'play' || !viewer || !viewer.alive) return hints;
-    const at = centreOf(viewer);
+    if (state.phase !== 'play' || !viewer) return hints;
+    const at = centre(viewer);
+    const comms = state.sabotage && state.sabotage.kind === 'comms';
 
-    if (viewer.role === 'crew') {
+    if (viewer.tasks && viewer.tasks.length) {
       const open = TASKS
-        .filter(task => !state.tasksDone.includes(task.id) && dist(at, task) <= task.range)
+        .filter(task => viewer.tasks.includes(task.id) && !viewer.tasksDone.includes(task.id) && dist(at, task) <= task.range)
         .sort((a, b) => dist(at, a) - dist(at, b));
       hints.use = open.length ? open[0].id : null;
-      hints.gas = !viewer.gas && dist(at, GASCAN) <= GASCAN.range;
+      hints.gas = !viewer.gas && dist(at, GASCAN) <= GASCAN.range && viewer.tasks.includes('fuel');
+    }
+
+    if (viewer.alive && !comms) {
+      let best = null;
+      for (const [name, console] of Object.entries(CONSOLES)) {
+        const d = dist(at, console);
+        if (d <= console.range && (!best || d < best.d)) best = { name, d };
+      }
+      hints.room = best ? best.name : null;
     }
 
     if (viewer.role === 'impostor') {
-      if (viewer.cooldown <= 0) {
-        const targets = state.players.filter(
-          player => player.alive && player.role === 'crew' && dist(at, centreOf(player)) <= KILL_RANGE,
-        );
-        hints.kill = targets.sort((a, b) => dist(at, centreOf(a)) - dist(at, centreOf(b)))[0]?.id || null;
+      if (viewer.alive) {
+        if (viewer.cooldown <= 0) {
+          const reach = KILL_DISTANCE[state.settings.killDistance] || KILL_RANGE;
+          const targets = state.players.filter(
+            player => player.alive && player.role === 'crew' && dist(at, centre(player)) <= reach,
+          );
+          hints.kill = targets.sort((a, b) => dist(at, centre(a)) - dist(at, centre(b)))[0]?.id || null;
+        }
+        if (viewer.ventCooldown <= 0 && nearestVent(at)) hints.vent = 'vent';
       }
-      if (viewer.ventCooldown <= 0 && nearestVent(at)) hints.vent = 'vent';
-      hints.sabotage.lights = canSabotage(state, 'lights');
-      hints.sabotage.reactor = canSabotage(state, 'reactor');
+      for (const kind of SABOTAGE_KINDS) hints.sabotage[kind] = canSabotage(state);
     }
 
-    const body = state.bodies
-      .filter(candidate => dist(at, centreOf(candidate)) <= REPORT_RANGE)
-      .sort((a, b) => dist(at, centreOf(a)) - dist(at, centreOf(b)))[0];
-    hints.report = body ? body.id : null;
-    hints.button = !viewer.emergencyUsed && dist(at, BUTTON) <= BUTTON_RANGE;
+    if (viewer.alive) {
+      const body = state.bodies
+        .filter(candidate => dist(at, centre(candidate)) <= REPORT_RANGE)
+        .sort((a, b) => dist(at, centre(a)) - dist(at, centre(b)))[0];
+      hints.report = body ? body.id : null;
+      hints.button = !viewer.emergencyUsed && dist(at, BUTTON) <= BUTTON_RANGE;
+    }
+
     if (state.sabotage) {
-      const point = FIX[state.sabotage.kind];
-      hints.fix = Boolean(point && dist(at, point) <= point.range);
+      const def = sabotageDef(state.sabotage.kind);
+      if (def && viewer.alive) {
+        for (const point of def.fixes) {
+          if (dist(at, point) <= point.range) hints.fix.push(point.pad);
+        }
+      }
     }
     return hints;
   }
@@ -1086,6 +1570,9 @@ window.ImposterCore = (function () {
   function snapshotFor(state, viewerId) {
     const viewer = getPlayer(state, viewerId);
     const meeting = state.meeting;
+    const totals = taskTotals(state);
+    const mine = viewer ? viewer.tasks || [] : [];
+    const myDone = viewer ? viewer.tasksDone || [] : [];
 
     return {
       code: state.code,
@@ -1096,17 +1583,28 @@ window.ImposterCore = (function () {
       map: { w: WORLD.w, h: WORLD.h, view: VIEW },
       button: BUTTON,
       vents: VENTS.map(vent => ({ x: vent[0], y: vent[1] })),
-      tasks: { done: state.tasksDone.slice(), total: TASKS.length },
+      tasks: { done: totals.done, total: totals.total },
       stations: TASKS.map(task => ({
-        id: task.id, label: task.label, x: task.x, y: task.y, range: task.range,
-        done: state.tasksDone.includes(task.id),
+        id: task.id, label: task.label, x: task.x, y: task.y, range: task.range, room: task.room,
+        done: myDone.includes(task.id),
+        mine: mine.includes(task.id),
       })),
       gas: GASCAN,
-      fix: state.sabotage ? FIX[state.sabotage.kind] : null,
+      fix: state.sabotage
+        ? { ...(sabotageDef(state.sabotage.kind)?.fixes[0] || null), pads: sabotageDef(state.sabotage.kind)?.fixes || [] }
+        : null,
       sabotage: state.sabotage
-        ? { kind: state.sabotage.kind, msLeft: Math.max(0, Math.round(state.sabotage.msLeft)) }
+        ? { kind: state.sabotage.kind, msLeft: Math.max(0, Math.round(state.sabotage.msLeft)), held: Object.keys(state.sabotage.held || {}) }
+        : null,
+      doors: state.doors
+        ? { room: state.doors.room, msLeft: Math.max(0, Math.round(state.doors.msLeft)), rects: doorRects(state.doors.room) }
         : null,
       sabotageCooldown: Math.ceil(state.sabotageCooldown),
+      rooms: ROOMS,
+      cams: CAMS,
+      vision: visionFor(state, viewer),
+      chat: state.chat.slice(-24),
+      ghostChat: viewer && !viewer.alive ? state.ghostChat.slice(-24) : [],
       you: viewer
         ? {
             id: viewer.id,
@@ -1115,8 +1613,12 @@ window.ImposterCore = (function () {
             ready: viewer.ready,
             host: viewer.host,
             gas: viewer.gas,
-            done: state.tasksDone.length,
-            total: TASKS.length,
+            done: myDone.length,
+            total: mine.length,
+            tasks: mine.map(id => {
+              const task = stationById(id);
+              return { id, label: task?.label || id, room: task?.room || '', done: myDone.includes(id) };
+            }),
             cooldown: Math.ceil(viewer.cooldown),
             ventCooldown: Math.ceil(viewer.ventCooldown),
             emergencyUsed: viewer.emergencyUsed,
@@ -1131,6 +1633,8 @@ window.ImposterCore = (function () {
         alive: player.alive,
         x: round(player.x),
         y: round(player.y),
+        taskCount: (player.tasks || []).length,
+        taskDone: (player.tasksDone || []).length,
         role: state.phase === 'over' || player.revealed ? player.role : undefined,
         teammate: viewer && viewer.role === 'impostor' && player.role === 'impostor' && player.id !== viewer.id ? true : undefined,
       })),
@@ -1140,9 +1644,11 @@ window.ImposterCore = (function () {
             caller: meeting.caller,
             reason: meeting.reason,
             bodyOf: meeting.bodyOf,
+            phase: meeting.phase,
             msLeft: Math.max(0, Math.round(meeting.msLeft)),
             voted: Object.keys(meeting.votes),
             total: meeting.voters.length,
+            chat: meeting.chat || state.chat.slice(-24),
             canVote: viewer ? meeting.voters.includes(viewer.id) : false,
           }
         : null,
@@ -1154,7 +1660,7 @@ window.ImposterCore = (function () {
 
   const SNAPSHOT_MS = 100;
   const MIRROR_MS = 1200;
-  const PUBLIC_EVENTS = new Set(['start', 'meeting', 'eject', 'win', 'vote', 'task', 'join', 'lobby', 'sabotage', 'fixed', 'gas']);
+  const PUBLIC_EVENTS = new Set(['start', 'meeting', 'eject', 'win', 'vote', 'task', 'join', 'lobby', 'sabotage', 'fixed', 'gas', 'chat', 'doors', 'hold']);
 
   function adoptState(source, { newHostId = null, hostId = 'host' } = {}) {
     let state;
@@ -1172,6 +1678,14 @@ window.ImposterCore = (function () {
     state.settings = Object.assign({}, DEFAULTS, state.settings || {});
     if (!Array.isArray(state.bodies)) state.bodies = [];
     if (!Array.isArray(state.tasksDone)) state.tasksDone = [];
+    if (!Array.isArray(state.chat)) state.chat = [];
+    if (!Array.isArray(state.ghostChat)) state.ghostChat = [];
+    if (!('doors' in state)) state.doors = null;
+    for (const player of state.players) {
+      if (!Array.isArray(player.tasks)) player.tasks = [];
+      if (!Array.isArray(player.tasksDone)) player.tasksDone = [];
+      if (state.phase !== 'lobby' && !player.tasks.length && player.role === 'crew') player.tasks = drawTasks();
+    }
 
     const oldHost = newHostId
       ? state.players.find(player => player.host && player.id !== newHostId)
@@ -1268,8 +1782,12 @@ window.ImposterCore = (function () {
           player.ready ? 1 : 0, player.revealed ? 1 : 0, player.gas ? 1 : 0,
           Math.ceil(player.cooldown || 0), Math.ceil(player.ventCooldown || 0)].join(',')).join(';');
       const votes = state.meeting && state.meeting.votes ? Object.keys(state.meeting.votes).length : 0;
-      return [state.phase, players, state.bodies.length, votes, state.tasksDone.length,
-        state.sabotage ? state.sabotage.kind : '-', Math.ceil(state.sabotageCooldown),
+      const totals = taskTotals(state);
+      return [state.phase, players, state.bodies.length, votes, totals.done + '/' + totals.total,
+        state.chat.length, state.ghostChat.length,
+        (state.meeting && state.meeting.phase) || '-',
+        state.sabotage ? state.sabotage.kind + ':' + Object.keys(state.sabotage.held || {}).length : '-',
+        state.doors ? state.doors.room : '-', Math.ceil(state.sabotageCooldown),
         Math.ceil(((state.meeting && state.meeting.msLeft) || 0) / 1000),
         Math.ceil(((state.over && state.over.msLeft) || 0) / 1000)].join('|');
     }
@@ -1404,10 +1922,12 @@ window.ImposterCore = (function () {
   }
 
   return {
-    WORLD, VIEW, SPEED, PLAYER_W, PLAYER_H, WALLS, SPAWNS, VENTS, BUTTON, TASKS, GASCAN, FIX,
+    WORLD, VIEW, SPEED, PLAYER_W, PLAYER_H, WALLS, SPAWNS, VENTS, BUTTON, TASKS, GASCAN,
+    ROOMS, CAMS, CONSOLES, SABOTAGE, SABOTAGE_KINDS, DOOR_ROOMS, KILL_DISTANCE, VISION_BASE,
     COLORS, DEFAULTS, SNAPSHOT_MS, KILL_COOLDOWN, SABOTAGE_COOLDOWN, REACTOR_MS, KILL_RANGE,
-    REPORT_RANGE, BUTTON_RANGE, VENT_RANGE, MEETING_MS, RESET_MS, ABSENT_MS, MIN_PLAYERS, MAX_PLAYERS,
-    stationById, overlapsWall, nearestVent, createGame, addPlayer, removePlayer, getPlayer, setReady,
+    REPORT_RANGE, BUTTON_RANGE, VENT_RANGE, RESET_MS, ABSENT_MS, MIN_PLAYERS, MAX_PLAYERS,
+    stationById, overlapsWall, nearestVent, roomAt, doorRects, taskTotals, drawTasks,
+    createGame, addPlayer, removePlayer, getPlayer, setReady,
     configure, start, beginRound, maybeAutoStart, backToLobby, endMeeting, checkWin, apply, step,
     snapshotFor, drainEvents, adoptState, createHostRoom,
   };
@@ -2265,7 +2785,23 @@ window.ImposterNet = (function () {
     'room-full': 'The room is full (10).',
     'already-joined': 'You are already in this room.',
     'unknown-player': 'The host lost your seat.',
+    'not-your-task': 'That task is not on your list.',
+    'no-tasks': 'You have no tasks.',
+    'not-host': 'Only the host sets the rules.',
+    'not-voting': 'Voting has not started yet.',
+    'chat-slow': 'Slow down a moment.',
+    'chat-in-meeting': 'Talk in the meeting.',
+    'empty-chat': 'Say something.',
+    'already-held': 'Somebody is already holding this one.',
+    'no-pad': 'Nothing to hold here.',
   };
+
+  // Quick chat, the way the real wheel works: whole phrases, never free text.
+  const PHRASES = [
+    'Where?', 'Who?', 'I saw them vent', 'It was them', 'I was doing tasks',
+    'I was with someone', 'Follow me', 'Sus', 'I am crew', 'They are safe',
+    'Skip', 'Any sus?', 'Meeting!', 'They ran away',
+  ];
 
   let session = null;
   let snap = null;
@@ -2421,6 +2957,8 @@ window.ImposterNet = (function () {
     selfId = 'host';
     listKeys.clear();
     closeTask();
+    closeRoom();
+    $('overlay-chat').hidden = true;
     $('overlay-meeting').hidden = true;
     $('overlay-over').hidden = true;
     $('overlay-list').hidden = true;
@@ -2493,6 +3031,8 @@ window.ImposterNet = (function () {
       $('overlay-meeting').hidden = true;
       $('overlay-over').hidden = true;
       closeTask();
+      closeRoom();
+      $('overlay-chat').hidden = true;
       renderLobby(next, hosting, publicRoom);
       return;
     }
@@ -2502,12 +3042,15 @@ window.ImposterNet = (function () {
     $('actions').hidden = false;
     $('task-bar').hidden = false;
     renderHud(next);
+    if (roomKind && next.actions?.room !== roomKind) closeRoom();
+    if (!$('overlay-chat').hidden) renderChat($('chat-log'), next.ghostChat || [], true);
     $('lobby-note').textContent = '';
 
     if (next.phase === 'meeting') {
       $('overlay-over').hidden = true;
       $('overlay-meeting').hidden = false;
       closeTask();
+      closeRoom();
       renderMeeting(next);
     } else {
       $('overlay-meeting').hidden = true;
@@ -2544,7 +3087,15 @@ window.ImposterNet = (function () {
   }
 
   function applySettingsToForm(settings) {
-    for (const [id, value] of [['set-impostors', settings.impostors], ['set-cooldown', settings.killCooldownSec]]) {
+    const fields = [
+      ['set-cooldown', settings.killCooldownSec],
+      ['set-distance', settings.killDistance],
+      ['set-speed', settings.speed],
+      ['set-vision', settings.crewVision],
+      ['set-discussion', settings.discussionSec],
+      ['set-voting', settings.votingSec],
+    ];
+    for (const [id, value] of fields) {
       const field = $(id);
       if (field && document.activeElement !== field) field.value = String(value);
     }
@@ -2559,16 +3110,18 @@ window.ImposterNet = (function () {
     const parts = [];
     if (!you.alive) parts.push('ghost');
     parts.push(you.role === 'impostor' ? 'impostor' : 'crewmate');
-    if (you.role === 'crew') parts.push(`${you.done}/${you.total} tasks`);
+    if (you.total) parts.push(`${you.done}/${you.total} tasks`);
     if (you.role === 'impostor' && you.alive) {
       parts.push(you.cooldown > 0 ? `kill ${you.cooldown}s` : 'kill ready');
     }
-    if (s.sabotage?.kind === 'lights') parts.push('lights out');
-    if (s.sabotage?.kind === 'reactor') parts.push(`reactor ${Math.ceil(s.sabotage.msLeft / 1000)}s`);
+    const names = { reactor: 'reactor', o2: 'O2', lights: 'lights', comms: 'comms' };
+    if (s.sabotage) parts.push(`${names[s.sabotage.kind] || s.sabotage.kind} ${Math.ceil(s.sabotage.msLeft / 1000)}s`);
+    else if (s.doors) parts.push(`doors ${Math.ceil(s.doors.msLeft / 1000)}s`);
     $('hud').textContent = parts.join(' · ');
 
     const fill = $('task-bar').firstElementChild;
-    fill.style.width = `${Math.round((s.tasks.done.length / s.tasks.total) * 100)}%`;
+    fill.style.width = `${s.tasks.total ? Math.round((s.tasks.done / s.tasks.total) * 100) : 0}%`;
+    $('task-bar').hidden = you.role === 'impostor' || s.phase !== 'play';
 
     const actions = s.actions;
     $('act-use').hidden = !actions.use;
@@ -2577,44 +3130,84 @@ window.ImposterNet = (function () {
     $('act-vent').hidden = !actions.vent;
     $('act-report').hidden = !actions.report;
     $('act-button').hidden = !actions.button;
-    $('act-fix').hidden = !actions.fix;
+    $('act-fix').hidden = !actions.fix.length;
+    if (actions.fix.length) $('act-fix').dataset.pad = actions.fix[0];
 
-    const canSabotage = you.role === 'impostor' && you.alive && s.phase === 'play';
-    $('sab-lights').hidden = !canSabotage || !actions.sabotage.lights;
-    $('sab-reactor').hidden = !canSabotage || !actions.sabotage.reactor;
+    const canSabotage = you.role === 'impostor' && s.phase === 'play';
+    const chips = { lights: 'sab-lights', reactor: 'sab-reactor', o2: 'sab-o2', comms: 'sab-comms', doors: 'sab-doors' };
+    for (const [kind, id] of Object.entries(chips)) $(id).hidden = !canSabotage || !actions.sabotage[kind];
+
+    $('open-vitals').hidden = actions.room !== 'vitals';
+    $('open-admin').hidden = actions.room !== 'admin';
+    $('open-cams').hidden = actions.room !== 'cams';
+    $('open-chat').hidden = you.alive;
 
     const note = $('sabotage-note');
-    if (s.sabotage?.kind === 'reactor') {
+    const def = s.sabotage ? C.SABOTAGE[s.sabotage.kind] : null;
+    if (def) {
       note.hidden = false;
-      note.textContent = `Reactor meltdown in ${Math.ceil(s.sabotage.msLeft / 1000)}s — reset it in Reactor.`;
-    } else if (s.sabotage?.kind === 'lights') {
+      note.textContent = `${def.label} — ${def.where}. ${Math.ceil(s.sabotage.msLeft / 1000)}s left.`;
+    } else if (s.doors) {
       note.hidden = false;
-      note.textContent = 'Lights out — fix the breaker in Electrical.';
+      note.textContent = `Doors sealed in ${s.doors.room}.`;
     } else {
       note.hidden = true;
     }
   }
 
+  function renderChat(node, lines, ghostMode) {
+    const key = (ghostMode ? 'g' : 'l') + lines.map(line => `${line.seat}:${line.at}:${line.text}`).join('|');
+    setList(node, key, box => {
+      if (!lines.length) {
+        box.append(el('p', 'chat-empty', ghostMode ? 'Only the dead can read this.' : 'Say something to the room.'));
+        return;
+      }
+      for (const line of lines.slice(-12)) {
+        const row = el('p', 'chat-line');
+        row.append(el('span', 'chat-who', `${line.name}: `), document.createTextNode(line.text));
+        box.append(row);
+      }
+      box.scrollTop = box.scrollHeight;
+    });
+  }
+
+  function renderPhrases(node, ghostMode) {
+    setList(node, ghostMode ? 'phrases-g' : 'phrases', box => {
+      for (const text of PHRASES) {
+        const button = el('button', 'phrase', text);
+        button.type = 'button';
+        button.addEventListener('click', () => {
+          send({ t: 'chat', text });
+          button.disabled = true;
+          setTimeout(() => { button.disabled = false; }, 1300);
+        });
+        box.append(button);
+      }
+    });
+  }
+
   function renderMeeting(s) {
     const meeting = s.meeting;
     if (!meeting) return;
-    const reason = meeting.reason === 'body' ? 'A body was reported' : 'Emergency meeting';
-    $('meeting-reason').textContent = reason;
+    $('meeting-reason').textContent = meeting.reason === 'body' ? 'A body was reported' : 'Emergency meeting called';
     const alive = s.players.filter(player => player.alive);
     const you = s.you;
+    const voting = meeting.phase === 'voting';
     const voted = meeting.voted.includes(selfId);
     const canVote = meeting.canVote !== false;
     $('meeting-note').textContent = !canVote
       ? 'You joined mid-meeting, so you vote in the next one.'
-      : voted
-        ? 'Vote locked. Waiting for the rest.'
-        : `${alive.length} alive · ${meeting.voted.length}/${meeting.total} voted`;
-    $('meeting-timer').textContent = `${Math.max(0, Math.ceil(meeting.msLeft / 1000))}s`;
+      : !voting
+        ? `${alive.length} alive · discussion first`
+        : voted
+          ? 'Vote locked. Waiting for the rest.'
+          : `${alive.length} alive · ${meeting.voted.length}/${meeting.total} voted`;
+    $('meeting-timer').textContent = `${voting ? 'Vote' : 'Talk'} ${Math.max(0, Math.ceil(meeting.msLeft / 1000))}s`;
 
-    const key = `${reason}|${alive.map(player => player.id).join(',')}|${meeting.voted.join(',')}|${you?.alive}|${canVote}`;
+    const key = `${meeting.phase}|${alive.map(player => player.id).join(',')}|${meeting.voted.join(',')}|${you?.alive}|${canVote}`;
     setList($('votes'), key, list => {
       if (!you?.alive || !canVote) {
-        list.append(el('li', '', you?.alive ? 'Waiting for the next meeting.' : 'Ghosts watch. They do not vote.'));
+        list.append(el('li', '', you?.alive ? 'You are watching this one.' : 'Ghosts watch. They do not vote.'));
         return;
       }
       for (const player of alive) {
@@ -2622,13 +3215,164 @@ window.ImposterNet = (function () {
         const row = playerRow(player, meeting.voted.includes(player.id) ? 'voted' : '');
         const button = el('button', 'vote', 'Vote');
         button.type = 'button';
-        button.disabled = voted;
+        button.disabled = voted || !voting;
         button.addEventListener('click', () => send({ t: 'vote', target: player.id }));
         row.append(button);
         list.append(row);
       }
     });
-    $('skip').disabled = voted || !canVote;
+
+    const skip = $('skip');
+    skip.disabled = voted || !voting || !you?.alive || !canVote;
+    skip.textContent = voting ? 'Skip vote' : 'Discussion…';
+
+    const lines = (meeting.chat || []).slice();
+    if (you && !you.alive) lines.push(...(s.ghostChat || []));
+    renderChat($('meeting-log'), lines, Boolean(you && !you.alive));
+    renderPhrases($('meeting-phrases'), false);
+  }
+
+  /* ── vitals, admin and the cameras ───────────────────────────────────── */
+
+  let roomKind = null;
+  let roomFrame = 0;
+
+  function closeRoom() {
+    roomKind = null;
+    if (roomFrame) cancelAnimationFrame(roomFrame);
+    roomFrame = 0;
+    $('overlay-room').hidden = true;
+    $('room-body').replaceChildren();
+  }
+
+  function openRoom(kind) {
+    if (!snap) return;
+    if (snap.sabotage && snap.sabotage.kind === 'comms') {
+      toast('Comms are down.');
+      return;
+    }
+    closeTask();
+    $('overlay-list').hidden = true;
+    roomKind = kind;
+    $('room-title').textContent = kind === 'vitals' ? 'Vitals' : kind === 'admin' ? 'Admin table' : 'Security cameras';
+    $('overlay-room').hidden = false;
+    const body = $('room-body');
+    body.replaceChildren();
+    if (kind === 'vitals') {
+      const list = el('ul', 'vitals-list');
+      list.id = 'vitals-list';
+      body.append(list);
+      body.append(el('p', 'hint', 'A flat line means a body.'));
+      renderVitals();
+    } else if (kind === 'admin') {
+      const table = el('table', 'admin-table');
+      table.id = 'admin-table';
+      body.append(table);
+      body.append(el('p', 'hint', 'Living crew per room, straight from the table.'));
+      renderAdmin();
+    } else {
+      const grid = el('div', 'cam-grid');
+      for (const cam of C.CAMS) {
+        const cell = el('div', 'cam-cell');
+        const canvas = document.createElement('canvas');
+        canvas.width = 480;
+        canvas.height = 270;
+        canvas.className = 'cam-canvas';
+        canvas.dataset.cam = cam.id;
+        cell.append(canvas, el('span', 'cam-tag', cam.name));
+        grid.append(cell);
+      }
+      body.append(grid);
+      body.append(el('p', 'hint', 'Four feeds. Comms cut them; so does leaving the desk.'));
+      const loop = () => {
+        if (roomKind !== 'cams' || $('overlay-room').hidden) return;
+        for (const canvas of body.querySelectorAll('canvas')) drawCam(canvas);
+        roomFrame = requestAnimationFrame(loop);
+      };
+      loop();
+    }
+  }
+
+  function drawCam(canvas) {
+    const cam = C.CAMS.find(entry => entry.id === canvas.dataset.cam);
+    if (!cam) return;
+    const ctx = canvas.getContext('2d');
+    const sx = MAP_ART.complete && MAP_ART.naturalWidth ? MAP_ART.naturalWidth / C.WORLD.w : 1;
+    const sy = MAP_ART.complete && MAP_ART.naturalHeight ? MAP_ART.naturalHeight / C.WORLD.h : 1;
+    const [x, y, w, h] = cam.rect;
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (MAP_ART.complete && MAP_ART.naturalWidth) {
+      ctx.drawImage(MAP_ART, x * sx, y * sy, w * sx, h * sy, 0, 0, canvas.width, canvas.height);
+    }
+    ctx.fillStyle = 'rgba(5,7,12,.28)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(120,200,150,.18)';
+    ctx.lineWidth = 1;
+    for (let line = 0; line < canvas.height; line += 4) {
+      ctx.beginPath();
+      ctx.moveTo(0, line);
+      ctx.lineTo(canvas.width, line);
+      ctx.stroke();
+    }
+    const viewer = snap?.you;
+    for (const player of snap?.players || []) {
+      if (!player.alive) continue;
+      if (viewer && player.id === viewer.id) continue;
+      const px = player.x + C.PLAYER_W / 2;
+      const py = player.y + C.PLAYER_H / 2;
+      if (px < x || px > x + w || py < y || py > y + h) continue;
+      ctx.fillStyle = colorHex(player.color);
+      ctx.beginPath();
+      ctx.arc(((px - x) / w) * canvas.width, ((py - y) / h) * canvas.height, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0b0d10';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  function renderVitals() {
+    const list = $('vitals-list');
+    if (!list || !snap) return;
+    const players = snap.players;
+    setList(list, 'vitals:' + players.map(p => `${p.id}:${p.alive}`).join('|'), box => {
+      for (const player of players) {
+        const row = el('li', 'vitals-row' + (player.alive ? '' : ' dead'));
+        row.append(el('span', 'vitals-pip'));
+        row.append(el('span', 'name', player.name));
+        row.append(el('span', 'tail', player.alive ? 'alive' : 'dead'));
+        box.append(row);
+      }
+    });
+  }
+
+  function renderAdmin() {
+    const table = $('admin-table');
+    if (!table || !snap) return;
+    const counts = new Map();
+    for (const room of C.ROOMS) counts.set(room.name, 0);
+    for (const player of snap.players) {
+      if (!player.alive) continue;
+      const px = player.x + C.PLAYER_W / 2;
+      const py = player.y + C.PLAYER_H / 2;
+      const room = C.ROOMS.find(entry => {
+        const [x, y, w, h] = entry.rect;
+        return px >= x && px <= x + w && py >= y && py <= y + h;
+      });
+      if (room) counts.set(room.name, counts.get(room.name) + 1);
+    }
+    const rows = [...counts.entries()];
+    setList(table, 'admin:' + rows.map(([name, count]) => name + count).join('|'), box => {
+      const head = el('tr');
+      head.append(el('th', '', 'Room'), el('th', '', 'Crew'));
+      box.append(head);
+      for (const [name, count] of rows) {
+        const row = el('tr');
+        row.append(el('td', '', name), el('td', '', String(count)));
+        box.append(row);
+      }
+    });
   }
 
   function renderOver(s, hosting, publicRoom) {
@@ -2678,11 +3422,21 @@ window.ImposterNet = (function () {
       case 'gas':
         if (event.id === selfId) toast('Gas can in hand. Take it to the engine.');
         break;
-      case 'sabotage':
-        toast(event.kind === 'reactor' ? 'Reactor meltdown.' : 'Lights cut.');
+      case 'sabotage': {
+        const def = C.SABOTAGE[event.kind];
+        toast(def ? `${def.label} — fix it in ${def.where}.` : 'Sabotage running.');
         break;
-      case 'fixed':
-        toast(event.kind === 'reactor' ? 'Reactor reset.' : 'Lights back on.');
+      }
+      case 'fixed': {
+        const def = C.SABOTAGE[event.kind];
+        toast(def ? `${def.label} fixed.` : 'Sabotage fixed.');
+        break;
+      }
+      case 'doors':
+        if (event.open) toast('Doors open again.');
+        else toast(`Doors sealed in ${event.room}.`);
+        break;
+      case 'chat':
         break;
       case 'rejected':
         toast(ERRORS[event.error] || event.error);
@@ -2832,7 +3586,7 @@ window.ImposterNet = (function () {
 
     // Task marks: yellow diamonds for the crew, faded once done.
     for (const station of snap.stations) {
-      if (station.done) continue;
+      if (station.done || !station.mine) continue;
       const crew = you?.role === 'crew';
       ctx.globalAlpha = crew ? 1 : 0.5;
       ctx.fillStyle = crew ? '#f2df6a' : '#8b8e94';
@@ -2852,7 +3606,7 @@ window.ImposterNet = (function () {
     }
 
     // Gas can, only while the crew still needs it.
-    if (you?.role === 'crew' && !you.gas && snap.tasks.done.indexOf('fuel') === -1) {
+    if (you && !you.gas && (you.tasks || []).some(task => task.id === 'fuel' && !task.done)) {
       const gas = snap.gas;
       if (GAS_ART.complete && GAS_ART.naturalWidth) ctx.drawImage(GAS_ART, gas.x - 26, gas.y - 34, 52, 52);
       else {
@@ -2862,15 +3616,18 @@ window.ImposterNet = (function () {
       if (Math.hypot(centreX - gas.x, centreY - gas.y) < 520) label(ctx, 'Gas can', gas.x, gas.y - 44, '#f7efc2', 28);
     }
 
-    // Sabotage repair point.
-    if (snap.fix) {
-      const fix = snap.fix;
-      ctx.strokeStyle = snap.sabotage.kind === 'reactor' ? '#e08a80' : '#e8dfa0';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(fix.x, fix.y, 46, 0, Math.PI * 2);
-      ctx.stroke();
-      label(ctx, fix.label, fix.x, fix.y - 56, '#e8dfa0', 28);
+    // Sabotage repair pads. The reactor and O2 both have two.
+    if (snap.fix && snap.fix.pads) {
+      const held = snap.sabotage?.held || [];
+      for (const pad of snap.fix.pads) {
+        const done = held.includes(pad.pad);
+        ctx.strokeStyle = done ? '#8fd69a' : '#e8dfa0';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(pad.x, pad.y, 46, 0, Math.PI * 2);
+        ctx.stroke();
+        label(ctx, done ? 'held' : pad.label, pad.x, pad.y - 56, done ? '#8fd69a' : '#e8dfa0', 28);
+      }
     }
 
     // Bodies.
@@ -2891,7 +3648,7 @@ window.ImposterNet = (function () {
       const dir = walkVector();
       if (dir.x || dir.y) {
         const length = Math.hypot(dir.x, dir.y) || 1;
-        const step = C.SPEED * dt;
+        const step = C.SPEED * (snap.settings.speed || 1) * dt;
         const nx = selfView.x + (dir.x / length) * step;
         const ny = selfView.y + (dir.y / length) * step;
         const hitX = C.overlapsWall(nx, selfView.y);
@@ -2903,7 +3660,7 @@ window.ImposterNet = (function () {
 
     for (const player of snap.players) {
       const isSelf = player.id === selfId;
-      if (!player.alive && !isSelf) continue;
+      if (!player.alive && !isSelf && you?.alive) continue;
       const entry = view.get(player.id) || { x: player.x, y: player.y, tx: player.x, ty: player.y, dir: 0 };
       let px;
       let py;
@@ -2944,25 +3701,37 @@ window.ImposterNet = (function () {
       label(ctx, player.name, px + C.PLAYER_W / 2, py - 14, isSelf ? '#f2df6a' : '#e7e5e0', 30);
     }
 
-    // Lights out: everything but a circle round the player goes dark, which is
-    // the Python's light mask done with a gradient.
-    if (snap.sabotage?.kind === 'lights') {
-      const cx = centreX;
-      const cy = centreY;
-      const gradient = ctx.createRadialGradient(cx, cy, 40, cx, cy, 620);
+    // Doors: red shutters over the sealed room's doorways.
+    if (snap.doors) {
+      for (const rect of snap.doors.rects) {
+        ctx.fillStyle = 'rgba(150,40,34,.85)';
+        ctx.fillRect(rect[0], rect[1], rect[2], rect[3]);
+        ctx.strokeStyle = 'rgba(230,120,110,.7)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rect[0], rect[1], rect[2], rect[3]);
+      }
+    }
+
+    // Vision: a disc of light around the viewer and black past it. Crew get a
+    // radius, the impostor a wider one, lights sabotage squeezes the crew, and
+    // ghosts get 0, which means the whole ship.
+    if (snap.vision > 0) {
+      const glow = snap.vision;
+      const gradient = ctx.createRadialGradient(centreX, centreY, glow * 0.5, centreX, centreY, glow);
       gradient.addColorStop(0, 'rgba(0,0,0,0)');
-      gradient.addColorStop(0.35, 'rgba(0,0,0,0.25)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.94)');
+      gradient.addColorStop(0.55, 'rgba(0,0,0,0.5)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.985)');
       ctx.fillStyle = gradient;
       ctx.fillRect(camX - 10, camY - 10, viewW + 20, viewH + 20);
     }
 
-    // Reactor: a red wash and the countdown, like the Python's alarm tint.
-    if (snap.sabotage?.kind === 'reactor') {
+    // Critical sabotages: a red wash and the countdown.
+    if (snap.sabotage && C.SABOTAGE[snap.sabotage.kind]?.critical) {
       const pulse = 0.12 + 0.08 * Math.sin(now / 220);
       ctx.fillStyle = `rgba(190,30,20,${pulse})`;
       ctx.fillRect(camX - 10, camY - 10, viewW + 20, viewH + 20);
-      label(ctx, `REACTOR ${Math.ceil(snap.sabotage.msLeft / 1000)}`, camX + viewW / 2, camY + 90, '#ffb3a8', 52);
+      const tag = snap.sabotage.kind === 'o2' ? 'O2' : 'REACTOR';
+      label(ctx, `${tag} ${Math.ceil(snap.sabotage.msLeft / 1000)}`, camX + viewW / 2, camY + 90, '#ffb3a8', 52);
     }
 
     ctx.restore();
@@ -3214,6 +3983,256 @@ window.ImposterNet = (function () {
       window.addEventListener('pointerup', () => { dragging = false; });
       root.append(board, el('p', 'task-help', 'Drag the ship marker onto the centre crosshair.'));
     },
+
+    swipe(root, done) {
+      const track = el('div', 'swipe-track');
+      track.append(el('div', 'swipe-slot'));
+      const card = el('div', 'swipe-card');
+      card.append(el('span', '', 'ID CARD'));
+      track.append(card);
+      const help = el('p', 'task-help', 'Drag the card through the reader in one steady swipe.');
+      let from = 0;
+      let started = 0;
+      let moved = 0;
+      const reset = () => {
+        card.style.transform = 'translateX(0)';
+        moved = 0;
+        started = 0;
+      };
+      card.addEventListener('pointerdown', event => {
+        started = performance.now();
+        from = event.clientX;
+        moved = 0;
+        card.classList.add('dragging');
+        try { card.setPointerCapture(event.pointerId); } catch {}
+      });
+      card.addEventListener('pointermove', event => {
+        if (!started) return;
+        moved = Math.max(0, Math.min(300, event.clientX - from));
+        card.style.transform = `translateX(${moved}px)`;
+        if (moved < 286) return;
+        const took = performance.now() - started;
+        started = 0;
+        card.classList.remove('dragging');
+        if (took < 260) {
+          help.textContent = 'Too fast — the reader rejects a flick.';
+          reset();
+          return;
+        }
+        done();
+      });
+      const release = () => {
+        card.classList.remove('dragging');
+        if (started && moved < 286) {
+          help.textContent = 'Swipe all the way through.';
+          reset();
+        }
+        started = 0;
+      };
+      card.addEventListener('pointerup', release);
+      card.addEventListener('pointercancel', release);
+      root.append(track, help);
+    },
+
+    manifolds(root, done) {
+      const board = el('div', 'keypad');
+      const help = el('p', 'task-help', 'Press 1 to 10 in order.');
+      let next = 1;
+      for (let number = 1; number <= 10; number += 1) {
+        const button = el('button', '', String(number));
+        button.type = 'button';
+        button.addEventListener('click', () => {
+          if (number !== next) {
+            help.textContent = `That was ${number}; the panel wants ${next}.`;
+            return;
+          }
+          button.classList.add('done');
+          button.disabled = true;
+          next += 1;
+          if (next > 10) done();
+        });
+        board.append(button);
+      }
+      root.append(board, help);
+    },
+
+    o2filter(root, done) {
+      const grid = el('div', 'leaf-grid');
+      const total = 8;
+      let cleared = 0;
+      for (let index = 0; index < total; index += 1) {
+        const leaf = el('button', 'leaf', 'Leaf');
+        leaf.type = 'button';
+        leaf.addEventListener('click', () => {
+          if (leaf.classList.contains('cleared')) return;
+          leaf.classList.add('cleared');
+          leaf.textContent = '·';
+          cleared += 1;
+          if (cleared >= total) done();
+        });
+        grid.append(leaf);
+      }
+      root.append(grid, el('p', 'task-help', 'Pull every leaf out of the filter.'));
+    },
+
+    distributor(root, done) {
+      const targets = [42, 56, 68].map(base => base + Math.round(Math.random() * 8) - 4);
+      const solved = targets.map(() => false);
+      root.append(el('p', 'task-help', 'Line the three outputs up with their marks.'));
+      targets.forEach((target, index) => {
+        const row = el('div', 'gauge-row');
+        row.append(el('span', 'gauge-tag', `Output ${index + 1}`));
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = '0';
+        input.max = '100';
+        input.value = '0';
+        const read = () => {
+          const aligned = Math.abs(Number(input.value) - target) <= 4;
+          row.classList.toggle('aligned', aligned);
+          solved[index] = aligned;
+          if (solved.every(Boolean)) done();
+        };
+        input.addEventListener('input', read);
+        row.append(input);
+        root.append(row);
+        read();
+      });
+    },
+
+    shields(root, done) {
+      const grid = el('div', 'hexes');
+      let online = 0;
+      for (let index = 0; index < 7; index += 1) {
+        const hex = el('button', 'hex', 'OFF');
+        hex.type = 'button';
+        hex.addEventListener('click', () => {
+          if (hex.classList.contains('on')) return;
+          hex.classList.add('on');
+          hex.textContent = 'ON';
+          online += 1;
+          if (online >= 7) done();
+        });
+        grid.append(hex);
+      }
+      root.append(grid, el('p', 'task-help', 'Bring all seven shields online.'));
+    },
+
+    scan(root, done) {
+      const bar = el('div', 'scan-bar');
+      const fill = el('i');
+      bar.append(fill);
+      const button = el('button', 'btn btn-primary', 'Hold to scan');
+      button.type = 'button';
+      let timer = 0;
+      let level = 0;
+      const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = 0;
+      };
+      const tick = () => {
+        level = Math.min(100, level + 3);
+        fill.style.width = level + '%';
+        if (level >= 100) {
+          stop();
+          button.disabled = true;
+          done();
+        }
+      };
+      button.addEventListener('pointerdown', () => {
+        if (!timer) timer = setInterval(tick, 60);
+      });
+      button.addEventListener('pointerup', stop);
+      button.addEventListener('pointerleave', stop);
+      root.append(bar, button, el('p', 'task-help', 'Keep the scanner pressed until the bar fills.'));
+      return stop;
+    },
+
+    sample(root, done) {
+      const grid = el('div', 'samples');
+      const odd = Math.floor(Math.random() * 5);
+      const help = el('p', 'task-help', 'Analysing the tray…');
+      const buttons = [];
+      for (let index = 0; index < 5; index += 1) {
+        const button = el('button', 'sample');
+        button.type = 'button';
+        button.append(el('span', 'beaker', '▮'), el('span', '', `Sample ${index + 1}`));
+        button.disabled = true;
+        button.addEventListener('click', () => {
+          if (index !== odd) {
+            help.textContent = 'Clean. Try the one that keeps moving.';
+            return;
+          }
+          done();
+        });
+        grid.append(button);
+        buttons.push(button);
+      }
+      root.append(grid, help);
+      const timer = setTimeout(() => {
+        for (const button of buttons) button.disabled = false;
+        buttons[odd].classList.add('odd');
+        help.textContent = 'Analysis done. One of them is not settling.';
+      }, 2200);
+      return () => clearTimeout(timer);
+    },
+
+    chute(root, done) {
+      const bar = el('div', 'scan-bar');
+      const fill = el('i');
+      bar.append(fill);
+      const button = el('button', 'btn btn-primary', 'Hold to empty');
+      button.type = 'button';
+      let timer = 0;
+      let level = 0;
+      const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = 0;
+      };
+      const tick = () => {
+        level = Math.min(100, level + 6);
+        fill.style.width = level + '%';
+        if (level >= 100) {
+          stop();
+          button.disabled = true;
+          done();
+        }
+      };
+      button.addEventListener('pointerdown', () => {
+        if (!timer) timer = setInterval(tick, 70);
+      });
+      button.addEventListener('pointerup', stop);
+      button.addEventListener('pointerleave', stop);
+      root.append(bar, button, el('p', 'task-help', 'Hold the lever until the chute runs clear.'));
+      return stop;
+    },
+
+    steering(root, done) {
+      const wrap = el('div', 'steer');
+      const dial = document.createElement('input');
+      dial.type = 'range';
+      dial.min = '0';
+      dial.max = '100';
+      dial.value = '50';
+      const state = el('p', 'steer-state', 'Hold the wheel steady.');
+      let drift = 0;
+      let held = 0;
+      const timer = setInterval(() => {
+        drift += (Math.random() - 0.5) * 7;
+        const next = Math.min(100, Math.max(0, Number(dial.value) + drift));
+        dial.value = String(Math.round(next));
+        const centred = Math.abs(Number(dial.value) - 50) <= 6;
+        held = centred ? held + 120 : 0;
+        state.textContent = centred ? `Holding… ${(held / 1000).toFixed(1)}s` : 'Off course.';
+        if (held >= 1500) {
+          clearInterval(timer);
+          done();
+        }
+      }, 120);
+      wrap.append(dial, state);
+      root.append(wrap, el('p', 'task-help', 'Keep the needle inside the centre band for a moment.'));
+      return () => clearInterval(timer);
+    },
   };
 
   function openTask(station) {
@@ -3240,6 +4259,11 @@ window.ImposterNet = (function () {
   }
 
   function openList(kind) {
+    if (snap?.sabotage && snap.sabotage.kind === 'comms') {
+      toast('Comms are down.');
+      return;
+    }
+    closeRoom();
     $('overlay-list').hidden = false;
     $('list-title').textContent = kind === 'map' ? 'The Skeld' : 'Tasks';
     const body = $('list-body');
@@ -3255,15 +4279,19 @@ window.ImposterNet = (function () {
     }
     const you = snap?.you;
     const list = el('ul', 'roster tasks-list');
-    for (const station of snap?.stations || []) {
-      const row = el('li', 'row-item');
-      row.append(el('span', 'dot', station.done ? '✓' : '·'));
-      row.firstElementChild.style.background = station.done ? '#4f8f4f' : 'transparent';
-      row.append(el('span', 'name', station.label));
-      row.append(el('span', 'tail', station.room));
-      list.append(row);
+    if (!you || !you.tasks || !you.tasks.length) {
+      list.append(el('li', 'row-item', you?.role === 'impostor' ? 'Fake tasks. Sabotage, vent, kill.' : 'No tasks dealt.'));
+    } else {
+      for (const task of you.tasks) {
+        const row = el('li', 'row-item');
+        row.append(el('span', 'dot', task.done ? '✓' : '·'));
+        row.firstElementChild.style.background = task.done ? '#4f8f4f' : 'transparent';
+        row.append(el('span', 'name', task.label));
+        row.append(el('span', 'tail', task.room));
+        list.append(row);
+      }
     }
-    if (you?.role === 'crew' && !you.gas && !snap?.tasks.done.includes('fuel')) {
+    if (you?.alive && you?.tasks?.some(task => task.id === 'fuel' && !task.done) && !you.gas) {
       const row = el('li', 'row-item');
       row.append(el('span', 'dot'));
       row.append(el('span', 'name', 'Find a gas can'));
@@ -3272,8 +4300,8 @@ window.ImposterNet = (function () {
     }
     body.append(list);
     body.append(el('p', 'hint', you?.role === 'impostor'
-      ? 'Your list is a decoy. Sabotage, vent and kill; the crew has to finish eight missions.'
-      : `${snap?.tasks.done.length || 0} of ${snap?.tasks.total || 8} missions done.`));
+      ? 'Your list is a decoy. The crew wins by finishing theirs; you have to stop them.'
+      : `${you?.done || 0} of ${you?.total || 0} of your tasks done · ${snap?.tasks.done || 0} of ${snap?.tasks.total || 0} across the ship.`));
   }
 
   function drawMap(canvas) {
@@ -3287,8 +4315,11 @@ window.ImposterNet = (function () {
     }
     const sx = canvas.width / C.WORLD.w;
     const sy = canvas.height / C.WORLD.h;
-    for (const station of snap?.stations || []) {
-      if (station.done) continue;
+    const you = snap?.you;
+    for (const task of you?.tasks || []) {
+      if (task.done) continue;
+      const station = C.stationById(task.id);
+      if (!station) continue;
       ctx.fillStyle = '#f2df6a';
       ctx.beginPath();
       ctx.arc(station.x * sx, station.y * sy, 5, 0, Math.PI * 2);
@@ -3342,9 +4373,12 @@ window.ImposterNet = (function () {
     }
     if (action === 'report' && snap.actions.report) send({ t: 'report', body: snap.actions.report });
     if (action === 'button' && snap.actions.button) send({ t: 'button' });
-    if (action === 'fix' && snap.actions.fix) send({ t: 'fix' });
+    if (action === 'fix' && snap.actions.fix.length) send({ t: 'fix', pad: snap.actions.fix[0] });
     if (action === 'lights') send({ t: 'sabotage', kind: 'lights' });
     if (action === 'reactor') send({ t: 'sabotage', kind: 'reactor' });
+    if (action === 'o2') send({ t: 'sabotage', kind: 'o2' });
+    if (action === 'comms') send({ t: 'sabotage', kind: 'comms' });
+    if (action === 'doors') send({ t: 'sabotage', kind: 'doors' });
   }
 
   function pointerTarget(event) {
@@ -3374,7 +4408,9 @@ window.ImposterNet = (function () {
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'tab'].includes(key)) event.preventDefault();
 
     if (key === 'escape') {
-      if (!$('overlay-list').hidden) $('overlay-list').hidden = true;
+      if (!$('overlay-room').hidden) closeRoom();
+      else if (!$('overlay-chat').hidden) $('overlay-chat').hidden = true;
+      else if (!$('overlay-list').hidden) $('overlay-list').hidden = true;
       else if (!$('overlay-task').hidden) closeTask();
       return;
     }
@@ -3391,7 +4427,7 @@ window.ImposterNet = (function () {
     // game.py's keys: Space interacts/uses, Enter kills, Alt changes vent,
     // Ctrl cuts the lights, Shift sabotages the reactor.
     if (key === ' ' || key === 'spacebar') {
-      if (snap?.actions.fix) trigger('fix');
+      if (snap?.actions.fix?.length) trigger('fix');
       else if (snap?.actions.use) trigger('use');
       else trigger('button');
       return;
@@ -3480,6 +4516,19 @@ window.ImposterNet = (function () {
   $('act-fix').addEventListener('click', () => trigger('fix'));
   $('sab-lights').addEventListener('click', () => trigger('lights'));
   $('sab-reactor').addEventListener('click', () => trigger('reactor'));
+  $('sab-o2').addEventListener('click', () => trigger('o2'));
+  $('sab-comms').addEventListener('click', () => trigger('comms'));
+  $('sab-doors').addEventListener('click', () => trigger('doors'));
+  $('open-vitals').addEventListener('click', () => openRoom('vitals'));
+  $('open-admin').addEventListener('click', () => openRoom('admin'));
+  $('open-cams').addEventListener('click', () => openRoom('cams'));
+  $('room-close').addEventListener('click', closeRoom);
+  $('open-chat').addEventListener('click', () => {
+    $('overlay-chat').hidden = false;
+    renderChat($('chat-log'), snap?.ghostChat || [], true);
+    renderPhrases($('chat-phrases'), true);
+  });
+  $('chat-close').addEventListener('click', () => { $('overlay-chat').hidden = true; });
   $('open-tasks').addEventListener('click', () => openList('tasks'));
   $('open-map').addEventListener('click', () => openList('map'));
   $('skip').addEventListener('click', () => send({ t: 'vote', target: 'skip' }));
@@ -3495,13 +4544,17 @@ window.ImposterNet = (function () {
     }
   });
 
-  for (const id of ['set-impostors', 'set-cooldown']) {
+  for (const id of ['set-cooldown', 'set-distance', 'set-speed', 'set-vision', 'set-discussion', 'set-voting']) {
     $(id).addEventListener('change', () => {
       send({
         t: 'settings',
         settings: {
-          impostors: Number($('set-impostors').value),
           killCooldownSec: Number($('set-cooldown').value),
+          killDistance: $('set-distance').value,
+          speed: Number($('set-speed').value),
+          crewVision: Number($('set-vision').value),
+          discussionSec: Number($('set-discussion').value),
+          votingSec: Number($('set-voting').value),
         },
       });
     });
