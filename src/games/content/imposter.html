@@ -14,13 +14,16 @@
   meltdown, 30 s meetings, eight missions at their original trigger points.
   The art is that repo's ripped set (artwork is Innersloth's).
 
-  Network: PeerJS 1.5.5 vendored beside this file (imposter/peerjs.min.js, MIT),
-  using its public broker at 0.peerjs.com.
+  Network: signaling is Supabase Broadcast on the Realtime channel
+  "imposter-<CODE>" (see src/hub/realtime.js for the same protocol); the round
+  itself is a WebRTC data channel between the browsers, so the 10 Hz snapshots
+  never touch a database. There is no broker and no id registry: a room is a
+  topic, and it exists while anybody is in it.
   The room host owns the rules and sends each player a snapshot with roles
   stripped. The host chair is not fixed: every snapshot names the next player in
   the ring, that player keeps a checkpoint, and if the host disappears it claims
-  the room's peer id and carries on. The public room lives at a fixed peer id,
-  so the same election keeps it open when the current host closes the tab.
+  the room in the same topic and carries on. The public room lives at a fixed
+  topic, so the same election keeps it open when the current host closes the tab.
 -->
 <style>
 :root{
@@ -198,18 +201,6 @@ select{padding:8px 10px;font-size:13px}
   .lever{width:48px;height:48px}
 }
 </style>
-<!-- The hub drops this document into a srcdoc frame, where a relative address
-     resolves against the arcade root; opened on its own it sits beside the
-     vendored library instead. Writing the tag here, before the game script, keeps
-     the load synchronous so Peer exists by the time the menu checks for it. -->
-<script>
-(function () {
-  var base = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? 'imposter/' : 'games/content/imposter/';
-  var tag = '<scr' + 'ipt src="' + new URL(base + 'peerjs.min.js', document.baseURI).href + '"><\/scr' + 'ipt>';
-  if (document.readyState === 'loading') document.write(tag);
-  else document.head.insertAdjacentHTML('beforeend', tag);
-})();
-</script>
 </head>
 <body>
 <main id="shell">
@@ -1425,22 +1416,64 @@ window.ImposterCore = (function () {
 </script>
 
 <script id="imposter-net">
-/* PeerJS transport. The public room lives at one fixed peer id; a private room
-   lives at an id derived from its four-letter code. Both share one election: the
-   host keeps the next player in the ring checkpointed, that player claims the id
-   when the host goes quiet, and everyone else keeps knocking until a host
-   answers. Nobody needs the same person to stay online. */
+/* Signaling over Supabase Broadcast, game state over WebRTC.
+
+   The 10 Hz snapshots still travel through a data channel between the browsers;
+   only the introductions go through the relay. That is the whole point of the
+   change: PeerJS's public broker (0.peerjs.com) answered every join with its own
+   id registry, so a broker hiccup or a rate limit looked like "no room with that
+   code". A Realtime channel has no id registry to lose — the room is a topic,
+   `imposter-<CODE>` or `imposter-PUBLIC`, and it exists while anybody is in it.
+
+   Message flow, all broadcast on the room topic:
+     hello   a client knocking; a host answers by offering
+     host    a host saying who it is (also the election's tie-break input)
+     offer   host -> one client, carrying the data channel it just created
+     answer  client -> host
+     ice     trickled both ways, addressed to one peer
+     bye     a seat leaving on purpose
+
+   The host makes every offer because it owns the data channel, so there is no
+   offer glare to resolve. A client that loses its channel just knocks again and
+   gets a fresh offer, which is what makes a failed join cheap now.
+
+   Election keeps its old shape: the host mirrors the round to the next player in
+   the ring, and when the host goes quiet the ring's first player claims the room
+   in the same topic. Two claims are settled by rank and then by peer id, and the
+   loser steps down and re-knocks, so the room cannot end up with two chairs. */
 window.ImposterNet = (function () {
   'use strict';
 
   const C = window.ImposterCore;
-  const PREFIX = 'bored-imposter-v2-';
-  const PUBLIC_ID = PREFIX + 'public';
-  const PROTOCOL = 'bored-imposter/2';
-  const HOST_TIMEOUT = 3000;
+  const PROTOCOL = 'bored-imposter/3';
   const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const TOPIC = 'imposter-';
+  const HOST_TIMEOUT = 3000;
+  const ALIVE_MS = 2000;
+  const KNOCK_MS = 900;
+  const MISSING_MS = 6000;
+  const ICE_SERVERS = [{ urls: ['stun:stun.l.google.com:19302'] }];
 
-  const roomIdFor = code => PREFIX + String(code || '').toUpperCase();
+  // The project and publishable key the hub already ships (src/hub/backend.js).
+  // Both are public: RLS is what protects the tables, and a Realtime channel is
+  // a relay, not a store. Overridable so the hub can inject them later.
+  const FALLBACK_RELAY = {
+    url: 'https://djdpttltfmwkofdrvkem.supabase.co',
+    key: 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ',
+  };
+  function relayConfig() {
+    const injected = globalThis.__boredRealtime;
+    return {
+      url: (injected && injected.url) || FALLBACK_RELAY.url,
+      key: (injected && injected.key) || FALLBACK_RELAY.key,
+    };
+  }
+
+  const PeerConnection = globalThis.RTCPeerConnection || globalThis.webkitRTCPeerConnection;
+  const supported = Boolean(PeerConnection && globalThis.WebSocket);
+
+  const roomIdFor = code => TOPIC + String(code || '').toUpperCase();
+  const PUBLIC_ID = roomIdFor('PUBLIC');
 
   function makeCode(rng = Math.random) {
     let code = '';
@@ -1450,109 +1483,586 @@ window.ImposterNet = (function () {
     return code;
   }
 
-  function createSession({ mode = 'public', code = '', intent = 'join', name = 'Crewmate', onSnapshot, onEvent, onStatus }) {
-    if (typeof Peer === 'undefined') {
-      return {
-        unavailable: true,
-        send() {},
-        close() {},
-        hosting: false,
-        roomId: mode === 'public' ? PUBLIC_ID : roomIdFor(code),
-      };
+  /* ── the relay: one Supabase Realtime channel, broadcast only ─────────── */
+
+  // Same Phoenix channel protocol the hub speaks in src/hub/realtime.js, cut
+  // down to what signaling needs: join, broadcast both ways, heartbeat, backoff.
+  function createRelay({ url, key, channel, onMessage, onOpen, onDown }) {
+    // Realtime answers only on realtime:<channel>; the bare name is "unmatched topic".
+    const topic = 'realtime:' + channel;
+    const endpoint = String(url).replace(/\/+$/, '').replace(/^http/, 'ws') +
+      '/realtime/v1/websocket?apikey=' + encodeURIComponent(key) + '&vsn=1.0.0';
+    const backoff = [600, 1200, 2400, 4800, 9000];
+    let socket = null, joinRef = '', ref = 0, joined = false, closed = false;
+    let attempt = 0, missed = 0, retryTimer = 0, beatTimer = 0, joinTimer = 0;
+
+    function frame(event, payload, to) {
+      ref += 1;
+      return JSON.stringify({ topic: to || topic, event, payload, ref: String(ref), join_ref: joinRef });
     }
 
+    function push(event, payload) {
+      if (!socket || socket.readyState !== 1 || !joined) return false;
+      try {
+        socket.send(frame(event, payload));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function beat() {
+      if (!socket || socket.readyState !== 1) return;
+      try {
+        socket.send(frame('heartbeat', {}, 'phoenix'));
+      } catch { /* the close handler follows */ }
+    }
+
+    function down(reason) {
+      const was = joined;
+      joined = false;
+      clearInterval(beatTimer);
+      clearTimeout(joinTimer);
+      beatTimer = 0;
+      joinTimer = 0;
+      const old = socket;
+      socket = null;
+      if (old) {
+        try { old.close(); } catch { /* already closed */ }
+      }
+      if (onDown) onDown(reason || 'The relay closed.', was);
+      if (closed) return;
+      const base = backoff[Math.min(attempt, backoff.length - 1)];
+      attempt += 1;
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(connect, base + Math.floor(Math.random() * base * 0.3));
+    }
+
+    function receive(raw) {
+      let message;
+      try {
+        message = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (!message || typeof message !== 'object') return;
+      if (message.event === 'phx_reply') {
+        if (message.topic === 'phoenix') {
+          missed = 0;
+          return;
+        }
+        if (message.topic !== topic || message.ref !== joinRef) return;
+        const reply = message.payload || {};
+        if (reply.status === 'ok') {
+          clearTimeout(joinTimer);
+          joinTimer = 0;
+          joined = true;
+          attempt = 0;
+          missed = 0;
+          beatTimer = setInterval(() => {
+            if (missed >= 2) {
+              down('The relay stopped answering.');
+              return;
+            }
+            missed += 1;
+            beat();
+          }, 25000);
+          if (onOpen) onOpen();
+        } else {
+          down((reply.response && reply.response.reason) || 'The relay refused the channel.');
+        }
+        return;
+      }
+      if (message.topic !== topic) return;
+      if (message.event === 'broadcast') {
+        const body = message.payload || {};
+        if (onMessage) onMessage(String(body.event || ''), body.payload || {});
+      } else if (message.event === 'phx_error' || message.event === 'phx_close') {
+        down('The channel closed.');
+      }
+    }
+
+    function connect() {
+      if (closed || socket) return;
+      let mine;
+      try {
+        mine = new WebSocket(endpoint);
+      } catch {
+        if (onDown) onDown('The relay is unreachable.', false);
+        return;
+      }
+      socket = mine;
+      mine.onopen = () => {
+        if (mine !== socket) return;
+        ref += 1;
+        joinRef = String(ref);
+        try {
+          mine.send(JSON.stringify({
+            topic,
+            event: 'phx_join',
+            payload: {
+              config: {
+                broadcast: { ack: false, self: false },
+                presence: { key: '' },
+                postgres_changes: [],
+                private: false,
+              },
+              access_token: key,
+            },
+            ref: joinRef,
+            join_ref: joinRef,
+          }));
+        } catch { /* the close handler follows */ }
+        joinTimer = setTimeout(() => {
+          if (mine === socket && !joined) down('The relay did not answer.');
+        }, 10000);
+      };
+      mine.onmessage = event => {
+        if (mine === socket) receive(event.data);
+      };
+      mine.onclose = () => {
+        if (mine !== socket) return;
+        socket = null;
+        down('The relay connection closed.');
+      };
+      mine.onerror = () => { /* onclose follows */ };
+    }
+
+    connect();
+
+    return {
+      isOpen: () => joined,
+      send(event, payload) {
+        return push('broadcast', { type: 'broadcast', event, payload });
+      },
+      reconnect() {
+        if (closed || socket) return;
+        attempt = 0;
+        clearTimeout(retryTimer);
+        connect();
+      },
+      close() {
+        closed = true;
+        clearTimeout(retryTimer);
+        clearInterval(beatTimer);
+        clearTimeout(joinTimer);
+        const old = socket;
+        socket = null;
+        if (old) {
+          try {
+            if (old.readyState === 1) old.send(frame('phx_leave', {}));
+          } catch { /* closing anyway */ }
+          try { old.close(); } catch { /* already closed */ }
+        }
+        joined = false;
+      },
+    };
+  }
+
+  /* ── one player's session ─────────────────────────────────────────────── */
+
+  function createSession({ mode = 'public', code = '', intent = 'join', name = 'Crewmate', onSnapshot, onEvent, onStatus }) {
     const roomId = mode === 'public' ? PUBLIC_ID : roomIdFor(code);
-    // The seat outlives the data channel: a reconnect (or a promotion to host)
-    // reintroduces itself with this id so its role and tasks come back.
     const clientId = globalThis.crypto && crypto.randomUUID
       ? crypto.randomUUID()
       : 'p-' + Math.random().toString(36).slice(2, 12);
 
-    let peer = null;
+    if (!supported) {
+      return {
+        unavailable: true,
+        supported: false,
+        roomId,
+        send() {},
+        close() {},
+        hosting: false,
+        publicRoom: mode === 'public',
+      };
+    }
+
+    let relay = null;
     let host = null;
-    let conn = null;
+    let link = null;            // the one channel a client has, to the host
+    let hostPeer = '';
+    let hostSince = 0;
+    let lastHostSeen = 0;
+    let claimRank = 0;
     let mirror = null;
     let rank = 0;
+    let knocks = 0;
+    let joinedAt = 0;
     let lastSnap = 0;
     let closed = false;
     let recovery = null;
     let ticker = 0;
+    let aliveTimer = 0;
+    let knockTimer = 0;
     let watchdog = 0;
     let kick = null;
+
+    const peers = new Map();    // host side: peer id -> { pc, channel, send }
 
     const status = payload => {
       if (!closed) onStatus(payload);
     };
 
-    function teardown() {
-      kick = null;
+    function sendRelay(event, payload) {
+      if (!relay) return false;
+      try {
+        return relay.send(event, payload);
+      } catch {
+        return false;
+      }
+    }
+
+    /* ── WebRTC plumbing ───────────────────────────────────────────────── */
+
+    function makeConnection(peerId) {
+      const pc = new PeerConnection({ iceServers: ICE_SERVERS });
+      pc.onicecandidate = event => {
+        if (!event.candidate) return;
+        const candidate = typeof event.candidate.toJSON === 'function' ? event.candidate.toJSON() : event.candidate;
+        sendRelay('ice', { from: clientId, to: peerId, c: candidate });
+      };
+      return pc;
+    }
+
+    function channelWriter(channel) {
+      return message => {
+        if (!channel || channel.readyState !== 'open') return;
+        try {
+          channel.send(JSON.stringify(message));
+        } catch { /* it closed between the check and the send */ }
+      };
+    }
+
+    function dropPeer(peerId, detach = true) {
+      const entry = peers.get(peerId);
+      if (!entry) return;
+      peers.delete(peerId);
+      try { entry.channel?.close(); } catch { /* already closed */ }
+      try { entry.pc?.close(); } catch { /* already closed */ }
+      if (detach && host) host.detach(peerId);
+    }
+
+    function dropLink() {
+      const entry = link;
+      link = null;
+      hostPeer = '';
+      if (!entry) return;
+      try { entry.channel?.close(); } catch { /* already closed */ }
+      try { entry.pc?.close(); } catch { /* already closed */ }
+    }
+
+    function attachHostChannel(peerId, channel) {
+      const entry = peers.get(peerId);
+      if (!entry) return;
+      entry.channel = channel;
+      entry.send = channelWriter(channel);
+      channel.onmessage = event => {
+        let data;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (!host || !data || typeof data !== 'object') return;
+        if (data.t === 'hello') {
+          const result = host.admit(peerId, data.name, entry.send, data.playerId);
+          if (result.error) {
+            entry.send({ t: 'reject', error: result.error });
+            setTimeout(() => dropPeer(peerId), 80);
+          }
+        } else if (data.t === 'input') {
+          const seat = host.seatOf(peerId);
+          if (seat) host.receive(seat, data.m);
+        }
+      };
+      // A closed channel is not a lost seat yet: the client re-knocks and gets a
+      // fresh offer with the same playerId, which lands on the seat it already
+      // had. Give it that window before the room hears about a departure.
+      channel.onclose = () => {
+        setTimeout(() => {
+          const at = peers.get(peerId);
+          if (at && at.channel === channel && channel.readyState !== 'open') dropPeer(peerId, false);
+        }, 2500);
+      };
+    }
+
+    function connectPeer(peerId) {
+      if (!host || closed) return;
+      const existing = peers.get(peerId);
+      if (existing && existing.channel && existing.channel.readyState === 'open') return;
+      // A stale entry is replaced without detaching, so the re-knock keeps the seat.
+      if (existing) dropPeer(peerId, false);
+
+      let pc;
+      try {
+        pc = makeConnection(peerId);
+      } catch {
+        return;
+      }
+      const entry = { pc, channel: null, send: null };
+      peers.set(peerId, entry);
+
+      const channel = pc.createDataChannel('game', { ordered: true });
+      attachHostChannel(peerId, channel);
+
+      pc.onconnectionstatechange = () => {
+        if (peers.get(peerId) !== entry) return;
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peerId);
+        else if (pc.connectionState === 'disconnected') {
+          setTimeout(() => {
+            if (peers.get(peerId) === entry && pc.connectionState === 'disconnected') dropPeer(peerId);
+          }, 6000);
+        }
+      };
+
+      pc.createOffer()
+        .then(offer => pc.setLocalDescription(offer))
+        .then(() => sendRelay('offer', { from: clientId, to: peerId, sdp: pc.localDescription.sdp }))
+        .catch(() => dropPeer(peerId, false));
+    }
+
+    async function acceptOffer(from, sdp) {
+      if (host || closed || !sdp) return;
+      dropLink();
+      let pc;
+      try {
+        pc = makeConnection(from);
+      } catch {
+        return;
+      }
+      const entry = { pc, channel: null, send: null, pid: from };
+      link = entry;
+      hostPeer = from;
+
+      pc.ondatachannel = event => {
+        const channel = event.channel;
+        entry.channel = channel;
+        entry.send = channelWriter(channel);
+        channel.onopen = () => {
+          if (closed) return;
+          lastSnap = Date.now();
+          recovery = null;
+          rank = 0;
+          knocks = 0;
+          stopKnock();
+          try {
+            channel.send(JSON.stringify({ t: 'hello', protocol: PROTOCOL, name, playerId: clientId }));
+          } catch { /* the close handler follows */ }
+          startWatchdog();
+          status({ state: 'joined' });
+        };
+        channel.onmessage = message => {
+          let data;
+          try {
+            data = JSON.parse(message.data);
+          } catch {
+            return;
+          }
+          handleData(data);
+        };
+        channel.onclose = () => {
+          if (link === entry && !host) onHostGone();
+        };
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (link !== entry || host) return;
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') onHostGone();
+      };
+
+      try {
+        await pc.setRemoteDescription({ type: 'offer', sdp });
+        await flushIce(entry);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendRelay('answer', { from: clientId, to: from, sdp: pc.localDescription.sdp });
+      } catch {
+        if (link === entry && !host) onHostGone();
+      }
+    }
+
+    async function acceptAnswer(from, sdp) {
+      const entry = peers.get(from);
+      if (!entry || !sdp) return;
+      try {
+        await entry.pc.setRemoteDescription({ type: 'answer', sdp });
+        await flushIce(entry);
+      } catch { /* the offer is gone; the peer will knock again */ }
+    }
+
+    // Candidates are trickled as soon as they exist, which is usually before the
+    // other side has applied its description. Dropping those loses the pair the
+    // connection needs, so hold them until there is somewhere to put them.
+    function queueIce(entry, candidate) {
+      if (!entry || !candidate) return;
+      if (entry.pc.remoteDescription && entry.pc.remoteDescription.type) {
+        entry.pc.addIceCandidate(candidate).catch(() => { /* stale */ });
+        return;
+      }
+      (entry.ice || (entry.ice = [])).push(candidate);
+    }
+
+    async function flushIce(entry) {
+      const list = entry && entry.ice;
+      if (!list || !list.length) return;
+      entry.ice = [];
+      for (const candidate of list) {
+        try {
+          await entry.pc.addIceCandidate(candidate);
+        } catch { /* stale */ }
+      }
+    }
+
+    function acceptIce(from, candidate) {
+      queueIce(peers.get(from) || (link && link.pid === from ? link : null), candidate);
+    }
+
+    /* ── knocking, hosting, and who holds the chair ────────────────────── */
+
+    function knock() {
+      if (closed || host) return;
+      knocks += 1;
+      sendRelay('hello', { from: clientId, name });
+    }
+
+    function stopKnock() {
+      if (knockTimer) clearInterval(knockTimer);
+      knockTimer = 0;
+    }
+
+    function startKnock() {
+      if (knockTimer || closed) return;
+      joinedAt = Date.now();
+      knocks = 0;
+      knock();
+      knockTimer = setInterval(() => {
+        if (closed || host) return;
+        if (link && link.channel && link.channel.readyState === 'open') return;
+        if (recovery) return;            // the election owns the knocks now
+        knock();
+        if (link) return;
+        if (Date.now() - joinedAt < MISSING_MS) return;
+        if (mode === 'public') {
+          startRecovery('lost');
+          return;
+        }
+        // A private room nobody is hosting: say so instead of knocking forever.
+        stopKnock();
+        status({ state: 'missing' });
+      }, KNOCK_MS);
+    }
+
+    function announceHost() {
+      if (!host) return;
+      sendRelay('host', { from: clientId, since: hostSince, rank: claimRank });
+    }
+
+    function startAlive() {
+      if (aliveTimer) return;
+      aliveTimer = setInterval(announceHost, ALIVE_MS);
+    }
+
+    function stopHost() {
+      if (aliveTimer) clearInterval(aliveTimer);
+      aliveTimer = 0;
       if (ticker) clearInterval(ticker);
       ticker = 0;
-      if (watchdog) clearInterval(watchdog);
-      watchdog = 0;
-      if (host) {
-        try {
-          host.close();
-        } catch {}
-      }
+      kick = null;
+      // Let the room hear about it before the channels go.
+      const closing = host;
       host = null;
-      if (conn) {
-        try {
-          conn.close();
-        } catch {}
+      if (closing) {
+        try { closing.close(); } catch { /* already gone */ }
       }
-      conn = null;
-      if (peer) {
-        try {
-          peer.destroy();
-        } catch {}
-      }
-      peer = null;
+      for (const peerId of [...peers.keys()]) dropPeer(peerId, false);
     }
 
-    function send(message) {
-      if (host) {
-        host.receive(host.hostId, message);
-        return;
-      }
-      if (conn && conn.open) {
-        try {
-          conn.send({ t: 'input', m: message });
-        } catch {}
-      }
-    }
-
-    /* ── recovery: who holds the chair, and who keeps knocking ─────────── */
-
-    function fail(kind) {
+    function beginHost(resume) {
       if (closed) return;
-      if (!recovery) {
-        if (kind === 'busy') status({ state: 'taken' });
-        else status({ state: 'error', message: 'The room service is unreachable.' });
-        return;
-      }
-      setTimeout(recover, kind === 'busy' ? 900 : 2200);
+      stopKnock();
+      host = C.createHostRoom({
+        code: mode === 'public' ? 'PUBLIC' : code,
+        publicRoom: mode === 'public',
+        name,
+        resume: resume ? { state: resume, playerId: clientId } : null,
+      });
+      hostSince = Date.now();
+      claimRank = rank > 0 ? rank : 0;
+
+      host.on('snapshot', snapshot => {
+        lastSnap = Date.now();
+        onSnapshot(snapshot);
+      });
+      host.on('event', event => onEvent(event));
+
+      // A hidden tab throttles timers to about 1 Hz, so the loop advances by the
+      // wall clock instead of assuming 50 ms. A badly delayed host (a laptop
+      // asleep) is capped so one tick cannot replay an hour.
+      let lastTick = performance.now();
+      const loop = () => {
+        const now = performance.now();
+        const elapsed = Math.min(10_000, Math.max(0, now - lastTick));
+        lastTick = now;
+        if (host) host.tick(elapsed);
+      };
+      ticker = setInterval(loop, 50);
+      kick = () => {
+        lastTick = performance.now() - 120;
+        loop();
+      };
+      mirror = null;
+      rank = 0;
+      recovery = null;
+      status({ state: 'hosting', promoted: Boolean(resume) });
+      announceHost();
+      startAlive();
     }
 
-    function recover() {
-      if (closed || host || !recovery) return;
-      recovery.tries += 1;
-      if (recovery.tries > 90) {
-        recovery = null;
-        status({ state: 'error', message: 'The room did not come back.' });
+    function beginClient() {
+      if (closed || host) return;
+      hostPeer = '';
+      startKnock();
+    }
+
+    function stepDown() {
+      // Two claims in one topic: the ring already knows whose is older, so the
+      // one that loses becomes a client again and re-knocks at the winner.
+      stopHost();
+      status({ state: 'taken' });
+      beginClient();
+      setTimeout(() => {
+        if (!closed && !host && !link) startRecovery('lost');
+      }, 1500);
+    }
+
+    function noteHostClaim(from, theirRank) {
+      if (!host) {
+        // Somebody is hosting, so stop competing for the chair and knock at them.
+        if (recovery) {
+          recovery = null;
+          beginClient();
+        }
         return;
       }
-      const waited = Date.now() - recovery.since;
-      teardown();
-      // Alternate claim and knock: a failed claim usually means somebody else
-      // won the chair, and a knock finds them within a second.
-      if (waited >= recovery.claimAt && recovery.last !== 'host') {
-        recovery.last = 'host';
-        beginHost(mirror);
-      } else {
-        recovery.last = 'client';
-        beginClient();
-      }
+      const mine = claimRank;
+      const theirs = theirRank;
+      if (theirs > 0 && (mine === 0 || theirs < mine)) stepDown();
+    }
+
+    function onHostGone() {
+      if (closed || host || recovery) return;
+      startRecovery('lost');
+    }
+
+    function startWatchdog() {
+      if (watchdog) return;
+      watchdog = setInterval(() => {
+        if (closed || host) return;
+        if (!link || !link.channel || link.channel.readyState !== 'open') return;
+        if (!recovery && Date.now() - lastSnap > HOST_TIMEOUT) onHostGone();
+      }, 500);
     }
 
     function startRecovery(kind) {
@@ -1565,119 +2075,65 @@ window.ImposterNet = (function () {
         // the rest of the ring only takes the chair if it never turns up.
         claimAt: kind === 'start' ? 1200 : myRank === 1 ? 0 : myRank === 2 ? 12000 : 12000 + (myRank - 2) * 4000,
         tries: 0,
+        timer: 0,
       };
       if (kind === 'lost') status({ state: 'lost' });
       setTimeout(recover, 0);
     }
 
-    function onHostGone() {
-      if (closed || host || recovery) return;
-      startRecovery('lost');
-    }
-
-    function startWatchdog() {
-      if (watchdog) return;
-      watchdog = setInterval(() => {
-        if (closed || host || !conn) return;
-        if (!recovery && Date.now() - lastSnap > HOST_TIMEOUT) onHostGone();
-      }, 500);
-    }
-
-    /* ── host ─────────────────────────────────────────────────────────── */
-
-    function wireHostConnection(connection) {
-      connection.on('open', () => {
-        const id = connection.peer;
-        const sendTo = message => {
-          if (!connection.open) return;
-          try {
-            connection.send(message);
-          } catch {}
-        };
-        connection.on('data', data => {
-          if (!host || !data || typeof data !== 'object') return;
-          if (data.t === 'hello') {
-            const result = host.admit(id, data.name, sendTo, data.playerId);
-            if (result.error) {
-              sendTo({ t: 'reject', error: result.error });
-              setTimeout(() => {
-                try {
-                  connection.close();
-                } catch {}
-              }, 80);
-            }
-          } else if (data.t === 'input') {
-            const seat = host.seatOf(id);
-            if (seat) host.receive(seat, data.m);
-          }
-        });
-        connection.on('close', () => {
-          if (host) host.detach(id);
-        });
-        connection.on('error', () => {
-          if (host) host.detach(id);
-        });
-      });
-    }
-
-    function beginHost(resume) {
-      const p = new Peer(roomId, { debug: 0 });
-      peer = p;
-      p.on('open', () => {
-        if (closed || peer !== p) return;
-        host = C.createHostRoom({
-          code: mode === 'public' ? 'PUBLIC' : code,
-          publicRoom: mode === 'public',
-          name,
-          resume: resume ? { state: resume, playerId: clientId } : null,
-        });
-        host.on('snapshot', snapshot => {
-          lastSnap = Date.now();
-          onSnapshot(snapshot);
-        });
-        host.on('event', event => onEvent(event));
-        // A hidden tab throttles timers to about 1 Hz, so the loop advances by
-        // the wall clock instead of assuming 50 ms. A badly delayed host (a
-        // laptop asleep) is capped so one tick cannot replay an hour.
-        let lastTick = performance.now();
-        const loop = () => {
-          const now = performance.now();
-          const elapsed = Math.min(10_000, Math.max(0, now - lastTick));
-          lastTick = now;
-          if (host) host.tick(elapsed);
-        };
-        ticker = setInterval(loop, 50);
-        kick = () => {
-          lastTick = performance.now() - 120;
-          loop();
-        };
-        mirror = null;
-        rank = 0;
+    function recover() {
+      if (closed || host || !recovery) return;
+      recovery.tries += 1;
+      if (recovery.tries > 90) {
         recovery = null;
-        status({ state: 'hosting', promoted: Boolean(resume) });
-      });
-      p.on('connection', connection => wireHostConnection(connection));
-      p.on('disconnected', () => {
-        try {
-          p.reconnect();
-        } catch {}
-      });
-      p.on('error', error => {
-        if (closed || peer !== p) return;
-        const type = error && error.type;
-        if (type === 'unavailable-id' || type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
-          try {
-            p.destroy();
-          } catch {}
-          if (peer === p) peer = null;
-          fail(type === 'unavailable-id' ? 'busy' : 'network');
+        status({ state: 'error', message: 'The room did not come back.' });
+        return;
+      }
+      const active = recovery;
+      const waited = Date.now() - active.since;
+      dropLink();
+      if (waited >= active.claimAt) {
+        if (Date.now() - lastHostSeen < 3000) {
+          // Somebody already has the chair; knocking is what gets us in.
+          beginClient();
+          if (recovery !== active) return;
+          clearTimeout(active.timer);
+          active.timer = setTimeout(recover, 1200);
           return;
         }
-        status({ state: 'error', code: type, message: (error && error.message) || 'Connection error.' });
-      });
+        beginHost(mirror);
+        return;
+      }
+      beginClient();
+      // Alternate knock and claim: a knock usually finds the winner in under a second.
+      if (recovery !== active) return;
+      clearTimeout(active.timer);
+      active.timer = setTimeout(recover, 1200);
     }
 
-    /* ── client ───────────────────────────────────────────────────────── */
+    /* ── what the relay says ───────────────────────────────────────────── */
+
+    function onRelay(event, message) {
+      if (closed || !message || typeof message !== 'object') return;
+      const from = String(message.from || '');
+      if (!from || from === clientId) return;
+
+      if (event === 'hello') {
+        if (host) connectPeer(from);
+      } else if (event === 'host') {
+        lastHostSeen = Date.now();
+        noteHostClaim(from, Number(message.rank) || 0);
+      } else if (event === 'offer') {
+        if (!host && String(message.to || '') === clientId) acceptOffer(from, message.sdp);
+      } else if (event === 'answer') {
+        if (String(message.to || '') === clientId) acceptAnswer(from, message.sdp);
+      } else if (event === 'ice') {
+        if (String(message.to || '') === clientId) acceptIce(from, message.c);
+      } else if (event === 'bye') {
+        if (host && peers.has(from)) dropPeer(from);
+        else if (!host && from === hostPeer) onHostGone();
+      }
+    }
 
     function handleData(data) {
       if (!data || typeof data !== 'object') return;
@@ -1699,82 +2155,58 @@ window.ImposterNet = (function () {
       }
     }
 
-    function beginClient() {
-      const p = new Peer({ debug: 0 });
-      peer = p;
-      p.on('open', () => {
-        if (closed || peer !== p) return;
-        const connection = p.connect(roomId, { reliable: true });
-        conn = connection;
-        connection.on('open', () => {
-          if (closed || peer !== p) return;
-          lastSnap = Date.now();
-          recovery = null;
-          rank = 0;
-          try {
-            connection.send({ t: 'hello', protocol: PROTOCOL, name, playerId: clientId });
-          } catch {}
-          startWatchdog();
-          status({ state: 'joined' });
-        });
-        connection.on('data', handleData);
-        connection.on('close', () => {
-          if (peer === p && !host) onHostGone();
-        });
-        connection.on('error', () => {
-          if (peer === p && !host) onHostGone();
-        });
-      });
-      p.on('disconnected', () => {
-        try {
-          p.reconnect();
-        } catch {}
-      });
-      p.on('error', error => {
-        if (closed || peer !== p) return;
-        const type = error && error.type;
-        if (type === 'peer-unavailable') {
-          try {
-            p.destroy();
-          } catch {}
-          if (peer === p) peer = null;
-          if (mode === 'public' && !recovery) {
-            startRecovery('start');
-            return;
-          }
-          if (recovery) {
-            setTimeout(recover, 1200);
-            return;
-          }
-          status({ state: 'missing' });
-          return;
-        }
-        if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
-          if (recovery) {
-            setTimeout(recover, 2500);
-            return;
-          }
-          status({ state: 'error', message: 'The room service is unreachable.' });
-          return;
-        }
-        status({ state: 'error', code: type, message: (error && error.message) || 'Connection error.' });
-      });
-    }
-
-    /* ── start ────────────────────────────────────────────────────────── */
+    /* ── start ─────────────────────────────────────────────────────────── */
 
     // Coming back to a hidden host tab should not wait for the throttled timer.
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && kick && !closed) kick();
     });
 
-    if (mode === 'public') startRecovery('start');
-    else if (intent === 'host') beginHost(null);
-    else beginClient();
+    const conf = relayConfig();
+    relay = createRelay({
+      url: conf.url,
+      key: conf.key,
+      channel: roomId,
+      onMessage: onRelay,
+      onOpen: () => {
+        if (closed) return;
+        if (host) announceHost();
+        else knock();
+      },
+      onDown: (reason, was) => {
+        if (closed) return;
+        // The data channel does not depend on the relay, so a relay hiccup is
+        // only news while we are still trying to reach somebody.
+        const live = host || (link && link.channel && link.channel.readyState === 'open');
+        if (live) return;
+        status({ state: 'error', message: was ? 'The room relay dropped. Reconnecting…' : 'The room relay is unreachable.' });
+      },
+    });
+
+    if (!relay) {
+      status({ state: 'error', message: 'This browser cannot open a WebSocket.' });
+    } else if (mode === 'public') {
+      startRecovery('start');
+    } else if (intent === 'host') {
+      beginHost(null);
+    } else {
+      beginClient();
+    }
 
     return {
       roomId,
-      send,
+      supported: true,
+      send(message) {
+        if (host) {
+          host.receive(host.hostId, message);
+          return;
+        }
+        if (link && link.channel && link.channel.readyState === 'open') {
+          try {
+            link.channel.send(JSON.stringify({ t: 'input', m: message }));
+          } catch { /* the close handler follows */ }
+        }
+      },
       get hosting() {
         return Boolean(host);
       },
@@ -1784,12 +2216,19 @@ window.ImposterNet = (function () {
       close() {
         closed = true;
         recovery = null;
-        teardown();
+        if (relay) sendRelay('bye', { from: clientId, host: Boolean(host) });
+        stopHost();
+        dropLink();
+        stopKnock();
+        if (watchdog) clearInterval(watchdog);
+        watchdog = 0;
+        if (relay) relay.close();
+        relay = null;
       },
     };
   }
 
-  return { createSession, makeCode, roomIdFor, PUBLIC_ID, PROTOCOL };
+  return { createSession, makeCode, roomIdFor, PUBLIC_ID, PROTOCOL, supported };
 })();
 </script>
 
@@ -1950,8 +2389,8 @@ window.ImposterNet = (function () {
 
   function openSession({ mode, code, intent }) {
     if (session) return;
-    if (typeof Peer === 'undefined') {
-      menuStatus('PeerJS did not load. Imposter needs an internet connection.', true);
+    if (!N.supported) {
+      menuStatus('This browser cannot open a data channel. Imposter needs WebRTC.', true);
       return;
     }
     const name = readName();
@@ -3094,8 +3533,8 @@ window.ImposterNet = (function () {
 
   show('menu');
   menuStatus('');
-  if (typeof Peer === 'undefined') {
-    menuStatus('PeerJS did not load. Imposter needs an internet connection.', true);
+  if (!N.supported) {
+    menuStatus('This browser cannot open a data channel. Imposter needs WebRTC.', true);
   }
   requestAnimationFrame(draw);
 })();

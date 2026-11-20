@@ -21,6 +21,6 @@ ship size, walk speed, wall rectangles, vent positions, the eight mission
 trigger points and their screens, kill/sabotage/meeting timers. The netcode,
 host election and room handling are this game's own.
 
-peerjs.min.js is PeerJS 1.5.5 (MIT), unmodified, from
-https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js. It is vendored so
-the game does not depend on a CDN being reachable from the arcade's origin.
+Signaling runs over Supabase Realtime (Broadcast) on the arcade's own project,
+and the round runs over the browser's own RTCPeerConnection; no third-party
+broker or vendored networking library is used any more.
