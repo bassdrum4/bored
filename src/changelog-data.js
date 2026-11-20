@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 699,
+  "count": 700,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"edb1e4b","date":"2026-11-20","author":"Codebuff","subject":"Start Trackbound descents above the ground and bridge courses that cross themselves"},
   {"sha":"b275bdb","date":"2026-11-20","author":"PenguinV360","subject":"Poké Gacha: Wiki tab, bars off other mons, ranged units face targets, item sprites","pr":271},
   {"sha":"c67b9fe","date":"2026-11-20","author":"Codebuff","subject":"Let Trackbound pieces take extras, join smoothly and name their bends right"},
   {"sha":"6aa4454","date":"2026-11-20","author":"Codebuff","subject":"Count every solved Photo Puzzle 4x4, not only uploaded pictures."},
