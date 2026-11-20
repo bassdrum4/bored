@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 691,
+  "count": 692,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c2d7909","date":"2026-11-20","author":"Codebuff","subject":"Hide the host rules from guests and let a stalled join recover itself."},
   {"sha":"c138c91","date":"2026-11-20","author":"Codebuff","subject":"Make Trackbound's track build cheap so the editor stops freezing."},
   {"sha":"af886a2","date":"2026-11-20","author":"Codebuff","subject":"Stop the ship teleporting when the host stalls."},
   {"sha":"0e1984d","date":"2026-11-20","author":"Codebuff","subject":"Let Trackbound authors delete their courses and explain why a name is needed."},
