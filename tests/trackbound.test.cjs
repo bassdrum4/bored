@@ -14,6 +14,18 @@ function load(options) {
   const nodes = new Map();
   const storage = new Map();
   const glCalls = [];
+  const previewCalls = [];
+  const previewContext = new Proxy({}, {
+    get(target, key) {
+      if (key in target) return target[key];
+      target[key] = (...args) => {
+        previewCalls.push(String(key));
+        return undefined;
+      };
+      return target[key];
+    },
+    set(target, key, value) { target[key] = value; return true; }
+  });
   let ids = 0;
 
   // A recording stand-in for WebGL: every call is counted, creations return
@@ -85,13 +97,15 @@ function load(options) {
     if (nodes.has(id)) return nodes.get(id);
     const element = {
       id, textContent: '', className: '', hidden: false, value: '', dataset: {}, style: {},
+      width: id === 'editorPreview' ? 660 : 440, height: id === 'editorPreview' ? 420 : 220,
       listeners: {}, clientWidth: 960, clientHeight: 600,
       classList: { add: noop, remove: noop, contains: () => false, toggle: noop },
       addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
       removeEventListener: noop,
       appendChild: noop, append: noop, replaceChildren: noop,
       setAttribute: noop, removeAttribute: noop, focus: noop,
-      getContext: type => (gl && /webgl/i.test(String(type)) ? gl : null),
+      getContext: type => (gl && /webgl/i.test(String(type)) ? gl :
+        (options && options.preview2d && type === '2d' ? previewContext : null)),
       getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 600 }),
       querySelectorAll: () => [],
       setPointerCapture: noop
@@ -137,6 +151,7 @@ function load(options) {
     element: id => nodes.get(id),
     storage,
     glCalls,
+    previewCalls,
     flush: () => new Promise(resolve => queueMicrotask(resolve)),
     advance: noop
   };
@@ -591,4 +606,55 @@ test('Trackbound editor saves drafts, imports codes and keeps custom races out o
   assert.equal(T.snapshot().finished, false, 'custom race cannot trigger the hub campaign score');
   assert.equal(T.snapshot().points, 0, 'custom race does not award career points');
   assert.ok(page.storage.get('bored.trackbound.best').includes('custom-'), 'best time is still saved');
+});
+
+
+test('Trackbound editor renders physical road faces, walls, tunnels and loops in an orbitable 3D preview', () => {
+  const page = load({ preview2d: true });
+  const T = page.sandbox.__test;
+  const draft = { name: 'Sky road', blocks: ['sprint', 'curveR', 'tunnel', 'loop', 'checkpoint', 'sprint'] };
+  T.openEditor(draft);
+  const geometry = T.editorPreviewGeometry(T.editorView.track);
+  assert.ok(geometry.faces.length > 100, 'the preview contains actual 3D surface faces');
+  assert.ok(geometry.faces.some(f => f.kind === 'wall'), 'walls have geometry');
+  assert.ok(geometry.faces.some(f => f.kind === 'roof'), 'tunnels have visible roofs');
+  assert.ok(geometry.faces.some(f => f.kind === 'gate'), 'start, checkpoint and finish have visible gates');
+  assert.ok(new Set(geometry.faces.flatMap(f => f.corners.map(p => p[1].toFixed(1)))).size > 6,
+    'the preview includes 3D height, not merely projected map lines');
+  assert.ok(page.previewCalls.includes('fill'), 'faces were drawn in a 2D canvas');
+  T.selectEditorPiece(2);
+  assert.equal(T.editorView.selected, 2);
+  assert.ok(geometry.faces.some(f => f.index === 2 && f.kind === 'road'), 'selection maps to the right block');
+  const canvas = page.element('editorPreview');
+  const event = (clientX, clientY, type) => ({
+    clientX, clientY, pointerId: 1, type, button: 0, preventDefault() {}
+  });
+  const yaw = T.editorView.yaw;
+  canvas.listeners.pointerdown[0](event(310, 190, 'pointerdown'));
+  canvas.listeners.pointermove[0](event(480, 215, 'pointermove'));
+  canvas.listeners.pointerup[0](event(480, 215, 'pointerup'));
+  assert.notEqual(T.editorView.yaw, yaw, 'dragging rotates the camera');
+  const zoom = T.editorView.zoom;
+  canvas.listeners.wheel[0]({ deltaY: -100, preventDefault() {} });
+  assert.ok(T.editorView.zoom > zoom, 'wheel zooms the preview');
+  T.resetEditorCamera();
+  assert.equal(T.editorView.zoom, 1);
+  assert.ok(Number.isFinite(T.previewPick(300,200)), 'selecting by projected position is available');
+});
+
+test('Trackbound home screen gives campaign and saved courses separate, persistent tabs', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  assert.equal(page.element('menuCampaignPanel').hidden, false);
+  assert.equal(page.element('menuCustomPanel').hidden, true);
+  T.showMenuLibrary('custom');
+  assert.equal(page.element('menuCampaignPanel').hidden, true);
+  assert.equal(page.element('menuCustomPanel').hidden, false);
+  T.openEditor({ name: 'My circuit', blocks: ['sprint', 'straight', 'checkpoint', 'sprint'] });
+  assert.equal(T.saveCustomTrack(), true);
+  T.openMenu();
+  assert.equal(page.element('menuCustomPanel').hidden, false, 'the chosen tab persists through editing');
+  assert.match(page.element('menuCustomTab').textContent, /1$/, 'my tracks count is shown');
+  T.showMenuLibrary('campaign');
+  assert.equal(page.element('menuCampaignPanel').hidden, false);
 });
