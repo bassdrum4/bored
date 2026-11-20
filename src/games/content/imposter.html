@@ -1197,8 +1197,15 @@ window.ImposterCore = (function () {
       const nextX = player.x + stepX;
       const hit = ghostsWalkThroughWalls ? null : overlapsWall(nextX, player.y, extra);
       if (hit) {
-        player.x = stepX > 0 ? hit[0] - PLAYER_W : hit[0] + hit[2];
-        player.dir = { x: 0, y: player.dir.y };
+        // Hold the wall, don't drop the key: the direction stays what the
+        // player asked for, so sliding along a wall keeps working and the
+        // client's prediction does not walk off on its own. Only step onto a
+        // face that is within this step; anything further means the seat was
+        // already inside that rectangle, and clamping to its far edge would
+        // fling the player across the room.
+        const face = stepX > 0 ? hit[0] - PLAYER_W : hit[0] + hit[2];
+        const gap = stepX > 0 ? face - player.x : player.x - face;
+        if (gap >= -1 && gap <= Math.abs(stepX) + 1) player.x = face;
       } else {
         player.x = nextX;
       }
@@ -1207,8 +1214,9 @@ window.ImposterCore = (function () {
       const nextY = player.y + stepY;
       const hit = ghostsWalkThroughWalls ? null : overlapsWall(player.x, nextY, extra);
       if (hit) {
-        player.y = stepY > 0 ? hit[1] - PLAYER_H : hit[1] + hit[3];
-        player.dir = { x: player.dir.x, y: 0 };
+        const face = stepY > 0 ? hit[1] - PLAYER_H : hit[1] + hit[3];
+        const gap = stepY > 0 ? face - player.y : player.y - face;
+        if (gap >= -1 && gap <= Math.abs(stepY) + 1) player.y = face;
       } else {
         player.y = nextY;
       }
@@ -1217,9 +1225,10 @@ window.ImposterCore = (function () {
     player.y = clamp(player.y, 0, WORLD.h - PLAYER_H);
   }
 
-  function step(state, dtMs, rng = Math.random) {
+  function step(state, dtMs, rng = Math.random, walkMs = dtMs) {
     const slice = clamp(dtMs, 0, 250);
     const dt = slice / 1000;
+    const walkDt = clamp(walkMs, 0, slice) / 1000;
     state.time += slice;
 
     if (state.sabotageCooldown > 0) state.sabotageCooldown = Math.max(0, state.sabotageCooldown - dt);
@@ -1283,7 +1292,7 @@ window.ImposterCore = (function () {
         if (player.cooldown > 0) player.cooldown = Math.max(0, player.cooldown - dt);
         if (player.ventCooldown > 0) player.ventCooldown = Math.max(0, player.ventCooldown - dt);
       }
-      movePlayer(player, dt, speed, extra);
+      movePlayer(player, walkDt, speed, extra);
     }
   }
 
@@ -1968,9 +1977,16 @@ window.ImposterCore = (function () {
       rankOf,
       tick(dtMs) {
         let remaining = Math.max(0, dtMs);
+        // A stalled host (a backgrounded tab runs its timers at 1 Hz) must not
+        // replay the whole gap as one stride: at most a couple of ordinary
+        // frames of the gap become walking, the rest is lost. Without this a
+        // one-second pause moves everyone 400px in a single frame.
+        let walkLeft = Math.min(remaining, 120);
         while (remaining > 0) {
           const slice = Math.min(remaining, 250);
-          step(state, slice, rng);
+          const walk = Math.min(walkLeft, slice);
+          walkLeft -= walk;
+          step(state, slice, rng, walk);
           remaining -= slice;
         }
         if (state.settings.auto) maybeAutoStart(state, rng);
@@ -3604,6 +3620,8 @@ window.ImposterNet = (function () {
 
   const view = new Map();
   let selfView = null;
+  let selfAim = null;
+  let aimAt = 0;
   let lastFrame = performance.now();
 
   function seedView(state) {
@@ -3620,9 +3638,14 @@ window.ImposterNet = (function () {
       if (!state.players.some(player => player.id === id)) view.delete(id);
     }
     const me = state.players.find(player => player.id === selfId);
-    if (me && (!selfView || Math.hypot(selfView.x - me.x, selfView.y - me.y) > 220)) {
-      selfView = { x: me.x, y: me.y };
-    }
+    if (!me) return;
+    // Only a seat that jumped between two snapshots (a spawn, a vent, a
+    // meeting) is taken as read. Everything else is a walking disagreement and
+    // the draw loop pulls the view onto it instead of cutting across the room.
+    const seatJumped = selfAim ? Math.hypot(me.x - selfAim.x, me.y - selfAim.y) : 0;
+    if (!selfView || !me.alive || seatJumped > 200) selfView = { x: me.x, y: me.y };
+    selfAim = { x: me.x, y: me.y };
+    aimAt = performance.now();
   }
 
   // Frames run down, left, right, up inside each colour sheet.
@@ -3831,10 +3854,31 @@ window.ImposterNet = (function () {
       ctx.restore();
     }
 
-    // Your own seat, predicted locally from the keys.
+    // Your own seat, predicted locally from the keys and pulled back toward the
+    // server's copy every frame, so the two staying a frame or two apart reads
+    // as a glide instead of the old jump to a nearby spot.
     if (me?.alive && selfView) {
+      // Prediction only covers the trip time between snapshots: if the host
+      // stops publishing, the local copy stops walking with it rather than
+      // running on and then being dragged back.
+      const live = (snap.phase === 'play' || snap.phase === 'lobby') && now - aimAt < 300;
+      if (live && selfAim) {
+        // Catch up on the error at walking pace, not at teleport pace: a long
+        // frame (a backgrounded tab coming back) glides instead of jumping.
+        const pull = 1 - Math.exp(-dt * 8);
+        let kx = (selfAim.x - selfView.x) * pull;
+        let ky = (selfAim.y - selfView.y) * pull;
+        const klen = Math.hypot(kx, ky);
+        const cap = 900 * dt;
+        if (klen > cap) {
+          kx *= cap / klen;
+          ky *= cap / klen;
+        }
+        selfView.x += kx;
+        selfView.y += ky;
+      }
       const dir = walkVector();
-      if (dir.x || dir.y) {
+      if (live && (dir.x || dir.y)) {
         const length = Math.hypot(dir.x, dir.y) || 1;
         const step = C.SPEED * (snap.settings.speed || 1) * dt;
         const nx = selfView.x + (dir.x / length) * step;
@@ -4803,7 +4847,7 @@ window.ImposterNet = (function () {
   window.__imposterOpenTask = id => openTask(id);
   window.__imposterOpenMap = () => openList('map');
   window.__imposterTest = () => (snap
-    ? { phase: snap.phase, code: snap.code, net: snap.net, you: snap.you, players: snap.players, bodies: snap.bodies, meeting: snap.meeting, tasks: snap.tasks, sabotage: snap.sabotage, actions: snap.actions }
+    ? { phase: snap.phase, code: snap.code, net: snap.net, you: snap.you, players: snap.players, bodies: snap.bodies, meeting: snap.meeting, tasks: snap.tasks, sabotage: snap.sabotage, actions: snap.actions, self: selfView ? { x: selfView.x, y: selfView.y } : null }
     : null);
 
   show('menu');
