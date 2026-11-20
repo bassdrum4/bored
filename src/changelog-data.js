@@ -2,13 +2,17 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 709,
+  "count": 713,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"dd6057c","date":"2026-11-20","author":"Daniel Lowe","subject":"test(analytics): keep standalone popularity separate from multiplayer opens"},
+  {"sha":"731ffc3","date":"2026-11-20","author":"Daniel Lowe","subject":"feat(analytics): use server-side solo launches and real Together counts"},
+  {"sha":"15e508f","date":"2026-11-20","author":"Daniel Lowe","subject":"feat(analytics): distinguish game popularity and multiplayer reopens"},
+  {"sha":"d719542","date":"2026-11-20","author":"Daniel Lowe","subject":"feat(analytics): count solo opens, real Together matches and turns separately"},
   {"sha":"5abe079","date":"2026-11-20","author":"Daniel Lowe","subject":"revert(trackbound): undo Nov 20 neon redesign, preserve gameplay"},
   {"sha":"0678bb6","date":"2026-11-20","author":"bassdrum4","subject":"feat(prototypes): add the Among Us Python game source"},
   {"sha":"dd97615","date":"2026-11-20","author":"Daniel Lowe","subject":"Change 'Hello World' to 'Goodbye World'"},
