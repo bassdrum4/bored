@@ -133,13 +133,16 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 /* The course board on a public track: the leader in the row, and the rest of
    the top four in a panel that opens under it on hover or keyboard focus. It
    is a real block, not a title bubble, and it cannot be clipped by the list. */
-#publicTrackList li{flex-wrap:wrap}
-.track-board{flex:1 0 100%;display:none;padding:3px 0 5px 22px;color:var(--dim);text-align:left}
-#publicTrackList li:hover .track-board,#publicTrackList li:focus-within .track-board{display:block}
+/* A course's board is a small box by the mouse: it used to open as a row inside
+   the list, which grew the list under the pointer as you scanned it. */
+.track-board{position:fixed;z-index:70;display:none;min-width:148px;max-width:min(270px,calc(100vw - 24px));
+  padding:6px 8px;background:var(--panel);border:1px solid var(--rule);border-radius:3px;
+  box-shadow:0 8px 20px rgba(0,0,0,.16);color:var(--dim);text-align:left;pointer-events:none}
+.track-board.open{display:block}
 .track-board-head{display:block;letter-spacing:.05em;margin-bottom:3px}
-#publicTrackList li .track-board-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;
+.track-board-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;
   gap:8px;align-items:baseline;line-height:1.55}
-#publicTrackList li .track-board-row span{flex:none;font-size:10px;overflow-wrap:normal}
+.track-board-row span{flex:none;font-size:10px;overflow-wrap:normal}
 .track-board-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .track-board-value{color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
 .medalTable.courseBoard{display:flex;flex-direction:column;gap:0;font-size:11px}
@@ -157,6 +160,10 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 .editorField{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--dim);letter-spacing:.06em}
 .editorField input,.editorField select{width:100%}
 .editorField .note{letter-spacing:0;text-transform:none;font-size:11px;line-height:1.35}
+.editorExtras{display:flex;flex-wrap:wrap;gap:4px}
+.editorExtras button{padding:4px 8px;border:1px solid var(--rule);border-radius:3px;background:var(--panel);
+  color:var(--dim);font:inherit;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.editorExtras button[aria-pressed="true"]{background:#f8ecd8;border-color:var(--accent);color:#995007}
 #editorPieces{list-style:none;padding:0;margin:7px 0;border-top:1px solid var(--rule);max-height:310px;overflow-y:auto}
 #editorPieces li{display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--rule);padding:4px 0}
 #editorPieces li span{flex:1;min-width:0;font-size:11px}
@@ -324,6 +331,12 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
               <select id="editorPiece" aria-label="Road piece to insert"></select>
               <button id="editorAdd" type="button">Add at end</button>
               <button id="editorNew" class="quiet" type="button">New</button>
+            </div>
+            <div class="editorField">
+              <span>EXTRAS FOR THE PIECE</span>
+              <div id="editorExtras" class="editorExtras" role="group" aria-label="Extras for the piece"></div>
+              <span class="note">Choose extras, then Add at end. With a piece selected in the list below, a chip
+                changes that piece.</span>
             </div>
             <ol id="editorPieces"></ol>
             <p id="editorCount" class="note"></p>
@@ -941,7 +954,7 @@ const waveDef = (height, len, waves, name) => ({
 // A wide banked right-hander: the surface rolls into the apex and back to level
 // at the exit, so four of them can join four equal sides into a closed loop.
 const bowlDef = dir => ({
-  name: dir > 0 ? 'Bowl R' : 'Bowl L', len: Math.PI / 2 * 26, hw: 10, samples: 30, radius: 26,
+  name: dir > 0 ? 'Bowl L' : 'Bowl R', len: Math.PI / 2 * 26, hw: 10, samples: 30, radius: 26,
   arcSweep: Math.PI / 2, arcSide: dir,
   curve: t => {
     const a = (Math.PI / 2) * t;
@@ -1009,18 +1022,21 @@ const BLOCKS = {
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
   sprint: { name: 'Sprint', len: 32, hw: 6, samples: 10,
     curve: t => ({ p: [0, 0, 32 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
-  curveR: Object.assign(arcDef(R90, Math.PI / 2, 1), { name: 'Right' }),
-  curveL: Object.assign(arcDef(R90, Math.PI / 2, -1), { name: 'Left' }),
-  hairpinR: Object.assign(arcDef(12, Math.PI, 1), { name: 'Hairpin R', samples: 30 }),
-  hairpinL: Object.assign(arcDef(12, Math.PI, -1), { name: 'Hairpin L', samples: 30 }),
+  // The car's own +x axis reads to the screen's left from the chase camera, so
+  // a bend that swings towards +x is a left-hander. Every R/L name below
+  // follows what the driver sees on screen.
+  curveR: Object.assign(arcDef(R90, Math.PI / 2, 1), { name: 'Left' }),
+  curveL: Object.assign(arcDef(R90, Math.PI / 2, -1), { name: 'Right' }),
+  hairpinR: Object.assign(arcDef(12, Math.PI, 1), { name: 'Hairpin L', samples: 30 }),
+  hairpinL: Object.assign(arcDef(12, Math.PI, -1), { name: 'Hairpin R', samples: 30 }),
   up: Object.assign(slopeDef(24, 18), { name: 'Climb' }),
   down: Object.assign(slopeDef(-24, 18), { name: 'Drop' }),
   kicker: Object.assign(slopeDef(30, 9, { samples: 8, wall: 0.5 }), { name: 'Kicker' }),
   // The second kicker on the Kicker course lands at speed, so it takes the same
   // ramp at a shallower angle: the launch is shorter and much easier to hold.
   kicker2: Object.assign(slopeDef(18, 9, { samples: 8, wall: 0.5 }), { name: 'Kicker' }),
-  wallL: wallDef(-1, 'Wall ride L'),
-  wallR: wallDef(1, 'Wall ride R'),
+  wallL: wallDef(-1, 'Wall ride R'),
+  wallR: wallDef(1, 'Wall ride L'),
   checkpoint: { name: 'Checkpoint', len: 16, hw: 6, samples: 8, trigger: 'checkpoint',
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
   finish: { name: 'Finish', len: 18, hw: 6, samples: 8, trigger: 'finish',
@@ -1049,6 +1065,66 @@ const BLOCKS = {
   bowlL: bowlDef(-1)
 };
 
+/* ── extras ─────────────────────────────────────────────────────────────────
+   An extra is a surface or a feature laid over a road piece: ice and dirt
+   change the grip and the paint, narrow pinches the ribbon, a tunnel roofs it
+   and boost lays chevrons on it. A piece id carries its extras after the road
+   it follows — 'curveR+tunnel', 'straight+ice+narrow' — so a bend, a hairpin or
+   a sprint can take any of them without a catalogue full of variants. */
+const PIECE_EXTRAS = {
+  ice: { label: 'Ice',
+    apply: def => Object.assign(def, { grip: ICE_GRIP, paint: ICE_KERB, top: ICE_PAINT }) },
+  narrow: { label: 'Narrow', apply: def => Object.assign(def, { hw: 3.9 }) },
+  tunnel: { label: 'Tunnel', apply: def => Object.assign(def,
+    { wall: Math.max(def.wall === undefined ? 0.95 : def.wall, 4.6), ceiling: true }) },
+  dirt: { label: 'Dirt',
+    apply: def => Object.assign(def, { grip: 4.4, paint: PALETTE.dirt, top: PALETTE.dirt }) },
+  boost: { label: 'Boost', apply: def => Object.assign(def, { boost: true, paint: PALETTE.boost }) }
+};
+const EXTRA_KEYS = Object.keys(PIECE_EXTRAS);
+const EXTRA_SET = new Set(EXTRA_KEYS);
+function splitPiece(id) {
+  const text = String(id === undefined || id === null ? '' : id);
+  const cut = text.indexOf('+');
+  return cut < 0
+    ? { base: text, extras: [] }
+    : { base: text.slice(0, cut), extras: text.slice(cut + 1).split('+').filter(Boolean) };
+}
+// Extras are written in catalogue order, so the same set of extras always makes
+// the same id and a saved track or a shared code stays stable.
+function joinPiece(base, extras) {
+  const list = EXTRA_KEYS.filter(key => extras && extras.includes(key));
+  return list.length ? base + '+' + list.join('+') : base;
+}
+function pieceExtras(id) { return splitPiece(id).extras; }
+const pieceDefs = new Map();
+function pieceDef(id) {
+  const text = String(id === undefined || id === null ? '' : id);
+  const cached = pieceDefs.get(text);
+  if (cached !== undefined) return cached;
+  const { base, extras } = splitPiece(text);
+  const source = BLOCKS[base];
+  if (!source) return null;
+  let def = source;
+  if (extras.length) {
+    def = Object.assign({}, source);     // the catalogue entry never takes the extras
+    for (const key of extras) if (PIECE_EXTRAS[key]) PIECE_EXTRAS[key].apply(def);
+    const labels = EXTRA_KEYS.filter(key => extras.includes(key)).map(key => PIECE_EXTRAS[key].label);
+    def.name = source.name + ' · ' + labels.join(' + ');
+  }
+  pieceDefs.set(text, def);
+  return def;
+}
+function pieceLabel(id) {
+  const def = pieceDef(id);
+  return def ? def.name : String(id);
+}
+function validPiece(id) {
+  const { base, extras } = splitPiece(id);
+  return EDITOR_PIECES.includes(base) && extras.length === new Set(extras).size &&
+    extras.every(key => EXTRA_SET.has(key));
+}
+
 function localCurveFrame(def, t) {
   const c = def.curve(t);
   return frame(c.p, c.f, c.u);
@@ -1064,7 +1140,28 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
   const hw = def.hw || 6;
   const wallH = def.wall === undefined ? 0.95 : def.wall;
   const base = def.base === undefined ? 0.65 : def.base;
-  const cols = [-hw, -hw + 0.55, -0.18, 0.18, hw - 0.55, hw];
+  // A block never steps sideways into its neighbour. Where the neighbour is
+  // wider, this block flares out over its first or last few metres so the edge
+  // of a wide road eases into a narrow one, and the guide walls follow the
+  // flare: a car riding the kerb is funnelled in instead of meeting a wall
+  // across the seam. This is what used to stop a car dead at the edge where a
+  // straight joined ice (6.4 wide) or narrow (3.9 wide).
+  const span = def.len || 16;
+  const blend = Math.min(6, span * 0.45);
+  const ease = t => t * t * (3 - 2 * t);
+  const halfAt = t => {
+    let h = hw;
+    if (prevHw > hw + 0.01) {
+      const s = clamp((t * span) / blend, 0, 1);
+      h = Math.max(h, hw + (prevHw - hw) * (1 - ease(s)));
+    }
+    if (nextHw > hw + 0.01) {
+      const s = clamp(((1 - t) * span) / blend, 0, 1);
+      h = Math.max(h, hw + (nextHw - hw) * (1 - ease(s)));
+    }
+    return h;
+  };
+  const columns = h => [-h, -h + 0.55, -0.18, 0.18, h - 0.55, h];
   const rows = [];
   const box = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
   const grow = p => {
@@ -1072,11 +1169,13 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
   };
 
   for (let i = 0; i <= segments; i++) {
-    const w = compose(entry, localCurveFrame(def, i / segments));
-    const pts = cols.map(offset => madd(w.p, w.x, offset));
+    const t = i / segments;
+    const w = compose(entry, localCurveFrame(def, t));
+    const rowHw = halfAt(t);
+    const pts = columns(rowHw).map(offset => madd(w.p, w.x, offset));
     const low = pts.map(p => madd(p, w.y, -base));
     pts.forEach(grow); low.forEach(grow);
-    rows.push({ w, pts, low });
+    rows.push({ w, h: rowHw, pts, low });
   }
 
   const roadColor = idx => {
@@ -1166,43 +1265,28 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
   if (def.ceiling) {
     for (const row of [rows[0], rows[segments]]) {
       const frame = row.w;
+      const mouthHw = Math.max(hw, row.h);
       const top = madd(frame.p, frame.y, wallH + 0.3);
-      pushBox(road, frame, top, [hw + 1.2, 0.62, 0.7], shade(PALETTE.wall, 0.38));
+      pushBox(road, frame, top, [mouthHw + 1.2, 0.62, 0.7], shade(PALETTE.wall, 0.38));
       for (const side of [-1, 1]) {
-        pushBox(road, frame, madd(madd(frame.p, frame.x, side * (hw + 0.45)), frame.y, wallH / 2), [0.62, wallH / 2 + 0.3, 0.7], shade(PALETTE.wall, 0.38));
+        pushBox(road, frame, madd(madd(frame.p, frame.x, side * (mouthHw + 0.45)), frame.y, wallH / 2), [0.62, wallH / 2 + 0.3, 0.7], shade(PALETTE.wall, 0.38));
       }
     }
   }
 
-  // End caps where this block is narrower than its neighbour, so the wall end
-  // is solid instead of something you can slip past.
-  if (wallH > 0.02 && walls) {
-    const caps = [];
-    if (prevHw > hw + 0.1) caps.push([rows[0], -1, prevHw - hw]);
-    if (nextHw > hw + 0.1) caps.push([rows[segments], 1, nextHw - hw]);
-    for (const [row, facing, extra] of caps) {
-      for (const side of [-1, 1]) {
-        walls.push({
-          a: madd(row.w.p, row.w.x, side * (hw + 0.05)),
-          t: mul(row.w.x, side),
-          len: extra + 0.6,
-          n: mul(row.w.z, facing),
-          up: row.w.y,
-          h: Math.max(wallH, 0.95)
-        });
-      }
-    }
-  }
+  // No end caps: a narrower block flares out to meet a wider one, so there is
+  // no wall across the seam for a car to hit. See halfAt above.
 
   // painted details: start line, finish chequer, boost chevrons, gates
   const paintFrame = t => compose(entry, localCurveFrame(def, t));
   const paintQuad = (t0, t1, color, lift) => {
     const f0 = paintFrame(t0), f1 = paintFrame(t1);
     const up0 = lift === undefined ? 0.02 : lift;
-    const a = madd(madd(f0.p, f0.x, -hw + 0.4), f0.y, up0);
-    const b = madd(madd(f1.p, f1.x, -hw + 0.4), f1.y, up0);
-    const c = madd(madd(f1.p, f1.x, hw - 0.4), f1.y, up0);
-    const d = madd(madd(f0.p, f0.x, hw - 0.4), f0.y, up0);
+    const h0 = Math.max(0.6, halfAt(t0) - 0.4), h1 = Math.max(0.6, halfAt(t1) - 0.4);
+    const a = madd(madd(f0.p, f0.x, -h0), f0.y, up0);
+    const b = madd(madd(f1.p, f1.x, -h1), f1.y, up0);
+    const c = madd(madd(f1.p, f1.x, h1), f1.y, up0);
+    const d = madd(madd(f0.p, f0.x, h0), f0.y, up0);
     pushQuad(road, a, b, c, d, f0.y, color);
   };
   if (def.start) {
@@ -1247,12 +1331,13 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
     const gate = paintFrame(0.2);
     const post = def.trigger === 'checkpoint' ? PALETTE.check : PALETTE.finish;
     const half = 4.4;
+    const gateHw = halfAt(0.2);
     for (const side of [-1, 1]) {
-      const center = madd(madd(gate.p, gate.x, side * (hw + 0.35)), gate.y, half / 2);
+      const center = madd(madd(gate.p, gate.x, side * (gateHw + 0.35)), gate.y, half / 2);
       pushBox(road, gate, center, [0.28, half / 2, 0.28], shade(post, 0.9));
     }
     const beam = madd(gate.p, gate.y, half);
-    pushBox(road, gate, beam, [hw + 0.6, 0.34, 0.3], post);
+    pushBox(road, gate, beam, [gateHw + 0.6, 0.34, 0.3], post);
   }
 
   return box;
@@ -1445,14 +1530,14 @@ function buildTrack(typeIds, meta) {
   // one surface rather than a few blocks named after it.
   const ice = !!(meta && meta.ice);
   for (let i = 0; i < typeIds.length; i++) {
-    const source = BLOCKS[typeIds[i]];
+    const source = pieceDef(typeIds[i]);
     if (!source) continue;
     // An open track has no guide walls at all: nothing keeps the car on the
     // ribbon, so the trick points banked in the air are part of the run.
     const surface = open ? Object.assign({}, source, { wall: 0 }) : source;
     const def = ice ? Object.assign({}, surface, { grip: ICE_GRIP, paint: ICE_KERB, top: ICE_PAINT }) : surface;
     const exit = compose(entry, blockExit(def));
-    const prevDef = BLOCKS[typeIds[i - 1]], nextDef = BLOCKS[typeIds[i + 1]];
+    const prevDef = pieceDef(typeIds[i - 1]), nextDef = pieceDef(typeIds[i + 1]);
     const box = emitBlock(road, scenery, entry, def, i, legs, walls,
       prevDef ? (prevDef.hw || 6) : 0, nextDef ? (nextDef.hw || 6) : 0);
     boxes.push(box);
@@ -3580,6 +3665,34 @@ const editorView = {
   selected: null, track: null, faces: [], samples: [],
   projectedSegments: [], drag: null
 };
+// The extras the next piece is added with. Selecting a piece in the list loads
+// that piece's extras here, so the chips always read as the piece in hand.
+const editorExtras = new Set();
+function paintEditorExtras() {
+  const chips = $('editorExtras');
+  if (!chips || !chips.children) return;
+  for (const button of chips.children) {
+    button.setAttribute('aria-pressed', String(editorExtras.has(button.dataset.mod)));
+  }
+}
+function loadEditorExtras(id) {
+  editorExtras.clear();
+  for (const key of pieceExtras(id)) editorExtras.add(key);
+  paintEditorExtras();
+}
+function withEditorExtras(id) {
+  return joinPiece(splitPiece(id).base, [...editorExtras]);
+}
+function toggleEditorExtra(key) {
+  if (editorExtras.has(key)) editorExtras.delete(key); else editorExtras.add(key);
+  const index = editorView.selected;
+  if (Number.isInteger(index) && editor.blocks[index]) {
+    editor.blocks[index] = withEditorExtras(editor.blocks[index]);
+    refreshEditor();
+  } else {
+    paintEditorExtras();
+  }
+}
 
 function cleanTrackName(value) {
   return String(value || '').trim().slice(0, 32) || 'My track';
@@ -3594,21 +3707,50 @@ function hashLayout(value) {
 function customTrackId(blocks) {
   return 'custom-' + hashLayout(layoutOf(blocks)).toString(36);
 }
+// A code is TB<version>-<body>-<checksum>. Version 1 wrote one character per
+// piece and still decodes, so courses already shared keep working. Version 2
+// writes the road and its extras mask, two characters a piece, which is what
+// lets a code carry an iced tunnel bend.
+function extrasMask(extras) {
+  let mask = 0;
+  EXTRA_KEYS.forEach((key, index) => { if (extras.includes(key)) mask |= 1 << index; });
+  return mask;
+}
+function extrasFromMask(mask) {
+  return EXTRA_KEYS.filter((key, index) => mask & (1 << index));
+}
 function encodeTrackCode(blocks) {
   if (!Array.isArray(blocks) || blocks.length < EDITOR_MIN || blocks.length > EDITOR_MAX ||
-      blocks.some(id => !EDITOR_PIECES.includes(id))) return '';
-  const body = blocks.map(id => EDITOR_PIECES.indexOf(id).toString(36)).join('');
-  const checksum = (hashLayout('TB1:' + body) % (36 ** 4)).toString(36).padStart(4, '0');
-  return 'TB1-' + body + '-' + checksum;
+      blocks.some(id => !validPiece(id))) return '';
+  const body = blocks.map(id => {
+    const { base, extras } = splitPiece(id);
+    return EDITOR_PIECES.indexOf(base).toString(36) + extrasMask(extras).toString(36);
+  }).join('');
+  const checksum = (hashLayout('TB2:' + body) % (36 ** 4)).toString(36).padStart(4, '0');
+  return 'TB2-' + body + '-' + checksum;
 }
 function decodeTrackCode(code) {
   const normalized = String(code || '').trim().toLowerCase();
-  const match = /^tb1-([0-9a-z]{3,36})-([0-9a-z]{4})$/.exec(normalized);
+  const match = /^tb([12])-([0-9a-z]{3,72})-([0-9a-z]{4})$/.exec(normalized);
   if (!match) throw new Error('That is not a track code.');
-  const actual = (hashLayout('TB1:' + match[1]) % (36 ** 4)).toString(36).padStart(4, '0');
-  if (actual !== match[2]) throw new Error('Code checksum does not match.');
-  const blocks = [...match[1]].map(token => EDITOR_PIECES[parseInt(token, 36)]);
-  if (blocks.some(id => !id)) throw new Error('This code uses a road piece this version does not support.');
+  const version = match[1], body = match[2];
+  const actual = (hashLayout('TB' + version + ':' + body) % (36 ** 4)).toString(36).padStart(4, '0');
+  if (actual !== match[3]) throw new Error('Code checksum does not match.');
+  if (version === '1') {
+    const blocks = [...body].map(token => EDITOR_PIECES[parseInt(token, 36)]);
+    if (blocks.some(id => !id)) throw new Error('This code uses a road piece this version does not support.');
+    return blocks;
+  }
+  if (body.length % 2) throw new Error('This code is damaged.');
+  const blocks = [];
+  for (let i = 0; i < body.length; i += 2) {
+    const base = EDITOR_PIECES[parseInt(body[i], 36)];
+    const mask = parseInt(body[i + 1], 36);
+    if (!base || !(mask >= 0 && mask < (1 << EXTRA_KEYS.length))) {
+      throw new Error('This code uses a road piece this version does not support.');
+    }
+    blocks.push(joinPiece(base, extrasFromMask(mask)));
+  }
   return blocks;
 }
 function validateCustom(blocks) {
@@ -3616,7 +3758,7 @@ function validateCustom(blocks) {
     return { ok: false, error: 'Add at least ' + EDITOR_MIN + ' road pieces before driving.' };
   if (blocks.length > EDITOR_MAX)
     return { ok: false, error: 'A track can contain at most ' + EDITOR_MAX + ' road pieces.' };
-  if (blocks.some(id => !EDITOR_PIECES.includes(id)))
+  if (blocks.some(id => !validPiece(id)))
     return { ok: false, error: 'This layout contains an unknown road piece.' };
   try {
     const track = buildTrack(['start', ...blocks, 'finish'], {
@@ -3639,13 +3781,14 @@ function validateCustom(blocks) {
    walls, tunnel roofs and start/checkpoint/finish gates. A lightweight
    orthographic/painter renderer keeps this usable even in a Sites iframe. */
 function previewMaterial(id) {
-  if (id === 'ice') return '#a5cedf';
-  if (id === 'dirt') return '#937453';
-  if (id === 'boost') return '#5791ae';
+  const { base, extras } = splitPiece(id);
+  if (base === 'ice' || extras.includes('ice')) return '#a5cedf';
+  if (base === 'dirt' || extras.includes('dirt')) return '#937453';
+  if (base === 'boost' || extras.includes('boost')) return '#5791ae';
   if (id === 'checkpoint') return '#85af87';
   if (id === 'finish') return '#d8d2ac';
   if (id === 'start') return '#849f8a';
-  if (id === 'narrow') return '#60646a';
+  if (base === 'narrow' || extras.includes('narrow')) return '#60646a';
   return '#777d7d';
 }
 function editorPreviewGeometry(track) {
@@ -3660,14 +3803,38 @@ function editorPreviewGeometry(track) {
     const count = Math.max(8, Math.min(30, Math.ceil((def.samples || 12) / 1.4)));
     const hw = def.hw || 6;
     const wall = def.wall === undefined ? 0.95 : def.wall;
+    // The preview flares a narrow piece out to meet a wider neighbour exactly as
+    // the built road does, so the editor shows the funnel the car drives through
+    // rather than a step the geometry does not have.
+    const nearHw = offset => {
+      const other = track.chain[linkIndex + offset];
+      return other ? (other.def.hw || 6) : 0;
+    };
+    const prevHw = nearHw(-1), nextHw = nearHw(1);
+    const span = def.len || 16;
+    const blend = Math.min(6, span * 0.45);
+    const ease = t => t * t * (3 - 2 * t);
+    const halfAt = t => {
+      let h = hw;
+      if (prevHw > hw + 0.01) {
+        const s = clamp((t * span) / blend, 0, 1);
+        h = Math.max(h, hw + (prevHw - hw) * (1 - ease(s)));
+      }
+      if (nextHw > hw + 0.01) {
+        const s = clamp(((1 - t) * span) / blend, 0, 1);
+        h = Math.max(h, hw + (nextHw - hw) * (1 - ease(s)));
+      }
+      return h;
+    };
     const row = t => {
       const w = from(link, t);
-      const left = madd(w.p, w.x, -hw);
-      const right = madd(w.p, w.x, hw);
+      const h = halfAt(t);
+      const left = madd(w.p, w.x, -h);
+      const right = madd(w.p, w.x, h);
       return {
         p: w.p, left, right,
-        leftIn: madd(w.p, w.x, -(hw - 0.55)),
-        rightIn: madd(w.p, w.x, hw - 0.55),
+        leftIn: madd(w.p, w.x, -(h - 0.55)),
+        rightIn: madd(w.p, w.x, h - 0.55),
         centerL: madd(w.p, w.x, -0.11),
         centerR: madd(w.p, w.x, 0.11),
         underL: madd(left, w.y, -0.65),
@@ -3701,7 +3868,8 @@ function editorPreviewGeometry(track) {
     if (def.trigger || def.start) {
       const gate = from(link, def.start ? 0.07 : 0.2);
       const x = gate.x, y = gate.y, z = gate.z, p = gate.p;
-      const left = madd(p, x, -hw + 0.4), right = madd(p, x, hw - 0.4);
+      const gateHw = halfAt(def.start ? 0.07 : 0.2);
+      const left = madd(p, x, -gateHw + 0.4), right = madd(p, x, gateHw - 0.4);
       const wide = 0.29, high = 4.2;
       const gateColor = def.start ? '#4a936a' : def.trigger === 'finish' ? '#deae52' : '#91c2a1';
       const post = pt => {
@@ -3808,6 +3976,7 @@ function drawEditorPreview(track) {
 function selectEditorPiece(index) {
   editorView.selected = Number.isInteger(index) && index >= 0 && index < editor.blocks.length
     ? index : null;
+  if (editorView.selected !== null) loadEditorExtras(editor.blocks[editorView.selected]);
   const list = $('editorPieces');
   if (list.children) Array.from(list.children).forEach((li, i) => {
     li.classList.toggle('selected', i === editorView.selected);
@@ -3966,9 +4135,9 @@ function refreshEditor() {
       moveBlockTo(from, index);
     });
     li.appendChild(el('span', 'partNumber', String(index + 1).padStart(2, '0')));
-    const select = el('button', 'editorSelect', BLOCKS[id].name);
+    const select = el('button', 'editorSelect', pieceLabel(id));
     select.type = 'button';
-    select.setAttribute('aria-label', 'Select ' + BLOCKS[id].name + ' block ' + (index + 1));
+    select.setAttribute('aria-label', 'Select ' + pieceLabel(id) + ' block ' + (index + 1));
     select.setAttribute('aria-pressed', String(editorView.selected === index));
     select.addEventListener('click', () => selectEditorPiece(index));
     li.appendChild(select);
@@ -3979,8 +4148,8 @@ function refreshEditor() {
       button.addEventListener('click', () => { change(); refreshEditor(); });
       li.appendChild(button);
     };
-    action('+', 'Insert selected piece after block', editor.blocks.length < EDITOR_MAX,
-      () => { editor.blocks.splice(index + 1, 0, $('editorPiece').value); editorView.selected = index + 1; });
+    action('+', 'Insert the chosen piece and extras after block', editor.blocks.length < EDITOR_MAX,
+      () => { editor.blocks.splice(index + 1, 0, withEditorExtras($('editorPiece').value)); editorView.selected = index + 1; });
     action('↑', 'Move block up', index > 0, () => {
       [editor.blocks[index - 1], editor.blocks[index]] = [editor.blocks[index], editor.blocks[index - 1]];
       editorView.selected = index - 1;
@@ -4010,10 +4179,11 @@ function refreshEditor() {
   paintPostButton(validation);
   let previewTrack = validation.track || null;
   // Incomplete or intersecting courses still need a visual preview to fix them.
-  if (!previewTrack && editor.blocks.every(id => EDITOR_PIECES.includes(id))) {
+  if (!previewTrack && editor.blocks.every(id => validPiece(id))) {
     try { previewTrack = buildTrack(['start', ...editor.blocks, 'finish'],
       { id: 'preview', name: editor.name, author: 30000 }); } catch (error) {}
   }
+  paintEditorExtras();
   drawEditorPreview(previewTrack);
   drawEditorMap(previewTrack);
   return validation;
@@ -4038,7 +4208,9 @@ function openEditor(draft, slot) {
       posted: draft.posted && typeof draft.posted.code === 'string'
         ? { id: draft.posted.id || null, code: draft.posted.code } : null };
     editorView.selected = null;
+    editorExtras.clear();
   }
+  paintEditorExtras();
   mode = 'editor'; paused = false;
   $('editorName').value = editor.name;
   $('barTrack').textContent = 'editor · custom track';
@@ -4136,7 +4308,29 @@ function publicStatus(text, invalid) {
   note.textContent = publicNote;
   note.className = 'note' + (invalid ? ' invalid' : '');
 }
+let openTrackBoard = null;
+function hideTrackBoard() {
+  if (openTrackBoard) openTrackBoard.classList.remove('open');
+  openTrackBoard = null;
+}
+// Put the box by the pointer, flipped back over the cursor near an edge.
+function placeTrackBoard(board, clientX, clientY) {
+  board.classList.add('open');
+  openTrackBoard = board;
+  const box = board.getBoundingClientRect ? board.getBoundingClientRect() : null;
+  const width = box && box.width ? box.width : 170;
+  const height = box && box.height ? box.height : 96;
+  const viewWidth = (typeof window !== 'undefined' && window.innerWidth) || 1024;
+  const viewHeight = (typeof window !== 'undefined' && window.innerHeight) || 768;
+  const pointerX = clientX || 0, pointerY = clientY || 0;
+  let x = pointerX + 14, y = pointerY + 16;
+  if (x + width > viewWidth - 8) x = Math.max(8, pointerX - width - 12);
+  if (y + height > viewHeight - 8) y = Math.max(8, pointerY - height - 12);
+  board.style.left = Math.round(x) + 'px';
+  board.style.top = Math.round(y) + 'px';
+}
 function renderPublicList(rows) {
+  openTrackBoard = null;
   const tab = $('menuPublicTab');
   if (tab) tab.textContent = 'Public tracks' + (rows.length ? ' · ' + rows.length : '');
   const list = $('publicTrackList');
@@ -4190,8 +4384,19 @@ function renderPublicList(rows) {
       });
       li.appendChild(remove);
     }
-    // The board is a full row under the course's own line and buttons.
-    if (board) li.appendChild(board);
+    // The board follows the pointer as a small box, and sits under the row for
+    // keyboard focus, where there is no pointer to follow.
+    if (board) {
+      li.addEventListener('pointerenter', event => placeTrackBoard(board, event.clientX, event.clientY));
+      li.addEventListener('pointermove', event => placeTrackBoard(board, event.clientX, event.clientY));
+      li.addEventListener('pointerleave', hideTrackBoard);
+      li.addEventListener('focusin', () => {
+        const box = li.getBoundingClientRect ? li.getBoundingClientRect() : null;
+        placeTrackBoard(board, box ? box.right - 10 : 0, box ? box.top + 8 : 0);
+      });
+      li.addEventListener('focusout', hideTrackBoard);
+      li.appendChild(board);
+    }
     list.appendChild(li);
   });
 }
@@ -4709,17 +4914,30 @@ for (const pad of document.querySelectorAll('[data-drive]')) {
 }
 
 
-// Keep the editor's controls separate from the drive keys.
+// Keep the editor's controls separate from the drive keys. Ice, dirt, narrow
+// and tunnel used to be pieces of their own; they are extras now, so the picker
+// lists road shapes and the chips under it add the surface to any of them.
+const SURFACE_ONLY = ['ice', 'dirt', 'narrow', 'tunnel'];
 for (const id of EDITOR_PIECES) {
-  const option = el('option', '', BLOCKS[id].name);
+  if (SURFACE_ONLY.includes(id)) continue;
+  const option = el('option', '', pieceLabel(id));
   option.value = id;
   $('editorPiece').appendChild(option);
 }
 $('editorPiece').value = 'straight';
+for (const key of EXTRA_KEYS) {
+  const chip = el('button', '', PIECE_EXTRAS[key].label);
+  chip.type = 'button';
+  chip.dataset.mod = key;
+  chip.setAttribute('aria-pressed', 'false');
+  chip.addEventListener('click', () => toggleEditorExtra(key));
+  $('editorExtras').appendChild(chip);
+}
+paintEditorExtras();
 $('editorName').addEventListener('input', () => { editor.name = $('editorName').value; paintPostButton(); });
 $('editorAdd').addEventListener('click', () => {
   if (editor.blocks.length >= EDITOR_MAX) return;
-  editor.blocks.push($('editorPiece').value);
+  editor.blocks.push(withEditorExtras($('editorPiece').value));
   editorView.selected = editor.blocks.length - 1;
   refreshEditor();
 });
@@ -4734,6 +4952,8 @@ $('menuPublicTab').addEventListener('click', () => {
   if (!publicTracks) void refreshPublicList();
 });
 $('menuPublicReload').addEventListener('click', () => { publicTracks = null; void refreshPublicList(); });
+// Scrolling the list moves the rows out from under the box, so put it away.
+$('publicTrackList').addEventListener('scroll', hideTrackBoard, { passive: true });
 $('menuNewTrack').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorNew').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorBack').addEventListener('click', () => openMenu());
@@ -4801,6 +5021,9 @@ window.__test = {
   seedDate, dailyRecord, dailyStreak, saveDaily, packGhost, unpackGhost, paintCrowd,
   openMenu, toggleMute,
   EDITOR_PIECES, EDITOR_MIN, EDITOR_MAX, validateCustom, encodeTrackCode, decodeTrackCode,
+  PIECE_EXTRAS, EXTRA_KEYS, splitPiece, joinPiece, pieceExtras, pieceDef, pieceLabel, validPiece,
+  editorExtras, toggleEditorExtra, loadEditorExtras, paintEditorExtras,
+  placeTrackBoard, hideTrackBoard, renderPublicList,
   customTrackId, openEditor, refreshEditor, saveCustomTrack, startCustomTrack,
   editorDraft: () => editor, customTracks: () => saved.custom, showMenuLibrary,
   refreshPublicList, drivePublic, postPublicTrack, postState, paintPostButton, moveBlockTo,
@@ -4848,7 +5071,7 @@ function boot() {
     if (!Array.isArray(saved.custom)) saved.custom = [];
     saved.custom = saved.custom.filter(track => track && Array.isArray(track.blocks) &&
       track.blocks.length >= EDITOR_MIN && track.blocks.length <= EDITOR_MAX &&
-      track.blocks.every(id => EDITOR_PIECES.includes(id))).slice(0, EDITOR_LIMIT);
+      track.blocks.every(id => validPiece(id))).slice(0, EDITOR_LIMIT);
     if (mode === 'menu') refreshMenu();
   });
 }

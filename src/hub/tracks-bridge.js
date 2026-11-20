@@ -37,7 +37,8 @@ function tracksBridge(channel) {
 
 const LIST_LIMIT = 60;
 const refuse = message => { const error = new Error(message); error.permanent = true; return error; };
-const TRACK_CODE = /^TB1-([0-9a-z]{3,36})-([0-9a-z]{4})$/i;
+// TB1 is one character a piece, TB2 carries the road and its extras.
+const TRACK_CODE = /^TB([12])-([0-9a-z]{3,72})-([0-9a-z]{4})$/i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const cleanTrackId = value => (UUID.test(String(value || '').trim()) ? String(value).trim() : null);
 const RUN_MIN_MS = 4000, RUN_MAX_MS = 600000;
@@ -48,12 +49,12 @@ function cleanName(value) {
   return name;
 }
 
-// The editor writes TB1-<body>-<checksum>; accept any case and store the shape
-// the game parses, so the checksum text stays comparable.
+// The editor writes TB<version>-<body>-<checksum>; accept any case and store
+// the shape the game parses, so the checksum text stays comparable.
 function cleanCode(value) {
   const match = TRACK_CODE.exec(String(value || '').trim());
   if (!match) throw refuse('That is not a saved track.');
-  return 'TB1-' + match[1].toLowerCase() + '-' + match[2].toLowerCase();
+  return 'TB' + match[1] + '-' + match[2].toLowerCase() + '-' + match[3].toLowerCase();
 }
 
 // Public read: the list function is granted to the publishable key, so this

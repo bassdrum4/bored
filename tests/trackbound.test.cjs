@@ -567,8 +567,13 @@ test('Trackbound editor codes round-trip road blocks and reject corrupt or unkno
   const T = page.sandbox.__test;
   const pieces = ['sprint', 'curveR', 'checkpoint', 'straight', 'curveL', 'boost'];
   const code = T.encodeTrackCode(pieces);
-  assert.match(code, /^TB1-[0-9a-z]+-[0-9a-z]{4}$/);
+  assert.match(code, /^TB2-[0-9a-z]{6,72}-[0-9a-z]{4}$/);
   assert.deepEqual(Array.from(T.decodeTrackCode(code)), pieces);
+  // A course shared before extras existed still decodes to the same road.
+  assert.deepEqual(Array.from(T.decodeTrackCode('TB1-136-416e')), ['sprint', 'curveR', 'checkpoint']);
+  assert.deepEqual(Array.from(T.decodeTrackCode(T.encodeTrackCode(['curveR+ice', 'straight+narrow+tunnel', 'sprint+boost']))),
+    ['curveR+ice', 'straight+narrow+tunnel', 'sprint+boost'], 'extras survive a shared code');
+  assert.equal(T.encodeTrackCode(['straight+lava', 'straight', 'straight']), '', 'unknown extras are not written');
   assert.equal(T.customTrackId(pieces), T.customTrackId(Array.from(T.decodeTrackCode(code))),
     'the same shared layout has the same local best-time key');
   assert.throws(() => T.decodeTrackCode(code.slice(0, -1) + (code.endsWith('x') ? 'y' : 'x')), /checksum/);
@@ -795,4 +800,109 @@ test('Trackbound lets an author remove a posted track and forgets it locally', a
   assert.equal(calls.some(call => call.op === 'remove' && call.payload.id === trackId), true);
   assert.equal(T.publicTracks().length, 0, 'the row leaves the list');
   assert.equal(T.customTracks()[0].posted, undefined, 'the saved copy can be posted again');
+});
+
+test('Trackbound extras ride on any road piece, not only the ones named after them', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const icyBend = T.pieceDef('curveL+ice+narrow');
+  assert.equal(icyBend.name, 'Right · Ice + Narrow', 'the label says what was added');
+  assert.equal(icyBend.hw, 3.9, 'narrow pinches a bend');
+  assert.equal(icyBend.grip, T.BLOCKS.ice.grip, 'ice gives the bend its grip');
+  assert.equal(icyBend.paint, T.BLOCKS.ice.paint);
+  assert.equal(T.pieceDef('curveL').hw, 6, 'the plain bend is untouched');
+  assert.equal(T.pieceDef('curveL').grip, undefined, 'and keeps the road grip');
+  const roofed = T.pieceDef('hairpinR+tunnel');
+  assert.equal(roofed.ceiling, true, 'a tunnel can roof a hairpin');
+  assert.ok(roofed.wall >= 4.5, 'with walls tall enough to carry the roof');
+  assert.equal(T.BLOCKS.hairpinR.ceiling, undefined, 'the catalogue entry never takes an extra');
+  assert.equal(T.pieceDef('sprint+boost').boost, true, 'boost can be laid on a sprint');
+  assert.equal(T.joinPiece('curveR', ['narrow', 'ice']), 'curveR+ice+narrow', 'extras are written in one order');
+  assert.deepEqual(Array.from(T.pieceExtras('curveR+ice+narrow')), ['ice', 'narrow']);
+  assert.equal(T.pieceLabel('curveR+ice'), 'Left · Ice');
+  assert.equal(T.validPiece('curveR+ice'), true);
+  assert.equal(T.validPiece('curveR+lava'), false, 'an unknown extra is refused');
+  assert.equal(T.validPiece('start+ice'), false, 'structural pieces are not editor pieces');
+});
+
+test('Trackbound editor puts extras on the chosen piece and on the selected one', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  T.openEditor({ name: 'Ice road', blocks: ['sprint', 'curveR', 'straight'] });
+  T.selectEditorPiece(1);
+  assert.equal(T.editorExtras.size, 0, 'a plain piece starts with no extras');
+  T.toggleEditorExtra('ice');
+  assert.equal(T.editorDraft().blocks[1], 'curveR+ice', 'the selected piece takes the extra');
+  assert.equal(T.editorDraft().blocks[0], 'sprint', 'and the others do not');
+  assert.equal(T.editorExtras.has('ice'), true);
+  T.toggleEditorExtra('ice');
+  assert.equal(T.editorDraft().blocks[1], 'curveR', 'the same chip takes it away');
+  // With nothing selected the chips are the brush for the next piece.
+  T.selectEditorPiece(null);
+  T.toggleEditorExtra('tunnel');
+  page.element('editorPiece').value = 'sprint';
+  page.element('editorAdd').listeners.click[0]({});
+  const blocks = Array.from(T.editorDraft().blocks);
+  assert.equal(blocks[blocks.length - 1], 'sprint+tunnel', 'Add at end uses the chosen extras');
+  T.selectEditorPiece(null);
+  assert.equal(T.editorExtras.size, 1, 'the brush survives a fresh selection');
+  T.selectEditorPiece(3);
+  assert.deepEqual(Array.from(T.editorExtras), ['tunnel'], 'selecting a piece shows its own extras');
+  assert.equal(T.validateCustom(blocks).ok, true, 'a course built with extras is drivable');
+});
+
+test('Trackbound flares a narrow piece into its wide neighbours instead of a wall at the seam', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const track = T.buildTrack(['start', 'straight', 'narrow', 'straight', 'finish'],
+    { id: 'join', name: 'Join', author: 30000 });
+  const link = track.chain[2];
+  assert.equal(link.def.hw, 3.9);
+  const probe = (t, out) => {
+    const at = T.compose(link.entry, T.localCurveFrame(link.def, t));
+    return [at.p[0] + at.x[0] * out, at.p[1] + 6, at.p[2] + at.x[2] * out];
+  };
+  // A car riding the kerb of the wide straight arrives here at a little over
+  // five units out. On the first metre of the narrow piece that is still road.
+  assert.ok(T.raycast(track.mesh, probe(0.06, 5.2), [0, -1, 0], 40),
+    'the road flares out to meet the wider neighbour');
+  // Halfway along it has pinched back in to its own width.
+  assert.equal(T.raycast(track.mesh, probe(0.5, 5.2), [0, -1, 0], 40), null,
+    'and narrows to its own width once inside');
+});
+
+test('Trackbound shows a course board as a small box by the pointer', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const shown = new Set();
+  const board = {
+    classList: { add: name => shown.add(name), remove: name => shown.delete(name) },
+    style: {},
+    getBoundingClientRect: () => ({ width: 160, height: 90 })
+  };
+  T.placeTrackBoard(board, 100, 100);
+  assert.equal(shown.has('open'), true, 'the box is shown');
+  assert.equal(board.style.left, '114px');
+  assert.equal(board.style.top, '116px');
+  T.placeTrackBoard(board, 1010, 760);
+  assert.equal(board.style.left, '838px', 'near the right edge it flips back over the pointer');
+  assert.equal(board.style.top, '658px', 'and up from the bottom edge');
+  T.hideTrackBoard();
+  assert.equal(shown.has('open'), false, 'leaving the row puts it away');
+});
+
+test('Trackbound names a bend for the way it goes on the screen', () => {
+  const T = load().sandbox.__test;
+  // The chase camera shows the car's own +x axis on its left (see stepCar), so
+  // a bend that swings towards +x is a left-hander, not a right one.
+  assert.ok(T.pieceDef('curveR').curve(1).p[0] > 0, 'the Left bend swings towards +x');
+  assert.ok(T.pieceDef('curveL').curve(1).p[0] < 0, 'the Right bend swings the other way');
+  assert.equal(T.BLOCKS.curveR.name, 'Left');
+  assert.equal(T.BLOCKS.curveL.name, 'Right');
+  assert.equal(T.BLOCKS.hairpinR.name, 'Hairpin L');
+  assert.equal(T.BLOCKS.hairpinL.name, 'Hairpin R');
+  assert.equal(T.BLOCKS.wallR.name, 'Wall ride L');
+  assert.equal(T.BLOCKS.wallL.name, 'Wall ride R');
+  assert.equal(T.BLOCKS.bowlR.name, 'Bowl L');
+  assert.equal(T.BLOCKS.bowlL.name, 'Bowl R');
 });
