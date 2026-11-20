@@ -245,6 +245,31 @@ canvas, img { image-rendering: pixelated; display: block }
 #card-stats { left: 248px; top: 8px; width: 384px; height: 264px }
 #card-stats .stat { display: flex; justify-content: space-between; align-items: center; height: 28px; border-bottom: 1px solid var(--ink) }
 #card-stats .stat:last-child { border-bottom: 0 }
+#wiki-tabs { left: 8px; top: 8px; width: 624px; height: 36px; padding: 2px 8px; display: flex; gap: 8px; align-items: center }
+#wiki-tabs > span { padding: 0 8px; border: 1px solid var(--dim); line-height: 26px; cursor: pointer; white-space: nowrap }
+#wiki-tabs > span.on { border-color: var(--gold); color: var(--gold) }
+#wiki-box { left: 8px; top: 52px; width: 624px; height: 220px; padding: 4px; display: flex; gap: 8px }
+#wiki-box .wlist { width: 184px; flex: none; height: 100%; scroll-snap-type: none }
+#wiki-box .wbody, #wiki-box .wside { flex: 1; min-width: 0; overflow-y: auto; white-space: normal; line-height: 18px; scrollbar-width: thin; scrollbar-color: var(--red) var(--panel) }
+#wiki-box .wbody > div { margin-bottom: 4px }
+#wiki-box .title { display: flex; align-items: center; gap: 4px }
+.tsw { display: inline-block; width: 8px; height: 8px; border: 1px solid var(--ink); margin: 0 3px 0 0; vertical-align: middle }
+#wiki-box .wside .tl { line-height: 16px; font-size: 16px }
+.wchart { flex: none; display: grid; grid-template-columns: 22px repeat(18, 18px); grid-auto-rows: 11px; font: 400 10px/11px var(--pixel); text-align: center; align-self: start }
+.wchart span { cursor: pointer; overflow: hidden; white-space: nowrap }
+.wchart .th { font-size: 9px }
+.wchart .th.on { background: var(--ink); outline: 1px solid var(--gold) }
+.wchart .corner { font-size: 7px; color: var(--dim) }
+.wchart .c { background: var(--ink); border: 0 solid var(--panel); border-width: 0 1px 1px 0 }
+.wchart .c.hl { background: #3a3856 }
+.wchart .c.x2 { color: var(--ink); background: var(--gold) }
+.wchart .c.xh { color: var(--paper); background: #5a566f }
+.wchart .c.x0 { color: var(--paper); background: #14131f }
+#scr-wiki.over { position: absolute; inset: 0; background: var(--ink); z-index: 60 }
+#wiki-foot { left: 8px; right: 8px; bottom: 8px; height: 56px; padding: 6px 12px; white-space: normal; line-height: 20px }
+#tutor-box .wlink { margin-left: auto; margin-right: 16px; color: var(--gold) }
+#frame.no-pixel #wiki-box, #frame.no-pixel #wiki-tabs, #frame.no-pixel #wiki-foot { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
+#frame.no-pixel .wchart { font: 600 8px/11px Arial, Helvetica, sans-serif }
 #quest-tabs { left: 8px; top: 8px; width: 624px; height: 36px; padding: 2px 8px; display: flex; gap: 8px; align-items: center }
 #quest-tabs > span { padding: 0 8px; border: 1px solid var(--dim); line-height: 26px; cursor: pointer; white-space: nowrap }
 #quest-tabs > span.on { border-color: var(--gold); color: var(--gold) }
@@ -491,6 +516,11 @@ img.mirror { scale: -1 1 }
         <div class="panel" id="card-buddy"></div>
         <div class="panel" id="card-stats"></div>
       </section>
+      <section id="scr-wiki" class="screen" hidden>
+        <div class="panel" id="wiki-tabs"></div>
+        <div class="panel" id="wiki-box"></div>
+        <div class="panel" id="wiki-foot" hidden></div>
+      </section>
       <section id="scr-starter" class="screen" hidden>
         <div class="panel" id="starter-list"><div class="title" id="starter-title">STARTER</div><div class="rows scroll" id="starter-rows"></div></div>
         <div class="panel" id="starter-detail"><div class="cell" id="starter-pic"></div><div id="starter-info"></div><div class="rows" id="starter-gifts"></div></div>
@@ -599,7 +629,31 @@ function mapCanvas(key, pal, scale = ART) {
 }
 // A held item: a small round charm in the item's colour.
 const ITEM_HEX = { leftovers: "#7ac74c", sash: "#ee8130", band: "#c8372f", claw: "#e3ad2b", lens: "#6390f0", helmet: "#a07514", belt: "#705746", bell: "#f4a6c0" };
-const itemIcon = (id, scale = 2) => { const c = mapCanvas("item", { k: C.ink, 1: ITEM_HEX[id] || C.paper, 2: C.paper }, scale); c.classList.add("item-ico"); c.title = (T && T.items && T.items[id] ? T.items[id].name + ": " + T.items[id].about : id); return c; };
+// Held items: PokeRogue's item sprites (Choice Band and Rocky Helmet from Showdown's set),
+// cut to their art at 1x and kept here so the page needs no other file. Drawn at whole-number
+// scales only: 1x where the old charm was 2x, 2x for the Shop's big picture.
+const ITEM_SPRITES = { leftovers: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA0AAAAUCAYAAABWMrcvAAABgUlEQVR42p2SIXMbMRCFP2UKFHZmPqaDNotYjqUwZgkMDDQ1S2HDjt5PMGvh0cALioxiwxOqD6ViEVOBU/lkpwbdGY1mtPu0u+89OBFKqaCUCofvZ6cAd4vPc1+GRcPEt7mGdwATc9ZaEUFKqdBqTZZlOOcojQHge21otY4flRCsteJsCHjse4yUyShGSmrvAWi1RikVhFIqdPNrAN43nse+P9rhYTzGObfrZsx+JxY159WcB8YJwDmXAKy1QkSmplMuswz9McpwvGfnWK7XkYhIeXElyasbau8xUsaTVzcUV+me4pBy0zV0200suC13Yv3tknSy1gprrdDFjCKfJD8PAScdcSr+C3RkzrfwGt7Ca3j59SPeh8aNlHddx2/WkYQin9BtN8l+uphhrRX78ap5BOj8Nj6PmO7uqj52ebNyzHiCRZ2Ku/2JXj7RrNwxqL/wNCvH1/t7zieSETD68GPjPf2Fh/YTce8WcNmWiZWMlDyXLctqr5c4ZPBf7A4F/gM+M76BorVfsgAAAABJRU5ErkJggg==",
+  sash: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAVCAYAAABG1c6oAAABS0lEQVR42qVVPXqEIBQc/CzSWqZ7tOmWckuPYI7gNezWa9ClzRW23BK6tHCC5QikEUWEVZPXyc8wzJtBBgBE5DGVtZbhH1UTkb9/fgAA2u+fQ5tiAimJ+szpAcj0/WqcS+kDaDUPXt52wWTTQDYNuJTFdVUMZkaxuU4MlrCC0xpOayix7KustYwPapdZqN65l42rVl8tYB7LaWfBAIDFTMxDLFe6KgSw3rlVN8NBF84BAEKpea6OW8+vWOmXAqWljSkzPGObVzKwMwZWQqxY5TRlRwzstF7NC6WKUtQ5sDQJAaCUdyLyWZ2JyD+7zj+7zvvbzRORzxk93eO/unldMctcyl3PxVYzowAf4Ku/PlOpb9HmklLw1i7YFARrLatKhpVNs7FN0NSMArhvwbK2yeU3lBkTVsPWPuxoInj7vsg1vey5pp1KypH/zi/SycvRVBTmJAAAAABJRU5ErkJggg==",
+  band: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAACWElEQVR42o1VIXezMBS97CCQ6z9Y5TeXuA+Zn7DJytSBRCKRrQNX5OaKm8V9T765TnYOSd3i8gkaCi1tl3NyOIS8y81997141lrcG1LK0SZm9u7F+L8BzbL8Yu0euHeLsZTSEjGMAYgIVfU+YE24dYq7jAEgCICqegczQcoQzIThDydPYa29OYUQ9ufHWiGEHb5/fPzrn266PdZaPNzXOEQcx6hr7vWua4JSIQAgDMN+73ye9In2b7lAyhCrVZc4pSTqmpEkMZgJWZYjTeM+5jzB/hRgXTMAIEm6QKJOW6fn21uN9TodJU1KaaUMAXSs/SHoOWCXJBq5gJl6UCcPM3vM7Ekp7Xwenhgvl7ElYsRxfFNr5wo3kqTTfrmM7WaTj+zmaR3ZPM8vQIc+HYK5dbe2WuVQSo4kYWbPBwBjMGLDTCPDD0t6CJBleS/VRaEIIexu1/ZeHXpxamodWSGEbdvOwy8vb5MxPgDs948gOoCIJ5vOUBJnPyJCWX5D6yek6ZUm1DQHvL4+oi3WMC+6/4ExlwFNc8B+v+tBy/J7MtkPXfUAP+UaM6UAAG2xRtMc0EYLtNECTXPAdntAlp30dKBaP00Du4TNlIKZCwRV2X0pMpi06JpQFsFVblnujs9fMCYC2rq+7GpZNALX+vlYGCfGsxlNNv6HzSb3ikLh889fBPtP/HY4xud9+aLRSyntVikgShFUJUzTwOgUQRZ1iUyLXoZjKpCm8dVranSDOJttt50sQVXCMMOkBYiAr68dtH7GYqHu3n2TV9NyGdtrR5QyxHlfmBr/AX1Q0mHa2CvFAAAAAElFTkSuQmCC",
+  claw: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAATCAYAAAB2pebxAAAA7klEQVR42p2UoRaCMBSG7zi8BI1VIo9A1IbRN4BqtOkr2KhEq9GGDRvYttuw+QgzyCZjQwc37Yzzffy7d0BgRoVhKOQaEYlckznwtVypvWR7USLiIpAwDXLtGU3WgIiEuAg0mEYAvAXenVQi30lAo88mb4HfvsLX4wkAAN4sQf/2oQAAzCT/BBLmvFOMNxac97GzYFd2gIjESBInB0Ngg4d3xTdG+UMwhq09UaMcCTbHuxXWJFoKi2AKNhpLg3yRQJ+O7EVfrgLVUFZlQrBGsCoTdZGK4dfqLBGsEXWRLhOML9usI9iSLEkw+cdaUm9vv8HTZslRQQAAAABJRU5ErkJggg==",
+  lens: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAVCAYAAABCIB6VAAACdElEQVR42qWVIXTaUBSGP3YqqEtlXSKDA7e4VhKXOFJFcK2DqQZFqjYck6ASXFAUN6qauswlbg/H1EBtdZngJAVSunJ2z8k5ycl73/3f/+67r8SBkGU5zd4Xi0WJI+PDIWgUC8zaT+rW9U6S90bpEJTvOmW1TLc1I6KBiOYcs4KTQ9DxRNAwFADsps0QMA0DSTrDubEOriBLWtoHx1Et/35OngG4688xej9wug5202a9XiFJZyiKUgBbusZisSiV/gXNwH/UHlbDwuk6mIYBwPz78w7UuDhHURQsXdu14jXodgghcHsuTtcp/FNVlckDGNse76t9K4QQBN6QRCxfoMo5AOaVzbpqFDcPYHSX0LxVd1QrikKQJFRUFUk6YzYPARiOhvkYu2nj9lz8sV+sY70lEYiP6C2pqDSaE0wmrNerHBp4Q7R6G63eZvKw3Fh129kozmzQWxKBt1GQiCU1XSPyK6/aMRxtgP1xvOdxAoQviiu1iMAb0h/HtLoBTtchigU1Kz7odbuxSdqYfzp8pDvmKYlYEs76rMQsV90xT6lZMXG5mduRRbZ548vPO8DMqhOAavMblq4RxSKfZOka7sDHvYDwKcwnBpMJpmHQH4W0mxoAs6cVSZJwWS0TJ8luVfj3IeaVnatyBz6KoiCE2Duu8zRWVS6rKv3RS8IMOvO/bk6eLMupfx/mNbpdYkIIwqeQiqryxbnJ+4Asy2ndui74mkHzXpE1n+2iB/DHfg7d72qvtdJC15NlOfWmj+mv32n+eNPH1Js+prIspwNvmh7bk3cUuAO/UK9208a5sY6+RQpts+MOdgZse/vfN8ibvr0z/gLsX1SU9eSuMgAAAABJRU5ErkJggg==",
+  helmet: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAASCAYAAABb0P4QAAABW0lEQVR42pVUoZaDMBAc7vUnTiIjie0fIFtZi6MOeciexFGHrQSZP6gNciXyPiMnIOmyTendmGxeJpPZ3SSJcw5b0FqvCNbaZIu/eyfWtm2YExG01m5L9AN/BBFBKYWyLJ9cRx1ykrU24e6IaDW+TVmmxsW9iDEGADBNE16ZWDn0KXncyhF104T5JR8AAEoBRHET1tpkJ+tkjIFtRwBAr4awdmwOc2CAvhqQpilkFsGhr1mapuirAfj8mld/voNYVVUhi2MzO66XBPI8j18bnxaHF5NulAIumPmn6/RcQ0/izmQ5fHN4PSUS5xy01u5WjlECEVCbQ7Q5nHO6Zog0ZSbu2XXrIqXgYnt6cbGLZbMn3BfhgsWPk9cHAsBJCnZiJIrHEoWsYZZlzrYj9sumggnHYomOlUGfs4fDu3o4KYQYHyVkI0OXAYQX8l/ocxbec8I/2K1vaQv8f/wFUF3AMyK3FCIAAAAASUVORK5CYII=",
+  belt: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAVCAYAAABCIB6VAAABQklEQVR42qWVMRKDIBBFV8dDmA5ajmDJNVJ6LkqvQekR0kIXb0GafGZdQcJkK4dxn5/PfiSlVKJv8ed/awAwxjgAHGMcWo1ShOyZ+IvrcyW3uZ+A63M9rbvNJQ4fATTaUAihCTXakNEmC6j1ZCvsYvOi3/1la4CiXuFFUA447xvhj999UymHAhBCIK31pWeUC1prsovNXt5BUSU7Ltu1i80K3OYIUGwdUHxwfsxF+yY5Mp58op0uXtZG8Hgf9cPrKVjUsqc7CHaxJ5UciqDdgmUQ5AFhikpQpVSaalCZLDmOfOs4yBhj/sBUg2I+kbDW/TE/5pNtRcUc2gLyOwaCPPk01hpa94a0LEO/8zz2zGbNstIdM9X8Ot4H2cWSJ5/kQWHsYBlXejvHiDaUI318jnmUS4c79CSMVyvq3cmr/YpkfQCc7BJVrfrN/gAAAABJRU5ErkJggg==",
+  bell: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABUAAAASCAYAAAC0EpUuAAAB70lEQVR42qWUIZObQBiGn2QiOBfkOrArI5EnE9ep6lVG3cTWpa79B5lTVxfqegosrnGlKisDinUhKuC2gkA2U+jcTd+ZFbvAs+/7sd+O+A95nmfseZ7nozcD2tEHtNdGr3EAsP4RMhc+AEEQDDr769vWSVEUxpiDabU/H01RFGYbRcaYg5nP52YbRWbI7die7HY7sixBCEEYK8I4RmuNyDROWfKwkHxLNQC1cPmy2fSm6oCtu20UmW0UmeN+f3HbjP35aIw5mKIozPOvnzfv22DP88yknQhRE8aKue/jyrvLalNDVZW4pxp9ckjSlHe+z4vOQIPTY3Lcxm4BteveAAHcU02SpiRp2m06Fz4vn79SC/cmcZ7nIzzP62JcI1/V/iD7WVEUZn8+dtHtowYwaeJNuZ/NoCxvYmitb9y1KqcO7qkePPRjgN/JDiHE5UN/AOhTqqqrb5KmjZG+mgKsVytUZbvMrvW8AFVVUrsun95/JAgC7mczhKiHoVJKFnKGqqZARqmqzmULdE81y+USpRRSSoSo0drphU4APjw+8v3piYVs4sQq5UHeobWD1hrXas2rfILA723Vkd1NrZMhSSmbTeMNYaxYr1bD0BacZQkAi8WqFxrHG8AnjONB4OD1ZrenLftc/ovz6qvvLRfxH0akhWOh4i/YAAAAAElFTkSuQmCC" };
+const ITEM_IMG = Object.fromEntries(Object.entries(ITEM_SPRITES).map(([id, src]) => { const i = new Image(); i.src = src; return [id, i]; }));
+const itemIcon = (id, scale = 2) => {
+  const img = ITEM_IMG[id], title = T && T.items && T.items[id] ? T.items[id].name + ": " + T.items[id].about : id;
+  let c;
+  if (!img) c = mapCanvas("item", { k: C.ink, 1: ITEM_HEX[id] || C.paper, 2: C.paper }, scale);
+  else {
+    const k = Math.max(1, Math.floor(scale / 3));
+    c = document.createElement("canvas");
+    const paint = () => { c.width = img.naturalWidth * k; c.height = img.naturalHeight * k; c.style.width = c.width + "px"; c.style.height = c.height + "px";
+      const g = c.getContext("2d"); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, c.width, c.height); };
+    if (img.complete && img.naturalWidth) paint(); else img.addEventListener("load", paint, { once: true });
+  }
+  c.classList.add("item-ico"); c.dataset.item = id; c.title = title; return c;
+};
 // Candy: a wrapped sweet, drawn here, for candy in general and the few lines without their own.
 const candyIcon = (scale = 2) => { const c = mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], e: SHADE.red[0], w: C.paper }, scale); c.classList.add("candy-ico"); c.title = "Candy"; return c; };
 // Each type's colour, for a line's candy: the sweet in its first type, the twisted ends in its second.
@@ -2756,10 +2810,14 @@ function heading(e) {
 // Our units face where foes come from: a foe they are holding, else up the nearest stretch of
 // path (foes walk each route from spawn to goal, so they come from its earlier point). Every
 // battle strip faces left, so facing right is a mirror. Fixed per unit; paths do not move.
+// Snipers, casters and medics turn to whoever they act on right now (aimOf); with no one in
+// range they keep the way they last faced.
 function unitFacesRight(bt, u) {
   const b = bt.b, held = b.enemies.find(e => e.blockedBy === u.id);
   if (held) return held.x > u.x;
   bt.face ||= {};
+  const aim = !u.ground && aimOf(b, u);
+  if (aim && Math.abs(aim.x - u.x) > 0.05) return (bt.face[u.id] = aim.x > u.x);
   if (u.id in bt.face) return bt.face[u.id];
   let best = Infinity, right = false;
   for (const p of b.paths) for (let i = 0; i + 1 < p.length; i++) {
@@ -2769,6 +2827,18 @@ function unitFacesRight(bt, u) {
     if (d < best - 1e-6) { best = d; right = vx ? vx < 0 : p[0][0] > u.x; }
   }
   return (bt.face[u.id] = right);
+}
+// Who a ranged unit acts on now, as the engine picks it: a medic, the most hurt ally in range
+// (itself never counts as a way to face); a sniper or caster, the foe it can hit with the least
+// path left, flyers first for snipers.
+function aimOf(b, u) {
+  const d = o => Math.hypot(o.x - u.x, o.y - u.y);
+  if (u.cls === "medic") return b.units.filter(a => a !== u && a.hp < a.maxHp && d(a) <= u.range).sort((a, c) => a.hp / a.maxHp - c.hp / c.maxHp)[0] || null;
+  const can = (e => T && T.canHit ? T.canHit(u, e, b) : !e.flying || u.cls === "sniper");
+  const left = e => { let n = e.path[e.seg + 1] ? Math.hypot(e.path[e.seg + 1][0] - e.x, e.path[e.seg + 1][1] - e.y) : 0;
+    for (let i = e.seg + 2; i < e.path.length; i++) n += Math.hypot(e.path[i][0] - e.path[i - 1][0], e.path[i][1] - e.path[i - 1][1]); return n; };
+  const air = !!(T && T.classes && T.classes[u.cls] && T.classes[u.cls].air);
+  return b.enemies.filter(e => e.hp > 0 && can(e) && d(e) <= u.range).sort((a, c) => (a.flying && air ? -1e3 : 0) + left(a) - ((c.flying && air ? -1e3 : 0) + left(c)))[0] || null;
 }
 const facesRight = e => { const u = e.blockedBy && battle && battle.b.units.find(o => o.id === e.blockedBy); return u ? u.x > e.x : heading(e)[0] > 0; };
 // Where an enemy is drawn. Blocked ones stand at the edge of the blocker's tile,
@@ -2878,13 +2948,31 @@ function waveBanner(bt) {
 }
 // Tiles in range of a unit standing at (x, y): the engine's range is a radius in tiles.
 const inRange = (u, x, y) => { const out = []; for (let ty = 0; ty < T.H; ty++) for (let tx = 0; tx < T.W; tx++) if (Math.hypot(tx - x, ty - y) <= u.range) out.push([tx, ty]); return out; };
-// Inside a unit's own tile, along its top: the HP and skill bar, then the block pips under it.
-const MARK_H = 15;
+// A unit's marks: the HP and skill bar, then the block pips under it. They go in the first free
+// spot of: the top of its own tile, the bottom of its own tile, then just above its own head
+// (stepping up). Free means over no other sprite and no bar already placed; when none is free,
+// the spot that covers the least. Never across another tile's sprite if it can be helped.
+const MARK_H = 15, BAR_W = 46;
 const unitBarAt = r => ({ x: Math.round(r.x + (TW - 36) / 2), y: Math.round(r.y + 1) });
-function unitMarks(g, b, o, r, now) {
-  const { x: bx, y: by } = unitBarAt(r);
+function unitBarSpot(st, o, own, others, placed) {
+  const r = tileRect(st, o.x, o.y), h = o.block > 0 ? MARK_H : 8, th = TH + (r.high ? RAISE : 0), x = Math.round(r.x + (TW - 36) / 2);
+  const spots = [{ x, y: Math.round(r.y + 1), at: "top" }, { x, y: Math.round(r.y + th - h - 1), at: "bottom" }];
+  if (own) for (let j = 0; j < 4; j++) spots.push({ x: Math.round(own.x + own.w / 2 - 18), y: own.y - h - 2 - j * (h + 1), at: "head" });
+  const cover = (p, q) => Math.max(0, Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x)) * Math.max(0, Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y));
+  let best = null;
+  for (const sp of spots) {
+    if (sp.y < 0) continue;
+    const box = { x: sp.x, y: sp.y, w: BAR_W, h };
+    const score = others.reduce((n, q) => n + cover(box, q), 0) + placed.reduce((n, q) => n + cover(box, { ...q, w: q.w || 36 }), 0) * 4;
+    if (!best || score < best.score) best = { ...sp, h, score };
+    if (!score) break;
+  }
+  return best || { ...spots[0], h, score: 0 };
+}
+function unitMarks(g, b, o, spot, now) {
+  const { x: bx, y: by } = spot;
   if (o.block > 0) {
-    const n = o.block, held = b.enemies.filter(e => e.blockedBy === o.id).length, w = n * 7 - 2, x0 = Math.round(r.x + (TW - w) / 2), py = by + 10;
+    const n = o.block, held = b.enemies.filter(e => e.blockedBy === o.id).length, w = n * 7 - 2, x0 = Math.round(bx + (36 - w) / 2), py = by + 10;
     g.fillStyle = C.ink; g.fillRect(x0 - 1, py - 1, w + 2, 6);
     for (let i = 0; i < n; i++) { g.fillStyle = i < held ? C.gold : SHADE.paper[0]; g.fillRect(x0 + i * 7, py, 5, 4); }
   }
@@ -3168,9 +3256,9 @@ function drawField(now = performance.now()) {
     // A stealthy foe no one can see yet is a faint shimmer.
     const hidden = !unit && o.trait === "stealth" && T.seen && !T.seen(b, o);
     const top = drawMon(g, img, cx, cy, { flip: unit ? unitFacesRight(bt, o) : facesRight(o), white: flash, maxH, alpha: hidden ? 0.25 : 1 });
-    // A unit's own marks (HP and skill bar, block pips) sit along the top of its own tile, drawn
+    // A unit's own marks (HP and skill bar, block pips) are placed and drawn
     // over every sprite after this loop (the unit in front is kept below them, above).
-    if (unit) { unitBars.push({ o, ...unitBarAt(tileRect(st, o.x, o.y)) }); if (o.block > 0) marks.push({ pips: o, own: true }); }
+    if (unit) { unitBars.push({ o }); if (o.block > 0) marks.push({ pips: o, own: true }); }
     if (!unit && o.blockedBy && !o.flying) marks.push({ stop: o, x: cx, y: groundY });
     if (lastRect) drawn.push({ o, unit, img, rect: lastRect, flip: unit ? unitFacesRight(bt, o) : facesRight(o) });
     // Exploder fuse, armor, boss marks.
@@ -3184,7 +3272,15 @@ function drawField(now = performance.now()) {
       for (const [dy, w] of [[-14, 8], [-8, 12], [-2, 8]]) g.fillRect(Math.round(cx + back * 22 - (back < 0 ? w : 0)), Math.round(groundY + dy), w, 2); }
     if (!unit) bars.push({ o, unit, x: Math.round(cx) - 18, y: top - 9 });
   }
-  for (const u of unitBars) unitMarks(g, b, u.o, tileRect(st, u.o.x, u.o.y), now);
+  // Each unit's marks in a spot clear of every other sprite (see unitBarSpot), then drawn.
+  const placed = [];
+  for (const u of unitBars) {
+    const own = drawn.find(d => d.o === u.o), others = drawn.filter(d => d.o !== u.o).map(d => d.rect);
+    Object.assign(u, unitBarSpot(st, u.o, own && own.rect, others, placed));
+    placed.push({ x: u.x, y: u.y, w: BAR_W, h: u.h });
+    unitMarks(g, b, u.o, u, now);
+  }
+  bt.sprites = drawn.map(d => ({ id: (d.unit ? "u" : "e") + d.o.id, ...d.rect }));
   // A blocker: one pip per foe it can hold, gold for each it holds now (under its feet).
   // A blocked foe: a shield on the side facing its blocker. Foes walking past have none.
   const stops = [];
@@ -3213,12 +3309,12 @@ function drawField(now = performance.now()) {
   // Shields go over the sprites and the outlines of hidden units, crisp at their whole-number scales.
   g.imageSmoothingEnabled = false;
   for (const [x, y] of stops) g.drawImage(STOP_IMG, Math.round(x), Math.round(y), STOP_IMG.naturalWidth * STOP_SX, STOP_IMG.naturalHeight * STOP_SY);
-  // HP and skill bars on top of every sprite; a bar that would sit on another steps up.
-  const placed = [];
+  // HP bars over foes' heads, on top of every sprite; a bar that would sit on another (a unit's too) steps up.
+  const unitPlaced = placed.length;
   bars.sort((a, c) => c.y - a.y);
   for (const bar of bars) {
     const h = bar.unit ? 8 : 5;
-    for (let tries = 0; tries < 6 && placed.some(p => bar.x < p.x + 36 && p.x < bar.x + 36 && bar.y < p.y + p.h + 1 && p.y < bar.y + h + 1); tries++) bar.y -= h + 1;
+    for (let tries = 0; tries < 6 && placed.some(p => bar.x < p.x + (p.w || 36) && p.x < bar.x + 36 && bar.y < p.y + p.h + 1 && p.y < bar.y + h + 1); tries++) bar.y -= h + 1;
     placed.push({ x: bar.x, y: bar.y, h });
     const o = bar.o, bx = bar.x, by = bar.y;
     g.fillStyle = C.ink; g.fillRect(bx, by, 36, h);
@@ -3227,7 +3323,7 @@ function drawField(now = performance.now()) {
     if (bar.unit) { g.fillStyle = C.gold; g.fillRect(bx + 1, by + 5, Math.round(34 * Math.min(1, o.sp / o.spMax)), 2); }
     if (bar.unit && o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by - 6); }
   }
-  bt.bars = placed.map((p, i) => ({ ...p, id: "e" + bars[i].o.id })).concat(unitBars.map(u => ({ x: u.x, y: u.y, h: 8, id: "u" + u.o.id, own: true })));
+  bt.bars = placed.slice(unitPlaced).map((p, i) => ({ ...p, id: "e" + bars[i].o.id })).concat(unitBars.map(u => ({ x: u.x, y: u.y, h: u.h, at: u.at, id: "u" + u.o.id, own: true })));
   // The dragged card's mon, at the cursor.
   if (bt.drag && bt.drag.at && card) drawMon(g, spriteFor(card.num, card.look), bt.drag.at[0], bt.drag.at[1] + 16, { alpha: 0.7 });
   // Effects: projectiles, bursts and numbers.
@@ -3667,7 +3763,9 @@ function tutorDraw() {
   const tb = $("#tutor-box"), low = box && (box.b - f.top) / k > 250;
   Object.assign(tb.style, low ? { top: (battle ? 40 : 44) + "px", bottom: "auto" } : { top: "auto", bottom: "8px" });
   const foot = el("div", "foot");
-  foot.append(el("span", "", st.done ? (st.run ? "Watch…" : "Do it to continue") : "Enter: next"), (() => { const sk = el("span", "skip", "Skip tutorial (X)"); sk.dataset.skip = 1; return sk; })());
+  foot.append(el("span", "", st.done ? (st.run ? "Watch…" : "Do it to continue") : "Enter: next"));
+  if (st.wiki) foot.append(wikiLink(st.wiki));
+  foot.append((() => { const sk = el("span", "skip", "Skip tutorial (X)"); sk.dataset.skip = 1; return sk; })());
   tb.replaceChildren(el("div", "", typeof st.text === "function" ? st.text() : st.text), foot);
 }
 function tutorPoll() {
@@ -3707,31 +3805,34 @@ function tutorKey(e) {
 // What each screen says on its first visit.
 const TIPS = {
   loop: () => [
-    { at: () => boxOf("#tabs"), text: "Welcome to Poké Gacha. You cannot buy Pokémon: you pull eggs with vouchers, and they hatch as you play the rest of Bored. Five steps, then it is yours." },
-    { at: () => tabBox("pull"), text: "1 · Pull. One Regular egg costs 1 voucher, and your first ten eggs hatch the moment you get them. Open one now." },
-    { at: () => tabBox("eggs"), text: "2 · Eggs. After those ten, an egg hatches on waves: Poké Idle catches, Pokédoku boards and battle waves all count." },
-    { at: () => tabBox("story"), text: "3 · Squad. New mons join your roster. Pick up to eight that beat the foes' types here, and keep a sniper for flyers." },
-    { at: () => boxOf("#story-list-panel"), text: "4 · Story. A win pays coins, vouchers and waves and opens the next stage. Coins buy more vouchers in the Shop tab." },
-    { at: () => tabBox("quests"), text: "5 · Quests. Daily and weekly missions pay the most vouchers. That is the whole loop: story, eggs, squad, repeat." }
+    { at: () => boxOf("#tabs"), wiki: ["eggs", "rates"], text: "Welcome to Poké Gacha. You cannot buy Pokémon: you pull eggs with vouchers, and they hatch as you play the rest of Bored. Six steps, then it is yours." },
+    { at: () => tabBox("pull"), wiki: ["eggs", "vouchers"], text: "1 · Pull. One Regular egg costs 1 voucher, and your first ten eggs hatch the moment you get them. Open one now." },
+    { at: () => tabBox("eggs"), wiki: ["eggs", "hatch"], text: "2 · Eggs. After those ten, an egg hatches on waves: Poké Idle catches, Pokédoku boards and battle waves all count." },
+    { at: () => tabBox("story"), wiki: ["classes", "sniper"], text: "3 · Squad. New mons join your roster. Pick up to eight that beat the foes' types here, and keep a sniper for flyers." },
+    { at: () => boxOf("#story-list-panel"), wiki: ["types", "Water"], text: "4 · Story. A win pays coins, vouchers and waves and opens the next stage. Coins buy more vouchers in the Shop tab." },
+    { at: () => tabBox("quests"), wiki: ["eggs", "vouchers"], text: "5 · Quests. Daily and weekly missions pay the most vouchers. That is the whole loop: story, eggs, squad, repeat." },
+    { at: () => tabBox("wiki"), wiki: ["types", "Water"], text: "Stuck? The Wiki tab is always open: the type chart, every foe and its icon, the classes, skills, items, candy and egg odds." }
   ],
   pull: () => [
-    { at: () => boxOf("#hit-machine"), text: "Three machines: Move UP doubles the rare-skill chance, Legendary UP adds today's banner legendary, Shiny UP makes shinies twice as likely and can roll SP skins." },
-    { at: () => boxOf("#counts"), text: "Your vouchers: Regular is 1 egg, Plus 5, Premium 10 with a Rare or better, Gold 25 with an Epic or better." },
-    { at: () => boxOf("#menu"), text: "Pity: if 9 eggs in a row have no Rare, the 10th is one; Epic comes by the 60th, Legendary by the 413th." }
+    { at: () => boxOf("#hit-machine"), wiki: ["eggs", "rates"], text: "Three machines: Move UP doubles the rare-skill chance, Legendary UP adds today's banner legendary, Shiny UP makes shinies twice as likely and can roll SP skins." },
+    { at: () => boxOf("#counts"), wiki: ["eggs", "vouchers"], text: "Your vouchers: Regular is 1 egg, Plus 5, Premium 10 with a Rare or better, Gold 25 with an Epic or better." },
+    { at: () => boxOf("#menu"), wiki: ["eggs", "pity"], text: "Pity: if 9 eggs in a row have no Rare, the 10th is one; Epic comes by the 60th, Legendary by the 413th." }
   ],
-  eggs: () => [{ at: () => boxOf("#eggs-tray"), text: "Eggs hatch on waves: Poké Idle catches, Pokédoku boards and battle waves all count. Your first 10 eggs hatch at once." }],
+  eggs: () => [{ at: () => boxOf("#eggs-tray"), wiki: ["eggs", "hatch"], text: "Eggs hatch on waves: Poké Idle catches, Pokédoku boards and battle waves all count. Your first 10 eggs hatch at once." }],
   dex: () => [
-    { at: () => boxOf("#dex-list"), text: "Every line an egg can hatch. The bar above the list filters by type, class, tier or name, and sorts (keys: / and C, T, R, F, S)." },
-    { at: () => boxOf("#dex-detail"), text: "Candy from hatches evolves a line, unlocks its passive and cuts its deploy cost. Set a buddy to show it on the leaderboard." }
+    { at: () => boxOf("#dex-list"), wiki: ["candy", "evolve"], text: "Every line an egg can hatch. The bar above the list filters by type, class, tier or name, and sorts (keys: / and C, T, R, F, S)." },
+    { at: () => boxOf("#dex-detail"), wiki: ["candy", "get"], text: "Candy from hatches evolves a line, unlocks its passive and cuts its deploy cost. Set a buddy to show it on the leaderboard." }
   ],
   squad: () => [
-    { at: () => boxOf("#squad-roster"), text: "On the path: Blocker holds 3 foes and has the most HP. Guard hits hard up close and holds 2. Vanguard is cheap, and its skill gives energy back." },
-    { at: () => boxOf("#squad-roster"), text: "Up high: Sniper shoots far and is the only one that hits flyers. Caster hits an area and goes through armor. Medic heals allies in range." },
-    { at: () => boxOf("#squad-grid .card.fit-tank, #squad-grid .card.fit-damage") || boxOf("#squad-roster"), text: "The bar under a card: green means a good tank here (its type resists these foes), red means good damage here (its type hits them hard)." },
-    { at: () => boxOf("#squad-stage"), text: "These are the foes' types and traits. Pick counters: types that beat them, and snipers for flyers." }
+    { at: () => boxOf("#squad-roster"), wiki: ["classes", "blocker"], text: "On the path: Blocker holds 3 foes and has the most HP. Guard hits hard up close and holds 2. Vanguard is cheap, and its skill gives energy back." },
+    { at: () => boxOf("#squad-roster"), wiki: ["classes", "sniper"], text: "Up high: Sniper shoots far and is the only one that hits flyers. Caster hits an area and goes through armor. Medic heals allies in range." },
+    { at: () => boxOf("#squad-grid .card.fit-tank, #squad-grid .card.fit-damage") || boxOf("#squad-roster"), wiki: ["types", "Water"], text: "The bar under a card: green means a good tank here (its type resists these foes), red means good damage here (its type hits them hard)." },
+    { at: () => boxOf("#squad-stage"), wiki: ["foes", "normal"], text: "These are the foes' types and traits. Pick counters: types that beat them, and snipers for flyers. Click a trait for its card." },
+    { at: () => boxOf("#squad-stage"), wiki: ["foes", "shields"], text: "Foe icons in battle: a gray shield is Armored (Casters go through), a blue mark and bar is Shielded (Casters break it fast). A red shield beside a foe only means a unit is blocking it." }
   ],
-  quests: () => [{ at: () => boxOf("#quest-tabs"), text: "Daily missions reset at midnight (Detroit time), weekly ones on Monday; the clocks count down. Rewards are paid when you finish them." }],
-  shop: () => [{ at: () => boxOf("#scr-shop .left-panel"), text: "Coins buy Regular vouchers here; shards from duplicate hatches buy SP skins." }]
+  quests: () => [{ at: () => boxOf("#quest-tabs"), wiki: ["eggs", "vouchers"], text: "Daily missions reset at midnight (Detroit time), weekly ones on Monday; the clocks count down. Rewards are paid when you finish them." }],
+  shop: () => [{ at: () => boxOf("#scr-shop .left-panel"), wiki: ["items", "leftovers"], text: "Coins buy Regular vouchers here; shards from duplicate hatches buy SP skins. Held items are here too." }],
+  wiki: () => [{ at: () => boxOf("#wiki-tabs"), wiki: ["foes", "shields"], text: "Every rule in one place. Types is the full chart: click a type to see what it hits hard and what hits it. Foes, Classes, Skills, Items, Candy and Eggs each list every entry." }]
 };
 function screenTips(id) {
   if (!G || battle || picking) return;
@@ -3744,18 +3845,19 @@ function screenTips(id) {
   if (TIPS[id]) tip(id, TIPS[id]());
 }
 const TYPE_TIP = "Types: a super-effective hit does double damage (a yellow number), a resisted one half (gray). Tanks want types that resist these foes' attacks; damage dealers want types that hit them super effectively. This line says which.";
+const TYPE_EXAMPLE = "For example: Squirtle's Water attack on a Charmander is 2× (Water beats Fire, a yellow number), and Charmander's Fire on Squirtle is ½ (gray). Against a Fire stage, bring Water, Ground or Rock.";
 function typeTip(force = false) {
   const at = () => boxOf(storyMode === "squad" ? "#squad-stage .roles" : "#story-info .roles");
-  tip("types", [{ at, text: TYPE_TIP }], { force });
+  tip("types", [{ at, text: TYPE_TIP, wiki: ["types", "Water"] }, { at, text: TYPE_EXAMPLE, wiki: ["types", "Fire"] }], { force });
 }
 const SKILL_TIP = "Skills: Steady is the class's usual skill. Quick charges 30% sooner at 80% power. Heavy hits at 130% but charges 35% slower. Rare hits at 130% at the usual charge.";
-function skillTip(sel) { tip("skills", [{ at: () => boxOf(sel), text: SKILL_TIP }]); }
+function skillTip(sel) { tip("skills", [{ at: () => boxOf(sel), text: SKILL_TIP, wiki: ["skills", "steady"] }]); }
 // The "?" in the tab bar: this screen's tips again.
 function replayTips() {
   if (tutor) return;
   const id = tab === "story" ? (storyMode === "squad" ? "squad" : "loop") : tab;
   if (TIPS[id]) tip(id, TIPS[id](), { force: true });
-  if (id === "squad") { typeTip(true); tip("skills", [{ at: () => boxOf("#squad-detail"), text: SKILL_TIP }], { force: true }); }
+  if (id === "squad") { typeTip(true); tip("skills", [{ at: () => boxOf("#squad-detail"), text: SKILL_TIP, wiki: ["skills", "steady"] }], { force: true }); }
 }
 // The guided first battle, then one new idea per stage, and a card for each new kind of foe.
 function battleTips() {
@@ -3777,7 +3879,8 @@ function battleTips() {
         text: () => "Your squad's cards. Pick " + name(sq_[gi].num) + ", a " + T.classes[sq_[gi].cls].name + ": tap its card or press " + (gi + 1) + "." },
       { at: () => tileBox(...pathTile), enter_: () => afford(gi), done: () => !!unitOn(gi), text: "Now tap this path tile. Melee units stand on the path; gold marks show where a card can go." },
       { at: () => boxOf("#deploy-info"), text: "Each deploy costs energy, and energy refills by 1 a second. Cards dim when you can't afford them." },
-      { at: () => unitOn(gi) && tileBox(unitOn(gi).x, unitOn(gi).y), run: true, done: () => b.enemies.some(e => e.blockedBy), text: "Blockers stop enemies that walk into them. Watch…" }
+      { at: () => unitOn(gi) && tileBox(unitOn(gi).x, unitOn(gi).y), run: true, done: () => b.enemies.some(e => e.blockedBy), text: "Blockers stop enemies that walk into them. Watch…" },
+      { at: () => unitOn(gi) && tileBox(unitOn(gi).x, unitOn(gi).y), wiki: ["foes", "shields"], text: "Stopped. The red shield between them means that foe is blocked; the gold pips under the blocker count how many it holds of the most it can." }
     ];
     if (si >= 0 && high.length) steps.push(
       { at: () => cardBox(si), enter_: () => { bt.cardTouched = false; }, done: () => bt.slot === si && bt.cardTouched,
@@ -3793,8 +3896,8 @@ function battleTips() {
     return tip("battle-1-1", steps);
   }
   const ideas = {
-    "1-2": [{ at: () => { const m = sq_.findIndex(u => u.cls === "medic"); return m >= 0 ? cardBox(m) : boxOf("#deploy"); }, text: "Medics heal units in range. Put one on high ground behind your blocker." }],
-    "1-3": [{ at: () => mapBox(), text: "Type matchups: yellow numbers are super effective, gray ones resisted. Bring types that beat these foes." }],
+    "1-2": [{ at: () => { const m = sq_.findIndex(u => u.cls === "medic"); return m >= 0 ? cardBox(m) : boxOf("#deploy"); }, wiki: ["classes", "medic"], text: "Medics heal units in range. Put one on high ground behind your blocker." }],
+    "1-3": [{ at: () => mapBox(), wiki: ["types", "Water"], text: "Type matchups: yellow numbers are super effective, gray ones resisted. Water on a Fire foe shows yellow; Fire on a Water foe, gray. Bring types that beat these foes." }],
     "1-4": [{ at: () => boxOf("#deploy"), text: "Tap a unit twice to retreat it: you get half its cost back, and its card cools down for 18s before it can go back out." }],
     "1-5": [{ at: () => boxOf("#deploy-info"), text: "Energy limits how many you can field at once, so place your cheapest units first and build up." }]
   };
@@ -3823,23 +3926,190 @@ const foeKind = e => e.trait && FOE_TIPS[e.trait] ? e.trait : e.boss ? "boss" : 
 // The kinds a stage sends, from its waves: [at, species, count, gap, boss, flying, explodes, armored, fast].
 const stageKinds = stage => FOE_KINDS.filter(k => stage.waves.some(w => k === "normal" ? !w[4] && !w[5] && !w[6] && !w[7] && !w[8] && !w[9]
   : k in { boss: 1, flying: 1, explodes: 1, armored: 1, fast: 1 } ? w[{ boss: 4, flying: 5, explodes: 6, armored: 7, fast: 8 }[k]] : w[9] === k));
-const foeCard = (kind, who) => FOE_NAME[kind].toUpperCase() + (who ? " · " + who : "") + ": " + FOE_TIPS[kind];
+const foeCard = (kind, who) => FOE_NAME[kind].toUpperCase() + (who ? " · " + who : "") + ": " + FOE_TIPS[kind] + (FOE_MARK[kind] && kind !== "normal" ? " Looks: " + FOE_MARK[kind] : "");
 // The first time each kind of foe shows up: a card on it.
 function foeTips(e) {
   const kind = foeKind(e);
-  tip("foe-" + kind, [{ at: () => { const [x, y] = enemySpot(battle, e); return tileBox(Math.round(x), Math.round(y)); }, text: foeCard(kind, name(e.num)) }]);
+  tip("foe-" + kind, [{ at: () => { const [x, y] = enemySpot(battle, e); return tileBox(Math.round(x), Math.round(y)); }, wiki: ["foes", kind], text: foeCard(kind, name(e.num)) }]);
 }
 // The stage preview's Foes list: click one to see its card again.
 function showFoeCard(kind) {
   const stage = stagesNow()[storyAt], who = stage && stage.waves.filter(w => stageKinds({ waves: [w] }).includes(kind)).map(w => name(w[1]));
-  tip("foe-" + kind, [{ at: () => boxOf("#story-info"), text: foeCard(kind, who && [...new Set(who)].join(", ")) }], { force: true });
+  tip("foe-" + kind, [{ at: () => boxOf("#story-info"), wiki: ["foes", kind], text: foeCard(kind, who && [...new Set(who)].join(", ")) }], { force: true });
 }
 
+/* ── Wiki: every rule in one place, like PokéClicker's ─────────────────────
+   Always open: a tab of its own, and over a battle (paused) when a tip's
+   "More in the Wiki" link is clicked there. Seven pages; each is a list of
+   entries with an icon and a few lines, except Types, which is the full chart.
+   Left/Right change page, Up/Down the entry; Backspace leaves. */
+const WIKI_PAGES = [["types", "Types"], ["foes", "Foes"], ["classes", "Classes"], ["skills", "Skills"], ["items", "Items"], ["candy", "Candy"], ["eggs", "Eggs"]];
+const WIKI_TYPES = ["Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground", "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy"];
+// Hatch candy, duplicate shards and hatch waves per egg tier, as gacha.js has them (HATCH_CANDY, DUPE_SHARDS, HATCH_WAVES).
+const WIKI_HATCH = { candy: [10, 20, 30, 50, 50], shards: [1, 5, 15, 50, 50], waves: [5, 15, 30, 60, 60], rare: [48, 24, 12, 6, 6] };
+let wikiPage = "types", wikiAt = 0, wikiType = "Fire", wikiOver = null;
+const wikiPages = () => WIKI_PAGES.filter(([id]) => T || id === "candy" || id === "eggs");
+// What each foe looks like in battle: the mark drawn on it.
+const FOE_MARK = {
+  normal: "No mark.", fast: "Three white speed lines trail behind it.", flying: "It floats high, with a small light shadow far below it.",
+  explodes: "A red fuse line flashes under it once it is blocked.", armored: "A gray shield beside its head.", boss: "A gold bar over its head.",
+  heal: "A green + beside its head.", ranged: "Red crosshairs beside its head.", shield: "A blue shield mark beside its head, and a blue bar over its red HP bar.",
+  split: "Two white dots beside its head.", stealth: "Faint, see-through, until it is spotted.", rally: "A gold flag beside its head."
+};
+function foeIcon(kind) {
+  const c = pixelCanvas(10, 10, g => {
+    const box = (col, rects) => { g.fillStyle = C.ink; for (const [a, b_, w, h] of rects) g.fillRect(a - 1, b_ - 1, w + 2, h + 2); g.fillStyle = col; for (const [a, b_, w, h] of rects) g.fillRect(a, b_, w, h); };
+    if (["heal", "ranged", "shield", "split", "rally"].includes(kind)) traitMark(g, kind, 2, 2);
+    else if (kind === "armored") box(C.dim, [[2, 1, 6, 3], [3, 4, 4, 2], [4, 6, 2, 2]]);
+    else if (kind === "boss") box(C.gold, [[1, 4, 8, 3]]);
+    else if (kind === "fast") box(C.paper, [[1, 2, 5, 1], [1, 5, 8, 1], [1, 8, 5, 1]]);
+    else if (kind === "flying") box(C.sky, [[1, 3, 3, 2], [4, 2, 2, 2], [6, 3, 3, 2], [4, 7, 2, 1]]);
+    else if (kind === "explodes") box(C.red, [[1, 5, 8, 2], [7, 2, 2, 2]]);
+    else if (kind === "stealth") { g.globalAlpha = 0.35; box(C.paper, [[2, 2, 6, 6]]); g.globalAlpha = 1; }
+    else box(C.paper, [[3, 3, 4, 4]]);
+  }, 2);
+  c.title = FOE_NAME[kind] || kind;
+  return c;
+}
+const typeSwatch = type => { const s = el("span", "tsw"); s.style.background = TYPE_HEX[type] || C.paper; s.title = type; return s; };
+const multText = m => m >= 2 ? "2×" : m === 0.5 ? "½" : m < 0.5 ? "¼" : "1×";
+// Each page's entries: { id, icon, label, lines: [text or node] }.
+function wikiEntries(page) {
+  if (page === "foes") {
+    const list = FOE_KINDS.map(k => { const [what, counter] = FOE_TIPS[k].split(" Counter: ");
+      return { id: k, icon: foeIcon(k), label: FOE_NAME[k], lines: [what, "Counter: " + counter, "Looks: " + FOE_MARK[k]] }; });
+    list.push({ id: "shields", icon: foeIcon("armored"), label: "Shield icons", lines: [
+      "Three shields show in battle, and they mean different things.",
+      "Gray shield beside a foe's head: Armored. Physical hits do little; Casters go through.",
+      "Blue mark and a blue bar over the HP bar: Shielded. The bar soaks hits until it breaks; Casters break it 3× as fast.",
+      "Red shield between a foe and your unit: that foe is blocked and stopped there. It is not a buff."] });
+    return list;
+  }
+  if (page === "classes") return Object.entries(T.classes).map(([id, c]) => ({ id, icon: classIcon(id), label: c.name, lines: [
+    c.about, (c.ground ? "Stands on the path (ground tiles)." : "Stands on high ground (raised tiles).") + " Blocks " + (c.block || "no") + (c.block === 1 ? " foe." : " foes."),
+    "Range " + c.range + " tiles · deploy cost " + c.cost + " energy · skill charges in " + c.sp + "s.",
+    c.air ? "The only class that hits flyers, and it sees stealthy foes." : c.heal ? "Heals instead of attacking; it never hits foes." : id === "caster" ? "Special attack: goes through armor, breaks shields 3× as fast, hits everyone in a small area." : ""].filter(Boolean) }));
+  if (page === "skills") {
+    const kinds = T.skillKinds || [];
+    return kinds.map(k => ({ id: k.id, icon: null, label: k.name, lines: [
+      { steady: "The class's usual skill.", quick: "Charges sooner, hits softer.", heavy: "Hits harder, charges slower.", rare: "Hits harder at the usual charge. Only some hatches have it." }[k.id] || "",
+      "Power " + Math.round(k.power * 100) + "% · charge time " + Math.round(k.charge * 100) + "%.",
+      k.id === "rare" ? "Each hatch rolls it: 1 in " + WIKI_HATCH.rare.slice(0, 4).join(" / ") + " for Common / Rare / Epic / Legendary; Move UP halves the odds against." : "Unlocked lines pick their skill in Squad (K) or the Dex."] }));
+  }
+  if (page === "items") {
+    const drops = T.itemDrops || {};
+    return Object.entries(T.items).map(([id, it]) => { const from = Object.keys(drops).filter(s => drops[s] === id);
+      return { id, icon: itemIcon(id), label: it.name, lines: [it.about, "Shop: " + it.price + " coins." + (from.length ? " Also a first-clear prize on " + from.join(", ") + "." : ""), "One held item per line; equip it in Squad (I) or the Dex."] }; });
+  }
+  if (page === "candy") {
+    const cs = G.costs || {}, shop = G.coinShop && G.coinShop.candy;
+    return [
+      { id: "get", icon: candyIcon(), label: "Getting candy", lines: ["Every hatch gives that line's candy: " + WIKI_HATCH.candy.slice(0, 4).join(" / ") + " for Common / Rare / Epic / Legendary eggs.",
+        shop ? "The Shop sells " + shop.candy + " candy of any caught line for " + shop.coins + " coins." : "The Shop sells candy for coins."] },
+      { id: "evolve", icon: candyIcon(), label: "Evolve", lines: ["Evolve a line for " + (cs.evolve || [25, 100]).join(" candy (first) and ") + " candy (second evolution).", "Both forms stay in your dex; the new one fights from then on."] },
+      { id: "passive", icon: candyIcon(), label: "Passive", lines: [(cs.passive || 50) + " candy: the line hits 10% harder (special attack for Casters and Medics)."] },
+      { id: "cost", icon: candyIcon(), label: "Cost cuts", lines: ["Cost −1: " + (cs.cost1 || 30) + " candy. Cost −2: " + (cs.cost2 || 60) + " more, after −1.", "Each cut deploys the line for 1 less energy."] },
+      { id: "egg", icon: candyIcon(), label: "Candy egg", lines: ["Buy an egg of a line you own with its candy" + (G.candyEgg ? ": 1 in " + G.candyEgg.rare + " for its rare skill." : "."), "Price by tier: 20 / 40 / 60 / 100 candy for 3★ / 4★ / 5★ / 6★ lines."] }
+    ];
+  }
+  if (page === "eggs") {
+    const r = RATES.standard, l = RATES.legend;
+    return [
+      { id: "rates", icon: null, label: "Egg rates", lines: ["Common " + pct(r[0]) + " · Rare " + pct(r[1]) + " · Epic " + pct(r[2]) + " · Legendary " + pct(r[3]) + ".",
+        "Legendary UP: the same, plus " + pct(l[4]) + " for today's banner legendary (Common " + pct(l[0]) + ")."] },
+      { id: "pity", icon: null, label: "Pity", lines: ["A Rare or better by the " + (PITY[0] + 1) + "th egg, Epic by the " + (PITY[1] + 1) + "th, Legendary by the " + (PITY[2] + 1) + "th.",
+        "Pity is shared by all three machines; on Legendary UP each egg counts twice toward Legendary.", "After 9 hatches in a tier with no new species, the next one in that tier is new."] },
+      { id: "vouchers", icon: ticket("regular"), label: "Vouchers", lines: ["Regular: 1 egg. Plus: 5. Premium: 10, one Rare or better. Gold: 25, one Epic or better.", "Coins buy Regulars in the Shop; missions and trophies pay the rest."] },
+      { id: "hatch", icon: null, label: "Hatching", lines: ["Your first 10 eggs hatch at once. After that an egg needs waves: " + WIKI_HATCH.waves.slice(0, 4).join(" / ") + " for Common / Rare / Epic / Legendary.",
+        "Waves come from Poké Idle catches, Pokédoku boards and battle waves."] },
+      { id: "shiny", icon: null, label: "Shiny and SP", lines: ["Shiny: 1 in " + SHINY_IN.other + " per hatch, 1 in " + SHINY_IN.shiny + " on Shiny UP.", "SP skins: 1 in " + SP_IN + " on Shiny UP, or bought with shards."] },
+      { id: "dupes", icon: shardIcon(), label: "Duplicates", lines: ["A hatch you already own still gives candy, plus shards: " + WIKI_HATCH.shards.slice(0, 4).join(" / ") + " by tier."] }
+    ];
+  }
+  return [];
+}
+// The full chart: attacking type down the side, defending type across the top.
+function wikiChart() {
+  const grid = el("div", "wchart");
+  grid.append(el("span", "corner", "atk\\def"));
+  for (const d of WIKI_TYPES) { const h = el("span", "th" + (d === wikiType ? " on" : ""), d.slice(0, 3)); h.dataset.type = d; h.style.color = TYPE_HEX[d]; h.title = d; grid.append(h); }
+  for (const a of WIKI_TYPES) {
+    const h = el("span", "th row" + (a === wikiType ? " on" : ""), a.slice(0, 3)); h.dataset.type = a; h.style.color = TYPE_HEX[a]; h.title = a; grid.append(h);
+    for (const d of WIKI_TYPES) {
+      const m = T.typeMultiplier(a, [d]), c = el("span", "c" + (m > 1 ? " x2" : m === 0.5 ? " xh" : m < 0.5 ? " x0" : "") + (a === wikiType || d === wikiType ? " hl" : ""), m === 1 ? "" : multText(m));
+      c.dataset.type = a; c.title = a + " on " + d + ": " + multText(m); grid.append(c);
+    }
+  }
+  return grid;
+}
+function wikiTypeInfo(t) {
+  const on = m => WIKI_TYPES.filter(d => { const x = T.typeMultiplier(t, [d]); return m(x); }), from = m => WIKI_TYPES.filter(a => m(T.typeMultiplier(a, [t])));
+  const line = (label, list) => { const d = el("div", "tl"); d.append(el("span", "dim", label + " ")); if (!list.length) d.append("none"); list.forEach((x, i) => d.append(typeSwatch(x), x + (i < list.length - 1 ? ", " : ""))); return d; };
+  const head = el("div", "title"); head.append(typeSwatch(t), " " + t.toUpperCase());
+  return [head, el("div", "dim", "Attacking with " + t + ":"), line("2× on", on(x => x > 1)), line("½ on", on(x => x === 0.5)), line("¼ on", on(x => x < 0.5)),
+    el("div", "dim", "Defending as " + t + ":"), line("Weak to", from(x => x > 1)), line("Resists", from(x => x === 0.5)), line("Shrugs off", from(x => x < 0.5))];
+}
+function wikiUpdate() {
+  if (!wikiOver) drawBackdrop();
+  const pages = wikiPages();
+  if (!pages.some(([id]) => id === wikiPage)) wikiPage = pages[0][0];
+  $("#wiki-tabs").replaceChildren(...pages.map(([id, label]) => { const t = el("span", id === wikiPage ? "on" : "", label); t.dataset.wtab = id; return t; }));
+  const box = $("#wiki-box");
+  let hint;
+  if (wikiPage === "types") {
+    if (!WIKI_TYPES.includes(wikiType)) wikiType = "Fire";
+    const side = el("div", "wside"); side.append(...wikiTypeInfo(wikiType));
+    box.replaceChildren(wikiChart(), side);
+    hint = "Rows attack, columns defend: 2× super effective (gold), ½ resisted, ¼ almost nothing. In this game an immunity is ¼, not 0. Click a type, or Up/Down.";
+  } else {
+    const list = wikiEntries(wikiPage);
+    wikiAt = Math.max(0, Math.min(wikiAt, list.length - 1));
+    const left = el("div", "rows scroll wlist"), body = el("div", "wbody"), e = list[wikiAt];
+    rows(left, list.map(x => ({ icon: x.icon, label: x.label })), wikiAt, i => { wikiAt = i; wikiUpdate(); });
+    if (e) { const head = el("div", "title"), i = e.icon && wikiEntries(wikiPage)[wikiAt].icon; if (i) head.append(i, " "); head.append(e.label.toUpperCase()); body.append(head, ...e.lines.map(t => el("div", "", t))); }
+    box.replaceChildren(left, body);
+    const row = left.children[wikiAt]; if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
+    hint = "Up/Down: entries.";
+  }
+  const text = hint + " Left/Right: pages. Backspace: " + (wikiOver ? "back to the battle." : "leave.");
+  if (wikiOver) $("#wiki-foot").replaceChildren(el("span", "", text)); else say(text);
+  $("#wiki-foot").hidden = !wikiOver;
+}
+// Open the wiki at a page (and entry): as the tab, or over a battle or a starter pick.
+function openWiki(page, entry) {
+  if (page) { wikiPage = page; const list = page === "types" ? [] : wikiEntries(page); const i = list.findIndex(x => x.id === entry); wikiAt = i >= 0 ? i : 0; if (page === "types" && WIKI_TYPES.includes(entry)) wikiType = entry; }
+  if (!battle && !picking && !hatching) { if (tab !== "wiki") go("wiki"); else wikiUpdate(); return; }
+  if (!wikiOver) wikiOver = { paused: battle ? battle.paused : null };
+  if (battle) battle.paused = true;
+  $("#scr-wiki").hidden = false; $("#scr-wiki").classList.add("over");
+  wikiUpdate();
+}
+function closeWikiOver() {
+  if (!wikiOver) return;
+  const was = wikiOver; wikiOver = null;
+  $("#scr-wiki").hidden = true; $("#scr-wiki").classList.remove("over"); $("#wiki-foot").hidden = true;
+  if (battle) battle.paused = tutor && tutorStep() && !tutorStep().run ? true : was.paused;
+}
+function wikiKey(e) {
+  const k = e.key, pages = wikiPages().map(([id]) => id);
+  if (k === "ArrowRight" || k === "ArrowLeft") { e.preventDefault(); wikiPage = pages[(pages.indexOf(wikiPage) + (k === "ArrowRight" ? 1 : -1) + pages.length) % pages.length]; wikiAt = 0; return wikiUpdate(); }
+  if (k === "ArrowUp" || k === "ArrowDown") {
+    e.preventDefault();
+    const d = k === "ArrowUp" ? -1 : 1;
+    if (wikiPage === "types") wikiType = WIKI_TYPES[(WIKI_TYPES.indexOf(wikiType) + d + WIKI_TYPES.length) % WIKI_TYPES.length];
+    else { const n = wikiEntries(wikiPage).length; wikiAt = (wikiAt + d + n) % n; }
+    return wikiUpdate();
+  }
+  if (k === "Backspace" || k === "Escape") { e.preventDefault(); return wikiOver ? closeWikiOver() : go("pull"); }
+}
+// A tip's "More in the Wiki" link: [page, entry].
+function wikiLink(where) { const s_ = el("span", "skip wlink", "More in the Wiki"); s_.dataset.wiki = where.join(":"); return s_; }
+
 /* ── Frame, tabs and switching screens ─────────────────────────────────── */
-const TABS = [["story", "Story"], ["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"], ["card", "Card"]];
+const TABS = [["story", "Story"], ["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"], ["card", "Card"], ["wiki", "Wiki"]];
 // The tabs shown: Story only once the hub has the tower defense engine.
 const shownTabs = () => TABS.filter(([id]) => id !== "story" || T);
-const SCREENS = { story: [storyUpdate, storyKey], pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey], card: [cardUpdate, cardKey] };
+const SCREENS = { story: [storyUpdate, storyKey], pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey], card: [cardUpdate, cardKey], wiki: [wikiUpdate, wikiKey] };
 function refreshTop() {
   S = G.state();
   const ready = S.eggs.filter(e => e.ready).length;
@@ -3910,6 +4180,7 @@ function onKey(e) {
   }
   // With the panel open, Enter or Backspace closes it; other keys still reach the list behind.
   if (filtOpen && (e.key === "Enter" || e.key === "Backspace")) { e.preventDefault(); return closeFilters(); }
+  if (wikiOver) return wikiKey(e);
   if (tutor && tutorKey(e)) return;
   if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
   if (battle) return battleKey(e);
@@ -3979,6 +4250,10 @@ if (!G) {
     e.stopPropagation();
     onKey({ key: t.dataset.press, preventDefault() {}, ctrlKey: false, metaKey: false, altKey: false });
   }, true);
+  $("#scr-wiki").addEventListener("click", e => {
+    const t = e.target.closest("[data-wtab]"), ty = e.target.closest("[data-type]");
+    if (t) { wikiPage = t.dataset.wtab; wikiAt = 0; wikiUpdate(); } else if (ty) { wikiType = ty.dataset.type; wikiUpdate(); }
+  });
   $("#tabs").onclick = e => { if (e.target.closest("[data-sound]")) return toggleSound(); if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
@@ -4062,7 +4337,8 @@ if (!G) {
   $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) { if (battle.menu || battle.paused) closePauseMenu(); else openPauseMenu(); } };
   $("#battle-menu").onclick = e => { const r = e.target.closest("[data-pause]"); if (r) pausePick(r.dataset.pause); };
   // Click a card to pick it (it lights up); click it again to put it down: handled on pointerup above.
-  $("#tutor-box").onclick = e => { if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
+  $("#tutor-box").onclick = e => { const wl = e.target.closest("[data-wiki]"); if (wl) return openWiki(...wl.dataset.wiki.split(":"));
+    if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
   $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
   $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();
   $("#menu").onmousemove = e => { const r = e.target.closest("[data-row]"); if (r && Number(r.dataset.row) !== cursor && !message) { cursor = Number(r.dataset.row); updateScene(); } };

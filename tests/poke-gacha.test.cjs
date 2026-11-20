@@ -179,10 +179,10 @@ test('roster cut: an owned cut line is refunded once with a note, and leaves the
 test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1-1 clear pays and unlocks 1-2', async t => {
   const { tab, game, errors } = await openWithMons(t);
   const tabs = await game.$$eval('#tabs [data-tab]', nodes => nodes.map(n => n.dataset.tab));
-  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests', 'card'], 'Story is the first of seven tabs');
+  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests', 'card', 'wiki'], 'Story is the first of eight tabs, Wiki the last');
   // The tab bar and the purse fit on one line inside the frame.
-  const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), last = await rect(game, '#tabs [data-tab="quests"]');
-  assert.ok(purse.r <= bar.r + 0.5 && last.r <= purse.l, 'six tabs and the purse fit');
+  const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), last = await rect(game, '#tabs [data-tab="wiki"]'), help = await rect(game, '#tabs .help');
+  assert.ok(purse.r <= bar.r + 0.5 && last.r <= help.l && help.r <= purse.l, 'eight tabs, help and the purse fit');
 
   await key(tab, '1');
   assert.equal(await game.evaluate(() => tab), 'story');
@@ -1618,8 +1618,10 @@ test('battle clicks survive a held press, unit marks stay in their own tile, and
   await game.evaluate(() => { const st = battle.stage; for (const [i, [x, y]] of [[0, [3, 1]], [1, [2, 0]], [2, [5, 0]]]) { battle.b.squad[i].ground = st.map[y][x] === '.'; T.deploy(battle.b, i, x, y); } });
   await pause(200);
   const off = await game.evaluate(() => (battle.bars || []).filter(p => p.own).filter(p => { const u = battle.b.units.find(o => 'u' + o.id === p.id), r = tileRect(battle.stage, u.x, u.y);
-    return p.x < r.x || p.x + 36 > r.x + TW || p.y < r.y || p.y + MARK_H > r.y + TH; }));
-  assert.deepEqual(off, [], 'every unit bar and its pips sit inside the unit\'s tile');
+    const own = (battle.sprites || []).find(q => q.id === p.id);
+    const inTile = p.x >= r.x && p.x + 36 <= r.x + TW && p.y >= r.y && p.y + p.h <= r.y + TH + (r.high ? RAISE : 0);
+    return !inTile && !(p.at === 'head' && own && p.y + p.h <= own.y); }));
+  assert.deepEqual(off, [], 'every unit bar and its pips sit inside the unit\'s tile, or just over its own head');
   assert.deepEqual(errors, []);
 });
 
@@ -2292,4 +2294,135 @@ test('every stage is cleared by a type-matched squad at the page\'s recommended 
   };
   const lost = td.STAGES.filter(stage => play(stage, squadFor(stage, 1, recLevel(stage))) !== 'win').map(s => s.id + ' (Rec. Lv ' + recLevel(s) + ')');
   assert.deepEqual(lost, [], 'a type-matched squad at Rec. Lv loses these stages');
+});
+
+test('unit bars never cover another sprite: a blocker holding a foe that walks up from below moves its bars', async t => {
+  const { game, errors } = await openWithMons(t);
+  await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null; setSquad(roster().list.slice(0, 4).map(u => u.num)); squadStart(); battle.talk = []; battleTalk(); battle.paused = true; battle.b.energy = 99; });
+  // A blocker on a path tile, and a big foe it holds that walked up from the row below.
+  const r = await game.evaluate(() => {
+    const st = battle.stage, b = battle.b, path = T.pathsOf(st)[0];
+    const [x, y] = path.find(([px, py]) => py < T.H - 1 && st.map[py][px] === '.') || [];
+    if (x === undefined) return { skip: true };
+    const slot = Math.max(0, b.squad.findIndex(u => u.block > 0 && u.ground));
+    b.squad[slot].ground = true;
+    T.deploy(b, slot, x, y);
+    const u = b.units.find(o => o.slot === slot);
+    if (!u) return { skip: 'no deploy' };
+    // The Rockruff-and-Muk case: a foe held from the row below stands over the top of the blocker's tile.
+    b.queue = [];
+    b.enemies = [{ id: 901, num: 89, x, y: y + 0.2, hp: 80, maxHp: 80, path: [[x, y + 1], [x, y], [x, y - 1]], seg: 0, types: ['Poison'], flying: false, blockedBy: u.id, cd: 9 }];
+    return new Promise(done => { const img = spriteFor(89, 'normal'), mine = spriteFor(u.num, u.look); let n = 0;
+      const wait = () => (img.complete && img.naturalWidth && mine.complete && mine.naturalWidth) || n++ > 60 ? done() : setTimeout(wait, 50); wait(); }).then(() => {
+    drawField(performance.now());
+    const bar = battle.bars.find(p => p.id === 'u' + u.id), others = battle.sprites.filter(q => q.id !== 'u' + u.id);
+    const hit = others.filter(q => bar.x < q.x + q.w && q.x < bar.x + BAR_W && bar.y < q.y + q.h && q.y < bar.y + bar.h);
+    return { held: b.enemies.some(e => e.blockedBy === u.id), at: bar.at, hit: hit.map(q => q.id), sprites: battle.sprites.length };
+    });
+  });
+  assert.ok(!r.skip, "the stage has the layout this test needs");
+  assert.ok(r.held, 'the blocker holds the foe');
+  assert.equal(r.sprites, 2, 'both sprites drew');
+  assert.deepEqual(r.hit, [], 'its bars cover no other sprite (they sit at ' + r.at + ')');
+  assert.notEqual(r.at, 'top', 'not along the top of the tile, where the held foe stands');
+  assert.deepEqual(errors, []);
+});
+
+test('ranged units turn to face whoever they act on now, and keep that way when no one is in range', async t => {
+  const { game, errors } = await openWithMons(t);
+  await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null;
+    const pick = cls => S.owned.find(n => T.classOf(n) === cls); setSquad([pick('sniper'), pick('blocker')].filter(Boolean)); squadStart(); battle.talk = []; battleTalk(); battle.paused = true; battle.b.energy = 99; });
+  const r = await game.evaluate(() => {
+    const st = battle.stage, b = battle.b, slot = b.squad.findIndex(u => u.cls === 'sniper');
+    if (slot < 0) return { skip: true };
+    let spot = null; st.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H' && x >= 3 && x <= T.W - 4 && !spot) spot = [x, y]; }));
+    if (!spot) return { skip: true };
+    T.deploy(b, slot, spot[0], spot[1]);
+    const u = b.units[b.units.length - 1];
+    const foe = dx => ({ id: 900 + dx, num: 52, x: u.x + dx, y: u.y, hp: 50, maxHp: 50, path: [[u.x + dx, u.y], [u.x + dx, u.y + 1]], seg: 0, types: ['Normal'], flying: false });
+    b.enemies = [foe(-1)]; const left = unitFacesRight(battle, u);
+    b.enemies = [foe(1)]; const right = unitFacesRight(battle, u);
+    b.enemies = []; const kept = unitFacesRight(battle, u);
+    return { left, right, kept };
+  });
+  assert.ok(!r.skip, "the stage has the layout this test needs");
+  assert.deepEqual([r.left, r.right, r.kept], [false, true, true], 'faces a foe on its left, then one on its right, and keeps facing right after');
+  assert.deepEqual(errors, []);
+});
+
+test('the Wiki tab: the full type chart, every foe kind with its icon, classes, skills, items with sprites, candy and eggs', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '8');
+  assert.equal(await game.evaluate(() => tab), 'wiki', 'Wiki is tab 8');
+  assert.deepEqual(await game.$$eval('#wiki-tabs [data-wtab]', n => n.map(x => x.dataset.wtab)), ['types', 'foes', 'classes', 'skills', 'items', 'candy', 'eggs']);
+  assert.equal(await game.$$eval('#wiki-box .wchart .c', n => n.length), 18 * 18, 'an 18 by 18 chart');
+  assert.equal(await game.$eval('#wiki-box .wchart .c[title="Water on Fire: 2×"]', n => n.textContent), '2×');
+  // Click a type: its row lights up and the side says what it hits and what hits it.
+  await (await game.$('#wiki-box .wchart .th.row[data-type="Ground"]')).click(); await pause(40);
+  const side = await game.$eval('#wiki-box .wside', n => n.textContent);
+  assert.match(side, /GROUND/); assert.match(side, /2× on.*Fire/); assert.match(side, /Weak to.*Water/);
+  const page = async id => { await (await game.$(`#wiki-tabs [data-wtab="${id}"]`)).click(); await pause(40); return game.$$eval('#wiki-box .wlist > div', n => n.map(x => x.textContent)); };
+  const foes = await page('foes');
+  for (const k of ['Normal', 'Fast', 'Flyer', 'Exploder', 'Armored', 'Boss', 'Healer', 'Ranged', 'Shielded', 'Splitter', 'Stealth', 'Rallier', 'Shield icons']) assert.ok(foes.includes(k), k + ' is listed');
+  assert.equal(await game.$$eval('#wiki-box .wlist > div canvas', n => n.length), foes.length, 'every foe kind has an icon');
+  assert.match(await game.$eval('#wiki-box .wbody', n => n.textContent), /Counter:/);
+  assert.equal((await page('classes')).length, 6);
+  await key(tab, 'ArrowDown', 3);
+  assert.match(await game.$eval('#wiki-box .wbody', n => n.textContent), /SNIPER.*high ground.*Range 3\.2/s);
+  assert.deepEqual(await page('skills'), ['Steady', 'Quick', 'Heavy', 'Rare']);
+  assert.equal((await page('items')).length, 8);
+  assert.equal(await game.$$eval('#wiki-box .wlist canvas[data-item]', n => n.filter(c => c.width >= 13 && c.width <= 22).length), 8, 'item sprites at 1x');
+  assert.ok((await page('candy')).includes('Evolve'));
+  await page('eggs');
+  assert.match(await game.$eval('#wiki-box .wbody', n => n.textContent), /Common 79\.7%.*Legendary 0\.39%/s);
+  await key(tab, 'ArrowDown');
+  assert.match(await game.$eval('#wiki-box .wbody', n => n.textContent), /Legendary by the 413th/);
+  // Nothing in the wiki spills out of its panel.
+  const box = await rect(game, '#wiki-box'), tabs = await rect(game, '#wiki-tabs');
+  for (const id of ['types', 'foes', 'items']) { await page(id);
+    const out = await game.$$eval('#wiki-box > *', (n, b) => n.filter(x => { const r = x.getBoundingClientRect(); return r.right > b.r + 0.5 || r.bottom > b.b + 0.5; }).length, box);
+    assert.equal(out, 0, id + ' fits its panel'); }
+  const lastTab = await game.$$eval('#wiki-tabs > span', n => n[n.length - 1].getBoundingClientRect().right);
+  assert.ok(lastTab <= tabs.r, 'the page tabs fit');
+  assert.deepEqual(errors, []);
+});
+
+test('a tip\'s "More in the Wiki" opens the right page, over a battle too, and Backspace goes back to it paused', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { tipsSeen._skip = false; go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null; setSquad(roster().list.slice(0, 4).map(u => u.num)); squadStart(); battle.talk = []; battleTalk(); battle.paused = false;
+    tip('test-shield', [{ at: () => null, wiki: ['foes', 'shields'], text: 'test' }], { force: true }); });
+  await pause(60);
+  assert.equal(await game.$eval('#tutor-box [data-wiki]', n => n.textContent), 'More in the Wiki');
+  await (await game.$('#tutor-box [data-wiki]')).click(); await pause(60);
+  assert.deepEqual(await game.evaluate(() => [!!wikiOver, !document.querySelector('#scr-wiki').hidden, wikiPage, battle.paused]), [true, true, 'foes', true]);
+  assert.match(await game.$eval('#wiki-box .wbody', n => n.textContent), /SHIELD ICONS.*Gray shield.*Armored.*blue bar.*Shielded.*Red shield.*blocked/s);
+  const t0 = await game.evaluate(() => battle.b.t); await pause(200);
+  assert.equal(await game.evaluate(() => battle.b.t), t0, 'the battle holds still under the wiki');
+  await key(tab, 'Backspace');
+  assert.deepEqual(await game.evaluate(() => [!!wikiOver, document.querySelector('#scr-wiki').hidden, !!battle]), [false, true, true], 'back in the battle');
+  // Out of battle, a link goes to the tab at that page.
+  await game.evaluate(() => { leaveBattle && battle && (battle.done = true, leaveBattle()); });
+  await game.evaluate(() => { if (tutor) tutorEnd(true); openWiki('classes', 'medic'); });
+  await pause(60);
+  assert.deepEqual(await game.evaluate(() => [tab, wikiPage]), ['wiki', 'classes']);
+  assert.match(await game.$eval('#wiki-box .wbody', n => n.textContent.trim()), /^MEDIC/);
+  assert.deepEqual(errors, []);
+});
+
+test('the tutorial teaches a real type matchup, foe icons and shields, with a Wiki link on every tip', () => {
+  const tips = page.slice(page.indexOf('const TIPS = {'), page.indexOf('function screenTips'));
+  const steps = tips.match(/\{ at: /g).length, linked = tips.match(/wiki: \[/g).length;
+  assert.equal(linked, steps, 'every screen tip step links to the wiki');
+  assert.match(page, /const TYPE_EXAMPLE = "For example: Squirtle's Water attack on a Charmander is 2×/);
+  assert.match(page, /Looks: " \+ FOE_MARK\[kind\]/);
+  for (const k of ['normal', 'fast', 'flying', 'explodes', 'armored', 'boss', 'heal', 'ranged', 'shield', 'split', 'stealth', 'rally']) assert.match(page, new RegExp('\\b' + k + ': "', 'm'), k + ' has a mark described');
+});
+
+test('held items draw from the embedded sprites at whole-number scales in Shop, Squad and the deploy cards', async t => {
+  const { game, errors } = await openWithMons(t);
+  const r = await game.evaluate(() => Object.keys(T.items).map(id => { const s = itemIcon(id), b = itemIcon(id, 8), img = ITEM_IMG[id];
+    return { id, src: img.src.startsWith('data:image/png'), w: s.width, nat: img.naturalWidth, big: b.width / img.naturalWidth }; }));
+  for (const x of r) { assert.ok(x.src, x.id + ' is embedded'); assert.equal(x.w, x.nat, x.id + ' at 1x'); assert.equal(x.big, 2, x.id + ' at 2x in the Shop'); }
+  assert.ok(!/poke-gacha\/items\//.test(page), 'no separate item files');
+  assert.deepEqual(errors, []);
 });
