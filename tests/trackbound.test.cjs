@@ -713,3 +713,54 @@ test('Trackbound reports a finished public course to its board', async () => {
   assert.equal(calls[0].payload.track, track);
   assert.ok(calls[0].payload.ms > 0, 'the run clock is reported');
 });
+
+test('Trackbound reports times from My tracks when the saved copy is the posted version', async () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const calls = [];
+  page.sandbox.__boredTracks = { call: (op, payload) => { calls.push({ op, payload }); return Promise.resolve({ ok: true }); } };
+  const trackId = '33333333-3333-4333-8333-333333333333';
+  const blocks = ['sprint', 'checkpoint', 'sprint'];
+  T.openEditor({ name: 'Sky road', blocks });
+  assert.equal(T.saveCustomTrack(), true);
+  const record = T.customTracks()[0];
+  record.posted = { id: trackId, code: T.encodeTrackCode(blocks) };
+  assert.equal(T.publishedId(record), trackId);
+  assert.equal(T.startCustomTrack(record, T.publishedId(record)), true);
+  for (let i = 0; i < 120 * 14 && T.race.state !== 'finished'; i++) {
+    T.stepRace(1 / 120, { gas: true, brake: false, steer: 0, handbrake: false });
+  }
+  assert.equal(T.race.state, 'finished');
+  for (let i = 0; i < 3; i++) await page.flush();
+  assert.equal(calls.length, 1, 'a saved copy of the posted course reports its run');
+  assert.equal(calls[0].op, 'run');
+  assert.equal(calls[0].payload.track, trackId);
+  record.blocks.push('sprint');
+  assert.equal(T.publishedId(record), null, 'an edited course is no longer the posted one');
+});
+
+test('Trackbound lets an author remove a posted track and forgets it locally', async () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const calls = [];
+  const trackId = '44444444-4444-4444-8444-444444444444';
+  page.sandbox.__boredTracks = {
+    call: (op, payload) => {
+      calls.push({ op, payload });
+      if (op === 'list') {
+        return Promise.resolve({ tracks: [{ id: trackId, name: 'Sky road', handle: 'Ash',
+          code: T.encodeTrackCode(['sprint', 'checkpoint', 'sprint']), at: 1, best: [], mine: true }] });
+      }
+      return Promise.resolve({ ok: true });
+    }
+  };
+  T.openEditor({ name: 'Sky road', blocks: ['sprint', 'checkpoint', 'sprint'] });
+  assert.equal(T.saveCustomTrack(), true);
+  T.customTracks()[0].posted = { id: trackId, code: T.encodeTrackCode(T.customTracks()[0].blocks) };
+  await T.refreshPublicList();
+  assert.equal(T.publicTracks().length, 1);
+  assert.equal(await T.deletePublicTrack(T.publicTracks()[0]), true);
+  assert.equal(calls.some(call => call.op === 'remove' && call.payload.id === trackId), true);
+  assert.equal(T.publicTracks().length, 0, 'the row leaves the list');
+  assert.equal(T.customTracks()[0].posted, undefined, 'the saved copy can be posted again');
+});

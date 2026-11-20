@@ -126,6 +126,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 @media(max-width:680px){.editorGrid{grid-template-columns:1fr}}
 .editorField{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--dim);letter-spacing:.06em}
 .editorField input,.editorField select{width:100%}
+.editorField .note{letter-spacing:0;text-transform:none;font-size:11px;line-height:1.35}
 #editorPieces{list-style:none;padding:0;margin:7px 0;border-top:1px solid var(--rule);max-height:310px;overflow-y:auto}
 #editorPieces li{display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--rule);padding:4px 0}
 #editorPieces li span{flex:1;min-width:0;font-size:11px}
@@ -287,6 +288,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
           <div>
             <label class="editorField" for="editorName">TRACK NAME
               <input id="editorName" type="text" maxlength="32" value="My track" autocomplete="off">
+              <span class="note">Other players find a course by this name in the public list, so replace "My track" with something they can pick out.</span>
             </label>
             <div class="row">
               <select id="editorPiece" aria-label="Road piece to insert"></select>
@@ -3948,6 +3950,13 @@ function startCustomTrack(draft, publicTrack) {
   setScreens();
   return true;
 }
+// A saved course that still matches the version its author posted is that
+// public course, so its runs belong on the board.
+function publishedId(track) {
+  if (!track || !track.posted || !track.posted.id) return null;
+  try { return encodeTrackCode(track.blocks) === track.posted.code ? track.posted.id : null; }
+  catch (error) { return null; }
+}
 function refreshCustomList() {
   const list = $('customTrackList');
   list.replaceChildren();
@@ -3967,7 +3976,7 @@ function refreshCustomList() {
       button.type = 'button'; button.addEventListener('click', handler); li.appendChild(button);
       return button;
     };
-    action('Drive', () => { editor.slot = index; startCustomTrack(track); });
+    action('Drive', () => { editor.slot = index; startCustomTrack(track, publishedId(track)); });
     action('Edit', () => openEditor(track, index));
     // Two clicks rather than window.confirm: Google Sites embeds may block modals.
     const remove = action('Delete', () => {
@@ -4028,6 +4037,17 @@ function renderPublicList(rows) {
     drive.type = 'button';
     drive.addEventListener('click', () => drivePublic(row));
     li.appendChild(drive);
+    if (row.mine) {
+      const remove = el('button', 'quiet', 'Delete');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', 'Delete ' + row.name + ' from the public list');
+      // Two clicks rather than window.confirm: Google Sites embeds may block modals.
+      remove.addEventListener('click', () => {
+        if (remove.textContent !== 'Confirm?') { remove.textContent = 'Confirm?'; return; }
+        void deletePublicTrack(row, remove);
+      });
+      li.appendChild(remove);
+    }
     list.appendChild(li);
   });
 }
@@ -4063,6 +4083,33 @@ function drivePublic(row) {
   if (!validation.ok) { publicStatus(validation.error, true); return false; }
   return startCustomTrack({ name: row.name, blocks }, row.id);
 }
+// Only the author may delete, which the server enforces; this also lets a saved
+// copy of the course post again instead of believing it is still published.
+async function deletePublicTrack(row, button) {
+  const api = tracksAPI();
+  if (!api) { publicStatus('Removing a track needs Bored: open the game from the arcade.', true); return false; }
+  if (button) button.disabled = true;
+  try {
+    await api.call('remove', { id: row.id });
+    let touched = false;
+    if (Array.isArray(saved.custom)) {
+      saved.custom.forEach(record => {
+        if (record && record.posted && record.posted.id === row.id) { delete record.posted; touched = true; }
+      });
+      if (touched) persist('custom');
+    }
+    if (editor.posted && editor.posted.id === row.id) editor.posted = null;
+    publicTracks = (Array.isArray(publicTracks) ? publicTracks : []).filter(entry => entry.id !== row.id);
+    renderPublicList(publicTracks);
+    publicStatus('Removed · ' + row.name + ' is no longer in the public list.');
+    paintPostButton();
+    return true;
+  } catch (error) {
+    if (button) button.disabled = false;
+    publicStatus(error.message || 'That track could not be removed.', true);
+    return false;
+  }
+}
 function postedVersion() {
   return editor.posted && typeof editor.posted.code === 'string' ? editor.posted : null;
 }
@@ -4086,7 +4133,7 @@ function paintPostButton(validation) {
   const state = postState(validation);
   button.disabled = state.blocked;
   button.textContent = state.posted && state.changed ? 'Repost changes' : 'Post for others';
-  const hint = !state.named ? 'Give the track a name of its own first.'
+  const hint = !state.named ? 'Public tracks are listed by name: replace "My track" with one people can pick out.'
     : state.posted && !state.changed ? 'This version is already posted.'
       : state.posted ? 'Post the edited track again.' : 'Share this track in the public list.';
   button.title = hint;
@@ -4115,7 +4162,7 @@ async function postPublicTrack() {
   const note = $('editorStatus');
   if (!state.named) {
     note.className = 'note invalid';
-    note.textContent = 'Give the track a name of its own before posting.';
+    note.textContent = 'Name the track before posting: the public list shows this name, and "My track" is the placeholder every new course starts with.';
     return false;
   }
   if (!validation.ok) return false;
@@ -4534,7 +4581,7 @@ window.__test = {
   customTrackId, openEditor, refreshEditor, saveCustomTrack, startCustomTrack,
   editorDraft: () => editor, customTracks: () => saved.custom, showMenuLibrary,
   refreshPublicList, drivePublic, postPublicTrack, postState, paintPostButton, moveBlockTo,
-  timeLabel, nextTimesLabel,
+  deletePublicTrack, publishedId, timeLabel, nextTimesLabel,
   publicTracks: () => publicTracks,
   editorView, previewCameraLayout, editorPreviewGeometry, previewPick, selectEditorPiece,
   renderEditorPreview, changeEditorZoom, resetEditorCamera,

@@ -1,4 +1,4 @@
-import { hasIdentity, getSession, request, freshSession } from './backend.js';
+import { hasIdentity, getSession, request, freshSession, ANON_TOKEN } from './backend.js';
 
 // Trackbound's public tracks live on the Bored account, and only the hub has
 // the account. The game has no credentials of its own, so it asks over a channel
@@ -6,10 +6,10 @@ import { hasIdentity, getSession, request, freshSession } from './backend.js';
 // trackbound_track* functions with the player's session. No token, email or
 // account id ever enters the page.
 //
-// What the game is given: a list of { id, name, handle, code, at, best } (best
-// being that course's fastest four players), whether the player is signed in,
-// and the answers to a post and to a finished run. Nothing else about the
-// account.
+// What the game is given: a list of { id, name, handle, code, at, best, mine }
+// (best being that course's fastest four players, mine whether the signed-in
+// player shared it), whether the player is signed in, and the answers to a
+// post, a finished run and a delete. Nothing else about the account.
 
 // Serialized into the game's document before its script runs, like the other
 // bridges: call(op, payload) answers with the hub's result.
@@ -59,9 +59,16 @@ function cleanCode(value) {
 // Public read: the list function is granted to the publishable key, so this
 // answers signed out too.
 async function listTracks() {
-  const rows = await request('/rest/v1/rpc/trackbound_tracks_list', {
-    method: 'POST', body: { p_limit: LIST_LIMIT }
+  const ask = token => request('/rest/v1/rpc/trackbound_tracks_list', {
+    method: 'POST', body: { p_limit: LIST_LIMIT }, token
   });
+  let rows;
+  try { rows = await ask(); }
+  catch (error) {
+    // A stale session must not hide the public list; `mine` simply reads false.
+    if (!getSession() || error.status !== 401) throw error;
+    rows = await ask(ANON_TOKEN);
+  }
   return {
     tracks: (Array.isArray(rows) ? rows : []).filter(row => row && typeof row.code === 'string' && row.name)
       .slice(0, LIST_LIMIT)
@@ -77,7 +84,8 @@ async function listTracks() {
           .map(entry => ({
             handle: String(entry.handle || 'Bored player').slice(0, 32),
             ms: Math.round(Number(entry.ms))
-          }))
+          })),
+        mine: row.mine === true
       }))
   };
 }
@@ -119,9 +127,26 @@ async function postTrackRun(payload) {
   return { ok: true };
 }
 
+// Deleting a posted course: the author, checked by the function against the
+// session. Its times go with it through the cascade.
+async function removeTrack(payload) {
+  if (!hasIdentity()) throw refuse('Sign in to Bored to remove a track.');
+  const id = cleanTrackId(payload.id);
+  if (!id) throw refuse('That track is not shared.');
+  const owner = getSession()?.user?.id;
+  const session = await freshSession();
+  if (!session || session.user.id !== owner) throw refuse('Sign in again to remove a track.');
+  await request('/rest/v1/rpc/trackbound_track_delete', {
+    method: 'POST', body: { p_id: id }, token: session.access_token
+  });
+  if (getSession()?.user?.id !== owner) throw refuse('Your account changed. Please try again.');
+  return { ok: true };
+}
+
 export function createTracksBridge({ frame, deps = {} }) {
   const channel = crypto.randomUUID();
   const list = deps.list || listTracks, post = deps.post || postTrack, run = deps.run || postTrackRun;
+  const remove = deps.remove || removeTrack;
   const signedIn = deps.signedIn || (() => hasIdentity());
   let disposed = false;
   const send = message => { try { frame.contentWindow?.postMessage(Object.assign({ channel }, message), '*'); } catch (error) { /* the frame is gone */ } };
@@ -131,6 +156,7 @@ export function createTracksBridge({ frame, deps = {} }) {
     if (op === 'list') return list();
     if (op === 'post') return post(payload || {});
     if (op === 'run') return run(payload || {});
+    if (op === 'remove') return remove(payload || {});
     throw refuse('Unknown operation.');
   }
 
