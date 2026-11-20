@@ -2062,6 +2062,10 @@ window.ImposterNet = (function () {
   const ALIVE_MS = 2000;
   const KNOCK_MS = 900;
   const MISSING_MS = 6000;
+  // A fresh offer needs this long to finish negotiating before another knock
+  // replaces it; the host will not re-offer before OFFER_GRACE either.
+  const LINK_GRACE = 7000;
+  const OFFER_GRACE = 2500;
   const ICE_SERVERS = [{ urls: ['stun:stun.l.google.com:19302'] }];
 
   // The project and publishable key the hub already ships (src/hub/backend.js).
@@ -2292,6 +2296,7 @@ window.ImposterNet = (function () {
     let relay = null;
     let host = null;
     let link = null;            // the one channel a client has, to the host
+    let linkAt = 0;             // when that offer arrived, for the grace window
     let hostPeer = '';
     let lastHostSeen = 0;
     let claimRank = 0;
@@ -2361,6 +2366,7 @@ window.ImposterNet = (function () {
     function dropLink() {
       const entry = link;
       link = null;
+      linkAt = 0;
       hostPeer = '';
       if (!entry) return;
       try { entry.channel?.close(); } catch { /* already closed */ }
@@ -2406,6 +2412,9 @@ window.ImposterNet = (function () {
       if (!host || closed) return;
       const existing = peers.get(peerId);
       if (existing && existing.channel && existing.channel.readyState === 'open') return;
+      // An offer that is still negotiating must not be replaced: tearing it down
+      // for the next knock is what used to leave a guest on "Connecting…".
+      if (existing && Date.now() - (existing.at || 0) < OFFER_GRACE) return;
       // A stale entry is replaced without detaching, so the re-knock keeps the seat.
       if (existing) dropPeer(peerId, false);
 
@@ -2415,7 +2424,7 @@ window.ImposterNet = (function () {
       } catch {
         return;
       }
-      const entry = { pc, channel: null, send: null };
+      const entry = { pc, channel: null, send: null, at: Date.now() };
       peers.set(peerId, entry);
 
       const channel = pc.createDataChannel('game', { ordered: true });
@@ -2450,6 +2459,7 @@ window.ImposterNet = (function () {
       }
       const entry = { pc, channel: null, send: null, pid: from };
       link = entry;
+      linkAt = Date.now();
       hostPeer = from;
 
       pc.ondatachannel = event => {
@@ -2554,6 +2564,15 @@ window.ImposterNet = (function () {
         if (closed || host) return;
         if (link && link.channel && link.channel.readyState === 'open') return;
         if (recovery) return;            // the election owns the knocks now
+        // A link that is still coming up gets a quiet moment: another knock now
+        // only makes the host replace the offer and the negotiation restarts.
+        if (link && Date.now() - linkAt < LINK_GRACE) return;
+        if (link) {
+          // It never opened: start the join clean, and count the fresh attempt
+          // from now so the reset does not read as "no room with that code".
+          dropLink();
+          joinedAt = Date.now();
+        }
         knock();
         if (link) return;
         if (Date.now() - joinedAt < MISSING_MS) return;
@@ -3018,8 +3037,48 @@ window.ImposterNet = (function () {
 
   /* ── joining and leaving ─────────────────────────────────────────────── */
 
-  function openSession({ mode, code, intent }) {
+  // A join that never landed used to need a leave and a second try. Watch for
+  // the first snapshot instead: with none, rebuild the session in place, which
+  // is the same fresh start a manual rejoin gives, and only then admit defeat.
+  const JOIN_TIMEOUT = 12000;
+  const JOIN_TRIES = 2;
+  let joinWatch = 0;
+  let joinTries = 0;
+  let joinRequest = null;
+
+  function stopJoinWatch() {
+    if (joinWatch) clearTimeout(joinWatch);
+    joinWatch = 0;
+    joinTries = 0;
+  }
+
+  function watchJoin() {
+    if (joinWatch) clearTimeout(joinWatch);
+    joinWatch = setTimeout(retryJoin, JOIN_TIMEOUT);
+  }
+
+  function retryJoin() {
+    joinWatch = 0;
+    if (!session || snap || session.hosting || !joinRequest) return;
+    if (joinTries >= JOIN_TRIES) {
+      stopJoinWatch();
+      leave();
+      menuStatus('Could not reach that room. Try again in a moment.', true);
+      return;
+    }
+    joinTries += 1;
+    const request = joinRequest;
+    try {
+      session.close();
+    } catch {}
+    session = null;
+    openSession(request);
+  }
+
+  function openSession(request) {
     if (session) return;
+    const { mode, code, intent } = request;
+    joinRequest = request;
     if (!N.supported) {
       menuStatus('This browser cannot open a data channel. Imposter needs WebRTC.', true);
       return;
@@ -3052,9 +3111,12 @@ window.ImposterNet = (function () {
     $('roster').replaceChildren();
     listKeys.clear();
     $('lobby-note').textContent = mode === 'public' ? 'Joining the public room…' : 'Connecting…';
+    watchJoin();
   }
 
   function leave() {
+    stopJoinWatch();
+    joinRequest = null;
     try {
       session?.close();
     } catch {}
@@ -3148,6 +3210,7 @@ window.ImposterNet = (function () {
     if (!next) return;
     next = mergeSnapshot(next);
     snap = next;
+    stopJoinWatch();             // the join landed; nothing left to recover
     if (next.you?.id) selfId = next.you.id;
     seedView(next);
     const hosting = Boolean(next.you?.host);
@@ -3225,7 +3288,9 @@ window.ImposterNet = (function () {
       ? `${players.length} / ${C.MAX_PLAYERS} in the public room · ` + (need ? `${need} more to start` : 'starting…')
       : `${players.length} / ${C.MAX_PLAYERS} · ` + (need ? `${need} more to start` : 'ready when you are');
 
-    $('host-settings').hidden = publicRoom;
+    // The rules are the host's board: a guest who sees the panel only gets
+    // "Only the host sets the rules." bounced back at every change.
+    $('host-settings').hidden = publicRoom || !hosting;
     // Starting is the host's call; a guest only gets told to wait.
     $('start').hidden = publicRoom || !hosting;
     $('start').disabled = players.length < C.MIN_PLAYERS;
