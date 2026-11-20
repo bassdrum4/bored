@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 694,
+  "count": 695,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"09741cd","date":"2026-11-20","author":"Codebuff","subject":"Stand Trackbound's stunt-park ramps on level ground."},
   {"sha":"4743f10","date":"2026-11-20","author":"Codebuff","subject":"Make Trackbound's stunt park drivable again."},
   {"sha":"2de93ac","date":"2026-11-20","author":"Codebuff","subject":"Dismiss only the invite on screen, and only when the player closes it."},
   {"sha":"c2d7909","date":"2026-11-20","author":"Codebuff","subject":"Hide the host rules from guests and let a stalled join recover itself."},
