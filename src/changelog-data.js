@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 677,
+  "count": 678,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1796e6a","date":"2026-11-20","author":"Codebuff","subject":"Give Imposter the real Skeld's tasks, vision, chat and sabotages."},
   {"sha":"845c49d","date":"2026-11-20","author":"Codebuff","subject":"Drop the dead bits left over from the signaling swap."},
   {"sha":"31999e4","date":"2026-11-20","author":"Codebuff","subject":"Signal Imposter over Supabase Broadcast so joins stop failing."},
   {"sha":"b5151df","date":"2026-11-19","author":"Daniel Lowe","subject":"Add Trackbound track editor, local library and share codes"},
