@@ -22,7 +22,30 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   // An invite is an ordinary game for later: the recipient has not joined yet.
   const invited = new Map();
   let invite = null, inviteBusy = false;
-  const dismissedInvites = new Set();
+  // Every invitation waiting on this account, and the ids whose popup was
+  // dismissed. The dismissal is kept per account, so an invitation is announced
+  // once and never again; the invitation itself stays in the tab below.
+  let inviteList = null, dismissedInvites = null;
+  const dismissedKey = () => 'bored.together.invites.' + owner;
+  function dismissedIds() {
+    if (!dismissedInvites) {
+      const saved = readStored(dismissedKey(), null);
+      dismissedInvites = new Set(Array.isArray(saved) ? saved : []);
+    }
+    return dismissedInvites;
+  }
+  function dismissInvites(ids) {
+    const seen = dismissedIds();
+    let touched = false;
+    for (const id of ids) if (id && !seen.has(id)) { seen.add(id); touched = true; }
+    if (touched) writeStored(dismissedKey(), [...seen].slice(-200));
+  }
+  // The popup is a notice, not the invitation. Closing it stops that one coming
+  // back, even on another visit; the other invitations waiting keep their own
+  // notices, and the tab lists every one of them either way.
+  function dismissShownInvite() {
+    if (invite?.id) dismissInvites([invite.id]);
+  }
   const inviteDialog = $('#invite-dialog');
   const resultDialog = $('#result-dialog');
   const name = game => TOGETHER_GAMES[game]?.name || game;
@@ -153,7 +176,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     resultsSeen = null;
     if (resultDialog?.open) dialogClose(resultDialog);
     noticeDismissed = '';
-    invite = null;
+    invite = null; inviteList = null; dismissedInvites = null;
     if (inviteDialog?.open) dialogClose(inviteDialog);
     updateBadge(); render();
   }
@@ -240,8 +263,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   /* ── Invitations ────────────────────────────────────────────────────────── */
 
   // Shown to a signed-in Bored account that is not in Bored Together as soon as
-  // the site opens, and again after a sign-in. Closing only dismisses it for
-  // this page; accepting joins Bored Together and opens the game it promised.
+  // the site opens, and again after a sign-in. Closing it keeps that one invite
+  // dismissed for the account for good; the invitation itself stays in the
+  // Bored Together tab, where accepting joins and opens the game it promised.
   function inviteCopy() {
     const who = invite?.inviter || 'A Bored Together member';
     $('#invite-title').textContent = who + ' invited you to ' + name(invite.game);
@@ -255,43 +279,60 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     const el = $('#invite-status');
     el.textContent = text; el.dataset.tone = error ? 'error' : '';
   }
-  async function checkInvites() {
-    if (!hasIdentity() || inviteBusy || data?.enrolled || dialogBusy()) return;
+  // The account's waiting invitations, read once for the popup and for the tab.
+  // A signed-in account outside Bored Together has no games list, so its tab is
+  // where the invitations live: dismissing the popup never hides them.
+  async function loadInvites() {
+    if (!hasIdentity()) { inviteList = null; return null; }
+    const stamp = generation, who = owner;
     try {
       const result = await inviteRPC('list');
-      if (!result || result.enrolled) return;
-      const next = (result.invites || []).find(item => item?.id && !dismissedInvites.has(item.id));
-      if (!next || data?.enrolled) return;
-      invite = next;
-      inviteTone('', false); inviteCopy(); dialogOpen(inviteDialog);
-      $('#invite-close').focus();
+      if (stamp !== generation || owner !== who) return inviteList;
+      inviteList = result?.enrolled ? [] : (Array.isArray(result?.invites) ? result.invites : []);
     } catch {
       // An invitation is never worth interrupting a game with an error.
+      return inviteList;
     }
+    if (visible && stamp === generation) render();
+    return inviteList;
+  }
+  async function checkInvites() {
+    if (!hasIdentity() || inviteBusy || data?.enrolled || dialogBusy()) return;
+    const list = await loadInvites();
+    if (!list || data?.enrolled) return;
+    const seen = dismissedIds();
+    const next = list.find(item => item?.id && !seen.has(item.id));
+    if (!next) return;
+    invite = next;
+    inviteTone('', false); inviteCopy(); dialogOpen(inviteDialog);
+    $('#invite-close').focus();
   }
   // Accepting is one action: it takes the invitation, joins Bored Together under
   // the notice the enrollment screen shows, and opens the promised game with the
   // new member to move. That is the one game whose first seat is not the member
   // who started the match. The page is opened before the game so leaving it
   // lands on Bored Together, where the game waits for the next turn.
-  async function acceptInvite() {
-    if (!invite || inviteBusy) return;
+  async function acceptInvite(target) {
+    const taking = target && target.id ? target : invite;
+    if (!taking || inviteBusy) return;
     if (!hasIdentity()) {
       // No invitation can be taken without an account. The notice comes back
       // after the sign-in rather than being spent on a dialog that could not act.
       invite = null; dialogClose(inviteDialog); openAuthDialog('signin'); return;
     }
     inviteBusy = true; const accept = $('#invite-accept'); accept.disabled = true;
-    inviteTone('Joining Bored Together\u2026', false);
+    if (inviteDialog?.open) inviteTone('Joining Bored Together\u2026', false);
     try {
-      if (invite.status !== 'accepted') await inviteRPC('accept', { id: invite.id });
+      if (taking.status !== 'accepted') await inviteRPC('accept', { id: taking.id });
       // Taken but not joined yet: a second try goes straight to joining.
-      invite = { ...invite, status: 'accepted' };
+      invite = { ...taking, status: 'accepted' };
       await ensureProfile();
       await togetherRPC('enroll', { consent_version: CONSENT_VERSION });
       const claimed = await inviteRPC('claim');
       const match = (claimed?.matches || [])[0];
-      dismissedInvites.add(invite.id);
+      dismissInvites([taking.id]);
+      // A member's invitations become games, so there is no list left to carry.
+      inviteList = [];
       invite = null; dialogClose(inviteDialog); inviteTone('', false);
       open();
       if (match?.id) await launch(match.id);
@@ -301,12 +342,34 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     } finally { inviteBusy = false; accept.disabled = false; }
   }
   if (inviteDialog) {
-    $('#invite-accept').onclick = acceptInvite;
-    $('#invite-close').onclick = () => { if (invite) dismissedInvites.add(invite.id); dialogClose(inviteDialog); };
-    inviteDialog.addEventListener('close', () => { if (invite) dismissedInvites.add(invite.id); });
+    $('#invite-accept').onclick = () => acceptInvite();
+    // Only the player closes it for good: the Close button or Escape (cancel).
+    // A dialog the page closes itself is not a dismissal.
+    $('#invite-close').onclick = () => { dismissShownInvite(); dialogClose(inviteDialog); };
+    inviteDialog.addEventListener('cancel', () => { dismissShownInvite(); });
     // A sign-in or a finished-game popup may have been in the way when an
     // invitation was waiting; look again once it is gone.
     document.addEventListener('close', () => { if (!dialogBusy()) setTimeout(checkInvites, 300); }, true);
+  }
+  // The tab's own list of invitations, for an account that is not in Bored
+  // Together yet: the popup is easy to close, so the offer waits here with the
+  // same join, for as long as the invite does.
+  function invitesPanel(host) {
+    if (!inviteList || !inviteList.length) return;
+    const panel = node('section', undefined, 'bt-start bt-invites');
+    panel.setAttribute('aria-label', 'Invites waiting for you');
+    panel.append(node('p', 'Invites', 'eyebrow'),
+      node('h3', inviteList.length === 1 ? '1 invite waiting' : inviteList.length + ' invites waiting'),
+      node('p', 'Someone picked you for a game. Join and it opens on your first turn; nothing is lost while you think about it.', 'bt-caption'));
+    for (const game of inviteList) {
+      const row = node('div', undefined, 'bt-person');
+      const who = node('div');
+      who.append(node('strong', (game.inviter || 'A Bored Together member') + ' · ' + (game.game ? name(game.game) : 'a game')),
+        node('span', 'would like to play ' + (game.game ? name(game.game) : 'this') + ' with you', 'bt-caption'));
+      row.append(who, button(game.status === 'accepted' ? 'Finish joining' : 'Join and play', () => acceptInvite(game), true));
+      panel.append(row);
+    }
+    host.append(panel);
   }
   function intro() {
     // A member who joined under the older notice is shown the new one once
@@ -325,6 +388,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         try { await inviteRPC('claim'); } catch { /* joining still works */ }
       }, true));
     content.append(intro);
+    invitesPanel(content);
   }
   function overflow(host, match) {
     const opponent = match?.opponent;
@@ -723,7 +787,10 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = true;
     root.hidden = false; $('#together-nav').setAttribute('aria-current', 'page');
     try { history.replaceState(null, '', '#together'); } catch {}
-    resetIdentity(); render(); refresh(true); maybeShowResult(); root.scrollIntoView({ block: 'start' });
+    resetIdentity();
+    // A non-member's tab is the list of invitations the account is carrying.
+    if (hasIdentity() && data?.enrolled !== true) void loadInvites();
+    render(); refresh(true); maybeShowResult(); root.scrollIntoView({ block: 'start' });
   }
   function close() {
     visible = false; flow = people = null; root.hidden = true;
