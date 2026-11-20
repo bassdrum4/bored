@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 673,
-  "newest": "2026-11-19",
+  "count": 674,
+  "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"31999e4","date":"2026-11-20","author":"Codebuff","subject":"Signal Imposter over Supabase Broadcast so joins stop failing."},
   {"sha":"fdd3a9f","date":"2026-11-19","author":"Codebuff","subject":"Rank F-14 by its own play data on the Popular shelf."},
   {"sha":"cca1df6","date":"2026-11-19","author":"Codebuff","subject":"Remove the GitHub Sponsors link and funding config."},
   {"sha":"8f001c0","date":"2026-11-19","author":"Codebuff","subject":"Add a GitHub Sponsors link in the footer"},
