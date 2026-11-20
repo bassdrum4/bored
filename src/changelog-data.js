@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 680,
+  "count": 681,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"bfff9bb","date":"2026-11-20","author":"Codebuff","subject":"Show Together invites as soon as the site opens, and open the invited game on the invitee's first turn."},
   {"sha":"2d524b2","date":"2026-11-20","author":"Codebuff","subject":"Make Imposter move without the per-frame payload weighing it down."},
   {"sha":"1796e6a","date":"2026-11-20","author":"Codebuff","subject":"Give Imposter the real Skeld's tasks, vision, chat and sabotages."},
   {"sha":"845c49d","date":"2026-11-20","author":"Codebuff","subject":"Drop the dead bits left over from the signaling swap."},
