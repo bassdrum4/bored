@@ -288,6 +288,15 @@ select{padding:8px 10px;font-size:13px}
   .steer { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 420px; }
   .steer input[type=range] { width: 100%; }
   .steer-state { font-size: 13px; color: #aeb4bd; }
+
+  /* The ejection is the moment the round turns on: say it plainly. */
+  .eject-card{position:fixed;inset:0;z-index:55;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:8px;padding:24px;text-align:center;pointer-events:none;
+    background:rgba(6,7,8,.9);animation:eject-in .18s ease-out}
+  .eject-line{font-size:clamp(20px,4.2vw,34px);line-height:1.2;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  .eject-sub{font:12px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+  .eject-sub.bad{color:#e08a80}
+  @keyframes eject-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
   </style>
 </head>
 <body>
@@ -520,6 +529,11 @@ select{padding:8px 10px;font-size:13px}
     <button id="back-lobby" class="btn btn-primary" type="button" hidden>Back to lobby</button>
     <p class="hint" id="over-note"></p>
   </div>
+</section>
+
+<section id="eject-card" class="eject-card" hidden aria-live="polite">
+  <p id="eject-line" class="eject-line"></p>
+  <p id="eject-sub" class="eject-sub"></p>
 </section>
 
 <p id="toast" hidden></p>
@@ -925,8 +939,8 @@ window.ImposterCore = (function () {
     if (!player.host) return { ok: false, error: 'not-host' };
     if (state.phase !== 'lobby') return { ok: false, error: 'already-started' };
     const next = Object.assign({}, state.settings);
-    // One impostor is the house rule; the field is accepted and pinned.
-    next.impostors = 1;
+    // The impostor count follows the ship's size, so the field stays pinned.
+    next.impostors = state.players.length >= 7 ? 2 : 1;
     if (patch.killCooldownSec !== undefined) {
       const sec = Number(patch.killCooldownSec);
       next.killCooldownSec = clamp(Math.round((Number.isFinite(sec) ? sec : DEFAULTS.killCooldownSec) * 2) / 2, 10, 60);
@@ -970,7 +984,9 @@ window.ImposterCore = (function () {
     if (state.phase !== 'lobby') return { ok: false, error: 'already-started' };
     if (state.players.length < MIN_PLAYERS) return { ok: false, error: 'need-3-players' };
 
-    const impostorCount = Math.max(1, Math.min(state.settings.impostors, Math.floor(state.players.length / 3)));
+    // Seven or more on the ship gets the second impostor the real game deals;
+    // below that one killer keeps the round fair.
+    const impostorCount = state.players.length >= 7 ? 2 : 1;
     const order = shuffle(state.players.map(player => player.id), rng);
     const impostors = new Set(order.slice(0, impostorCount));
 
@@ -1380,8 +1396,10 @@ window.ImposterCore = (function () {
       case 'settings':
         return configure(state, id, message.settings || {});
       case 'start':
+        if (!player.host) return rejected('not-host');
         return start(state, id);
       case 'lobby':
+        if (!player.host) return rejected('not-host');
         return backToLobby(state, id);
       case 'use': {
         if (state.phase !== 'play') return rejected('not-playing');
@@ -1400,7 +1418,8 @@ window.ImposterCore = (function () {
         if (dist(centre(player), task) > task.range) return rejected('too-far');
         if (task.id === 'fuel' && !player.gas) return rejected('need-gas');
         player.tasksDone.push(task.id);
-        player.gas = false;
+        // Only the fuel task spends the can; another task on the way must not.
+        if (task.id === 'fuel') player.gas = false;
         emit(state, { t: 'task', id, station: task.id });
         checkWin(state);
         return { ok: true };
@@ -1560,6 +1579,7 @@ window.ImposterCore = (function () {
       const def = sabotageDef(state.sabotage.kind);
       if (def && viewer.alive) {
         for (const point of def.fixes) {
+          if (state.sabotage.held && state.sabotage.held[point.pad]) continue;
           if (dist(at, point) <= point.range) hints.fix.push(point.pad);
         }
       }
@@ -1730,6 +1750,7 @@ window.ImposterCore = (function () {
     const listeners = { snapshot: [], event: [] };
     let sinceSnapshot = SNAPSHOT_MS;
     let sinceMirror = MIRROR_MS;
+    let lastWire = 0;
 
     function on(kind, handler) {
       listeners[kind].push(handler);
@@ -1837,6 +1858,7 @@ window.ImposterCore = (function () {
       const next = successor();
       fire('snapshot', stamp(snapshotFor(state, hostId), hostId, next));
       for (const [id, send] of links) send({ t: 'snap', s: stamp(wireSnapshot(id, force), id, next) });
+      lastWire = Date.now();
     }
 
     function sendMirror(force = false) {
@@ -1880,6 +1902,7 @@ window.ImposterCore = (function () {
       if (!existing && state.players.length >= MAX_PLAYERS) return { error: 'room-full' };
       const player = existing || addPlayer(state, { id: seatId, name: playerName, rng });
       if (!player) return { error: 'room-full' };
+      player.seen = state.time;
       connections.set(connectionId, seatId);
       owners.set(seatId, connectionId);
       links.set(seatId, send);
@@ -1907,6 +1930,15 @@ window.ImposterCore = (function () {
       return result;
     }
 
+    // The channel went quiet: keep the seat (and the round) open for the
+    // reconnect window and stop sending to a link that is not there.
+    function suspend(seatId) {
+      links.delete(seatId);
+      const player = getPlayer(state, seatId);
+      if (player) player.seen = state.time;
+      publish(true);
+    }
+
     function detach(connectionId) {
       const seatId = connections.get(connectionId) || connectionId;
       connections.delete(connectionId);
@@ -1928,6 +1960,7 @@ window.ImposterCore = (function () {
       admit,
       seatOf,
       detach,
+      suspend,
       receive,
       snapshot: () => stamp(snapshotFor(state, hostId), hostId),
       checkpoint,
@@ -1947,6 +1980,13 @@ window.ImposterCore = (function () {
         flushEvents();
         publish();
         sendMirror();
+        // Snapshots only go out when something changed, so a room where nobody
+        // is moving looks dead to a client whose watchdog gives up after 3s.
+        // One tiny frame a second is enough to say "the host is still here".
+        if (links.size && Date.now() - lastWire > 1000) {
+          lastWire = Date.now();
+          for (const send of links.values()) send({ t: 'ping' });
+        }
       },
       close() {
         for (const send of links.values()) send({ t: 'bye' });
@@ -2297,7 +2337,9 @@ window.ImposterNet = (function () {
       peers.delete(peerId);
       try { entry.channel?.close(); } catch { /* already closed */ }
       try { entry.pc?.close(); } catch { /* already closed */ }
-      if (detach && host) host.detach(peerId);
+      if (!host) return;
+      if (detach) host.detach(peerId);
+      else host.suspend(peerId);
     }
 
     function dropLink() {
@@ -2365,10 +2407,12 @@ window.ImposterNet = (function () {
 
       pc.onconnectionstatechange = () => {
         if (peers.get(peerId) !== entry) return;
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peerId);
+        // A blip keeps the seat: the client re-knocks with the same playerId and
+        // lands back on it. A real departure is pruned by absence, or by `bye`.
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peerId, false);
         else if (pc.connectionState === 'disconnected') {
           setTimeout(() => {
-            if (peers.get(peerId) === entry && pc.connectionState === 'disconnected') dropPeer(peerId);
+            if (peers.get(peerId) === entry && pc.connectionState === 'disconnected') dropPeer(peerId, false);
           }, 6000);
         }
       };
@@ -2613,7 +2657,9 @@ window.ImposterNet = (function () {
       watchdog = setInterval(() => {
         if (closed || host) return;
         if (!link || !link.channel || link.channel.readyState !== 'open') return;
-        if (!recovery && Date.now() - lastSnap > HOST_TIMEOUT) onHostGone();
+        // Either a data frame or the relay's `host` announcement proves the
+        // chair is still held; a quiet room has no frames to show for itself.
+        if (!recovery && Date.now() - lastSnap > HOST_TIMEOUT && Date.now() - lastHostSeen > HOST_TIMEOUT) onHostGone();
       }, 500);
     }
 
@@ -3109,6 +3155,7 @@ window.ImposterNet = (function () {
       $('overlay-over').hidden = true;
       closeTask();
       closeRoom();
+      closeList();
       $('overlay-chat').hidden = true;
       renderLobby(next, hosting, publicRoom);
       return;
@@ -3123,11 +3170,16 @@ window.ImposterNet = (function () {
     if (!$('overlay-chat').hidden) renderChat($('chat-log'), next.ghostChat || [], true);
     $('lobby-note').textContent = '';
 
+    // Vitals and the Admin table are live readouts, not photographs.
+    if (roomKind === 'vitals') renderVitals();
+    else if (roomKind === 'admin') renderAdmin();
+    if (mapCanvas && !$('overlay-list').hidden) drawMap(mapCanvas);
     if (next.phase === 'meeting') {
       $('overlay-over').hidden = true;
       $('overlay-meeting').hidden = false;
       closeTask();
       closeRoom();
+      closeList();
       renderMeeting(next);
     } else {
       $('overlay-meeting').hidden = true;
@@ -3315,6 +3367,7 @@ window.ImposterNet = (function () {
 
   let roomKind = null;
   let roomFrame = 0;
+  let mapCanvas = null;
 
   function closeRoom() {
     roomKind = null;
@@ -3474,6 +3527,16 @@ window.ImposterNet = (function () {
       : 'Back to lobby deals a new round with the same players.';
   }
 
+  let ejectTimer = 0;
+  function ejectCard(line, sub, bad) {
+    $('eject-line').textContent = line;
+    $('eject-sub').textContent = sub;
+    $('eject-sub').classList.toggle('bad', Boolean(bad));
+    $('eject-card').hidden = false;
+    clearTimeout(ejectTimer);
+    ejectTimer = setTimeout(() => { $('eject-card').hidden = true; }, 2600);
+  }
+
   function handleEvent(event) {
     if (!event) return;
     switch (event.t) {
@@ -3485,8 +3548,15 @@ window.ImposterNet = (function () {
         break;
       case 'eject': {
         const player = snap?.players.find(candidate => candidate.id === event.id);
-        if (event.id) toast(`${player?.name || 'Someone'} was ejected — ${event.role}.`);
-        else toast(event.tie ? 'No one was ejected (tie).' : 'No one was ejected.');
+        if (event.id) {
+          ejectCard(
+            `${player?.name || 'Someone'} was ejected`,
+            event.role === 'impostor' ? 'They were the impostor' : 'They were not the impostor',
+            event.role === 'impostor',
+          );
+        } else {
+          ejectCard('No one was ejected', event.tie ? 'The vote was tied' : 'The vote was skipped', false);
+        }
         break;
       }
       case 'win':
@@ -3496,7 +3566,10 @@ window.ImposterNet = (function () {
         if (event.id !== selfId) toast(`${event.name} joined the round.`);
         break;
       case 'task':
-        if (event.id === selfId) toast('Task complete.');
+        if (event.id === selfId) {
+          closeTask();
+          toast('Task complete.');
+        }
         break;
       case 'gas':
         if (event.id === selfId) toast('Gas can in hand. Take it to the engine.');
@@ -4364,9 +4437,9 @@ window.ImposterNet = (function () {
     body.replaceChildren();
     $('overlay-task').hidden = false;
     const cleanup = GAMES[task.game](body, () => {
+      // The host decides; its `task` event closes this window, so a refusal
+      // (walked away, already done) leaves the board up with the reason.
       send({ t: 'use', station: task.id });
-      closeTask();
-      toast('Task complete.');
     });
     taskOpen = { cleanup: typeof cleanup === 'function' ? cleanup : null };
   }
@@ -4376,6 +4449,11 @@ window.ImposterNet = (function () {
     taskOpen = null;
     $('overlay-task').hidden = true;
     $('task-body').replaceChildren();
+  }
+
+  function closeList() {
+    $('overlay-list').hidden = true;
+    mapCanvas = null;
   }
 
   function openList(kind) {
@@ -4388,12 +4466,14 @@ window.ImposterNet = (function () {
     $('list-title').textContent = kind === 'map' ? 'The Skeld' : 'Tasks';
     const body = $('list-body');
     body.replaceChildren();
+    mapCanvas = null;
     if (kind === 'map') {
       const canvas = document.createElement('canvas');
       canvas.width = 1024;
       canvas.height = Math.round(1024 * (C.WORLD.h / C.WORLD.w));
       canvas.className = 'map-canvas';
       body.append(canvas);
+      mapCanvas = canvas;
       drawMap(canvas);
       return;
     }
@@ -4485,6 +4565,20 @@ window.ImposterNet = (function () {
     session.send(message);
   }
 
+  // One key for the thing in front of you, in the order that matters: a live
+  // sabotage, then a kill, then a body, the button, a task, the can, a vent.
+  function interact() {
+    if (!snap) return;
+    const actions = snap.actions;
+    if (actions.fix && actions.fix.length) return trigger('fix');
+    if (actions.kill) return trigger('kill');
+    if (actions.report) return trigger('report');
+    if (actions.button) return trigger('button');
+    if (actions.use) return trigger('use');
+    if (actions.gas) return trigger('gas');
+    if (actions.vent) return trigger('vent');
+  }
+
   function trigger(action) {
     if (!snap) return;
     if (action === 'use' && snap.actions.use) openTask(snap.actions.use);
@@ -4533,7 +4627,7 @@ window.ImposterNet = (function () {
     if (key === 'escape') {
       if (!$('overlay-room').hidden) closeRoom();
       else if (!$('overlay-chat').hidden) $('overlay-chat').hidden = true;
-      else if (!$('overlay-list').hidden) $('overlay-list').hidden = true;
+      else if (!$('overlay-list').hidden) closeList();
       else if (!$('overlay-task').hidden) closeTask();
       return;
     }
@@ -4547,8 +4641,8 @@ window.ImposterNet = (function () {
       if (snap && snap.phase !== 'lobby') openList('map');
       return;
     }
-    // game.py's keys: Space interacts/uses, Enter kills, Alt changes vent,
-    // Ctrl cuts the lights, Shift sabotages the reactor.
+    // Enter does whatever is in front of you; Space stays the old
+    // use/fix/button shortcut. Sabotage, kill and vent live on their buttons.
     if (key === ' ' || key === 'spacebar') {
       if (snap?.actions.fix?.length) trigger('fix');
       else if (snap?.actions.use) trigger('use');
@@ -4556,27 +4650,11 @@ window.ImposterNet = (function () {
       return;
     }
     if (key === 'enter') {
-      trigger('kill');
+      interact();
       return;
     }
     if (key === 'r') {
       trigger('report');
-      return;
-    }
-    if (key === 'alt') {
-      trigger('vent');
-      return;
-    }
-    if (key === ' ') {
-      trigger('vent');
-      return;
-    }
-    if (key === 'control') {
-      trigger('lights');
-      return;
-    }
-    if (key === 'shift') {
-      trigger('reactor');
       return;
     }
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
@@ -4656,7 +4734,7 @@ window.ImposterNet = (function () {
   $('open-map').addEventListener('click', () => openList('map'));
   $('skip').addEventListener('click', () => send({ t: 'vote', target: 'skip' }));
   $('task-close').addEventListener('click', closeTask);
-  $('list-close').addEventListener('click', () => { $('overlay-list').hidden = true; });
+  $('list-close').addEventListener('click', closeList);
 
   $('copy').addEventListener('click', async () => {
     try {
