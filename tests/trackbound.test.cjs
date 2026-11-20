@@ -530,3 +530,65 @@ test('Trackbound lets the car leave the ground when the road drops away', () => 
   }
   assert.ok(air > 0.08, 'the crest threw the car (' + air.toFixed(2) + 's)');
 });
+
+
+test('Trackbound editor codes round-trip road blocks and reject corrupt or unknown pieces', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const pieces = ['sprint', 'curveR', 'checkpoint', 'straight', 'curveL', 'boost'];
+  const code = T.encodeTrackCode(pieces);
+  assert.match(code, /^TB1-[0-9a-z]+-[0-9a-z]{4}$/);
+  assert.deepEqual(Array.from(T.decodeTrackCode(code)), pieces);
+  assert.equal(T.customTrackId(pieces), T.customTrackId(Array.from(T.decodeTrackCode(code))),
+    'the same shared layout has the same local best-time key');
+  assert.throws(() => T.decodeTrackCode(code.slice(0, -1) + (code.endsWith('x') ? 'y' : 'x')), /checksum/);
+  assert.throws(() => T.decodeTrackCode('TB1-zzz-0000'), /checksum|support/);
+  assert.equal(T.encodeTrackCode(['start', 'finish']), '', 'structural pieces cannot be forged');
+});
+
+test('Trackbound editor builds valid courses and rejects incomplete or unsupported roads', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const draft = ['sprint', 'curveR', 'straight', 'checkpoint', 'curveL', 'sprint'];
+  const result = T.validateCustom(draft);
+  assert.equal(result.ok, true, result.error);
+  assert.equal(result.track.checkpoints.length, 1);
+  assert.equal(result.track.blocks[0], 'start');
+  assert.equal(result.track.blocks[result.track.blocks.length - 1], 'finish');
+  assert.equal(T.trackFolds(result.track), false);
+  assert.equal(T.validateCustom(['straight']).ok, false);
+  assert.equal(T.validateCustom(['straight', 'bogus', 'straight']).ok, false);
+  assert.equal(T.validateCustom(Array(37).fill('straight')).ok, false);
+});
+
+test('Trackbound editor saves drafts, imports codes and keeps custom races out of campaign medals', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const draft = { name: 'Straight dash', blocks: ['sprint', 'checkpoint', 'sprint'] };
+  T.openEditor(draft);
+  assert.equal(T.mode(), 'editor');
+  assert.equal(T.saveCustomTrack(), true);
+  assert.equal(T.customTracks().length, 1);
+  const code = T.encodeTrackCode(draft.blocks);
+  assert.equal(page.storage.get('bored.trackbound.custom').includes('Straight dash'), true);
+  page.sandbox.document.getElementById('editorImport').value = code;
+  T.importCustomCode();
+  assert.deepEqual(Array.from(T.editorDraft().blocks), draft.blocks);
+  assert.equal(T.editorDraft().slot, null, 'an import does not silently overwrite a saved track');
+  page.sandbox.document.getElementById('editorImport').value = 'TB1-invalid-0000';
+  T.importCustomCode();
+  assert.deepEqual(Array.from(T.editorDraft().blocks), draft.blocks, 'a bad code leaves the draft untouched');
+  assert.equal(T.startCustomTrack(draft), true);
+  assert.equal(T.current().kind, 'custom');
+  assert.equal(T.world().id, T.customTrackId(draft.blocks));
+  T.restartRace();
+  assert.equal(T.current().kind, 'custom', 'restart uses the same custom layout');
+  for (let i = 0; i < 120 * 14 && T.race.state !== 'finished'; i++) {
+    T.stepRace(1 / 120, { gas: true, brake: false, steer: 0, handbrake: false });
+  }
+  assert.equal(T.race.state, 'finished', 'straight custom course can be driven to its finish');
+  assert.equal(T.race.medal, null, 'custom tracks do not create campaign medals');
+  assert.equal(T.snapshot().finished, false, 'custom race cannot trigger the hub campaign score');
+  assert.equal(T.snapshot().points, 0, 'custom race does not award career points');
+  assert.ok(page.storage.get('bored.trackbound.best').includes('custom-'), 'best time is still saved');
+});

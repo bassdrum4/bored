@@ -119,6 +119,27 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #comboBar i{display:block;height:100%;width:0;background:var(--ink)}
 #noGl{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;
   background:var(--paper);font-size:12px;color:var(--dim)}
+
+/* Track editor — everything is local, including the share-code fallback. */
+#screenEditor .panel{width:min(100%,940px)}
+.editorGrid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(250px,1fr);gap:16px;margin-top:12px}
+@media(max-width:680px){.editorGrid{grid-template-columns:1fr}}
+.editorField{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--dim);letter-spacing:.06em}
+.editorField input,.editorField select{width:100%}
+#editorPieces{list-style:none;padding:0;margin:7px 0;border-top:1px solid var(--rule);max-height:310px;overflow-y:auto}
+#editorPieces li{display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--rule);padding:4px 0}
+#editorPieces li span{flex:1;min-width:0;font-size:11px}
+#editorPieces li button{padding:4px 7px;min-width:27px}
+#editorPieces li .partNumber{flex:none;width:25px;color:var(--dim);font-size:10px}
+#editorMap{position:static;display:block;width:100%;height:auto;aspect-ratio:440/260;background:#e7e4da;border:1px solid var(--rule);border-radius:3px}
+#editorPiece{font:inherit;font-size:11px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:6px}
+#editorCode{font-size:11px;letter-spacing:.025em}
+#editorStatus{min-height:24px}
+#editorStatus.invalid{color:#9b332a}
+.editorActions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#customTrackList li button{display:inline-flex;width:auto;padding:6px}
+#customTrackList li{display:flex;align-items:center;gap:7px;padding:3px}
+#customTrackList li span{flex:1;font-size:11px}
 </style>
 </head>
 <body>
@@ -163,9 +184,13 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
             <div class="row">
               <button id="btnDaily" type="button">Daily track</button>
               <button id="btnFreeplay" type="button">Freeplay park</button>
+              <button id="btnEditor" type="button">Track editor</button>
             </div>
             <p id="dailyNote" class="note"></p>
             <p class="note">Freeplay is a stunt park: gold rings, a vertical loop, and ramps built to be flown.</p>
+            <h3>My tracks</h3>
+            <ol id="customTrackList" class="list"></ol>
+            <p class="note">Your tracks are saved on this device. Share codes work across devices.</p>
           </div>
           <div>
             <h3>Controls</h3>
@@ -182,6 +207,49 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       </div>
     </section>
 
+
+    <section id="screenEditor" class="screen" hidden>
+      <div class="panel">
+        <header class="panelHead">
+          <h2>Track editor</h2>
+          <p>Build a ribbon one block at a time. Start and finish are automatic. Make a course, test-drive it, then share its code.</p>
+        </header>
+        <div class="editorGrid">
+          <div>
+            <label class="editorField" for="editorName">TRACK NAME
+              <input id="editorName" type="text" maxlength="32" value="My track" autocomplete="off">
+            </label>
+            <div class="row">
+              <select id="editorPiece" aria-label="Road piece to insert"></select>
+              <button id="editorAdd" type="button">Add at end</button>
+              <button id="editorNew" class="quiet" type="button">New</button>
+            </div>
+            <ol id="editorPieces"></ol>
+            <p id="editorCount" class="note"></p>
+          </div>
+          <div>
+            <h3>Course map</h3>
+            <canvas id="editorMap" width="440" height="260" aria-label="Top-down map of your custom course"></canvas>
+            <p id="editorStatus" class="note" role="status" aria-live="polite"></p>
+            <div class="editorActions">
+              <button id="editorTest" type="button">Test drive</button>
+              <button id="editorSave" type="button">Save track</button>
+              <button id="editorBack" class="quiet" type="button">Back to menu</button>
+            </div>
+            <h3>Share</h3>
+            <label class="editorField" for="editorCode">YOUR TRACK CODE
+              <input id="editorCode" type="text" readonly aria-label="Shareable track code">
+            </label>
+            <div class="editorActions"><button id="editorCopy" type="button">Copy code</button></div>
+            <label class="editorField" for="editorImport">PASTE A FRIEND'S CODE
+              <input id="editorImport" type="text" spellcheck="false" placeholder="TB1-..." maxlength="90">
+            </label>
+            <div class="editorActions"><button id="editorImportBtn" type="button">Import code</button></div>
+            <p class="note">Codes contain road pieces, not player data. Imported tracks can be edited and saved locally.</p>
+          </div>
+        </div>
+      </div>
+    </section>
     <section id="screenPause" class="screen" hidden>
       <div class="panel">
         <h2>Paused</h2>
@@ -189,6 +257,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <div class="row">
           <button id="pauseResume" type="button">Resume</button>
           <button id="pauseRestart" type="button">Restart</button>
+          <button id="pauseEdit" type="button" hidden>Edit track</button>
           <button id="pauseNewPark" type="button" hidden>New park</button>
           <button id="pauseGhost" type="button">Ghost: on</button>
           <button id="pauseMute" type="button">Sound: on</button>
@@ -210,6 +279,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <div id="resBoard" class="medalTable"></div>
         <div class="row">
           <button id="resRestart" type="button">Race again</button>
+          <button id="resEdit" type="button" hidden>Edit track</button>
           <button id="resRivalBtn" type="button" hidden>Race the rival</button>
           <button id="resNext" type="button">Next track</button>
           <button id="resMenu" type="button">Menu</button>
@@ -277,7 +347,7 @@ const toLocal = (parent, worldPoint) => {
    (some embeds do) the same values are kept through localStorage; if both are
    blocked the game plays without saved data and never complains. */
 const DATA = 'bored.trackbound';
-const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, parkSwept: false, daily: {} };
+const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, parkSwept: false, daily: {}, custom: [] };
 let db = null;
 
 function persist(name) {
@@ -290,9 +360,9 @@ function persist(name) {
 
 function startSaved(onLoaded) {
   // Lift data a previous build kept in localStorage, then prefer what the
-  // database holds. Saved tracks are gone, so that key can go too.
+  // database holds. Old obsolete layouts are still ignored.
   try {
-    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'parkSwept', 'daily']) {
+    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'parkSwept', 'daily', 'custom']) {
       const raw = localStorage.getItem(DATA + '.' + name);
       if (raw) { const parsed = JSON.parse(raw); if (parsed) saved[name] = parsed; }
     }
@@ -2338,6 +2408,7 @@ let world = null;
 let car = null;
 let current = { kind: 'campaign', index: 0, track: null };
 const isFreeplay = () => current.kind === 'freeplay';
+const isCustom = () => current.kind === 'custom';
 const race = {
   state: 'menu', t: 0, cp: 0, cpTotal: 0, finishedAt: null, medal: null,
   respawn: null, record: [], recordClock: 0, best: null, ghost: null, splits: [],
@@ -2355,6 +2426,13 @@ function loadRace(kind, value) {
     const entry = CAMPAIGN[clamp(value, 0, CAMPAIGN.length - 1)];
     track = buildTrack(entry.blocks, entry);
     current = { kind: 'campaign', index: CAMPAIGN.indexOf(entry), track };
+  } else if (kind === 'custom') {
+    const layout = validateCustom(value.blocks);
+    if (!layout.ok) throw new Error(layout.error);
+    track = layout.track;
+    track.id = customTrackId(value.blocks);
+    track.name = cleanTrackName(value.name);
+    current = { kind: 'custom', index: 0, draft: { name: track.name, blocks: value.blocks.slice() }, track };
   } else if (kind === 'daily') {
     const seed = (window.__boredSeed && window.__boredSeed.seed) || 1;
     track = dailyTrack(seed);
@@ -2656,7 +2734,7 @@ function finishRun() {
   race.state = 'finished';
   race.finishedAt = race.t;
   const ms = Math.round(race.t * 1000);
-  race.medal = medalFor(world.author, ms);
+  race.medal = isCustom() ? null : medalFor(world.author, ms);
   // A daily ribbon is filed under its day; a campaign track under its id.
   const daily = world.id === 'daily';
   const day = seedDate();
@@ -2682,7 +2760,7 @@ function finishRun() {
     race.ghost = record.ghost;
   }
   // A daily medal is a fact about one ribbon, not a campaign trophy.
-  if (race.medal && !daily) {
+  if (race.medal && !daily && !isCustom()) {
     const order = m => m ? MEDALS.findIndex(medal => medal.id === m) : 99;
     if (order(race.medal) < order(saved.medals[world.id])) { saved.medals[world.id] = race.medal; persist('medals'); }
   }
@@ -3105,8 +3183,8 @@ function paintMedals() {
   if (!rail || !world) return;
   rail.replaceChildren();
   // A freeplay park has no author time, so medals would all read 0.000.
-  rail.hidden = isFreeplay();
-  if (isFreeplay()) return;
+  rail.hidden = isFreeplay() || isCustom();
+  if (isFreeplay() || isCustom()) return;
   const rows = medalTimes(world.author).map(medal => ({ id: medal.id, label: clock(medal.ms) }));
   for (const entry of rows) {
     const row = el('div', 'm ' + entry.id);
@@ -3267,12 +3345,15 @@ let paused = false;
 
 function setScreens() {
   $('screenMenu').hidden = mode !== 'menu';
+  $('screenEditor').hidden = mode !== 'editor';
   $('screenPause').hidden = !(mode === 'race' && paused);
   $('screenResult').hidden = !(mode === 'race' && race.state === 'finished');
   $('hud').hidden = mode !== 'race';
   $('btnMenu').hidden = mode !== 'race';
   $('pauseNewPark').hidden = !isFreeplay();
   if ($('pauseGhost')) $('pauseGhost').hidden = isFreeplay();
+  $('pauseEdit').hidden = !isCustom();
+  $('resEdit').hidden = !isCustom();
 }
 
 function el(tag, className, text) {
@@ -3282,9 +3363,249 @@ function el(tag, className, text) {
   return node;
 }
 
+
+/* ── local track editor ─────────────────────────────────────────────────────
+   A code describes only a sequence of whitelisted road pieces. This makes it
+   independent of the embedding site, accounts, usernames and external links. */
+const EDITOR_PIECES = [
+  'straight', 'sprint', 'curveL', 'curveR', 'hairpinL', 'hairpinR',
+  'checkpoint', 'boost', 'ice', 'dirt', 'narrow', 'tunnel',
+  'up', 'down', 'wallL', 'wallR', 'whoops', 'kicker', 'loop'
+];
+const EDITOR_MIN = 3, EDITOR_MAX = 36, EDITOR_LIMIT = 30;
+const EDITOR_STARTER = ['sprint', 'curveR', 'straight', 'checkpoint', 'curveL', 'sprint'];
+let editor = { name: 'My track', blocks: EDITOR_STARTER.slice(), slot: null };
+
+function cleanTrackName(value) {
+  return String(value || '').trim().slice(0, 32) || 'My track';
+}
+function hashLayout(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+  }
+  return hash >>> 0;
+}
+function customTrackId(blocks) {
+  return 'custom-' + hashLayout(layoutOf(blocks)).toString(36);
+}
+function encodeTrackCode(blocks) {
+  if (!Array.isArray(blocks) || blocks.length < EDITOR_MIN || blocks.length > EDITOR_MAX ||
+      blocks.some(id => !EDITOR_PIECES.includes(id))) return '';
+  const body = blocks.map(id => EDITOR_PIECES.indexOf(id).toString(36)).join('');
+  const checksum = (hashLayout('TB1:' + body) % (36 ** 4)).toString(36).padStart(4, '0');
+  return 'TB1-' + body + '-' + checksum;
+}
+function decodeTrackCode(code) {
+  const normalized = String(code || '').trim().toLowerCase();
+  const match = /^tb1-([0-9a-z]{3,36})-([0-9a-z]{4})$/.exec(normalized);
+  if (!match) throw new Error('Invalid code. Paste a complete TB1 track code.');
+  const actual = (hashLayout('TB1:' + match[1]) % (36 ** 4)).toString(36).padStart(4, '0');
+  if (actual !== match[2]) throw new Error('Code checksum does not match. Check the pasted code.');
+  const blocks = [...match[1]].map(token => EDITOR_PIECES[parseInt(token, 36)]);
+  if (blocks.some(id => !id)) throw new Error('This code uses a road piece this version does not support.');
+  return blocks;
+}
+function validateCustom(blocks) {
+  if (!Array.isArray(blocks) || blocks.length < EDITOR_MIN)
+    return { ok: false, error: 'Add at least ' + EDITOR_MIN + ' road pieces before driving.' };
+  if (blocks.length > EDITOR_MAX)
+    return { ok: false, error: 'A track can contain at most ' + EDITOR_MAX + ' road pieces.' };
+  if (blocks.some(id => !EDITOR_PIECES.includes(id)))
+    return { ok: false, error: 'This layout contains an unknown road piece.' };
+  try {
+    const track = buildTrack(['start', ...blocks, 'finish'], {
+      id: customTrackId(blocks), name: 'My track', author: 30000
+    });
+    if (!track.spawn || !track.finish || !track.mesh || !track.mesh.grid.size ||
+        track.chain.some(link => !link.exit.p.every(Number.isFinite)))
+      return { ok: false, error: 'This layout does not make a complete drivable road.' };
+    if (trackFolds(track)) return { ok: false, error: 'The road crosses itself. Move or replace a bend.', track };
+    track.author = Math.max(4000, Math.round(track.length / DAILY_PACE * 1000));
+    return { ok: true, track };
+  } catch (error) {
+    return { ok: false, error: 'That combination could not be built. Try different pieces.' };
+  }
+}
+function drawEditorMap(track) {
+  const canvas = $('editorMap');
+  if (!canvas || typeof canvas.getContext !== 'function') return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || typeof ctx.beginPath !== 'function') return;
+  const w = canvas.width || 440, h = canvas.height || 260;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#e7e4da';
+  ctx.fillRect(0, 0, w, h);
+  if (!track) return;
+  const points = [];
+  for (const link of track.chain) for (const sample of link.samples) points.push(sample);
+  if (!points.length) return;
+  const xs = points.map(p => p[0]), zs = points.map(p => p[2]);
+  const loX = Math.min(...xs), hiX = Math.max(...xs);
+  const loZ = Math.min(...zs), hiZ = Math.max(...zs);
+  const scale = Math.min((w - 48) / Math.max(24, hiX - loX), (h - 48) / Math.max(24, hiZ - loZ));
+  const xy = p => [w / 2 + (p[0] - (hiX + loX) / 2) * scale,
+                    h / 2 - (p[2] - (hiZ + loZ) / 2) * scale];
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  points.forEach((p, i) => { const pos = xy(p); if (!i) ctx.moveTo(...pos); else ctx.lineTo(...pos); });
+  ctx.lineWidth = 12; ctx.strokeStyle = '#bcb7a8'; ctx.stroke();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#38352e'; ctx.stroke();
+  const mark = (p, color) => {
+    const pos = xy(p);
+    ctx.beginPath(); ctx.arc(pos[0], pos[1], 5, 0, TAU);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#fffdf7'; ctx.stroke();
+  };
+  mark(points[0], '#47835f');
+  mark(points[points.length - 1], '#b45309');
+}
+function refreshEditor() {
+  const list = $('editorPieces');
+  list.replaceChildren();
+  editor.blocks.forEach((id, index) => {
+    const li = el('li');
+    li.appendChild(el('span', 'partNumber', String(index + 1).padStart(2, '0')));
+    li.appendChild(el('span', '', BLOCKS[id].name));
+    const action = (label, desc, allowed, change) => {
+      const button = el('button', 'quiet', label);
+      button.type = 'button'; button.disabled = !allowed;
+      button.setAttribute('aria-label', desc + ' ' + (index + 1));
+      button.addEventListener('click', () => { change(); refreshEditor(); });
+      li.appendChild(button);
+    };
+    action('+', 'Insert selected piece after block', editor.blocks.length < EDITOR_MAX,
+      () => editor.blocks.splice(index + 1, 0, $('editorPiece').value));
+    action('↑', 'Move block up', index > 0, () => {
+      [editor.blocks[index - 1], editor.blocks[index]] = [editor.blocks[index], editor.blocks[index - 1]];
+    });
+    action('↓', 'Move block down', index < editor.blocks.length - 1, () => {
+      [editor.blocks[index + 1], editor.blocks[index]] = [editor.blocks[index], editor.blocks[index + 1]];
+    });
+    action('×', 'Remove block', true, () => editor.blocks.splice(index, 1));
+    list.appendChild(li);
+  });
+  $('editorCount').textContent = editor.blocks.length + '/' + EDITOR_MAX +
+    ' road pieces · Start and Finish are automatic';
+  const validation = validateCustom(editor.blocks);
+  const status = $('editorStatus');
+  status.className = 'note' + (validation.ok ? '' : ' invalid');
+  status.textContent = validation.ok
+    ? 'Road ready · ' + validation.track.checkpoints.length + ' checkpoints · ' +
+      Math.round(validation.track.length) + ' m. Test the drive before sharing.'
+    : validation.error;
+  $('editorTest').disabled = !validation.ok;
+  $('editorSave').disabled = !validation.ok;
+  $('editorCopy').disabled = !validation.ok;
+  $('editorCode').value = validation.ok ? encodeTrackCode(editor.blocks) : '';
+  drawEditorMap(validation.track || null);
+  return validation;
+}
+function openEditor(draft, slot) {
+  if (draft) {
+    editor = { name: cleanTrackName(draft.name), blocks: draft.blocks.slice(),
+      slot: Number.isInteger(slot) ? slot : null };
+  }
+  mode = 'editor'; paused = false;
+  $('editorName').value = editor.name;
+  $('barTrack').textContent = 'editor · custom track';
+  refreshEditor();
+  setScreens();
+}
+function saveCustomTrack() {
+  const validation = refreshEditor();
+  if (!validation.ok) return false;
+  editor.name = cleanTrackName($('editorName').value);
+  $('editorName').value = editor.name;
+  if (!Array.isArray(saved.custom)) saved.custom = [];
+  const record = { name: editor.name, blocks: editor.blocks.slice() };
+  if (Number.isInteger(editor.slot) && saved.custom[editor.slot]) {
+    saved.custom[editor.slot] = record;
+  } else {
+    if (saved.custom.length >= EDITOR_LIMIT) {
+      $('editorStatus').textContent = 'Your local library is full (30 tracks). Remove one from the menu.';
+      return false;
+    }
+    editor.slot = saved.custom.push(record) - 1;
+  }
+  persist('custom');
+  $('editorStatus').textContent = 'Saved locally · ' + editor.name;
+  refreshMenu();
+  return true;
+}
+function startCustomTrack(draft) {
+  const validation = validateCustom(draft.blocks);
+  if (!validation.ok) { $('editorStatus').textContent = validation.error; return false; }
+  mode = 'race'; paused = false;
+  loadRace('custom', { name: cleanTrackName(draft.name), blocks: draft.blocks.slice() });
+  setScreens();
+  return true;
+}
+function refreshCustomList() {
+  const list = $('customTrackList');
+  list.replaceChildren();
+  const tracks = Array.isArray(saved.custom) ? saved.custom : [];
+  if (!tracks.length) {
+    const empty = el('li');
+    empty.appendChild(el('span', 'empty', 'No saved tracks yet. Build the first.'));
+    list.appendChild(empty);
+  }
+  tracks.forEach((track, index) => {
+    if (!track || !Array.isArray(track.blocks)) return;
+    const li = el('li');
+    li.appendChild(el('span', '', cleanTrackName(track.name) + ' · ' + track.blocks.length + ' pieces'));
+    const action = (label, handler) => {
+      const button = el('button', 'quiet', label);
+      button.type = 'button'; button.addEventListener('click', handler); li.appendChild(button);
+      return button;
+    };
+    action('Drive', () => { editor.slot = index; startCustomTrack(track); });
+    action('Edit', () => openEditor(track, index));
+    // Two clicks rather than window.confirm: Google Sites embeds may block modals.
+    const remove = action('Delete', () => {
+      if (remove.textContent !== 'Confirm?') { remove.textContent = 'Confirm?'; return; }
+      saved.custom.splice(index, 1);
+      if (editor.slot === index) editor.slot = null;
+      else if (Number.isInteger(editor.slot) && editor.slot > index) editor.slot--;
+      persist('custom'); refreshMenu();
+    });
+    list.appendChild(li);
+  });
+}
+function importCustomCode() {
+  try {
+    const blocks = decodeTrackCode($('editorImport').value);
+    const validation = validateCustom(blocks);
+    if (!validation.ok) throw new Error(validation.error);
+    editor = { name: 'Shared track', blocks, slot: null };
+    $('editorName').value = editor.name;
+    $('editorImport').value = '';
+    refreshEditor();
+    $('editorStatus').textContent = 'Imported · test-drive or save this track.';
+  } catch (error) {
+    $('editorStatus').className = 'note invalid';
+    $('editorStatus').textContent = error.message;
+  }
+}
+async function copyCustomCode() {
+  const code = $('editorCode').value;
+  if (!code) return;
+  try {
+    if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText)
+      throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(code);
+    $('editorStatus').textContent = 'Code copied · paste it to share the track.';
+  } catch (error) {
+    const input = $('editorCode');
+    if (typeof input.select === 'function') input.select();
+    $('editorStatus').textContent = 'Select the code above and copy it manually.';
+  }
+}
+
 function refreshMenu() {
   const storedMedals = saved.medals;
   const bests = saved.best;
+  refreshCustomList();
   const list = $('trackList');
   list.replaceChildren();
   CAMPAIGN.forEach((entry, index) => {
@@ -3325,9 +3646,10 @@ function refreshMenu() {
 function showResult(isBest, ms) {
   $('resTitle').textContent = isBest ? 'New personal best' : 'Track clear';
   $('resTrack').textContent = world.name + ' · ' + world.blocks.length + ' blocks' +
-    (world.open ? ' · no walls' : '') + ' · ' + careerPoints() + ' pts career';
+    (world.open ? ' · no walls' : '') + (isCustom() ? ' · custom time trial' : ' · ' + careerPoints() + ' pts career');
   $('resTime').textContent = clock(ms);
-  $('resMedal').textContent = medalName(race.medal) + (race.medal ? ' · +' + medalPoints(race.medal) : '');
+  $('resMedal').textContent = isCustom() ? 'Custom time trial' :
+    medalName(race.medal) + (race.medal ? ' · +' + medalPoints(race.medal) : '');
   $('resDot').className = 'dot ' + (race.medal || '');
   // A saved best can be missing on a slower run: a layout change prunes the
   // old record, and the result screen must not read through it.
@@ -3349,7 +3671,7 @@ function showResult(isBest, ms) {
   }
   const board = $('resBoard');
   board.replaceChildren();
-  for (const medal of medalTimes(world.author)) {
+  for (const medal of (isCustom() ? [] : medalTimes(world.author))) {
     const cell = el('span');
     cell.appendChild(el('b', '', clock(medal.ms)));
     cell.appendChild(el('i', '', medal.name));
@@ -3397,6 +3719,7 @@ function startFreeplay(seed) {
 function restartRace() {
   if (current.kind === 'campaign') loadRace('campaign', current.index);
   else if (current.kind === 'freeplay') loadRace('freeplay', current.seed);
+  else if (current.kind === 'custom') loadRace('custom', current.draft);
   else loadRace('daily');
   paused = false;
   setScreens();
@@ -3415,10 +3738,14 @@ const DRIVE_KEYS = { arrowup: 'gas', w: 'gas', arrowdown: 'brake', s: 'brake',
 function onKeyDown(event) {
   const key = event.key || '';
   const lower = key.toLowerCase();
-  if (event.target && event.target.tagName === 'INPUT') return;
+  if (event.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
   initAudio();
   if (lower === 'm') { toggleMute(); event.preventDefault(); return; }
-  if (lower === 'escape') { if (mode === 'race') togglePause(); event.preventDefault(); return; }
+  if (lower === 'escape') {
+    if (mode === 'race') togglePause();
+    else if (mode === 'editor') openMenu();
+    event.preventDefault(); return;
+  }
   if (mode === 'race' && paused) return;
   if (lower === 'r') { if (mode === 'race') { restartRace(); event.preventDefault(); } return; }
   if (lower === 'n' && mode === 'race' && isFreeplay()) { startFreeplay(); event.preventDefault(); return; }
@@ -3496,7 +3823,7 @@ window.__boredSnapshot = () => ({
   points: careerPoints(),
   runPoints: race.points | 0,
   open: !!(world && world.open),
-  finished: race.state === 'finished',
+  finished: race.state === 'finished' && !isCustom(),
   timeMs: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt * 1000) : 0,
   seconds: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt) : 0,
   track: world ? String(world.id) : '',
@@ -3540,6 +3867,30 @@ for (const pad of document.querySelectorAll('[data-drive]')) {
   pad.addEventListener('pointerleave', set(false));
 }
 
+
+// Keep the editor's controls separate from the drive keys.
+for (const id of EDITOR_PIECES) {
+  const option = el('option', '', BLOCKS[id].name);
+  option.value = id;
+  $('editorPiece').appendChild(option);
+}
+$('editorPiece').value = 'straight';
+$('editorName').addEventListener('input', () => { editor.name = $('editorName').value; });
+$('editorAdd').addEventListener('click', () => {
+  if (editor.blocks.length >= EDITOR_MAX) return;
+  editor.blocks.push($('editorPiece').value);
+  refreshEditor();
+});
+$('editorNew').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
+$('editorBack').addEventListener('click', () => openMenu());
+$('editorTest').addEventListener('click', () =>
+  startCustomTrack({ name: $('editorName').value, blocks: editor.blocks }));
+$('editorSave').addEventListener('click', () => saveCustomTrack());
+$('editorCopy').addEventListener('click', () => { void copyCustomCode(); });
+$('editorImportBtn').addEventListener('click', () => importCustomCode());
+$('btnEditor').addEventListener('click', () => openEditor());
+$('pauseEdit').addEventListener('click', () => openEditor(current.draft, editor.slot));
+$('resEdit').addEventListener('click', () => openEditor(current.draft, editor.slot));
 $('btnMenu').addEventListener('click', () => openMenu());
 $('btnDaily').addEventListener('click', () => startDaily());
 $('btnFreeplay').addEventListener('click', () => startFreeplay());
@@ -3589,6 +3940,9 @@ window.__test = {
   landFreeplay, bailed, freeplayBest, careerPoints,
   seedDate, dailyRecord, dailyStreak, saveDaily, packGhost, unpackGhost, paintCrowd,
   openMenu, toggleMute,
+  EDITOR_PIECES, EDITOR_MIN, EDITOR_MAX, validateCustom, encodeTrackCode, decodeTrackCode,
+  customTrackId, openEditor, refreshEditor, importCustomCode, saveCustomTrack, startCustomTrack,
+  editorDraft: () => editor, customTracks: () => saved.custom,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }
 };
 
@@ -3625,6 +3979,10 @@ function boot() {
       race.ghost = race.best && Array.isArray(race.best.ghost) ? race.best.ghost : null;
       paintBest();
     }
+    if (!Array.isArray(saved.custom)) saved.custom = [];
+    saved.custom = saved.custom.filter(track => track && Array.isArray(track.blocks) &&
+      track.blocks.length >= EDITOR_MIN && track.blocks.length <= EDITOR_MAX &&
+      track.blocks.every(id => EDITOR_PIECES.includes(id))).slice(0, EDITOR_LIMIT);
     if (mode === 'menu') refreshMenu();
   });
 }
