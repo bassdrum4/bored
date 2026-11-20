@@ -37,6 +37,9 @@ export function runtimeErrorMetadata(data) {
 export const ANALYTICS_PREFERENCE = 'bored.analytics.enabled';
 export const VISITOR_KEY = 'bored.analytics.visitor';
 const QA_SESSION_KEY = 'bored.analytics.qa-session';
+// A tester can mark the whole browser persistently, including later clean-URL
+// visits and signed-out play. ?bored_qa=off explicitly restores collection.
+const QA_BROWSER_KEY = 'bored.analytics.qa-browser';
 const STAFF_BROWSER_KEY = 'bored.analytics.staff-browser';
 
 // The shipped GitHub Pages site is the only source of genuine Bored telemetry.
@@ -52,12 +55,22 @@ export function isProductionTelemetryUrl(href, qa = false) {
 }
 
 function qaSession() {
-  let fromUrl = false;
-  try { fromUrl = new URL(location.href).searchParams.has('bored_qa'); } catch {}
+  let mode = null;
+  try { mode = new URL(location.href).searchParams.get('bored_qa'); } catch {}
+  if (mode === 'off') {
+    try { sessionStorage.removeItem(QA_SESSION_KEY); } catch {}
+    try { localStorage.removeItem(QA_BROWSER_KEY); } catch {}
+    return true; // The settings URL itself isn't a gameplay visit.
+  }
+  if (mode !== null) {
+    try { sessionStorage.setItem(QA_SESSION_KEY, '1'); } catch {}
+    try { localStorage.setItem(QA_BROWSER_KEY, '1'); } catch {}
+    return true;
+  }
   try {
-    if (fromUrl) sessionStorage.setItem(QA_SESSION_KEY, '1');
-    return fromUrl || sessionStorage.getItem(QA_SESSION_KEY) === '1';
-  } catch { return fromUrl; }
+    return sessionStorage.getItem(QA_SESSION_KEY) === '1' ||
+      localStorage.getItem(QA_BROWSER_KEY) === '1';
+  } catch { return false; }
 }
 // This identifies one browser, not a real person. Never create it on opt-out.
 export function getVisitorId() {
