@@ -54,7 +54,7 @@ export function isProductionTelemetryUrl(href, qa = false) {
   } catch { return false; }
 }
 
-function qaSession() {
+export function qaSession() {
   let mode = null;
   try { mode = new URL(location.href).searchParams.get('bored_qa'); } catch {}
   if (mode === 'off') {
