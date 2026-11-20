@@ -131,7 +131,7 @@
     "max_value": 10000000
   },
   "photo-puzzle": {
-    "label": "Fastest 4x4 solve on an uploaded picture",
+    "label": "Fastest 4x4 solve",
     "better": "low",
     "min_value": 8,
     "max_value": 3600

@@ -2070,3 +2070,21 @@ test('Poké Gacha ranks on its own board: species caught plus stage stars, from 
   assert.equal(scoreValue('poke-gacha', { ...snap, caught: 0, stars: 0, score: 0 }), 0, 'nothing caught posts nothing');
   assert.equal(scoreValue('poke-gacha-weekly', { ...snap, weeklyRisk: 4 }), 4, 'the weekly board still reads the same page');
 });
+
+test('Photo Puzzle counts a solved 4x4 on any picture, not only an upload', async () => {
+  const { HIGH_SCORE_GAMES, scoreValue } = await import('../src/hub/scores.js');
+  const rules = JSON.parse(load('src/games/score-rules.json'));
+  const spec = HIGH_SCORE_GAMES.find(game => game.id === 'photo-puzzle');
+  assert.ok(spec, 'the game has a board');
+  assert.equal(spec.metric, 'seconds');
+  assert.equal(spec.min, 8, 'the spec keeps its floor');
+  assert.equal(rules['photo-puzzle'].better, 'low');
+  assert.equal(rules['photo-puzzle'].min_value, spec.min, 'the rule and the spec agree on the floor');
+  const solved = { slug: 'photo-puzzle', seconds: 42, moves: 11, pieces: 16,
+    finished: true, standard: true, uploaded: false };
+  assert.equal(scoreValue('photo-puzzle', solved), 42, 'a solved sample picture counts');
+  assert.equal(scoreValue('photo-puzzle', { ...solved, uploaded: true }), 42, 'an uploaded picture still counts');
+  assert.equal(scoreValue('photo-puzzle', { ...solved, standard: false }), 0, 'a 3x3 or 5x5 is a different test');
+  assert.equal(scoreValue('photo-puzzle', { ...solved, finished: false }), 0, 'an unsolved board is not a time');
+  assert.equal(scoreValue('photo-puzzle', { ...solved, seconds: 4 }), 0, 'a sub-eight-second run is not a real 4x4');
+});

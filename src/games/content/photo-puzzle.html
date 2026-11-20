@@ -54,7 +54,7 @@
     <button id="shuffle" type="button">Restart</button>
     <button id="sample" type="button">Sample</button>
   </div>
-  <p id="status" role="status">Tap one tile, then another, to swap them. Your 4&times;4 upload counts for the high score.</p>
+  <p id="status" role="status">Tap one tile, then another, to swap them. Your 4&times;4 solve counts for the high score.</p>
 </main>
 <script>
 "use strict";
@@ -147,7 +147,7 @@ function useCanvas(canvas, fromDevice) {
 function useSample() {
   useCanvas(sampleCanvas(), false);
   forgetStored(PICTURE_KEY);
-  $("status").textContent = "Sample picture. Upload one of your own to rank on the board.";
+  $("status").textContent = "Sample picture. A 4\u00d74 solve counts; upload your own for a different picture.";
 }
 function useSavedOrSample() {
   const saved = readStored(PICTURE_KEY);
@@ -203,7 +203,7 @@ function solve() {
   updateHud();
   $("doneText").textContent = "SOLVED IN " + clock(elapsed);
   $("doneDetail").textContent = moves + " swaps \u00b7 " + grid + "\u00d7" + grid +
-    (uploaded && grid === 4 ? " \u00b7 counted on the board" : "");
+    (grid === 4 ? " \u00b7 counted on the board" : " \u00b7 only 4\u00d74 counts on the board");
   $("done").hidden = false;
   $("status").textContent = "Tap Play again to reshuffle the same picture.";
   draw();
@@ -305,7 +305,8 @@ for (const button of document.querySelectorAll("[data-grid]")) {
     for (const other of document.querySelectorAll("[data-grid]")) {
       other.classList.toggle("active", Number(other.dataset.grid) === grid);
     }
-    $("status").textContent = grid + "\u00d7" + grid + " board. Tap two tiles to swap them.";
+    $("status").textContent = grid + "\u00d7" + grid + " board. Tap two tiles to swap them." +
+      (grid === 4 ? " Your 4\u00d74 solve counts for the high score." : " Only 4\u00d74 counts on the board.");
     newRun();
   });
 }
@@ -316,7 +317,7 @@ $("shuffle").addEventListener("click", () => {
 });
 $("sample").addEventListener("click", () => {
   useSample();
-  $("status").textContent = "Sample picture. Upload one of your own to rank on the board.";
+  $("status").textContent = "Sample picture. A 4\u00d74 solve counts; upload your own for a different picture.";
 });
 $("again").addEventListener("click", () => {
   $("status").textContent = "Reshuffled. Tap two tiles to swap them.";
