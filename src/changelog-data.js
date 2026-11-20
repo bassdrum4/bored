@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 696,
+  "count": 697,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6aa4454","date":"2026-11-20","author":"Codebuff","subject":"Count every solved Photo Puzzle 4x4, not only uploaded pictures."},
   {"sha":"382f94c","date":"2026-11-20","author":"Codebuff","subject":"Replace Trackbound's stunt park with a sixteen-gate ring road."},
   {"sha":"09741cd","date":"2026-11-20","author":"Codebuff","subject":"Stand Trackbound's stunt-park ramps on level ground."},
   {"sha":"4743f10","date":"2026-11-20","author":"Codebuff","subject":"Make Trackbound's stunt park drivable again."},
