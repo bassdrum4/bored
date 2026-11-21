@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 762,
+  "count": 764,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"dabf983","date":"2026-11-21","author":"PenguinV360","subject":"Shotgun Roulette: full game, test mode, hub-side bets and server-checked board","pr":280},
+  {"sha":"15b7618","date":"2026-11-21","author":"PenguinV360","subject":"Poké Gacha: projectiles aim at their target in 8 directions","pr":279},
   {"sha":"8dd9192","date":"2026-11-21","author":"Daniel Lowe","subject":"Fix CI for intentionally unlisted Rooftop Duel without restoring catalog entry"},
   {"sha":"602b7f1","date":"2026-11-21","author":"Daniel Lowe","subject":"Remove unlisted rooftop duel from discovery metadata"},
   {"sha":"f36984a","date":"2026-11-21","author":"Daniel Lowe","subject":"Unlist editable Rooftop Snipers from public catalog"},
