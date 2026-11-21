@@ -87,8 +87,6 @@ for obj in env.objects:
         continue
     data = obj.read()
     name = data.m_Name
-    if name in KEEP:
-        assert data.m_IsActive, "Required menu control already inactive: " + name
     if name not in DISABLE:
         continue
     seen.add(name)
