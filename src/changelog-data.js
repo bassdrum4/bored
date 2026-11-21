@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 726,
+  "count": 729,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,9 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"6d42a11","date":"2026-11-20","author":"Daniel Lowe","subject":"Hide game analytics raw tables behind expandable details"},
+  {"sha":"50e5958","date":"2026-11-20","author":"Daniel Lowe","subject":"Let history game chart compare selected metrics instead of forcing a wide table"},
+  {"sha":"f7abc29","date":"2026-11-20","author":"Daniel Lowe","subject":"Make charts primary and collapse detailed analytics number tables"},
   {"sha":"f4e3f10","date":"2026-11-20","author":"Daniel Lowe","subject":"Style stacked visitor and cohort charts across analytics pages"},
   {"sha":"114ea14","date":"2026-11-20","author":"Daniel Lowe","subject":"Show charts alongside raw tables in game-specific analytics"},
   {"sha":"571f548","date":"2026-11-20","author":"Daniel Lowe","subject":"Visualize daily activity sources and event counts on scoped game analytics"},
