@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 717,
+  "count": 718,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"adf1b1a","date":"2026-11-20","author":"Daniel Lowe","subject":"Add ranked popularity chart before detailed analytics table"},
   {"sha":"d47b083","date":"2026-11-20","author":"Daniel Lowe","subject":"Style responsive analytics donut charts"},
   {"sha":"94550e1","date":"2026-11-20","author":"Daniel Lowe","subject":"Visualize categorical analytics with accessible donut charts"},
   {"sha":"584be3c","date":"2026-11-20","author":"Daniel Lowe","subject":"test: validate search coverage and hub focus without brittle counts"},
