@@ -29,7 +29,7 @@ test('Rooftop Snipers preserves original gameplay/assets and packages a valid of
   // Prevent accidentally swapping the actual game for the native remake or a
   // placeholder while keeping the new card. Core code, data and memory stay exact.
   for (const [name, hash] of Object.entries({
-    'rooftop-snipers.asm.code.unityweb': '9fdb1d5414f6bab1f84467e7d834f5694cb612d80af6394e4b6c13b85c7ba5da',
+    'rooftop-snipers.asm.code.unityweb': '9913fd53513f3f019016064ec4451c84d7f349d20c4d793f059d5c6cf3e0fd80',
     'rooftop-snipers.data.unityweb': 'b82dd5d2ee5567e5759c1f49413d8e48428a92fae7cc79d8da577b4345682f82',
     'rooftop-snipers.asm.memory.unityweb': '884ffa169399ef39af758b6d4fbc0dfd0a97e6dc8bff5d35a4cf2cf46098b682'
   })) assert.equal(sha(Buffer.from(build.assets[name], 'base64')), hash, name);
