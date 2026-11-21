@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 720,
+  "count": 723,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,9 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"cb2dba7","date":"2026-11-20","author":"Daniel Lowe","subject":"Use session counts in player ranking chart"},
+  {"sha":"ff52ff7","date":"2026-11-20","author":"Daniel Lowe","subject":"Display analytic charts on engagement history players and sessions tabs"},
+  {"sha":"8d18719","date":"2026-11-20","author":"Daniel Lowe","subject":"Add meaningful comparison and retention charts across analytics tabs"},
   {"sha":"b09a090","date":"2026-11-20","author":"Daniel Lowe","subject":"Clear popularity graph when authoritative summary is unavailable"},
   {"sha":"8a26dcc","date":"2026-11-20","author":"Daniel Lowe","subject":"Chart top standalone game launches while preserving detailed popularity table"},
   {"sha":"adf1b1a","date":"2026-11-20","author":"Daniel Lowe","subject":"Add ranked popularity chart before detailed analytics table"},
