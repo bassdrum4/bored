@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 723,
+  "count": 726,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,9 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"f4e3f10","date":"2026-11-20","author":"Daniel Lowe","subject":"Style stacked visitor and cohort charts across analytics pages"},
+  {"sha":"114ea14","date":"2026-11-20","author":"Daniel Lowe","subject":"Show charts alongside raw tables in game-specific analytics"},
+  {"sha":"571f548","date":"2026-11-20","author":"Daniel Lowe","subject":"Visualize daily activity sources and event counts on scoped game analytics"},
   {"sha":"cb2dba7","date":"2026-11-20","author":"Daniel Lowe","subject":"Use session counts in player ranking chart"},
   {"sha":"ff52ff7","date":"2026-11-20","author":"Daniel Lowe","subject":"Display analytic charts on engagement history players and sessions tabs"},
   {"sha":"8d18719","date":"2026-11-20","author":"Daniel Lowe","subject":"Add meaningful comparison and retention charts across analytics tabs"},
