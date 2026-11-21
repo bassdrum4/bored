@@ -24,7 +24,7 @@ const cstr=(index)=>{const x=region.string.off+index;return meta.subarray(x,meta
 let gm;for(let n=0;n<region.typeDefinitions.n/104;n++){let o=region.typeDefinitions.off+n*104;if(cstr(meta.readInt32LE(o))==='Gamemanager'){gm={index:n,methodStart:meta.readInt32LE(o+52),methodCount:meta.readUInt16LE(o+80),token:meta.readUInt32LE(o+100)};break}}
 if(!gm) throw Error('Gamemanager not found');
 console.log('GAMEMANAGER',gm);
-for(let j=0;j<gm.methodCount;j++){const ix=gm.methodStart+j,o=region.methods.off+ix*56;console.log('METHOD',ix,cstr(meta.readInt32LE(o)),'slot',meta.readUInt16LE(o+50),'token',meta.readUInt32LE(o+44).toString(16),'methodIndex',meta.readInt32LE(o+12));}
+for(let j=0;j<gm.methodCount;j++){const ix=gm.methodStart+j,o=region.methods.off+ix*56;console.log('METHOD',ix,cstr(meta.readInt32LE(o)),'slot',meta.readUInt16LE(o+50),'token',meta.readUInt32LE(o+44).toString(16),'methodIndex',meta.readInt32LE(o+24));}
 console.log('METADATA',Object.fromEntries(['methods','typeDefinitions','images','assemblies'].map(x=>[x,region[x]])));
 console.log('memory prefix',Array.from({length:24},(_,i)=>mem.readUInt32LE(i*4)));
 console.log('memory bytes',mem.length,'first nonzero');
