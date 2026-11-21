@@ -7,19 +7,19 @@
 // source, can repack it into a runnable game file, and proves the two are the same
 // program by comparing the complete token stream.
 //
-// Usage:
-//   node scripts/decompile-rooftop-snipers.mjs            # write decompiled/rooftop-snipers
-//   node scripts/decompile-rooftop-snipers.mjs --check    # verify the tree still matches
-//   node scripts/decompile-rooftop-snipers.mjs --rebuild <out.html>   # repack the source
+// Usage (from the repository root):
+//   node src/prototypes/rooftop-snipers/decompile.mjs            # rewrite this folder's source
+//   node src/prototypes/rooftop-snipers/decompile.mjs --check    # verify it still is the payload
+//   node src/prototypes/rooftop-snipers/decompile.mjs --rebuild <out.html>   # repack the source
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
+const root = fileURLToPath(new URL('../../../', import.meta.url));
 const GAME = resolve(root, 'src/games/content/rooftop-snipers.html');
-const OUT = resolve(root, 'decompiled/rooftop-snipers');
+const OUT = fileURLToPath(new URL('.', import.meta.url));
 const CODE_KEY = 'rooftop-snipers.asm.code.unityweb';
 const DATA_KEY = 'rooftop-snipers.data.unityweb';
 const UNITY_COMMENT = 'UnityWeb Compressed Content (gzip)\0';
@@ -459,7 +459,7 @@ function writeTree() {
     '//',
     '// This file IS the game: the payload in src/games/content/rooftop-snipers.html',
     '// is exactly this program, gzipped. Repack it with',
-    '//   node scripts/decompile-rooftop-snipers.mjs --rebuild out.html',
+    '//   node src/prototypes/rooftop-snipers/decompile.mjs --rebuild out.html',
     '// and whatever you change here is what runs.',
     '//',
     `// ${(original.length / 1048576).toFixed(2)} MB of asm.js, ${formatted.functions.length} functions,`,

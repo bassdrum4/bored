@@ -2,7 +2,7 @@
 //
 // This file IS the game: the payload in src/games/content/rooftop-snipers.html
 // is exactly this program, gzipped. Repack it with
-//   node scripts/decompile-rooftop-snipers.mjs --rebuild out.html
+//   node src/prototypes/rooftop-snipers/decompile.mjs --rebuild out.html
 // and whatever you change here is what runs.
 //
 // 21.55 MB of asm.js, 33833 functions,

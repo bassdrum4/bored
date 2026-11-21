@@ -8,7 +8,10 @@ and no C# left in the payload, so the only faithful source of the game's behavio
 asm.js program itself. That is what is here — the whole program, unbundled, formatted and
 indexed — plus the class model that IL2CPP kept in its metadata.
 
-Nothing in `src/` was changed to make this.
+Nothing in the game itself was changed to make this. The folder sits in `src/prototypes/`,
+so once it is pushed the files below can be read straight from the deployed site:
+`https://bassdrum4.github.io/bored/prototypes/rooftop-snipers/` (for example
+`…/source/rooftop-snipers.code.js`).
 
 ## What is here
 
@@ -18,13 +21,14 @@ Nothing in `src/` was changed to make this.
 | `functions.tsv` | Index of every function in that file: name, line, parameters, nesting depth. |
 | `il2cpp/classes.md` | The recovered C# class model: 302 no-namespace types with exact field names, method names, parameter counts and metadata tokens (`Gamemanager`, `Shoot`, `ShootAI`, `Jump`, `Sniper`, `SlowMo`, …). |
 | `il2cpp/string-literals.txt` | The `ldstr` string table from `global-metadata.dat` (2,842 entries). |
+| `decompile.mjs` | Unpacks the payload, rebuilds this folder, `--check`s it, and `--rebuild`s edits into a playable document. |
 
 ## Edit and run it
 
 ```bash
-# 1. change anything in decompiled/rooftop-snipers/source/rooftop-snipers.code.js
+# 1. change anything in src/prototypes/rooftop-snipers/source/rooftop-snipers.code.js
 # 2. repack it into a playable game document
-node scripts/decompile-rooftop-snipers.mjs --rebuild _build/rooftop-snipers/my-build.html
+node src/prototypes/rooftop-snipers/decompile.mjs --rebuild _build/rooftop-snipers/my-build.html
 # 3. open that file through any static server (it must be served over http, not file://)
 npx vite --port 3000        # then browse to /_build/rooftop-snipers/my-build.html
 ```
@@ -42,8 +46,8 @@ means renewing it deliberately.
 Regenerate this whole folder from the shipped document (no network, no other inputs):
 
 ```bash
-node scripts/decompile-rooftop-snipers.mjs          # rebuild the tree
-node scripts/decompile-rooftop-snipers.mjs --check  # verify it still is the shipped program
+node src/prototypes/rooftop-snipers/decompile.mjs          # rewrite the source tree
+node src/prototypes/rooftop-snipers/decompile.mjs --check  # verify it still is the shipped program
 ```
 
 ## Why the code looks like this
