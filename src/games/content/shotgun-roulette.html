@@ -8,149 +8,316 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
 <style>
-  /* Distortion World: the void, a purple platform, lavender ink, Giratina's gold. */
-  :root { --void: #000000; --platform: #1d1230; --edge: #3a2758; --ink: #ddd3ec; --dim: #8f82a6; --gold: #c9a24a;
-          --mono: ui-monospace, SFMono-Regular, Menlo, monospace; --display: "Fraunces", Georgia, "Times New Roman", serif; }
+  /* The Distortion World card room. The scene is a fixed 1280x720 stage scaled to
+     the frame; everything on the table lives in one 3D plane. */
+  :root { --void: #060409; --haze: #2a1838; --felt: #3e4a35; --chalk: #cfc6a8; --rail: #3b1d20;
+          --live: #9e2b2b; --blank: #8d8a82; --crt: #8dffa4; --ink: #e6dccb; --dim: #9b8f86; --gold: #c9a24a;
+          --mono: ui-monospace, SFMono-Regular, Menlo, monospace; --display: "Fraunces", Georgia, "Times New Roman", serif;
+          --tilt: 62deg; }
   * { margin: 0; padding: 0; box-sizing: border-box }
-  html { color-scheme: dark }
-  body { visibility: hidden; min-height: 100vh; background: var(--void); color: var(--ink); font: 17px/1.6 Georgia, "Times New Roman", serif;
-         padding: 24px clamp(16px, 3vw, 44px) 48px }
+  html, body { height: 100%; overflow: hidden; background: #000; color-scheme: dark }
+  body { visibility: hidden; color: var(--ink); font: 17px/1.5 Georgia, "Times New Roman", serif }
   button { font: inherit; color: inherit; touch-action: manipulation }
   button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
+  img { image-rendering: pixelated }
 
-  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-left: 56px }
-  .back { padding: 7px 12px; border: 1px solid var(--edge); border-radius: 3px; background: none; font-size: 15px; cursor: pointer }
-  .back:hover { border-color: var(--ink) }
-  .wallet { color: var(--dim); font-size: 15px }
-  .wallet .num { font: 600 15px var(--mono); color: var(--gold); font-variant-numeric: tabular-nums }
+  .stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; background: var(--void) }
+  .scene { position: absolute; inset: 0; background: var(--void); filter: saturate(.78) contrast(1.12) sepia(.18); transition: transform .6s ease-out }
+  .scene.tilt { transform: translateY(-46px) scale(1.04) }
+  .scene.shaking { animation: shake .42s }
+  @keyframes shake { 15% { transform: translate(-12px, 6px) } 30% { transform: translate(10px, -8px) } 45% { transform: translate(-7px, 4px) }
+                     60% { transform: translate(5px, -3px) } 80% { transform: translate(-2px, 1px) } }
 
-  .layout { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(24px, 4vw, 56px);
-            max-width: 1180px; margin-top: 36px }
-  @media (max-width: 780px) { .layout { grid-template-columns: 1fr } }
+  /* Back wall: the dark of the Distortion World, lit purple behind the dealer. */
+  .haze { position: absolute; inset: 0; background: radial-gradient(ellipse 34% 46% at 50% 34%, var(--haze), transparent 72%) }
+  .rig { position: absolute; inset: 0 0 auto; height: 300px }
+  .cone { transform-origin: 50% 0; animation: flicker 7s infinite steps(1) }
+  .cone.b { animation-duration: 9.5s; animation-delay: -3s }
+  @keyframes flicker { 0%, 100% { opacity: .4 } 41% { opacity: .28 } 42% { opacity: .45 } 43% { opacity: .2 } 44% { opacity: .4 } 77% { opacity: .36 } 78% { opacity: .12 } 79% { opacity: .4 } }
 
-  /* The title and the world beneath it, mirrored. */
-  .title { font: 700 clamp(48px, 7vw, 88px)/0.95 var(--display); letter-spacing: -.03em }
-  .reflection { display: block; font: 700 clamp(48px, 7vw, 88px)/0.95 var(--display); letter-spacing: -.03em;
-                transform: scaleY(-1); color: var(--edge); margin-top: .22em; user-select: none }
-  .status { max-width: 46ch; margin-top: 22px; color: var(--dim) }
-  .status b { color: var(--ink); font-weight: 400 }
+  /* Giratina, floating behind the far edge of the table. */
+  .dealer { position: absolute; left: 50%; top: 26px; width: 330px; height: 330px; margin-left: -165px; animation: bob 5.5s ease-in-out infinite;
+            transition: opacity .9s, filter .9s }
+  .dealer img { width: 100%; height: 100%; object-fit: contain; animation: sway 8s ease-in-out infinite; transform-origin: 50% 80%;
+                filter: brightness(.82) drop-shadow(0 0 18px #000); transition: filter .12s, transform .12s }
+  .dealer.hit img { filter: brightness(6) saturate(0); transform: translateY(-26px) scale(.92) }
+  .dealer.vanished { opacity: 0; filter: brightness(0) blur(6px) }
+  .dealer.away { opacity: 0 }
+  @keyframes bob { 50% { transform: translateY(14px) } }
+  @keyframes sway { 25% { transform: rotate(-2deg) } 75% { transform: rotate(2deg) } }
 
-  h2 { font: 400 26px/1.25 var(--display); margin-bottom: 14px }
-  .opponents { margin-top: 36px }
-  .islands { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; align-items: start }
-  .island { display: block; text-align: left; padding: 16px 18px 18px; background: var(--platform);
-            border: 1px solid var(--edge); border-radius: 3px; cursor: not-allowed }
-  .island.hard { margin-top: 28px; border-top: 3px solid var(--gold) }
-  .island .name { display: block; font: 400 22px/1.25 var(--display) }
-  .island .level { display: block; margin-top: 4px; color: var(--dim); font-size: 15px }
-  .island.hard .level { color: var(--gold) }
-  .island .locked { display: block; margin-top: 12px; font-size: 14px; color: var(--dim) }
+  /* The table plane. */
+  .room { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 8% }
+  .table { position: absolute; left: 150px; top: 296px; width: 980px; height: 720px; transform-origin: 50% 100%;
+           transform: translateY(-262px) rotateX(var(--tilt)); transform-style: preserve-3d;
+           background: var(--felt); border: 22px solid var(--rail); border-bottom: 0; box-shadow: inset 0 0 120px #000a }
+  .felt-lines { position: absolute; inset: 0; pointer-events: none }
+  .slots, #shell-layer { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none }
+  .slots .item { pointer-events: auto }
+  .slot { position: absolute; width: 128px; height: 132px; border: 3px solid #cfc6a8e6; transform-style: preserve-3d;
+          display: flex; align-items: flex-end; justify-content: center; gap: 4px; padding-bottom: 14px }
+  .item { position: relative; width: 64px; height: 64px; border: 0; background: none; cursor: default; transform-origin: 50% 100%;
+          transform: rotateX(calc(-1 * var(--tilt))); transition: transform .18s ease-out, filter .18s }
+  .item img { width: 64px; height: 64px; display: block; filter: drop-shadow(0 6px 3px #0009) }
+  .mine .item:not(:disabled) { cursor: pointer }
+  .mine .item:not(:disabled):hover, .mine .item:not(:disabled):focus-visible { transform: rotateX(calc(-1 * var(--tilt))) translateY(-16px) }
+  .mine .item:disabled { filter: brightness(.55) }
+  .item.using { animation: use-item .7s ease-in forwards }
+  .item.glow img { filter: drop-shadow(0 0 10px var(--gold)) brightness(1.4) }
+  @keyframes use-item { 40% { transform: rotateX(calc(-1 * var(--tilt))) translateY(-34px) scale(1.15); filter: brightness(1.8) }
+                        100% { transform: rotateX(calc(-1 * var(--tilt))) translateY(-60px) scale(.6); opacity: 0 } }
 
-  .bet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 18px; color: var(--dim); font-size: 15px }
-  .bet-row label { color: var(--ink) }
-  .bet-row input { width: 7ch; margin-left: 8px; padding: 6px 8px; border: 1px solid var(--edge); border-radius: 3px; background: var(--platform);
-                   color: var(--gold); font: 600 15px var(--mono) }
-  .bet-row input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
-  .island { cursor: pointer }
-  .island:hover:not(:disabled) { border-color: var(--ink) }
-  .island:disabled { cursor: not-allowed; opacity: .55 }
-  .island.test { margin-top: 56px; background: none; border-style: dashed }
-  .island .pays { display: block; margin-top: 12px; font-size: 14px; color: var(--dim) }
-  .test-pick { display: flex; gap: 14px; margin-top: 10px; font-size: 14px; color: var(--dim) }
-  .test-pick label { display: flex; align-items: center; gap: 5px; cursor: pointer }
-  .test-pick input { accent-color: var(--gold) }
-  .island-test-start { all: unset; display: block; cursor: pointer }
-  .island-test-start:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
-  .lobby-note { min-height: 1.6em; margin-top: 16px; font-size: 15px; color: var(--gold) }
+  /* The shotgun lies flat, barrel toward Giratina. */
+  .gun { position: absolute; left: 448px; top: 250px; width: 84px; height: 360px; border: 0; background: none; transform-origin: 50% 55%;
+         transform-style: preserve-3d; transition: transform .65s cubic-bezier(.3,.7,.3,1), filter .3s; cursor: default }
+  .gun svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 10px 6px #000a) }
+  .gun.ready { cursor: pointer; animation: ready 2.4s ease-in-out infinite }
+  .gun.ready:hover { filter: brightness(1.25) }
+  @keyframes ready { 50% { filter: brightness(1.3) drop-shadow(0 0 8px #e6dccb66) } }
+  .gun.at-foe { transform: translateZ(120px) translateY(-70px) rotateX(-28deg) }
+  .gun.at-you { transform: translateZ(150px) translateY(40px) rotateZ(180deg) rotateX(28deg) }
+  .gun.drop { transition-duration: .35s; transition-timing-function: ease-in }
+  .flash { position: absolute; left: 50%; top: -60px; width: 150px; height: 150px; margin-left: -75px; border-radius: 50%; opacity: 0;
+           background: radial-gradient(circle, #fff6d0 0, #ffb23b 30%, #c5361b66 55%, transparent 70%); pointer-events: none }
+  .flash.on { animation: flash .22s ease-out }
+  @keyframes flash { 0% { opacity: 1; transform: scale(.4) } 100% { opacity: 0; transform: scale(1.4) } }
 
-  /* The table: Giratina's world above the horizon, yours below, the shells on the line. */
-  .table[hidden] { display: none }
-  .roundbar { display: flex; align-items: baseline; gap: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--edge); font-size: 15px; color: var(--dim) }
-  .roundbar .round { font: 400 22px/1.2 var(--display); color: var(--ink) }
-  .roundbar .leave { margin-left: auto; padding: 5px 10px; border: 1px solid var(--edge); border-radius: 3px; background: none; font-size: 14px; cursor: pointer }
-  .roundbar .leave:hover { border-color: var(--ink) }
-  .arena { margin-top: 18px }
-  .plate { width: min(360px, 100%) }
-  .plate.you { margin-left: auto }
-  .plate .who { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap }
-  .plate .fname { font: 400 24px/1.2 var(--display) }
-  .plate .forme { font-size: 14px; color: var(--dim) }
-  .plate .flags { font-size: 14px; color: var(--gold) }
-  .hp { display: flex; align-items: center; gap: 8px; margin-top: 6px }
-  .hp .tag { padding: 0 5px; border-radius: 2px; background: var(--gold); color: var(--void); font: 700 11px/1.6 var(--mono) }
-  .hp .bar { flex: 1; height: 8px; border: 1px solid var(--edge); border-radius: 4px; background: var(--platform); overflow: hidden }
-  .hp .fill { display: block; height: 100%; background: #5fcf86; transition: width .45s ease-out }
-  .hp .fill.mid { background: var(--gold) }
-  .hp .fill.low { background: #e0564b }
-  .hp .num { min-width: 4ch; text-align: right; font: 13px var(--mono); font-variant-numeric: tabular-nums }
-  .holding { margin-top: 8px; font-size: 14px; color: var(--dim); min-height: 1.6em }
-  .horizon { position: relative; display: flex; align-items: center; gap: 14px; margin: 26px 0; padding: 12px 0;
-             border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge) }
-  .shells { display: flex; gap: 6px; flex-wrap: wrap }
-  .shell { width: 14px; height: 30px; border: 1px solid var(--ink); border-radius: 7px 7px 2px 2px }
-  .shell.live { background: #e0564b; border-color: #e0564b }
-  .shell.blank { background: var(--platform); border-color: var(--dim) }
-  .shell.spent { opacity: .45; height: 22px }
-  .shell.unknown { border-style: dashed; border-color: var(--dim) }
-  .chamber-text { font-size: 15px; color: var(--dim) }
-  .chamber-text b { color: var(--ink); font-weight: 400 }
-  .chamber-text .seen { display: block; color: var(--gold) }
-  .items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; justify-content: flex-end }
-  .item { padding: 5px 10px; border: 1px solid var(--edge); border-radius: 3px; background: var(--platform); font-size: 14px; cursor: pointer }
-  .item:hover:not(:disabled) { border-color: var(--ink) }
-  .item:disabled { opacity: .45; cursor: not-allowed }
-  .actions { display: flex; gap: 12px; margin-top: 22px }
-  .shoot { flex: 1; padding: 12px 16px; border: 1px solid var(--ink); border-radius: 3px; background: none; font: 400 19px/1.2 var(--display); cursor: pointer }
-  .shoot.at-foe { background: var(--ink); color: var(--void) }
-  .shoot:disabled { opacity: .35; cursor: not-allowed }
-  .hint { min-height: 1.6em; margin-top: 10px; font-size: 15px; color: var(--dim) }
-  .log { height: 190px; overflow-y: auto; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--edge); border-radius: 3px;
-         background: var(--sunk, #0a0712); font-size: 15px; line-height: 1.55 }
+  /* Shells: a row of slots, and the ones that pop out of the gun. */
+  .shell-row { position: absolute; left: 610px; top: 372px; width: 300px; height: 86px; border: 3px solid var(--chalk); display: flex;
+               transform-style: preserve-3d; opacity: .9 }
+  .shell-row span { flex: 1; border-right: 2px solid var(--chalk) }
+  .shell-row span:last-child { border-right: 0 }
+  .shell { position: absolute; width: 22px; height: 54px; transform-style: preserve-3d; transition: transform .5s ease-in, opacity .5s }
+  .shell i { position: absolute; inset: 0; border-radius: 4px 4px 2px 2px; backface-visibility: hidden }
+  .shell i::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: #b8923e; border-radius: 0 0 2px 2px }
+  .shell .face { background: var(--blank) }
+  .shell.live .face { background: var(--live) }
+  .shell .back { background: #2b2622; transform: rotateY(180deg) }
+  .shell.down { transform: rotateY(180deg) }
+  .spent { position: absolute; width: 16px; height: 40px; border-radius: 3px 3px 1px 1px; background: var(--blank); transform-origin: 50% 50%;
+           box-shadow: inset 0 -10px 0 #b8923e; animation: eject 1.9s ease-out forwards }
+  .spent.live { background: var(--live) }
+  @keyframes eject { 0% { transform: translate(0, 0) rotate(0) translateZ(60px); opacity: 1 }
+                     35% { transform: translate(var(--dx), -70px) rotate(220deg) translateZ(110px) }
+                     60% { transform: translate(calc(var(--dx) * 1.3), var(--dy)) rotate(380deg) translateZ(0); opacity: 1 }
+                     100% { transform: translate(calc(var(--dx) * 1.3), var(--dy)) rotate(380deg) translateZ(0); opacity: 0 } }
+
+  /* The charge box on the right rail. */
+  .meter { position: absolute; left: 1046px; top: 404px; width: 214px; padding: 12px; background: #251a19; border: 3px solid #4a3530;
+           transform: perspective(700px) rotateY(-24deg) rotateX(8deg); box-shadow: 0 18px 30px #000c }
+  .screen { padding: 10px 12px; background: #0c1a10; border: 1px solid #22402a; font: 12px/1.5 var(--mono); color: var(--crt);
+            text-shadow: 0 0 6px #8dffa488; box-shadow: inset 0 0 18px #000 }
+  .screen .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px }
+  .bolts { display: flex; gap: 3px }
+  .bolt { width: 13px; height: 22px; filter: drop-shadow(0 0 4px var(--crt)) }
+  .bolt path { fill: var(--crt) }
+  .bolt.dead { filter: none; opacity: .16 }
+  .bolt.breaking { animation: crack .7s ease-out forwards }
+  @keyframes crack { 0% { transform: scale(1.5); filter: drop-shadow(0 0 10px #fff) } 30% { transform: rotate(-18deg) translateY(2px) }
+                     100% { transform: rotate(-24deg) translateY(6px); opacity: .16; filter: none } }
+  .screen .line { border-top: 1px dashed #2f6a3c; margin: 6px 0; }
+  .screen .info { color: #b9f5c4; min-height: 3em }
+  .screen .seen { color: #ffd47a; text-shadow: 0 0 6px #ffd47a88 }
+
+  /* The retro pass over the whole room: a Bayer dither and a red-green grade. */
+  .dither { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; opacity: .5; image-rendering: pixelated;
+            background-size: 8px 8px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='4' height='4' fill='%23fff'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23000' fill-opacity='.0'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%23000' fill-opacity='.5'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%23000' fill-opacity='.75'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23000' fill-opacity='.25'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000' fill-opacity='.62'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%23000' fill-opacity='.12'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23000' fill-opacity='.38'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23000' fill-opacity='.88'/%3E%3C/svg%3E") }
+  .grade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#5a1f1f22, #1f3a2422); mix-blend-mode: color }
+  .vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 160px 40px #000 }
+  .redflash { position: absolute; inset: 0; pointer-events: none; background: #9e1b1b; opacity: 0 }
+  .redflash.on { animation: red .55s ease-out }
+  @keyframes red { 0% { opacity: .62 } 100% { opacity: 0 } }
+  .dark { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .45s;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center }
+  .dark.out { opacity: .94 }
+  .dark h2 { font: 400 54px/1.1 var(--display); color: var(--ink) }
+  .dark p { margin-top: 10px; color: var(--dim); font-style: italic }
+
+  /* What sits on top of the room, outside the 3D plane. */
+  .hud { position: absolute; inset: 0; pointer-events: none }
+  .hud > * { pointer-events: auto }
+  .corner { position: absolute; top: 18px; display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--dim) }
+  .corner.left { left: 76px }
+  .corner.right { right: 22px }
+  .corner .num { font: 600 15px var(--mono); color: var(--gold) }
+  .plain { padding: 6px 12px; border: 1px solid #ffffff33; border-radius: 3px; background: #0008; cursor: pointer; font-size: 15px }
+  .plain:hover { border-color: var(--ink) }
+  .say { position: absolute; left: 50%; bottom: 16px; width: 440px; margin-left: -220px; text-align: center; font-style: italic; font-size: 18px;
+         color: var(--ink); text-shadow: 0 2px 6px #000, 0 0 2px #000; pointer-events: none; min-height: 1.5em }
+  .choices { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); display: flex; gap: 12px }
+  .choices[hidden] { display: none }
+  .choice { padding: 11px 22px; border: 1px solid var(--ink); border-radius: 3px; background: #000b; font: 400 19px/1.2 var(--display); cursor: pointer }
+  .choice.primary { background: var(--ink); color: #120c0c }
+  .choice.quiet { border-color: #ffffff44; color: var(--dim); font: 16px Georgia, serif }
+  .log { position: absolute; left: 18px; top: 64px; width: 300px; height: 112px; overflow-y: auto; padding: 8px 10px; border: 1px solid #ffffff1f;
+         border-radius: 3px; background: #000a; font-size: 13px; line-height: 1.45 }
   .log p { color: var(--dim) }
-  .log p.round { color: var(--ink); font-family: var(--display); margin-top: 6px }
+  .log p.round { color: var(--ink); font-family: var(--display) }
   .log p.live { color: #f08a80 }
   .log p.secret, .log p.status { color: var(--gold) }
   .log p.you { color: var(--ink) }
-  .result { margin-top: 18px; padding: 16px 18px; border: 1px solid var(--gold); border-radius: 3px }
+  .result { position: absolute; left: 50%; top: 50%; width: 520px; transform: translate(-50%, -50%); padding: 24px 28px; background: #0b0709f2;
+            border: 1px solid var(--gold); border-radius: 3px; text-align: center }
   .result[hidden] { display: none }
-  .result h2 { margin-bottom: 6px }
-  .result p { color: var(--dim) }
-  .result .again { display: flex; gap: 10px; margin-top: 14px }
-  .result button { padding: 8px 14px; border: 1px solid var(--ink); border-radius: 3px; background: none; cursor: pointer }
-  .result button.primary { background: var(--ink); color: var(--void) }
-  .shake { animation: shake .36s }
-  @keyframes shake { 20% { transform: translateX(-7px) } 40% { transform: translateX(6px) } 60% { transform: translateX(-4px) } 80% { transform: translateX(2px) } }
-  @media (prefers-reduced-motion: reduce) { .shake { animation: none } .hp .fill { transition: none } }
+  .result h2 { font: 400 36px/1.15 var(--display) }
+  .result p { margin-top: 10px; color: var(--dim) }
+  .result .again { display: flex; justify-content: center; gap: 10px; margin-top: 18px }
+  .tip { position: fixed; z-index: 10; max-width: 240px; padding: 8px 10px; border: 1px solid #ffffff33; border-radius: 3px; background: #0c0809f0;
+         font-size: 14px; pointer-events: none }
+  .tip b { display: block; font: 400 16px var(--display); color: var(--ink) }
+  .tip span { color: var(--dim) }
+  .tip[hidden] { display: none }
 
-  .board-panel { border-left: 1px solid var(--edge); padding-left: clamp(20px, 3vw, 36px) }
-  @media (max-width: 780px) { .board-panel { border-left: 0; padding-left: 0; border-top: 1px solid var(--edge); padding-top: 24px } }
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px }
-  .tab { min-height: 36px; padding: 6px 14px; border: 1px solid var(--edge); border-radius: 3px; background: none;
-         color: var(--dim); font-size: 15px; cursor: pointer }
-  .tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--void) }
-  .board { width: 100%; border-collapse: collapse; font-size: 15px }
-  .board th { text-align: left; font-weight: 400; color: var(--dim); padding: 0 0 8px; border-bottom: 1px solid var(--ink) }
-  .board td { padding: 10px 0; border-bottom: 1px solid var(--edge); color: var(--dim) }
-  .board .n { text-align: right; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums }
-  .board th.n { font: inherit; font-size: 15px }
-  .board .rank { width: 3ch; font-family: var(--mono); font-size: 13px }
-  .empty { margin-top: 12px; color: var(--dim); font-size: 15px }
+  /* The lobby, over the room with the lights down and no dealer. */
+  .lobby { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 380px; gap: 48px; padding: 70px 76px 40px;
+           background: linear-gradient(90deg, #060409f5 0, #060409d9 60%, #060409f0 100%) }
+  .lobby[hidden] { display: none }
+  .title { font: 700 76px/0.95 var(--display); letter-spacing: -.03em }
+  .reflection { display: block; font: 700 76px/0.95 var(--display); letter-spacing: -.03em; transform: scaleY(-1); color: #3a2758;
+                margin-top: .22em; user-select: none }
+  .status { max-width: 46ch; margin-top: 16px; color: var(--dim) }
+  .lobby h2 { font: 400 24px/1.25 var(--display); margin: 26px 0 12px }
+  .bet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 16px; color: var(--dim); font-size: 15px }
+  .bet-row label { color: var(--ink) }
+  .bet-row input { width: 7ch; margin-left: 8px; padding: 6px 8px; border: 1px solid #3a2758; border-radius: 3px; background: #1d1230;
+                   color: var(--gold); font: 600 15px var(--mono) }
+  .islands { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start }
+  .island { display: block; text-align: left; padding: 14px 16px 16px; background: #1d1230; border: 1px solid #3a2758; border-radius: 3px; cursor: pointer }
+  .island:hover:not(:disabled) { border-color: var(--ink) }
+  .island:disabled { cursor: not-allowed; opacity: .55 }
+  .island.hard { margin-top: 24px; border-top: 3px solid var(--gold) }
+  .island.test { margin-top: 48px; background: none; border-style: dashed }
+  .island .name { display: block; font: 400 21px/1.25 var(--display) }
+  .island .level { display: block; margin-top: 4px; color: var(--dim); font-size: 15px }
+  .island.hard .level { color: var(--gold) }
+  .island .pays { display: block; margin-top: 10px; font-size: 14px; color: var(--dim) }
+  .island-test-start { all: unset; display: block; cursor: pointer }
+  .island-test-start:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
+  .test-pick { display: flex; gap: 14px; margin-top: 10px; font-size: 14px; color: var(--dim) }
+  .test-pick label { display: flex; align-items: center; gap: 5px; cursor: pointer }
+  .test-pick input { accent-color: var(--gold) }
+  .lobby-note { min-height: 1.6em; margin-top: 14px; font-size: 15px; color: var(--gold) }
+  .board-panel { border-left: 1px solid #3a2758; padding-left: 32px }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px }
+  .tab { min-height: 34px; padding: 5px 14px; border: 1px solid #3a2758; border-radius: 3px; background: none; color: var(--dim); font-size: 15px; cursor: pointer }
+  .tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: #120c0c }
+  .board { width: 100%; border-collapse: collapse; font-size: 14px }
+  .board th { text-align: left; font-weight: 400; color: var(--dim); padding: 0 0 6px; border-bottom: 1px solid var(--ink) }
+  .board td { padding: 6px 0; border-bottom: 1px solid #3a2758; color: var(--dim) }
+  .board .n { text-align: right; font-family: var(--mono); font-size: 12px }
+  .board th.n { font: inherit; font-size: 14px }
+  .board .rank { width: 3ch; font-family: var(--mono); font-size: 12px }
+  .empty { margin-top: 10px; color: var(--dim); font-size: 14px }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dealer, .dealer img, .cone, .gun.ready { animation: none }
+    .scene.shaking { animation: none }
+  }
 </style>
 </head>
 <body>
-<header class="top">
-  <button class="back" id="back" type="button">&#8249; Back to the arcade</button>
-  <p class="wallet">Poké Gacha wallet: <span class="num" id="coins">0</span> coins</p>
-</header>
+<div class="stage" id="stage">
+  <div class="scene" id="scene">
+    <div class="haze"></div>
 
-<div class="layout">
-  <main>
-    <div class="lobby" id="lobby">
+    <!-- Cables and two stage lights, drawn here: nothing borrowed. -->
+    <svg class="rig" viewBox="0 0 1280 300" aria-hidden="true">
+      <defs>
+        <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9c6ff" stop-opacity=".5"/><stop offset="1" stop-color="#d9c6ff" stop-opacity="0"/></linearGradient>
+      </defs>
+      <g fill="none" stroke="#3a2a31" stroke-width="7" stroke-linecap="round">
+        <path d="M-20 40 C 240 150, 420 30, 640 90 S 1040 20, 1300 60"/>
+        <path d="M-20 90 C 200 170, 470 120, 600 40"/>
+        <path d="M700 30 C 860 140, 1100 90, 1300 150"/>
+        <path d="M120 -10 C 200 120, 340 70, 430 60"/>
+        <path d="M1160 -10 C 1080 110, 940 70, 850 60"/>
+      </g>
+      <polygon class="cone" points="430,92 390,92 560,300 690,300" fill="url(#beam)"/>
+      <polygon class="cone b" points="850,92 890,92 720,300 590,300" fill="url(#beam)"/>
+      <g fill="#3a2a2d" stroke="#1a1214" stroke-width="3">
+        <line x1="430" y1="0" x2="430" y2="48" stroke="#1a1216" stroke-width="5"/>
+        <line x1="850" y1="0" x2="850" y2="48" stroke="#1a1216" stroke-width="5"/>
+        <g transform="translate(410 48) rotate(-28 20 24)"><rect width="46" height="52" rx="6"/><rect x="-10" y="44" width="66" height="12" rx="3" fill="#3a2a2b"/><circle cx="23" cy="50" r="13" fill="#f3e6ff" opacity=".8"/></g>
+        <g transform="translate(826 48) rotate(28 20 24)"><rect width="46" height="52" rx="6"/><rect x="-10" y="44" width="66" height="12" rx="3" fill="#3a2a2b"/><circle cx="23" cy="50" r="13" fill="#f3e6ff" opacity=".8"/></g>
+      </g>
+    </svg>
+
+    <div class="dealer away" id="dealer"><img id="dealer-img" alt="Giratina" width="84" height="84"></div>
+
+    <div class="room">
+      <div class="table" id="felt">
+        <svg class="felt-lines" viewBox="0 0 936 698" preserveAspectRatio="none" aria-hidden="true">
+          <g fill="none" stroke="#cfc6a8" stroke-width="3" opacity=".75">
+            <rect x="372" y="20" width="192" height="90"/>
+            <line x1="468" y1="110" x2="468" y2="220"/>
+            <line x1="40" y1="330" x2="896" y2="330"/>
+            <line x1="40" y1="510" x2="896" y2="510"/>
+          </g>
+        </svg>
+        <div class="slots foe" id="foe-slots"></div>
+        <div class="slots mine" id="you-slots"></div>
+        <div class="shell-row" id="shell-row" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div id="shell-layer"></div>
+        <button class="gun" id="gun" type="button" aria-label="Pick up the shotgun" disabled>
+          <span class="flash" id="flash"></span>
+          <svg viewBox="0 0 84 360" aria-hidden="true">
+            <rect x="34" y="0" width="16" height="190" rx="3" fill="#3b3531"/>
+            <rect x="37" y="0" width="5" height="190" fill="#57504a"/>
+            <rect x="28" y="120" width="28" height="58" rx="5" fill="#5a3826"/>
+            <rect x="28" y="126" width="28" height="4" fill="#3d2418"/><rect x="28" y="138" width="28" height="4" fill="#3d2418"/><rect x="28" y="150" width="28" height="4" fill="#3d2418"/>
+            <rect x="26" y="186" width="32" height="70" rx="4" fill="#2e2a27"/>
+            <path d="M42 252 q -4 26 8 30" stroke="#1b1816" stroke-width="5" fill="none"/>
+            <path d="M28 254 L 56 254 L 66 352 Q 42 364 18 352 Z" fill="#5f3b28"/>
+            <path d="M30 262 L 54 262 L 60 340 Q 42 348 24 340 Z" fill="#6e4630"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="meter" aria-label="Charges">
+      <div class="screen">
+        <div class="row"><span>Giratina</span><span class="bolts" id="foe-bolts"></span></div>
+        <div class="row"><span>You</span><span class="bolts" id="you-bolts"></span></div>
+        <div class="line"></div>
+        <div class="info" id="info"></div>
+      </div>
+    </div>
+
+    <div class="grade"></div>
+    <div class="dither"></div>
+    <div class="vignette"></div>
+  </div>
+  <div class="redflash" id="redflash"></div>
+
+  <div class="hud" id="hud" hidden>
+    <div class="corner left"><button class="plain" id="leave" type="button">Leave table</button><span id="mode-label"></span></div>
+    <div class="corner right"><span id="round-label"></span></div>
+    <p class="say" id="say" role="status" aria-live="polite"></p>
+    <div class="choices" id="choices" hidden>
+      <button class="choice primary" id="shoot-foe" type="button">Shoot Giratina</button>
+      <button class="choice" id="shoot-self" type="button">Shoot yourself</button>
+      <button class="choice quiet" id="put-down" type="button">Put it down</button>
+    </div>
+    <div class="log" id="log" role="log" aria-label="What happened"></div>
+    <div class="result" id="result" hidden>
+      <h2 id="result-title"></h2>
+      <p id="result-text"></p>
+      <div class="again">
+        <button class="choice primary" id="again" type="button">Play again</button>
+        <button class="choice" id="to-lobby" type="button">Pick another opponent</button>
+      </div>
+    </div>
+  </div>
+  <div class="dark" id="dark" aria-live="polite"><h2 id="dark-title"></h2><p id="dark-text"></p></div>
+
+  <div class="lobby" id="lobby">
+    <main>
+      <div class="corner left" style="position:static;margin:-48px 0 26px"><button class="plain" id="back" type="button">&#8249; Back to the arcade</button>
+        <span>Poké Gacha wallet: <span class="num" id="coins">0</span> coins</span></div>
       <h1 class="title">Shotgun Roulette</h1>
       <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
       <p class="status">Take turns with Giratina pointing a shotgun at yourself or each other. Some shells are live, some are blank. Win two of three rounds.</p>
-
-      <section class="opponents" aria-labelledby="opponents-title">
+      <section aria-labelledby="opponents-title">
         <h2 id="opponents-title">Pick your opponent</h2>
         <div class="bet-row">
           <label for="bet">Your bet<input id="bet" type="number" min="10" max="500" step="10" value="50" inputmode="numeric"></label>
@@ -158,14 +325,10 @@
         </div>
         <div class="islands" role="group" aria-labelledby="opponents-title">
           <button class="island normal" type="button" data-mode="normal">
-            <span class="name">Altered Giratina</span>
-            <span class="level">Normal</span>
-            <span class="pays">A win pays 1.8 times your bet</span>
+            <span class="name">Altered Giratina</span><span class="level">Normal</span><span class="pays">A win pays 1.8 times your bet</span>
           </button>
           <button class="island hard" type="button" data-mode="hard">
-            <span class="name">Origin Giratina</span>
-            <span class="level">Hard</span>
-            <span class="pays">A win pays 3 times your bet</span>
+            <span class="name">Origin Giratina</span><span class="level">Hard</span><span class="pays">A win pays 3 times your bet</span>
           </button>
           <div class="island test">
             <button class="island-test-start" id="test-start" type="button">
@@ -180,83 +343,34 @@
         </div>
         <p class="lobby-note" id="lobby-note" role="status"></p>
       </section>
-    </div>
-
-    <section class="table" id="table" hidden aria-label="Shotgun Roulette table">
-      <div class="roundbar">
-        <span class="round" id="round-label">Round 1 of 3</span>
-        <span id="score-label">You 0, Giratina 0</span>
-        <span id="mode-label"></span>
-        <button class="leave" id="leave" type="button">Leave table</button>
+    </main>
+    <section class="board-panel" aria-labelledby="lb-title">
+      <h2 id="lb-title" style="margin-top:0">Leaderboard</h2>
+      <div class="tabs" role="tablist" aria-label="Leaderboard mode">
+        <button class="tab" type="button" role="tab" id="tab-normal" aria-controls="board-normal" aria-selected="true">Normal</button>
+        <button class="tab" type="button" role="tab" id="tab-hard" aria-controls="board-hard" aria-selected="false">Hard</button>
       </div>
-      <div class="arena" id="arena">
-        <div class="plate foe">
-          <div class="who"><span class="fname">Giratina</span><span class="forme" id="foe-forme"></span><span class="flags" id="foe-flags"></span></div>
-          <div class="hp"><span class="tag">HP</span><span class="bar"><span class="fill" id="foe-fill"></span></span><span class="num" id="foe-hp"></span></div>
-          <p class="holding" id="foe-items"></p>
-        </div>
-
-        <div class="horizon">
-          <div class="shells" id="shells" aria-hidden="true"></div>
-          <p class="chamber-text" id="chamber"></p>
-        </div>
-
-        <div class="plate you">
-          <div class="who"><span class="fname">You</span><span class="flags" id="you-flags"></span></div>
-          <div class="hp"><span class="tag">HP</span><span class="bar"><span class="fill" id="you-fill"></span></span><span class="num" id="you-hp"></span></div>
-          <div class="items" id="you-items" aria-label="Your items"></div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="shoot at-self" id="shoot-self" type="button">Shoot yourself</button>
-        <button class="shoot at-foe" id="shoot-foe" type="button">Shoot Giratina</button>
-      </div>
-      <p class="hint" id="hint" role="status"></p>
-      <div class="result" id="result" hidden>
-        <h2 id="result-title"></h2>
-        <p id="result-text"></p>
-        <div class="again">
-          <button class="primary" id="again" type="button">Play again</button>
-          <button id="to-lobby" type="button">Pick another opponent</button>
-        </div>
-      </div>
-      <div class="log" id="log" role="log" aria-live="polite" aria-label="What happened"></div>
+      <div id="board-normal" role="tabpanel" aria-labelledby="tab-normal"></div>
+      <div id="board-hard" role="tabpanel" aria-labelledby="tab-hard" hidden></div>
+      <p class="empty" id="board-empty">No runs yet. The first survivor goes here.</p>
     </section>
-  </main>
-
-  <section class="board-panel" aria-labelledby="lb-title">
-    <h2 id="lb-title">Leaderboard</h2>
-    <div class="tabs" role="tablist" aria-label="Leaderboard mode">
-      <button class="tab" type="button" role="tab" id="tab-normal" aria-controls="board-normal" aria-selected="true">Normal</button>
-      <button class="tab" type="button" role="tab" id="tab-hard" aria-controls="board-hard" aria-selected="false">Hard</button>
-    </div>
-    <div id="board-normal" role="tabpanel" aria-labelledby="tab-normal"></div>
-    <div id="board-hard" role="tabpanel" aria-labelledby="tab-hard" hidden></div>
-    <p class="empty" id="board-empty">No runs yet. The first survivor goes here.</p>
-  </section>
+  </div>
 </div>
+<div class="tip" id="tip" hidden></div>
 
 <script>
 /* Shotgun Roulette. You and Giratina take turns firing a shotgun loaded with
-   live and blank shells, best of three rounds. The whole game runs here; the
-   frame is sandboxed, so coins and the leaderboard go through the hub with
-   postMessage ("bored:roulette" requests, "bored:roulette-result" replies),
-   answered by src/hub/roulette.js, which enforces the bet range, payouts and cap.
-   Test games never send a coin or board request. If the hub does not answer,
-   real games stay closed and the board stays empty: the game itself never breaks.
-   This is a static GitHub Pages file, so the bytes are public. The hub still
-   requires a verified admin session to open the preview, and a direct load
-   shows a denial instead of the game. */
-// The parent sets this marker only inside the sandboxed admin preview frame.
-const authorized = parent !== window && window.__boredPreviewAuthorized === true;
-if (!authorized) {
-  const message = document.createElement("p");
-  message.textContent = "Admin access required. Open this preview from Bored while signed in as an admin.";
-  document.body.replaceChildren(message);
-  document.body.style.visibility = "visible";
-  window.__boredSnapshot = () => ({ slug: "shotgun-roulette", rounds: 0, finished: false });
-} else {
+   live and blank shells, best of three rounds. The rules engine is the same
+   as before; the fx functions below only animate what it decides.
+   The frame is sandboxed, so coins and the leaderboard go through the hub
+   with postMessage ("bored:roulette" requests, "bored:roulette-result"
+   replies), answered by src/hub/roulette.js, which enforces the bet range,
+   payouts and cap. Test games never send a coin or board request.
+   Sprites: Giratina from the shared Poké sprite set (pokedoku/sprites, 487
+   Altered and 10007 Origin), items from shotgun-roulette/items.
+   Opened on its own (not from the arcade), test games still work; real bets
+   get no answer and say so. */
+{
 document.body.style.visibility = "visible";
 
 const $ = s => document.querySelector(s);
@@ -266,23 +380,38 @@ const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 const pick = list => list[Math.floor(Math.random() * list.length)];
 const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
 
+/* ── Sprites (the same path rule as Pokédoku, Poké Idle and Poké Gacha) ── */
+const CONTENT_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "" : "games/content/";
+const SPRITE_DIR = CONTENT_DIR + "pokedoku/sprites/";
+const ITEM_DIR = CONTENT_DIR + "shotgun-roulette/items/";
+
 /* ── Rules ────────────────────────────────────────────────────────────── */
 const RULES = { hp: [2, 3, 4], maxItems: 8, minBet: 10, maxBet: 500, dailyCap: 3000, shadowForce: 0.2 };
 const MODES = {
-  normal: { name: "Altered Giratina", forme: "Altered Forme", level: "Normal", pays: 1.8 },
-  hard: { name: "Origin Giratina", forme: "Origin Forme", level: "Hard", pays: 3 }
+  normal: { name: "Altered Giratina", forme: "Altered Forme", level: "Normal", pays: 1.8, sprite: 487 },
+  hard: { name: "Origin Giratina", forme: "Origin Forme", level: "Hard", pays: 3, sprite: 10007 }
 };
 const ITEMS = {
-  potion: { name: "Potion", tip: "Heal 1 HP, up to your max." },
-  scope: { name: "Scope Lens", tip: "See whether the shell in the chamber is live or blank. Only you see it." },
-  eject: { name: "Eject Button", tip: "Throw out the shell in the chamber and see what it was." },
-  band: { name: "Choice Band", tip: "Your next shot does 2 damage if it is live." },
-  wave: { name: "Thunder Wave", tip: "Giratina skips its next turn. Can't stack, and can't be used two turns in a row." },
-  trick: { name: "Trick Room", tip: "Flip the shell in the chamber: live becomes blank, blank becomes live." },
-  orb: { name: "Griseous Orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
+  potion: { name: "Potion", art: "potion", tip: "Heal 1 HP, up to your max." },
+  scope: { name: "Scope Lens", art: "scope-lens", tip: "See whether the shell in the chamber is live or blank. Only you see it." },
+  eject: { name: "Eject Button", art: "eject-button", tip: "Throw out the shell in the chamber and see what it was." },
+  band: { name: "Choice Band", art: "choice-band", tip: "Your next shot does 2 damage if it is live." },
+  wave: { name: "Thunder Wave", art: "tm-electric", tip: "Giratina skips its next turn. Can't stack, and can't be used two turns in a row." },
+  trick: { name: "Trick Room", art: "tm-psychic", tip: "Flip the shell in the chamber: live becomes blank, blank becomes live." },
+  orb: { name: "Griseous Orb", art: "griseous-orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
 };
 const POOL = ["potion", "scope", "eject", "band", "wave", "trick"];
 const YOU = 0, FOE = 1;
+
+/* ── Fit the 1280x720 stage to the frame ─────────────────────────────── */
+function fit() {
+  const s = Math.min(innerWidth / 1280, innerHeight / 720), stage = $("#stage");
+  stage.style.transform = "scale(" + s + ")";
+  stage.style.left = Math.max(0, (innerWidth - 1280 * s) / 2) + "px";
+  stage.style.top = Math.max(0, (innerHeight - 720 * s) / 2) + "px";
+}
+addEventListener("resize", fit);
+fit();
 
 /* ── The hub: wallet, bets and the board, over postMessage ───────────── */
 let coins = null, seq = 0;
@@ -334,31 +463,115 @@ const alive = id => g && g.id === id && !g.over;
 const fighter = name => ({ name, hp: 0, max: 0, items: [], band: false, para: false, waveLock: false, knows: null, hidden: false });
 const N = i => i === YOU ? "You" : "Giratina";
 
+// Every line goes to the log; the latest one is also said over the table.
 function log(text, kind = "") {
   const box = $("#log"), line = el("p", kind, text);
   box.appendChild(line);
   box.scrollTop = box.scrollHeight;
+  $("#say").textContent = text;
 }
-function hint(text) { $("#hint").textContent = text; }
-function shake() {
-  const arena = $("#arena");
-  arena.classList.remove("shake");
-  void arena.offsetWidth;
-  arena.classList.add("shake");
-}
+function hint(text) { if (text) $("#say").textContent = text; }
+
+/* ── Effects: animate what the engine decides ─────────────────────────── */
+const fx = {
+  restart(node, cls) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); },
+  // Load: the shells stand in a row face up, turn face down, then go into the gun one by one.
+  async load() {
+    const layer = $("#shell-layer"), row = $("#shell-row");
+    layer.replaceChildren();
+    const shown = [...Array(g.loaded[0]).fill(true), ...Array(g.loaded[1]).fill(false)];
+    const rowBox = { left: 610 - 22 + 3, top: 372 - 22 + 3 };
+    const shells = shown.map((live, k) => {
+      const shell = el("div", "shell" + (live ? " live" : ""));
+      shell.append(el("i", "face"), el("i", "back"));
+      shell.style.left = (rowBox.left + 37.5 * k + 30) + "px";
+      shell.style.top = (rowBox.top + 38) + "px";
+      shell.style.transform = "rotateX(calc(-1 * var(--tilt)))";
+      layer.appendChild(shell);
+      return shell;
+    });
+    row.style.opacity = ".9";
+    await wait(1300);
+    for (const shell of shells) shell.style.transform = "rotateX(calc(-1 * var(--tilt))) rotateY(180deg)";
+    await wait(650);
+    for (const shell of shells) {
+      shell.style.transform = "translate(" + (490 - parseFloat(shell.style.left)) + "px, " + (420 - parseFloat(shell.style.top)) + "px) rotateZ(90deg) scale(.6)";
+      shell.style.opacity = "0";
+      await wait(150);
+    }
+    await wait(400);
+    layer.replaceChildren();
+  },
+  // Pick up the gun and point it. Aiming at you tilts the camera down.
+  async aim(atYou) {
+    const gun = $("#gun");
+    gun.classList.remove("drop", "ready");
+    gun.classList.add(atYou ? "at-you" : "at-foe");
+    $("#scene").classList.toggle("tilt", atYou);
+    await wait(700);
+  },
+  async lower() {
+    const gun = $("#gun");
+    gun.classList.add("drop");
+    gun.classList.remove("at-you", "at-foe");
+    $("#scene").classList.remove("tilt");
+    await wait(380);
+    gun.classList.remove("drop");
+  },
+  bang(hitFoe) {
+    fx.restart($("#flash"), "on");
+    fx.restart($("#scene"), "shaking");
+    fx.restart($("#redflash"), "on");
+    if (hitFoe) { const d = $("#dealer"); d.classList.add("hit"); setTimeout(() => d.classList.remove("hit"), 260); }
+  },
+  // Every shot throws its shell onto the felt, where it fades.
+  eject(live) {
+    const shell = el("div", "spent" + (live ? " live" : ""));
+    const right = Math.random() < 0.5 ? 1 : -1;
+    shell.style.left = "482px";
+    shell.style.top = "400px";
+    shell.style.setProperty("--dx", right * rand(90, 150) + "px");
+    shell.style.setProperty("--dy", rand(-30, 60) + "px");
+    $("#shell-layer").appendChild(shell);
+    setTimeout(() => shell.remove(), 2000);
+  },
+  async useItem(side, index) {
+    const node = document.querySelectorAll("#" + (side === YOU ? "you" : "foe") + "-slots .item")[index];
+    if (!node) return;
+    node.classList.add("glow");
+    await wait(side === FOE ? 420 : 0);
+    node.classList.add("using");
+    await wait(520);
+  },
+  breakBolt(side, index) {
+    const bolt = document.querySelectorAll("#" + side + "-bolts .bolt")[index];
+    if (bolt) bolt.classList.add("breaking");
+  },
+  // Round over: the lights go out, the result shows in the dark, the lights come back.
+  async lightsOut(title, text) {
+    $("#dark-title").textContent = title;
+    $("#dark-text").textContent = text;
+    $("#dark").classList.add("out");
+    await wait(1900);
+    $("#dark").classList.remove("out");
+    await wait(450);
+  }
+};
 
 function begin(mode, test, bet = 0, betId = null) {
   g = { id: ++run, mode, test, bet, betId, hard: mode === "hard", round: 0, wins: [0, 0],
-        s: [fighter("You"), fighter("Giratina")], shells: [], loaded: [0, 0], spent: [], turn: YOU, busy: true, over: false };
+        s: [fighter("You"), fighter("Giratina")], shells: [], loaded: [0, 0], spent: [], turn: YOU, busy: true, over: false, loading: null, holding: false };
   lastStart = { mode, test, bet };
   $("#lobby").hidden = true;
-  $("#table").hidden = false;
+  $("#hud").hidden = false;
   $("#result").hidden = true;
   $("#log").replaceChildren();
+  for (const box of [$("#you-slots"), $("#foe-slots")]) { box.dataset.sig = ""; box.replaceChildren(); }
   $("#leave").textContent = "Leave table";
   $("#leave").dataset.confirm = "";
-  $("#foe-forme").textContent = MODES[mode].forme;
-  $("#mode-label").textContent = MODES[mode].level + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " coins");
+  $("#mode-label").textContent = MODES[mode].name + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " coins");
+  $("#dealer-img").src = SPRITE_DIR + MODES[mode].sprite + ".png";
+  $("#dealer").classList.remove("away", "vanished");
   log(test ? "Test game against " + MODES[mode].name + ". No coins are on the table." : "You bet " + bet.toLocaleString("en-US") + " coins against " + MODES[mode].name + ".", "you");
   if (g.hard) log("Origin Giratina is in its own world: Shadow Force, Pressure and the Griseous Orb are on.", "status");
   startRound();
@@ -369,6 +582,7 @@ function startRound() {
   const hp = RULES.hp[g.round - 1];
   for (const s of g.s) Object.assign(s, { hp, max: hp, items: [], band: false, para: false, waveLock: false, knows: null, hidden: false });
   if (g.hard && g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
+  g.prevHp = [g.s[YOU].hp, g.s[FOE].hp];
   log("Round " + g.round + ". " + hp + " HP each" + (g.hard && g.round === 3 ? ", and Giratina draws 1 extra max HP from the Distortion World." : "."), "round");
   g.turn = YOU;
   reload();
@@ -398,6 +612,8 @@ function reload() {
   if (g.hard) log("Pressure: you only get 1 item this load.");
   deal(FOE, 2);
   if (g.hard && give(FOE, "orb")) log("Giratina gets a Griseous Orb.");
+  const game = g;
+  game.loading = fx.load().then(() => { if (g === game) { game.loading = null; render(); } });
 }
 
 /* ── Turns ────────────────────────────────────────────────────────────── */
@@ -408,9 +624,9 @@ async function beginTurn() {
     log("The gun is empty.");
     reload();
     render();
-    await wait(900);
-    if (!alive(id)) return;
   }
+  if (g.loading) { render(); await g.loading; }
+  if (!alive(id)) return;
   const me = g.s[g.turn];
   // Shadow Force lasts until Giratina's next turn, skipped or not.
   if (g.turn === FOE) me.hidden = false;
@@ -418,7 +634,7 @@ async function beginTurn() {
     me.para = false;
     log(g.turn === YOU ? "You're paralyzed! You can't move this turn." : "Giratina is paralyzed! It can't move this turn.", "status");
     render();
-    await wait(1000);
+    await wait(1100);
     if (!alive(id)) return;
     g.turn = 1 - g.turn;
     return beginTurn();
@@ -434,34 +650,39 @@ async function beginTurn() {
     return foeTurn(id);
   }
   g.busy = false;
-  hint("Your turn. Use any items you like, then shoot.");
   render();
+  hint("Your turn. Use items, then pick up the gun.");
 }
 
 async function fire(i, atSelf) {
   const id = g.id, me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
   g.busy = true;
+  g.holding = false;
   const dmg = me.band ? 2 : 1, banded = me.band;
   me.band = false;
   // The other side's Thunder Wave lock lifts once this side takes a real turn.
   other.waveLock = false;
-  hint("");
   log(i === YOU ? (atSelf ? "You point the gun at yourself..." : "You aim at Giratina...") : (atSelf ? "Giratina points the gun at itself..." : "Giratina aims at you..."), i === YOU ? "you" : "");
   render();
-  await wait(1000);
+  // The gun faces whoever is being shot: toward the camera when that is you.
+  await fx.aim(target === g.s[YOU]);
+  await wait(800);
   if (!alive(id)) return;
   const live = g.shells.shift();
   g.spent.push(live);
   for (const s of g.s) s.knows = null;
   if (!live) log("*click* Blank." + (banded ? " The Choice Band is wasted." : ""));
-  else if (i === YOU && !atSelf && other.hidden) log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status");
+  else if (i === YOU && !atSelf && other.hidden) { fx.bang(false); log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status"); }
   else {
     target.hp = Math.max(0, target.hp - dmg);
-    shake();
+    fx.bang(target === g.s[FOE]);
     log("*BANG* Live! " + (target === g.s[YOU] ? "You lose " : "Giratina loses ") + dmg + " HP" + (banded ? " (Choice Band)." : "."), "live");
   }
   render();
-  await wait(live ? 1000 : 700);
+  await wait(live ? 650 : 350);
+  fx.eject(live);
+  await fx.lower();
+  await wait(live ? 500 : 300);
   if (!alive(id)) return;
   if (g.s[YOU].hp <= 0 || g.s[FOE].hp <= 0) return endRound(g.s[YOU].hp <= 0 ? FOE : YOU);
   if (atSelf && !live) log(i === YOU ? "You keep the turn." : "Giratina keeps the turn.");
@@ -486,6 +707,7 @@ function useItem(i, index) {
       const shell = g.shells.shift();
       g.spent.push(shell);
       for (const s of g.s) s.knows = null;
+      fx.eject(shell);
       log(N(i) + " used an Eject Button. Out pops a " + (shell ? "live" : "blank") + " shell.", mine ? "you" : "");
       break;
     }
@@ -515,6 +737,22 @@ function useItem(i, index) {
   return true;
 }
 
+// The player's items animate first; the engine runs once the animation lands.
+async function playerItem(index) {
+  if (!g || g.turn !== YOU || g.busy || g.over || g.loading || g.holding) return;
+  const you = g.s[YOU], key = you.items[index];
+  const blocked = (key === "potion" && you.hp >= you.max) || (key === "band" && you.band) || (key === "wave" && (g.s[FOE].para || you.waveLock));
+  if (blocked) return useItem(YOU, index);
+  g.busy = true;
+  $("#tip").hidden = true;
+  // Redraw now so the gun stops looking ready while the item is in use.
+  render();
+  await fx.useItem(YOU, index);
+  if (!g || g.over) return;
+  g.busy = false;
+  useItem(YOU, index);
+}
+
 /* ── Giratina ─────────────────────────────────────────────────────────── */
 // Tracks the live and blank shells left. Plays a known shell correctly;
 // otherwise shoots you above 50% live, itself below, and flips a coin at 50%.
@@ -524,6 +762,7 @@ async function foeTurn(id) {
   await wait(900);
   for (let step = 0; step < 10; step++) {
     if (!alive(id)) return;
+    if (g.loading) await g.loading;
     const p = chance(), has = key => me.items.includes(key);
     const flip = has("orb") ? "orb" : has("trick") ? "trick" : null;
     let key = null;
@@ -535,10 +774,14 @@ async function foeTurn(id) {
     else if (p > 0 && p < 0.5 && flip && Math.random() < 0.35) key = flip;
     else if (has("wave") && !you.para && !me.waveLock && Math.random() < 0.4) key = "wave";
     if (!key) break;
-    useItem(FOE, me.items.indexOf(key));
-    await wait(900);
+    const index = me.items.indexOf(key);
+    await fx.useItem(FOE, index);
+    if (!alive(id)) return;
+    useItem(FOE, index);
+    await wait(700);
   }
   if (!alive(id)) return;
+  if (g.loading) await g.loading;
   const p = chance();
   return fire(FOE, p === 0.5 ? Math.random() < 0.5 : p < 0.5);
 }
@@ -550,9 +793,11 @@ async function endRound(winner) {
   g.busy = true;
   log(winner === YOU ? "Giratina fainted! You take round " + g.round + "." : "You fainted. Giratina takes round " + g.round + ".", "round");
   render();
-  await wait(1500);
+  const last = g.wins[winner] === 2;
+  await fx.lightsOut(winner === YOU ? "You take round " + g.round + "." : "Giratina takes round " + g.round + ".",
+    "You " + g.wins[YOU] + ", Giratina " + g.wins[FOE] + (last ? "" : ". Next round."));
   if (!alive(id)) return;
-  if (g.wins[winner] === 2) return endGame(winner === YOU);
+  if (last) return endGame(winner === YOU);
   startRound();
 }
 
@@ -586,56 +831,112 @@ async function endGame(won, forfeit = false) {
   $("#result-text").textContent = text;
   $("#again").textContent = game.test ? "Play another test game" : "Play again, bet " + game.bet.toLocaleString("en-US");
   $("#result").hidden = false;
-  hint("");
+  $("#say").textContent = "";
   $("#again").focus();
 }
 
 /* ── Drawing ──────────────────────────────────────────────────────────── */
-function drawHp(side, s) {
-  const share = s.max ? s.hp / s.max : 0, fill = $("#" + side + "-fill");
-  fill.style.width = (share * 100) + "%";
-  fill.className = "fill" + (share <= 0.25 ? " low" : share <= 0.5 ? " mid" : "");
-  $("#" + side + "-hp").textContent = s.hp + "/" + s.max;
+const BOLT = '<svg class="bolt" viewBox="0 0 13 22" aria-hidden="true"><path d="M8 0 L1 12 L6 12 L4 22 L12 8 L7 8 L9 0 Z"/></svg>';
+function drawBolts(side, s, index) {
+  const box = $("#" + side + "-bolts");
+  const before = g.prevHp[index];
+  box.innerHTML = BOLT.repeat(s.max);
+  box.setAttribute("aria-label", s.hp + " of " + s.max + " HP");
+  [...box.children].forEach((bolt, k) => {
+    if (k >= s.hp) bolt.classList.add(k < before ? "breaking" : "dead");
+  });
+  g.prevHp[index] = s.hp;
+}
+// 4 slots a side, 2 items to a slot: 8 items, the most anyone can hold.
+const SLOT_X = [40, 186, 664, 810], SLOT_Y = { foe: 160, you: 540 };
+function drawSlots(side, s, mine) {
+  const box = $("#" + side + "-slots");
+  // Rebuild only when the items or what you may do with them change, so sprites
+  // are not re-requested and a hovered item keeps its lift.
+  const you = g.s[YOU], foe = g.s[FOE];
+  const open = mine && g.turn === YOU && !g.busy && !g.over && !g.loading && !g.holding;
+  const sig = s.items.join() + "|" + open + "|" + (mine ? [you.hp >= you.max, you.band, foe.para || you.waveLock].join() : "");
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.replaceChildren();
+  for (let k = 0; k < 4; k++) {
+    const slot = el("div", "slot");
+    slot.style.left = SLOT_X[k] + "px";
+    slot.style.top = SLOT_Y[side] + "px";
+    for (const index of [k * 2, k * 2 + 1]) {
+      const key = s.items[index];
+      if (!key) continue;
+      const item = el("button", "item");
+      item.type = "button";
+      const art = el("img");
+      art.src = ITEM_DIR + ITEMS[key].art + ".png";
+      art.alt = ITEMS[key].name;
+      item.appendChild(art);
+      item.dataset.key = key;
+      item.setAttribute("aria-label", ITEMS[key].name + ". " + ITEMS[key].tip);
+      if (mine) {
+        item.disabled = !open ||
+          (key === "potion" && you.hp >= you.max) || (key === "band" && you.band) || (key === "wave" && (foe.para || you.waveLock));
+        item.onclick = () => playerItem(index);
+      } else item.tabIndex = -1;
+      item.onmouseenter = event => showTip(key, event);
+      item.onmousemove = event => moveTip(event);
+      item.onmouseleave = () => { $("#tip").hidden = true; };
+      slot.appendChild(item);
+    }
+    box.appendChild(slot);
+  }
+}
+function showTip(key, event) {
+  const tip = $("#tip");
+  tip.replaceChildren(el("b", "", ITEMS[key].name), el("span", "", ITEMS[key].tip));
+  tip.hidden = false;
+  moveTip(event);
+}
+function moveTip(event) {
+  const tip = $("#tip");
+  tip.style.left = Math.min(event.clientX + 16, innerWidth - 260) + "px";
+  tip.style.top = Math.max(8, event.clientY - 80) + "px";
 }
 function flags(s) {
-  return [s.para && "Paralyzed", s.band && "Choice Band on", s.hidden && "Vanished"].filter(Boolean).join(", ");
+  return [s.para && "paralyzed", s.band && "Choice Band on", s.hidden && "vanished"].filter(Boolean).join(", ");
 }
 function render() {
   if (!g) return;
-  const you = g.s[YOU], foe = g.s[FOE], mine = g.turn === YOU && !g.busy && !g.over;
-  $("#round-label").textContent = "Round " + g.round + " of 3";
-  $("#score-label").textContent = "You " + g.wins[YOU] + ", Giratina " + g.wins[FOE];
-  drawHp("you", you);
-  drawHp("foe", foe);
-  $("#you-flags").textContent = flags(you);
-  $("#foe-flags").textContent = flags(foe);
-  $("#foe-items").textContent = foe.items.length ? "Holding " + foe.items.map(k => ITEMS[k].name).join(", ") + "." : "Holding nothing.";
+  const you = g.s[YOU], foe = g.s[FOE];
+  const mine = g.turn === YOU && !g.busy && !g.over && !g.loading;
+  $("#round-label").textContent = "Round " + g.round + " of 3. You " + g.wins[YOU] + ", Giratina " + g.wins[FOE] + ".";
+  drawBolts("you", you, YOU);
+  drawBolts("foe", foe, FOE);
+  drawSlots("you", you, true);
+  drawSlots("foe", foe, false);
+  $("#dealer").classList.toggle("vanished", foe.hidden);
 
-  const shells = $("#shells");
-  shells.replaceChildren(
-    ...g.spent.map(live => el("span", "shell spent " + (live ? "live" : "blank"))),
-    ...g.shells.map(() => el("span", "shell unknown")));
-  const chamber = $("#chamber");
-  chamber.replaceChildren();
-  const loadedLine = el("span");
-  loadedLine.append("This load: ", el("b", "", g.loaded[0] + " live / " + g.loaded[1] + " blank"), ". " + g.shells.length + " left in the gun.");
-  chamber.appendChild(loadedLine);
-  if (you.knows !== null) chamber.appendChild(el("span", "seen", "Scope Lens: the shell in the chamber is " + (you.knows ? "live." : "blank.")));
+  const info = $("#info");
+  info.replaceChildren();
+  info.append(el("div", "", g.loaded[0] + " live / " + g.loaded[1] + " blank loaded"), el("div", "", g.shells.length + " in the gun"));
+  const status = [flags(you) && "You: " + flags(you), flags(foe) && "Giratina: " + flags(foe)].filter(Boolean);
+  for (const line of status) info.appendChild(el("div", "", line));
+  if (you.knows !== null) info.appendChild(el("div", "seen", "Scope Lens: chamber is " + (you.knows ? "live" : "blank")));
 
-  const box = $("#you-items");
-  box.replaceChildren(...you.items.map((key, index) => {
-    const b = el("button", "item", ITEMS[key].name);
-    b.type = "button";
-    b.title = ITEMS[key].tip;
-    b.disabled = !mine || (key === "potion" && you.hp >= you.max) || (key === "band" && you.band) ||
-      (key === "wave" && (foe.para || you.waveLock));
-    b.onclick = () => { if (g.turn === YOU && !g.busy && !g.over) useItem(YOU, index); };
-    return b;
-  }));
-  if (!you.items.length) box.appendChild(el("span", "holding", "No items."));
-  $("#shoot-self").disabled = !mine;
-  $("#shoot-foe").disabled = !mine;
+  const gun = $("#gun");
+  gun.disabled = !mine || g.holding;
+  gun.classList.toggle("ready", mine && !g.holding);
+  $("#choices").hidden = !(mine && g.holding);
 }
+
+/* ── Picking up the gun ───────────────────────────────────────────────── */
+$("#gun").onclick = async () => {
+  if (!g || g.turn !== YOU || g.busy || g.over || g.loading) return;
+  g.holding = true;
+  $("#tip").hidden = true;
+  render();
+  hint("Who do you shoot?");
+  $("#shoot-foe").focus();
+};
+$("#put-down").onclick = () => { if (!g || !g.holding) return; g.holding = false; render(); hint("Your turn. Use items, then pick up the gun."); };
+$("#shoot-self").onclick = () => { if (g && g.holding && !g.busy && !g.over) fire(YOU, true); };
+$("#shoot-foe").onclick = () => { if (g && g.holding && !g.busy && !g.over) fire(YOU, false); };
 
 /* ── The lobby ────────────────────────────────────────────────────────── */
 const note = text => { $("#lobby-note").textContent = text; };
@@ -666,8 +967,13 @@ $("#test-start").onclick = () => { note(""); begin(document.querySelector('input
 
 function toLobby() {
   g = null;
-  $("#table").hidden = true;
+  $("#hud").hidden = true;
   $("#lobby").hidden = false;
+  $("#tip").hidden = true;
+  $("#dealer").classList.add("away");
+  $("#gun").classList.remove("at-you", "at-foe", "ready");
+  $("#scene").classList.remove("tilt");
+  $("#shell-layer").replaceChildren();
   refreshCoins();
 }
 $("#to-lobby").onclick = toLobby;
@@ -693,8 +999,6 @@ $("#leave").onclick = () => {
   endGame(false, true);
   g = null;
 };
-$("#shoot-self").onclick = () => { if (g && g.turn === YOU && !g.busy && !g.over) fire(YOU, true); };
-$("#shoot-foe").onclick = () => { if (g && g.turn === YOU && !g.busy && !g.over) fire(YOU, false); };
 $("#back").onclick = () => parent.postMessage({ type: "bored:close" }, "*");
 
 /* ── Leaderboard ──────────────────────────────────────────────────────── */

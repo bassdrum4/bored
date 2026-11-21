@@ -1,5 +1,5 @@
 import {
-  ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, ADMIN_PREVIEWS, loadGameDocument
+  ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, ADMIN_PREVIEWS, SANDBOXED_GAMES, loadGameDocument
 } from './games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
@@ -270,7 +270,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   // Admin preview content can be updated independently by a contributor.
   // Give it an opaque origin: even an XSS inside this game cannot read the
   // parent's session, call parent functions, or modify the Poké Gacha wallet.
-  if (adminPreview) gameFrame.setAttribute('sandbox', 'allow-scripts');
+  // Public games on SANDBOXED_GAMES get the same opaque origin.
+  const sandboxed = adminPreview || SANDBOXED_GAMES.includes(slug);
+  if (sandboxed) gameFrame.setAttribute('sandbox', 'allow-scripts');
   else gameFrame.removeAttribute('sandbox');
   activeSlug = previousSlug = slug;
   // Ordinary games have shareable URLs; multiplayer sessions remain private.
@@ -346,8 +348,11 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
         '#cover > p.muted:last-child{display:none!important}' +
         '@media(pointer:fine){footer{display:none!important}}' +
         '</style>' : '';
+      // A sandboxed frame gets only the key bridge: no resume save or analytics,
+      // which need same-origin storage it does not have.
       gameFrame.srcdoc = injectHead(html, adminPreview
         ? '<script>window.__boredPreviewAuthorized=true;</' + 'script>' + head
+        : sandboxed ? head
         : resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
       const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
@@ -1029,8 +1034,10 @@ addEventListener('message', event => {
   if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
     case 'bored:admin-preview-wallet-request':
-      // The untrusted sandbox has only this read-only, narrowly scoped bridge.
-      if (Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) {
+      // The untrusted sandbox has only this read-only, narrowly scoped bridge:
+      // admin previews for an admin, and public sandboxed games for anyone.
+      if ((Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) ||
+          SANDBOXED_GAMES.includes(activeSlug)) {
         event.source.postMessage({
           type: 'bored:admin-preview-wallet', coins: walletBalance(readWallet()).coins || 0
         }, '*');
@@ -1038,11 +1045,14 @@ addEventListener('message', event => {
       break;
     case 'bored:roulette':
       // Shotgun Roulette's bets, payouts and board. The sandboxed frame only asks;
-      // src/hub/roulette.js enforces every limit, and only for a verified admin.
-      if (event.source === gameFrame.contentWindow && activeSlug === 'shotgun-roulette' &&
-          Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) {
+      // src/hub/roulette.js enforces every limit. Anyone may read the board and
+      // their own balance; only a signed-in player may bet.
+      if (event.source === gameFrame.contentWindow && activeSlug === 'shotgun-roulette') {
         const frame = event.source, id = event.data.id;
-        roulette(event.data).then(reply => {
+        const answer = event.data.op === 'bet' && !hasIdentity()
+          ? Promise.resolve({ ok: false, reason: 'signin' })
+          : roulette(event.data);
+        answer.then(reply => {
           if (gameFrame.contentWindow === frame) frame.postMessage({ type: 'bored:roulette-result', id, ...reply }, '*');
         });
       }
@@ -1170,7 +1180,13 @@ async function renderAnalyticsLink() {
     link.hidden = false;
     if (access.kind === 'admin') {
       adminPreviewAccess = true;
-      previewLink.hidden = false;
+      // The footer link only appears while there is a game in preview.
+      const preview = Object.keys(ADMIN_PREVIEWS)[0];
+      previewLink.hidden = !preview;
+      if (preview) {
+        previewLink.href = '#' + preview;
+        previewLink.textContent = ADMIN_PREVIEWS[preview] + ' (admin preview) · ';
+      }
       // Allow an admin's direct preview link once the async role check finishes.
       if (Object.hasOwn(ADMIN_PREVIEWS, location.hash.slice(1))) syncGameFromHash();
     }
@@ -1180,7 +1196,8 @@ async function renderAnalyticsLink() {
 }
 $('#admin-preview-link').addEventListener('click', event => {
   event.preventDefault();
-  if (window.__boredAdminPreviewAllowed('shotgun-roulette')) openGame('shotgun-roulette', null, event.currentTarget);
+  const preview = Object.keys(ADMIN_PREVIEWS)[0];
+  if (preview && window.__boredAdminPreviewAllowed(preview)) openGame(preview, null, event.currentTarget);
 });
 window.addEventListener('bored:identity', () => void renderAnalyticsLink());
 void renderAnalyticsLink();

@@ -343,53 +343,30 @@ test('browser regressions', async t => {
   await page.goto(url);
   await settleBoard();
 
-  await t.test('admin-only preview stays hidden and rejects guest and direct launches', async () => {
+  await t.test('Shotgun Roulette is public and still opens in a sandboxed frame', async () => {
+    // No game is in admin preview, so the footer link stays hidden.
     assert.equal(await page.$eval('#admin-preview-link', el => el.hidden), true);
-    assert.equal(await page.evaluate(() => document.querySelectorAll('.card[data-slug="shotgun-roulette"]').length), 0);
-    assert.equal(await page.evaluate(() => document.querySelectorAll('#recent-list [data-slug="shotgun-roulette"]').length), 0);
-    assert.equal(await page.evaluate(() => ORDER.some(([id]) => id === 'shotgun-roulette')), false);
-
-    // Neither the public window.openGame function nor an ordinary deep link can open it.
+    assert.equal(await page.evaluate(() => ORDER.some(([id]) => id === 'shotgun-roulette')), true);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('.card[data-slug="shotgun-roulette"]').length), 1);
     await page.evaluate(() => openGame('shotgun-roulette'));
-    assert.equal(await page.$eval('#player', el => el.hidden), true);
-    await page.evaluate(() => { location.hash = '#shotgun-roulette'; });
-    await pause(100);
-    assert.equal(await page.$eval('#player', el => el.hidden), true);
-    await page.evaluate(() => history.replaceState(null, '', location.pathname + location.search));
-
-    // A file URL can still be fetched on GitHub Pages, but must never activate the preview UI.
-    const directPage = await browser.newPage();
     try {
-      await directPage.goto(new URL('games/content/shotgun-roulette.html', url).href);
-      assert.match(await directPage.$eval('body', el => el.textContent), /Admin access required/);
-      assert.equal(await directPage.evaluate(() => document.querySelectorAll('button[data-mode]').length), 0);
+      await page.waitForFunction(() => document.querySelector('#frame')?.title === 'Shotgun Roulette');
+      // Public, but still an opaque origin: it cannot read the session or the wallet.
+      assert.equal(await page.$eval('#frame', el => el.getAttribute('sandbox')), 'allow-scripts');
+      assert.equal(await page.evaluate(() => window.current), 'shotgun-roulette');
     } finally {
-      await directPage.close();
+      await page.evaluate(() => closeGame({ force: true }));
     }
   });
 
-  await t.test('admin preview launcher opens a sandboxed game without entering public recents', async () => {
-    // Simulate only the successful authorization decision, not an actual admin
-    // session: this verifies routing/rendering separately from RLS auth.
-    await page.evaluate(() => {
-      window.__originalPreviewGuard = window.__boredAdminPreviewAllowed;
-      window.__boredAdminPreviewAllowed = slug => slug === 'shotgun-roulette';
-      openGame('shotgun-roulette', null, document.querySelector('#admin-preview-link'));
-    });
+  await t.test('Shotgun Roulette opened on its own still offers a test game', async () => {
+    const directPage = await browser.newPage();
     try {
-      await page.waitForFunction(() =>
-        document.querySelector('#frame')?.contentDocument === null ||
-        document.querySelector('#frame')?.title === 'Shotgun Roulette');
-      assert.equal(await page.$eval('#frame', el => el.getAttribute('sandbox')), 'allow-scripts');
-      assert.equal(await page.evaluate(() => window.current), 'shotgun-roulette');
-      assert.equal(await page.evaluate(() => document.querySelectorAll('#recent-list [data-slug="shotgun-roulette"]').length), 0);
-      assert.equal(await page.evaluate(() => document.querySelectorAll('.card[data-slug="shotgun-roulette"]').length), 0);
+      await directPage.goto(new URL('games/content/shotgun-roulette.html', url).href);
+      assert.equal(await directPage.evaluate(() => document.querySelectorAll('button[data-mode]').length), 2);
+      assert.equal(await directPage.evaluate(() => !!document.querySelector('#test-start')), true);
     } finally {
-      await page.evaluate(() => {
-        window.__boredAdminPreviewAllowed = window.__originalPreviewGuard;
-        delete window.__originalPreviewGuard;
-        closeGame({ force: true });
-      });
+      await directPage.close();
     }
   });
 
@@ -1765,6 +1742,9 @@ test('browser regressions', async t => {
     const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
+      // A sandboxed game (SANDBOXED_GAMES) has an opaque origin, so its window
+      // cannot be read from here by design; it is covered by its own test.
+      if (await page.$eval('#frame', frame => frame.hasAttribute('sandbox'))) { await close(); continue; }
       // A populated iframe can still be the loading stand-in. Wait for the
       // current document's title and seed, not a fixed delay or live metrics
       // (some snapshot metrics are initialized only when a run starts).
