@@ -343,6 +343,31 @@ test('browser regressions', async t => {
   await page.goto(url);
   await settleBoard();
 
+  await t.test('admin-only preview stays hidden and rejects guest and direct launches', async () => {
+    assert.equal(await page.$eval('#admin-preview-link', el => el.hidden), true);
+    assert.equal(await page.$eval('.card[data-slug="shotgun-roulette"]', els => els.length), 0);
+    assert.equal(await page.$eval('#recent-list [data-slug="shotgun-roulette"]', els => els.length), 0);
+    assert.equal(await page.evaluate(() => ORDER.some(([id]) => id === 'shotgun-roulette')), false);
+
+    // Neither the public window.openGame function nor an ordinary deep link can open it.
+    await page.evaluate(() => openGame('shotgun-roulette'));
+    assert.equal(await page.$eval('#player', el => el.hidden), true);
+    await page.evaluate(() => { location.hash = '#shotgun-roulette'; });
+    await pause(100);
+    assert.equal(await page.$eval('#player', el => el.hidden), true);
+    await page.evaluate(() => history.replaceState(null, '', location.pathname + location.search));
+
+    // A file URL can still be fetched on GitHub Pages, but must never activate the preview UI.
+    const directPage = await browser.newPage();
+    try {
+      await directPage.goto(new URL('games/content/shotgun-roulette.html', url).href);
+      assert.match(await directPage.$eval('body', el => el.textContent), /Admin access required/);
+      assert.equal(await directPage.$('button[data-mode]').then(els => els.length), 0);
+    } finally {
+      await directPage.close();
+    }
+  });
+
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
     // Counts come from the catalog so adding a game does not have to touch this
     // file: the suite checks the wiring, not the catalogue's contents.
