@@ -104,17 +104,14 @@
 
 <script>
 /* Shotgun Roulette: a shell for now. Nothing here spends or grants coins.
-   The balance comes from the hub's wallet through parent.__boredGacha, the
-   same bridge Poké Gacha reads. Scores will go to shotgun_roulette_scores
+   The balance is read from a narrow postMessage bridge, not from direct
+   access to the parent window or its wallet. Scores will go to shotgun_roulette_scores
    (sql/shotgun_roulette.sql) once the game exists. */
 // This is a static GitHub Pages file, so the actual bytes are public. The
 // hub still requires a verified admin session to open the preview, and a
 // standalone/direct load displays a denial instead of activating its UI.
-const authorized = (() => {
-  try {
-    return parent !== window && parent.__boredAdminPreviewAllowed?.('shotgun-roulette') === true;
-  } catch { return false; }
-})();
+// The parent sets this marker only inside the sandboxed admin preview frame.
+const authorized = parent !== window && window.__boredPreviewAuthorized === true;
 if (!authorized) {
   const message = document.createElement('p');
   message.textContent = 'Admin access required. Open this preview from Bored while signed in as an admin.';
@@ -123,24 +120,19 @@ if (!authorized) {
 } else {
   document.body.style.visibility = 'visible';
 const $ = s => document.querySelector(s);
-const G = (() => { try { return parent !== window && parent.__boredGacha ? parent.__boredGacha : null; } catch { return null; } })();
-
 function showCoins() {
-  let coins = 0;
-  try { coins = (G && G.state().balance.coins) || 0; } catch {}
-  $('#coins').textContent = coins.toLocaleString('en-US');
+  parent.postMessage({ type: 'bored:admin-preview-wallet-request' }, '*');
 }
+addEventListener('message', event => {
+  if (event.source !== parent || event.data?.type !== 'bored:admin-preview-wallet') return;
+  const coins = event.data.coins;
+  if (Number.isSafeInteger(coins) && coins >= 0) $('#coins').textContent = coins.toLocaleString('en-US');
+});
 showCoins();
 addEventListener('focus', showCoins);
 
 // Back: use the arcade's own back button when embedded, else go to the arcade.
-$('#back').onclick = () => {
-  try {
-    const hubBack = parent !== window && parent.document.getElementById('back');
-    if (hubBack) { hubBack.click(); return; }
-  } catch {}
-  location.href = '../../index.html#library';
-};
+$('#back').onclick = () => parent.postMessage({ type: 'bored:close' }, '*');
 
 // Placeholder rows for both boards.
 for (const panel of document.querySelectorAll('[role="tabpanel"]')) {
