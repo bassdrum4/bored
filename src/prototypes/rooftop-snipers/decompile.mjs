@@ -518,10 +518,16 @@ function check() {
 }
 
 function rebuild(outFile) {
-  const { build, html, start, end, formatted } = decompile();
+  // The source in this folder is editable; do not regenerate it from the shipped
+  // payload or user edits will silently be lost during repacking.
+  const { build, html, start, end } = readBuild();
+  const editedSource = readFileSync(SOURCE, 'utf8');
+  const programAt = editedSource.indexOf('(function(global');
+  if (programAt < 0) throw new Error('editable asm.js source is missing its program');
+  const editedProgram = editedSource.slice(programAt);
   if (!html) throw new Error('could not locate the game document');
   const next = { ...build, assets: { ...build.assets } };
-  next.assets[CODE_KEY] = unityGzip(formatted.text).toString('base64');
+  next.assets[CODE_KEY] = unityGzip(editedProgram).toString('base64');
   const packed = html.slice(0, start) + JSON.stringify(next) + html.slice(end);
   writeFileSync(resolve(outFile), packed);
   console.log(JSON.stringify({
