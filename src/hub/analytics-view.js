@@ -50,6 +50,43 @@ function bars(target, rows, label) {
   }));
   if (!rows.length) $(target).append(el('p', 'No activity recorded yet.'));
 }
+// Proportions are more readable as a donut than as a long list of small bars.
+// Keep the raw numbers alongside percentages and exclude zero-only categories.
+function donut(target, rows, label, value, format = n => n.toLocaleString()) {
+  const entries = rows.map(row => ({ name: String(label(row)), amount: Math.max(0, Number(value(row)) || 0) }))
+    .filter(row => row.amount > 0).sort((a, b) => b.amount - a.amount);
+  const total = entries.reduce((sum, row) => sum + row.amount, 0);
+  const host = $(target);
+  if (!host) return;
+  if (!total) { host.replaceChildren(el('p', 'No activity recorded yet.')); return; }
+  // Tiny categories remain represented, but get grouped to keep the key readable.
+  const kept = entries.slice(0, 7);
+  if (entries.length > 7) kept.push({ name: 'Other', amount: entries.slice(7).reduce((sum, row) => sum + row.amount, 0) });
+  const palette = ['#456653','#bd694b','#d1a04b','#648da5','#8a75a5','#779a6d','#b67c94','#8b8b80'];
+  let cursor = 0;
+  const stops = kept.map((row, i) => {
+    const start = cursor / total * 100;
+    cursor += row.amount;
+    return `${palette[i]} ${start}% ${cursor / total * 100}%`;
+  });
+  const figure = el('div'); figure.className = 'analytics-donut-layout';
+  const wheel = el('div'); wheel.className = 'analytics-donut';
+  wheel.style.background = 'conic-gradient(' + stops.join(',') + ')';
+  wheel.setAttribute('role', 'img');
+  wheel.setAttribute('aria-label', kept.map(row => row.name + ': ' + format(row.amount) + ' (' + Math.round(row.amount / total * 100) + '%)').join('; '));
+  const middle = el('div'); middle.className = 'analytics-donut-middle';
+  middle.append(el('strong', format(total)), el('span', 'Total'));
+  wheel.append(middle);
+  const legend = el('div'); legend.className = 'analytics-donut-legend';
+  kept.forEach((row, i) => {
+    const line = el('div'); line.className = 'analytics-donut-key';
+    const dot = el('i'); dot.style.backgroundColor = palette[i]; dot.setAttribute('aria-hidden', 'true');
+    const name = el('span', row.name); name.title = row.name;
+    const number = el('strong', format(row.amount) + ' · ' + (row.amount / total * 100).toFixed(1) + '%');
+    line.append(dot, name, number); legend.append(line);
+  });
+  figure.append(wheel, legend); host.replaceChildren(figure);
+}
 function gameRows(games) {
   return games.map(g => [names[g.id] || g.id, g.sessions, g.users.size, duration(g.active), duration(g.visible), duration(g.active / g.sessions), g.completed, g.errors]);
 }
@@ -198,13 +235,9 @@ function renderF14(rows) {
     }
     return [...map.values()].sort((a,b) => b.count-a.count || b.active-a.active);
   };
-  table('#f14-modes', ['Mode','Sorties','Active time'],
-    group('mode').map(s => [s.id,s.count,duration(s.active)]));
-  table('#f14-aircraft', ['Vehicle','Sorties','Active time'],
-    group('aircraft').map(s => [s.id,s.count,duration(s.active)]));
-  const outcomes = group('outcome');
-  table('#f14-outcomes', ['Outcome','Sorties'],
-    outcomes.map(s => [s.id,s.count]));
+  donut('#f14-modes', group('mode'), s => s.id, s => s.count);
+  donut('#f14-aircraft', group('aircraft'), s => s.id, s => s.count);
+  donut('#f14-outcomes', group('outcome'), s => s.id, s => s.count);
 }
 function renderHistory() {
   const totals = aggregateSummary?.totals;
@@ -279,9 +312,9 @@ function render() {
   $('#totals').replaceChildren(...stats.map(([label, value]) => { const n = el('div'); n.className = 'analytics-stat'; n.append(el('strong', value), el('span', label)); return n; }));
   bars('#game-chart', report.games, r => names[r.id] || r.id);
   bars('#day-chart', report.days, r => r.id);
-  bars('#source-chart', report.sources, r => r.id + ' · ' + r.sessions + ' sessions');
-  bars('#device-chart', report.devices, r => r.id);
-  bars('#mode-chart', report.modes, r => r.id);
+  donut('#source-chart', report.sources, r => r.id, r => r.active, duration);
+  donut('#device-chart', report.devices, r => r.id, r => r.active, duration);
+  donut('#mode-chart', report.modes, r => r.id, r => r.active, duration);
   const maxHour = Math.max(1, ...report.hours.map(h => h.active));
   $('#hour-chart').replaceChildren(...report.hours.map(h => {
     const n = el('div'); n.className = 'analytics-hour';
