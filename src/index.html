@@ -66,7 +66,7 @@ try {
   <section id="announcement-banner" class="announcement-banner" aria-label="Latest announcement" hidden></section>
   <p id="together-home" class="bt-home" hidden><a id="together-home-link" href="#together"></a></p>
   <section id="together" aria-labelledby="together-heading" hidden>
-    <div class="section-heading"><div><p class="eyebrow">Bored / Together</p><h2 id="together-heading">Bored Together</h2></div>
+    <div class="section-heading"><div><p class="eyebrow">Bored / Together</p><h2 id="together-heading">Bored Together</h2><svg class="bo bo-sm" data-mood="pleased" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#pleased"/></svg></div>
     <div class="bt-actions"><button id="together-refresh" class="action" type="button">Refresh</button><button id="together-back" class="action" type="button">All Games</button></div></div>
     <p id="together-status" role="status" aria-live="polite"></p>
     <div id="together-content"></div>
@@ -123,7 +123,7 @@ try {
   </section>
 
   <section id="leaderboard" aria-labelledby="leaderboard-heading">
-    <h2 id="leaderboard-heading">Leaderboard</h2>
+    <div class="bo-heading"><h2 id="leaderboard-heading">Leaderboard</h2><svg class="bo bo-sm" data-mood="surprised" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#surprised"/></svg></div>
     <div class="lb-bar">
       <button id="lb-refresh" class="action" type="button">Refresh</button>
     </div>
@@ -134,7 +134,7 @@ try {
   </section>
   <section id="settings" class="settings-page" aria-labelledby="settings-heading" hidden>
     <div class="settings-intro">
-      <div><p class="eyebrow">A few things your way</p><h2 id="settings-heading">Settings<span class="wordmark-dot">.</span></h2>
+      <div><p class="eyebrow">A few things your way</p><div class="bo-heading"><h2 id="settings-heading">Settings<span class="wordmark-dot">.</span></h2><svg class="bo bo-sm" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg></div>
       <p>Just the useful stuff. No account required, and no settings maze.</p></div>
       <span class="settings-local-note">Saved on this device</span>
     </div>
@@ -223,7 +223,7 @@ try {
 
 <dialog id="feedback-dialog" aria-labelledby="feedback-title">
   <form id="feedback-form" novalidate>
-    <h2 id="feedback-title">Send feedback</h2>
+    <div class="bo-heading"><h2 id="feedback-title">Send feedback</h2><svg class="bo bo-sm" data-mood="shrug" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#shrug"/></svg></div>
     <p id="feedback-blurb">Something broken? A game that will not load? A game you want added? Tell me.</p>
     <label for="feedback-text">Message<textarea id="feedback-text" rows="5" maxlength="2000" required></textarea></label>
     <label for="feedback-email">Email (only if you want a reply)<input id="feedback-email" type="email" autocomplete="email" maxlength="120"></label>
@@ -237,7 +237,7 @@ try {
 
 <dialog id="enjoyment-dialog" aria-labelledby="enjoyment-title">
   <form id="enjoyment-form">
-    <h2 id="enjoyment-title">Quick question</h2>
+    <div class="bo-heading"><h2 id="enjoyment-title">Quick question</h2><svg class="bo bo-sm" data-mood="surprised" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#surprised"/></svg></div>
     <p>Be honest. How is Bored treating you?</p>
     <fieldset class="enjoyment-choices"><legend>Your rating</legend>
       <label><input type="radio" name="rating" value="5" required> Obsessed</label>
