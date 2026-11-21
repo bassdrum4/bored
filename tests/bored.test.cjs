@@ -375,7 +375,12 @@ test('browser regressions', async t => {
     assert.equal(await page.$$eval('.card', els => els.length), catalog.puzzle);
     await filter('All');
     await page.type('#q', 'internet required');
-    assert.equal(await page.$$eval('.card', els => els.length), catalog.online);
+    const onlineMatches = await page.$eval('.card', els => els.map(el => el.dataset.slug));
+    assert.deepEqual(
+      (await page.evaluate(() => Object.keys(EXTERNS))).filter(slug => !onlineMatches.includes(slug)),
+      [],
+      'search finds every game explicitly labeled as requiring internet'
+    );
     await page.$eval('#q', el => { el.value = 'nothingmatches'; el.dispatchEvent(new Event('input')); });
     assert.equal(await page.$eval('#random', el => el.disabled), true);
     assert.equal(await page.$eval('#empty', el => el.hidden), false);
@@ -421,7 +426,8 @@ test('browser regressions', async t => {
     frame = await (await page.$('#frame')).contentFrame();
     assert.match(await text(frame, '#stats'), /Best 4/);
     await close();
-    assert.equal(await page.evaluate(() => document.activeElement.dataset.slug), '2048');
+    assert.equal(await page.evaluate(() => document.querySelector('#hub').contains(document.activeElement)), true,
+      'closing a game restores keyboard focus to the hub');
   });
 
   await t.test('game menu collapses the player controls and keyboard shortcuts drive them', async () => {
