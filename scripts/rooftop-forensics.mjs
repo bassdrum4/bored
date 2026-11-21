@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 const html = readFileSync('src/games/content/rooftop-snipers.html', 'utf8');
-const build = JSON.parse(html.match(/<script id="unity-build" type="application\\/json">([\\s\\S]*?)<\\/script>/)[1]);
+const marker = '<script id="unity-build" type="application/json">';
+const left = html.indexOf(marker) + marker.length;
+const right = html.indexOf('</script>', left);
+const build = JSON.parse(html.slice(left, right));
 const codeKey = 'rooftop-snipers.asm.code.unityweb';
 const dataKey = 'rooftop-snipers.data.unityweb';
 const memKey = 'rooftop-snipers.asm.memory.unityweb';
@@ -9,7 +12,7 @@ const unzip = key => gunzipSync(Buffer.from(build.assets[key], 'base64'));
 const data = unzip(dataKey), mem = unzip(memKey);
 console.log('sizes', {code:unzip(codeKey).length, data:data.length, mem:mem.length});
 function files(buf){
- const magic='UnityWebData1.0\\0', files=new Map();if(!buf.subarray(0,magic.length).equals(Buffer.from(magic,'latin1')))throw Error('container');
+ const magic='UnityWebData1.0\0', files=new Map();if(!buf.subarray(0,magic.length).equals(Buffer.from(magic,'latin1')))throw Error('container');
  const end=buf.readInt32LE(magic.length);for(let at=magic.length+4;at<end;){
   const off=buf.readInt32LE(at),sz=buf.readInt32LE(at+4),l=buf.readInt32LE(at+8),n=buf.subarray(at+12,at+12+l).toString('utf8');files.set(n,buf.subarray(off,off+sz));at+=12+l;
  }return files;
