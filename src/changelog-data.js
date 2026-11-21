@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 733,
+  "count": 734,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"f08d974","date":"2026-11-20","author":"Daniel Lowe","subject":"Allow vetted Shotgun Roulette game-only PRs to auto-merge after test job"},
   {"sha":"0e04ff9","date":"2026-11-20","author":"PenguinV360","subject":"poke-gacha: owner's Bug shot and burst art","pr":275},
   {"sha":"de9fd25","date":"2026-11-20","author":"PenguinV360","subject":"Fix the hub search test: read every matching card, not one","pr":276},
   {"sha":"90c9977","date":"2026-11-20","author":"Daniel Lowe","subject":"Retry alternate archive dates automatically when crossword candidates are unusable"},
