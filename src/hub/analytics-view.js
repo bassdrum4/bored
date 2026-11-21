@@ -95,6 +95,7 @@ const gameColumns = ['Game','Sessions','Accounts','Active time','Visible time','
 // iframe is not a new match and does not improve a game's solo rank.
 function renderPopularity() {
   if (!Array.isArray(popularitySummary?.games)) {
+    $('#popularity-chart').replaceChildren();
     $('#game-popularity').replaceChildren(el('p', 'Authoritative popularity breakdown is unavailable.'));
     return;
   }
