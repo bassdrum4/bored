@@ -2357,6 +2357,7 @@ test('ranged units turn to face whoever they act on now, and keep that way when 
   assert.deepEqual(errors, []);
 });
 
+// Regression: projectile rendering must track the current target, not its launch position.
 test('projectiles point along their path in 8 directions and follow a moving target', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null;
