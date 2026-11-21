@@ -49,3 +49,11 @@
 #discovery-chart{margin:16px 0 22px;max-width:940px}
 #history-ui-chart .analytics-bar-row,#engagement-together-chart .analytics-bar-row{grid-template-columns:minmax(150px,245px) 1fr 80px}
 @media(max-width:650px){#history-ui-chart .analytics-bar-row,#engagement-together-chart .analytics-bar-row{grid-template-columns:minmax(100px,130px) 1fr 55px}}
+
+/* Charts are the default; detailed numeric tables are available on demand. */
+.analytics-raw-data{margin:12px 0 24px}
+.analytics-raw-data>summary{display:list-item;width:fit-content;cursor:pointer;color:var(--ink,#242424);font-size:12px;text-decoration:underline;text-underline-offset:3px;padding:7px 4px}
+.analytics-raw-data>summary:hover{color:#456653}
+.analytics-raw-data[open]{border-top:1px solid var(--rule,#d5d0c5);padding-top:8px}
+.analytics-metric-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:15px 0 8px;font-size:13px}
+.analytics-metric-picker select{font:inherit;padding:7px 9px;background:var(--paper,#faf8f2);color:var(--ink,#242424);border:1px solid var(--rule,#aaa);max-width:100%}
