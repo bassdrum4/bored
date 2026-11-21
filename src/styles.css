@@ -601,3 +601,13 @@ body.playing #announcement-banner{display:none!important}
   #announcement-banner .announcement-card p:not(.announcement-eyebrow){-webkit-line-clamp:2}
   #announcement-banner .announcement-dismiss{top:9px;right:8px}
 }
+
+/* Small, contextual Bo cameos on secondary screens; never float over gameplay. */
+.bo-heading{display:flex;align-items:center;gap:12px;min-width:0}
+.bo-heading .bo{flex:none}
+#leaderboard .bo-heading{margin-bottom:16px}
+#leaderboard .bo-heading h2{margin-bottom:0}
+#settings .bo-heading h2{margin-bottom:0}
+#together>.section-heading .bo{margin-left:2px}
+#feedback-dialog .bo-heading,#enjoyment-dialog .bo-heading{margin-bottom:8px}
+#feedback-dialog .bo-heading h2,#enjoyment-dialog .bo-heading h2{margin:0}
