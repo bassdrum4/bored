@@ -342,7 +342,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
         '@media(pointer:fine){footer{display:none!important}}' +
         '</style>' : '';
       gameFrame.srcdoc = injectHead(html, adminPreview
-        ? '<script>window.__boredPreviewAuthorized=true;<\\/script>' + head
+        ? '<script>window.__boredPreviewAuthorized=true;</' + 'script>' + head
         : resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
       const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
