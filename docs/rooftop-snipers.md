@@ -51,12 +51,21 @@ owns, so it is a plain edit to `scripts/templates/rooftop-snipers.html` and
 `src/games/catalog.js`.
 
 The in-game title is a baked Unity texture (`Rooftop Snipers Title`), not text, so
-the running game still shows the original logo. An earlier attempt painted a
-subtitle into that texture and repacked `data.unity3d`; the repacked payload
-opened in UnityPy but the compiled game would not boot, so it was reverted and the
-`data` blob is byte-identical to upstream again. Changing that art needs a loop
-that can watch the game boot in a real browser: the deploy workflow publishes
-`src/` on every push without running the suite, so a broken payload ships.
+the running game still shows the original logo. The title screen's promotion
+controls are actual Unity GameObjects, not HTML elements. In this edition, the
+following objects are deactivated in the serialized Unity scene:
+`FullScreenButton`, `FullScreenIcon`, `FullscreenError`,
+`OnTheAppstore`, both `Tweet` objects, `TweetFavoriteCustomization`, and
+`NewEichGames`. Play, Settings, other menus, controls, and gameplay are
+unchanged. The patch is reproducible via
+`python scripts/rooftop-hide-menu-buttons.py` (UnityPy 1.25.4).
+
+Unlike the original upstream assets, the `data.unityweb` payload is now
+intentionally edited; its updated SHA-256 is pinned in
+`tests/rooftop-snipers.test.cjs`. A previous attempt to paint a subtitle
+onto the title texture did not survive a Unity boot test and was reverted.
+This narrower edit changes only GameObject activation and passed the headless
+Chromium boot test (`npm run test:rooftop`).
 
 ## Reproduce or edit
 
@@ -67,7 +76,12 @@ The shipped HTML contains generated binary payloads. Edit
 git clone https://github.com/SoBloxsy/rooftop-snipers.git ../rooftop-snipers-upstream
 git -C ../rooftop-snipers-upstream checkout 44aad84ec9c5f70ffb6179ed7f4fa91eb5c824bd
 node scripts/package-rooftop-snipers.mjs ../rooftop-snipers-upstream
+# Restore the intentional random-only asm.js edit from the checked-in source.
+node src/prototypes/rooftop-snipers/decompile.mjs --rebuild src/games/content/rooftop-snipers.html
+python -m pip install UnityPy==1.25.4
+python scripts/rooftop-hide-menu-buttons.py
 npm run games:check
+npm run test:rooftop
 npm test
 ```
 

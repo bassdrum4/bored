@@ -26,11 +26,12 @@ test('the original replaces the remake under its existing identity without obsol
 });
 
 test('Rooftop Snipers preserves original gameplay/assets and packages a valid offline Unity framework', () => {
+  // The Unity scene disables promotional title controls (see scripts/rooftop-hide-menu-buttons.py).
   // Prevent accidentally swapping the actual game for the native remake or a
   // placeholder while keeping the new card. Core code, data and memory stay exact.
   for (const [name, hash] of Object.entries({
     'rooftop-snipers.asm.code.unityweb': '9913fd53513f3f019016064ec4451c84d7f349d20c4d793f059d5c6cf3e0fd80',
-    'rooftop-snipers.data.unityweb': 'b82dd5d2ee5567e5759c1f49413d8e48428a92fae7cc79d8da577b4345682f82',
+    'rooftop-snipers.data.unityweb': '9f3d29eb394145dd6f5d6b5c89ea1ecd35a9146f1cf5a99ab3ed7aefe27aa53f',
     'rooftop-snipers.asm.memory.unityweb': '884ffa169399ef39af758b6d4fbc0dfd0a97e6dc8bff5d35a4cf2cf46098b682'
   })) assert.equal(sha(Buffer.from(build.assets[name], 'base64')), hash, name);
   for (const key of ['dataUrl', 'asmCodeUrl', 'asmMemoryUrl', 'asmFrameworkUrl']) {
