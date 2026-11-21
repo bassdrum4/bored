@@ -88,7 +88,7 @@ function donut(target, rows, label, value, format = n => n.toLocaleString()) {
   figure.append(wheel, legend); host.replaceChildren(figure);
 }
 
-function rankedChart(target, rows, label, value, limit = 12) {
+function rankedChart(target, rows, label, value, limit = 12, format = n => n.toLocaleString()) {
   const host = $(target); if (!host) return;
   const data = rows.map(row => ({ label: String(label(row)), value: Math.max(0, Number(value(row)) || 0) }))
     .filter(row => row.value > 0).sort((a,b) => b.value - a.value).slice(0,limit);
@@ -98,7 +98,7 @@ function rankedChart(target, rows, label, value, limit = 12) {
     const name = el('span',row.label); name.className = 'analytics-bar-label'; name.title = row.label;
     const track = el('div'); track.className = 'analytics-bar-track'; track.setAttribute('aria-hidden','true');
     const fill = el('div'); fill.className = 'analytics-bar'; fill.style.width = 100 * row.value / maximum + '%'; track.append(fill);
-    const count = el('span', row.value.toLocaleString()); count.className = 'analytics-bar-value';
+    const count = el('span', format(row.value)); count.className = 'analytics-bar-value';
     line.append(name,track,count); return line;
   }));
   if (!data.length) host.append(el('p','No activity recorded yet.'));
@@ -341,7 +341,34 @@ function renderHistory() {
     table('#history-games', ['Game','All-mode opens','Meaningful','Meaningful rate',
       'Browser IDs','Active time','Median active','Errors'], gameRows);
   }
-  rankedChart('#history-games-chart', popularGames || aggregateSummary.games || [], r => names[r.game] || r.game, r => popularGames ? r.standalone_launches : r.launches);
+  // Ranking is the primary interface; raw cross-metric data is optional below.
+  // Preserve the selected metric when the date filters refresh the report.
+  const picker = $('#history-game-metric');
+  const drawGameComparison = () => {
+    const metric = picker.value;
+    const rows = popularGames || aggregateSummary.games || [];
+    const value = r => {
+      const detail = byGame.get(r.game) || {};
+      switch (metric) {
+        case 'browsers': return popularGames ? r.standalone_browsers : r.browsers;
+        case 'meaningful': return detail.meaningful ?? r.meaningful ?? 0;
+        case 'active': return detail.active_ms ?? r.active_ms ?? 0;
+        case 'together': return popularGames ? r.together_opens : 0;
+        case 'matches': return popularGames ? r.matches_started : 0;
+        case 'turns': return popularGames ? r.turns_played : 0;
+        default: return popularGames ? r.standalone_launches : r.launches;
+      }
+    };
+    rankedChart('#history-games-chart', rows, r => names[r.game] || r.game, value, 15, metric === 'active' ? duration : n => n.toLocaleString());
+  };
+  for (const option of picker.options) {
+    if (['together','matches','turns'].includes(option.value)) option.disabled = !popularGames;
+    if (option.value === 'launches') option.textContent = popularGames ? 'Standalone launches' : 'All-mode opens';
+    if (option.value === 'browsers') option.textContent = popularGames ? 'Standalone browsers' : 'Browser IDs';
+  }
+  if (!popularGames && ['together','matches','turns'].includes(picker.value)) picker.value = 'launches';
+  picker.onchange = drawGameComparison;
+  drawGameComparison();
   donut('#history-sources-chart',aggregateSummary.sources || [],r=>r.source,r=>r.launches);
   table('#history-sources', ['Launch source','Launches','Meaningful','Active time'],
     (aggregateSummary.sources || []).map(r => [r.source,r.launches,r.meaningful,duration(r.active_ms)]));
