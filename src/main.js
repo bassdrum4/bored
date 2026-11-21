@@ -1,5 +1,5 @@
 import {
-  ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, loadGameDocument
+  ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, ADMIN_PREVIEWS, loadGameDocument
 } from './games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
@@ -76,6 +76,9 @@ function element(tag, className, text) {
 /* ── State ────────────────────────────────────────────────────────────────── */
 
 let activeSlug = null;
+// Validated via the existing Supabase analytics_admins role; never inferred from a handle.
+let adminPreviewAccess = false;
+window.__boredAdminPreviewAllowed = slug => adminPreviewAccess && hasIdentity() && Object.hasOwn(ADMIN_PREVIEWS, slug);
 let previousSlug = null;
 let launchSelector = '';
 // The element that opened the current game, kept as a node so a control built
@@ -238,7 +241,7 @@ const lobbyDeps = {
   openTogether: () => { closeGame({ force: true }); document.querySelector('#together-nav')?.click(); }
 };
 function openGame(slug, challenge = null, origin = null, multiplayer = null) {
-  if (!ORDER.some(([id]) => id === slug)) return;
+  if (!ORDER.some(([id]) => id === slug) && !window.__boredAdminPreviewAllowed(slug)) return;
   if (!activeSlug) {
     const from = origin || document.activeElement;
     // A caller that hands over the control it was launched from (the board's
@@ -281,7 +284,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
   saveLibrary();
   renderRecent();
-  const name = ORDER.find(([id]) => id === slug)[1];
+  const name = ADMIN_PREVIEWS[slug] || ORDER.find(([id]) => id === slug)[1];
   gameFrame.title = name;
   $('#challenge-progress').hidden = !challenge;
   $('#hint').hidden = !!challenge;
@@ -423,7 +426,7 @@ function closeGame({ force = false } = {}) {
   gameFrame.srcdoc = '';
   activeSlug = null;
   // Keep the URL aligned with the hub, including Escape and the Back button.
-  if (location.hash && ORDER.some(([id]) => '#' + id === location.hash)) {
+  if (location.hash && (ORDER.some(([id]) => '#' + id === location.hash) || Object.hasOwn(ADMIN_PREVIEWS, location.hash.slice(1)))) {
     history.replaceState(null, '', location.pathname + location.search);
   }
   const together = activeTogether;
@@ -1115,9 +1118,14 @@ const navigation = createHubNavigation({
 let analyticsLinkEpoch = 0;
 async function renderAnalyticsLink() {
   const link = $('#admin-analytics-link');
-  if (!link) return;
+  const previewLink = $('#admin-preview-link');
+  if (!link || !previewLink) return;
   const epoch = ++analyticsLinkEpoch;
   link.hidden = true;
+  previewLink.hidden = true;
+  // A changed or revoked account must immediately lose access to its old preview.
+  adminPreviewAccess = false;
+  if (activeSlug && Object.hasOwn(ADMIN_PREVIEWS, activeSlug)) closeGame({ force: true });
   if (!hasIdentity()) return;
   try {
     const access = await getAnalyticsAccess();
@@ -1126,10 +1134,20 @@ async function renderAnalyticsLink() {
     link.href = access.kind === 'admin' ? './analytics.html' : './civ-lite-analytics.html';
     link.textContent = access.kind === 'admin' ? 'Admin analytics · ' : 'Game analytics · ';
     link.hidden = false;
+    if (access.kind === 'admin') {
+      adminPreviewAccess = true;
+      previewLink.hidden = false;
+      // Allow an admin's direct preview link once the async role check finishes.
+      if (Object.hasOwn(ADMIN_PREVIEWS, location.hash.slice(1))) syncGameFromHash();
+    }
   } catch {
-    // No verified permission means no link, including on a failed network call.
+    // Permission or network failure fails closed: no preview link and no launch.
   }
 }
+$('#admin-preview-link').addEventListener('click', event => {
+  event.preventDefault();
+  if (window.__boredAdminPreviewAllowed('shotgun-roulette')) openGame('shotgun-roulette', null, event.currentTarget);
+});
 window.addEventListener('bored:identity', () => void renderAnalyticsLink());
 void renderAnalyticsLink();
 
@@ -1148,7 +1166,7 @@ function clearFavoriteGames() {
 // Forward, and links pasted into an already-open arcade tab.
 function syncGameFromHash() {
   const slug = location.hash.slice(1);
-  const valid = ORDER.some(([id]) => id === slug);
+  const valid = ORDER.some(([id]) => id === slug) || window.__boredAdminPreviewAllowed(slug);
   if (valid) {
     if (activeSlug !== slug) openGame(slug);
   } else if (activeSlug && !activeTogether) {
