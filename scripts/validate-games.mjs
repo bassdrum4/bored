@@ -36,7 +36,7 @@ for (const [slug, name] of Object.entries(ADMIN_PREVIEWS)) {
   check(existsSync(file), slug + ': missing admin preview document');
   if (existsSync(file)) {
     const html = readFileSync(file, 'utf8');
-    check(/<html[\\s>]/i.test(html) && /<\\/html>/i.test(html), slug + ': invalid admin preview HTML');
+    check(/<html[\s>]/i.test(html) && /<\/html>/i.test(html), slug + ': invalid admin preview HTML');
   }
 }
 
