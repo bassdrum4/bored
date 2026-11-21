@@ -46,6 +46,82 @@
   .island.hard .level { color: var(--gold) }
   .island .locked { display: block; margin-top: 12px; font-size: 14px; color: var(--dim) }
 
+  .bet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 18px; color: var(--dim); font-size: 15px }
+  .bet-row label { color: var(--ink) }
+  .bet-row input { width: 7ch; margin-left: 8px; padding: 6px 8px; border: 1px solid var(--edge); border-radius: 3px; background: var(--platform);
+                   color: var(--gold); font: 600 15px var(--mono) }
+  .bet-row input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
+  .island { cursor: pointer }
+  .island:hover:not(:disabled) { border-color: var(--ink) }
+  .island:disabled { cursor: not-allowed; opacity: .55 }
+  .island.test { margin-top: 56px; background: none; border-style: dashed }
+  .island .pays { display: block; margin-top: 12px; font-size: 14px; color: var(--dim) }
+  .test-pick { display: flex; gap: 14px; margin-top: 10px; font-size: 14px; color: var(--dim) }
+  .test-pick label { display: flex; align-items: center; gap: 5px; cursor: pointer }
+  .test-pick input { accent-color: var(--gold) }
+  .island-test-start { all: unset; display: block; cursor: pointer }
+  .island-test-start:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
+  .lobby-note { min-height: 1.6em; margin-top: 16px; font-size: 15px; color: var(--gold) }
+
+  /* The table: Giratina's world above the horizon, yours below, the shells on the line. */
+  .table[hidden] { display: none }
+  .roundbar { display: flex; align-items: baseline; gap: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--edge); font-size: 15px; color: var(--dim) }
+  .roundbar .round { font: 400 22px/1.2 var(--display); color: var(--ink) }
+  .roundbar .leave { margin-left: auto; padding: 5px 10px; border: 1px solid var(--edge); border-radius: 3px; background: none; font-size: 14px; cursor: pointer }
+  .roundbar .leave:hover { border-color: var(--ink) }
+  .arena { margin-top: 18px }
+  .plate { width: min(360px, 100%) }
+  .plate.you { margin-left: auto }
+  .plate .who { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap }
+  .plate .fname { font: 400 24px/1.2 var(--display) }
+  .plate .forme { font-size: 14px; color: var(--dim) }
+  .plate .flags { font-size: 14px; color: var(--gold) }
+  .hp { display: flex; align-items: center; gap: 8px; margin-top: 6px }
+  .hp .tag { padding: 0 5px; border-radius: 2px; background: var(--gold); color: var(--void); font: 700 11px/1.6 var(--mono) }
+  .hp .bar { flex: 1; height: 8px; border: 1px solid var(--edge); border-radius: 4px; background: var(--platform); overflow: hidden }
+  .hp .fill { display: block; height: 100%; background: #5fcf86; transition: width .45s ease-out }
+  .hp .fill.mid { background: var(--gold) }
+  .hp .fill.low { background: #e0564b }
+  .hp .num { min-width: 4ch; text-align: right; font: 13px var(--mono); font-variant-numeric: tabular-nums }
+  .holding { margin-top: 8px; font-size: 14px; color: var(--dim); min-height: 1.6em }
+  .horizon { position: relative; display: flex; align-items: center; gap: 14px; margin: 26px 0; padding: 12px 0;
+             border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge) }
+  .shells { display: flex; gap: 6px; flex-wrap: wrap }
+  .shell { width: 14px; height: 30px; border: 1px solid var(--ink); border-radius: 7px 7px 2px 2px }
+  .shell.live { background: #e0564b; border-color: #e0564b }
+  .shell.blank { background: var(--platform); border-color: var(--dim) }
+  .shell.spent { opacity: .45; height: 22px }
+  .shell.unknown { border-style: dashed; border-color: var(--dim) }
+  .chamber-text { font-size: 15px; color: var(--dim) }
+  .chamber-text b { color: var(--ink); font-weight: 400 }
+  .chamber-text .seen { display: block; color: var(--gold) }
+  .items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; justify-content: flex-end }
+  .item { padding: 5px 10px; border: 1px solid var(--edge); border-radius: 3px; background: var(--platform); font-size: 14px; cursor: pointer }
+  .item:hover:not(:disabled) { border-color: var(--ink) }
+  .item:disabled { opacity: .45; cursor: not-allowed }
+  .actions { display: flex; gap: 12px; margin-top: 22px }
+  .shoot { flex: 1; padding: 12px 16px; border: 1px solid var(--ink); border-radius: 3px; background: none; font: 400 19px/1.2 var(--display); cursor: pointer }
+  .shoot.at-foe { background: var(--ink); color: var(--void) }
+  .shoot:disabled { opacity: .35; cursor: not-allowed }
+  .hint { min-height: 1.6em; margin-top: 10px; font-size: 15px; color: var(--dim) }
+  .log { height: 190px; overflow-y: auto; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--edge); border-radius: 3px;
+         background: var(--sunk, #0a0712); font-size: 15px; line-height: 1.55 }
+  .log p { color: var(--dim) }
+  .log p.round { color: var(--ink); font-family: var(--display); margin-top: 6px }
+  .log p.live { color: #f08a80 }
+  .log p.secret, .log p.status { color: var(--gold) }
+  .log p.you { color: var(--ink) }
+  .result { margin-top: 18px; padding: 16px 18px; border: 1px solid var(--gold); border-radius: 3px }
+  .result[hidden] { display: none }
+  .result h2 { margin-bottom: 6px }
+  .result p { color: var(--dim) }
+  .result .again { display: flex; gap: 10px; margin-top: 14px }
+  .result button { padding: 8px 14px; border: 1px solid var(--ink); border-radius: 3px; background: none; cursor: pointer }
+  .result button.primary { background: var(--ink); color: var(--void) }
+  .shake { animation: shake .36s }
+  @keyframes shake { 20% { transform: translateX(-7px) } 40% { transform: translateX(6px) } 60% { transform: translateX(-4px) } 80% { transform: translateX(2px) } }
+  @media (prefers-reduced-motion: reduce) { .shake { animation: none } .hp .fill { transition: none } }
+
   .board-panel { border-left: 1px solid var(--edge); padding-left: clamp(20px, 3vw, 36px) }
   @media (max-width: 780px) { .board-panel { border-left: 0; padding-left: 0; border-top: 1px solid var(--edge); padding-top: 24px } }
   .tabs { display: flex; gap: 6px; margin-bottom: 14px }
@@ -69,24 +145,83 @@
 
 <div class="layout">
   <main>
-    <h1 class="title">Shotgun Roulette</h1>
-    <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
-    <p class="status"><b>Under construction.</b> The table opens once the game is built. Your coins stay where they are until then.</p>
+    <div class="lobby" id="lobby">
+      <h1 class="title">Shotgun Roulette</h1>
+      <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
+      <p class="status">Take turns with Giratina pointing a shotgun at yourself or each other. Some shells are live, some are blank. Win two of three rounds.</p>
 
-    <section class="opponents" aria-labelledby="opponents-title">
-      <h2 id="opponents-title">Pick your opponent</h2>
-      <div class="islands" role="group" aria-labelledby="opponents-title">
-        <button class="island normal" type="button" data-mode="normal" disabled>
-          <span class="name">Altered Giratina</span>
-          <span class="level">Normal</span>
-          <span class="locked">Opens with the game</span>
-        </button>
-        <button class="island hard" type="button" data-mode="hard" disabled>
-          <span class="name">Origin Giratina</span>
-          <span class="level">Hard</span>
-          <span class="locked">Opens with the game</span>
-        </button>
+      <section class="opponents" aria-labelledby="opponents-title">
+        <h2 id="opponents-title">Pick your opponent</h2>
+        <div class="bet-row">
+          <label for="bet">Your bet<input id="bet" type="number" min="10" max="500" step="10" value="50" inputmode="numeric"></label>
+          <span id="cap-line">Bets run from 10 to 500 coins. You can win up to 3,000 coins a day.</span>
+        </div>
+        <div class="islands" role="group" aria-labelledby="opponents-title">
+          <button class="island normal" type="button" data-mode="normal">
+            <span class="name">Altered Giratina</span>
+            <span class="level">Normal</span>
+            <span class="pays">A win pays 1.8 times your bet</span>
+          </button>
+          <button class="island hard" type="button" data-mode="hard">
+            <span class="name">Origin Giratina</span>
+            <span class="level">Hard</span>
+            <span class="pays">A win pays 3 times your bet</span>
+          </button>
+          <div class="island test">
+            <button class="island-test-start" id="test-start" type="button">
+              <span class="name">Test Game (no coins)</span>
+              <span class="level">Plays the full game. No bet, no payout, no leaderboard.</span>
+            </button>
+            <div class="test-pick" role="radiogroup" aria-label="Test game difficulty">
+              <label><input type="radio" name="test-mode" value="normal" checked> Normal</label>
+              <label><input type="radio" name="test-mode" value="hard"> Hard</label>
+            </div>
+          </div>
+        </div>
+        <p class="lobby-note" id="lobby-note" role="status"></p>
+      </section>
+    </div>
+
+    <section class="table" id="table" hidden aria-label="Shotgun Roulette table">
+      <div class="roundbar">
+        <span class="round" id="round-label">Round 1 of 3</span>
+        <span id="score-label">You 0, Giratina 0</span>
+        <span id="mode-label"></span>
+        <button class="leave" id="leave" type="button">Leave table</button>
       </div>
+      <div class="arena" id="arena">
+        <div class="plate foe">
+          <div class="who"><span class="fname">Giratina</span><span class="forme" id="foe-forme"></span><span class="flags" id="foe-flags"></span></div>
+          <div class="hp"><span class="tag">HP</span><span class="bar"><span class="fill" id="foe-fill"></span></span><span class="num" id="foe-hp"></span></div>
+          <p class="holding" id="foe-items"></p>
+        </div>
+
+        <div class="horizon">
+          <div class="shells" id="shells" aria-hidden="true"></div>
+          <p class="chamber-text" id="chamber"></p>
+        </div>
+
+        <div class="plate you">
+          <div class="who"><span class="fname">You</span><span class="flags" id="you-flags"></span></div>
+          <div class="hp"><span class="tag">HP</span><span class="bar"><span class="fill" id="you-fill"></span></span><span class="num" id="you-hp"></span></div>
+          <div class="items" id="you-items" aria-label="Your items"></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="shoot at-self" id="shoot-self" type="button">Shoot yourself</button>
+        <button class="shoot at-foe" id="shoot-foe" type="button">Shoot Giratina</button>
+      </div>
+      <p class="hint" id="hint" role="status"></p>
+      <div class="result" id="result" hidden>
+        <h2 id="result-title"></h2>
+        <p id="result-text"></p>
+        <div class="again">
+          <button class="primary" id="again" type="button">Play again</button>
+          <button id="to-lobby" type="button">Pick another opponent</button>
+        </div>
+      </div>
+      <div class="log" id="log" role="log" aria-live="polite" aria-label="What happened"></div>
     </section>
   </main>
 
@@ -98,71 +233,496 @@
     </div>
     <div id="board-normal" role="tabpanel" aria-labelledby="tab-normal"></div>
     <div id="board-hard" role="tabpanel" aria-labelledby="tab-hard" hidden></div>
-    <p class="empty">No runs yet. The first survivor goes here.</p>
+    <p class="empty" id="board-empty">No runs yet. The first survivor goes here.</p>
   </section>
 </div>
 
 <script>
-/* Shotgun Roulette: a shell for now. Nothing here spends or grants coins.
-   The balance is read from a narrow postMessage bridge, not from direct
-   access to the parent window or its wallet. Scores will go to shotgun_roulette_scores
-   (sql/shotgun_roulette.sql) once the game exists. */
-// This is a static GitHub Pages file, so the actual bytes are public. The
-// hub still requires a verified admin session to open the preview, and a
-// standalone/direct load displays a denial instead of activating its UI.
+/* Shotgun Roulette. You and Giratina take turns firing a shotgun loaded with
+   live and blank shells, best of three rounds. The whole game runs here; the
+   frame is sandboxed, so coins and the leaderboard go through the hub with
+   postMessage ("bored:roulette" requests, "bored:roulette-result" replies).
+   Test games never send a coin or board request. If the hub does not answer,
+   real games stay closed and the board stays empty: the game itself never breaks.
+   This is a static GitHub Pages file, so the bytes are public. The hub still
+   requires a verified admin session to open the preview, and a direct load
+   shows a denial instead of the game. */
 // The parent sets this marker only inside the sandboxed admin preview frame.
 const authorized = parent !== window && window.__boredPreviewAuthorized === true;
 if (!authorized) {
-  const message = document.createElement('p');
-  message.textContent = 'Admin access required. Open this preview from Bored while signed in as an admin.';
+  const message = document.createElement("p");
+  message.textContent = "Admin access required. Open this preview from Bored while signed in as an admin.";
   document.body.replaceChildren(message);
-  document.body.style.visibility = 'visible';
+  document.body.style.visibility = "visible";
+  window.__boredSnapshot = () => ({ slug: "shotgun-roulette", rounds: 0, finished: false });
 } else {
-  document.body.style.visibility = 'visible';
+document.body.style.visibility = "visible";
+
 const $ = s => document.querySelector(s);
-function showCoins() {
-  parent.postMessage({ type: 'bored:admin-preview-wallet-request' }, '*');
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const wait = ms => new Promise(done => setTimeout(done, ms));
+const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+const pick = list => list[Math.floor(Math.random() * list.length)];
+const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+
+/* ── Rules ────────────────────────────────────────────────────────────── */
+const RULES = { hp: [2, 3, 4], maxItems: 8, minBet: 10, maxBet: 500, dailyCap: 3000, shadowForce: 0.2 };
+const MODES = {
+  normal: { name: "Altered Giratina", forme: "Altered Forme", level: "Normal", pays: 1.8 },
+  hard: { name: "Origin Giratina", forme: "Origin Forme", level: "Hard", pays: 3 }
+};
+const ITEMS = {
+  potion: { name: "Potion", tip: "Heal 1 HP, up to your max." },
+  scope: { name: "Scope Lens", tip: "See whether the shell in the chamber is live or blank. Only you see it." },
+  eject: { name: "Eject Button", tip: "Throw out the shell in the chamber and see what it was." },
+  band: { name: "Choice Band", tip: "Your next shot does 2 damage if it is live." },
+  wave: { name: "Thunder Wave", tip: "Giratina skips its next turn. Can't stack, and can't be used two turns in a row." },
+  trick: { name: "Trick Room", tip: "Flip the shell in the chamber: live becomes blank, blank becomes live." },
+  orb: { name: "Griseous Orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
+};
+const POOL = ["potion", "scope", "eject", "band", "wave", "trick"];
+const YOU = 0, FOE = 1;
+
+/* ── The hub: wallet, bets and the board, over postMessage ───────────── */
+let coins = null, seq = 0;
+const pending = new Map();
+function ask(op, data = {}, timeout = 2500) {
+  return new Promise(resolve => {
+    const id = ++seq;
+    const timer = setTimeout(() => { pending.delete(id); resolve(null); }, timeout);
+    pending.set(id, reply => { clearTimeout(timer); resolve(reply); });
+    parent.postMessage({ type: "bored:roulette", op, id, ...data }, "*");
+  });
 }
-addEventListener('message', event => {
-  if (event.source !== parent || event.data?.type !== 'bored:admin-preview-wallet') return;
-  const coins = event.data.coins;
-  if (Number.isSafeInteger(coins) && coins >= 0) $('#coins').textContent = coins.toLocaleString('en-US');
+addEventListener("message", event => {
+  if (event.source !== parent) return;
+  const data = event.data || {};
+  if (data.type === "bored:admin-preview-wallet") setCoins(data.coins);
+  if (data.type === "bored:roulette-result" && pending.has(data.id)) {
+    const done = pending.get(data.id);
+    pending.delete(data.id);
+    done(data);
+  }
 });
-showCoins();
-addEventListener('focus', showCoins);
+function setCoins(value) {
+  if (!Number.isSafeInteger(value) || value < 0) return;
+  coins = value;
+  $("#coins").textContent = value.toLocaleString("en-US");
+}
+const refreshCoins = () => parent.postMessage({ type: "bored:admin-preview-wallet-request" }, "*");
+refreshCoins();
+addEventListener("focus", refreshCoins);
 
-// Back: use the arcade's own back button when embedded, else go to the arcade.
-$('#back').onclick = () => parent.postMessage({ type: 'bored:close' }, '*');
+/* ── Game state ───────────────────────────────────────────────────────── */
+let g = null, run = 0, lastStart = null;
+const alive = id => g && g.id === id && !g.over;
+const fighter = name => ({ name, hp: 0, max: 0, items: [], band: false, para: false, waveLock: false, knows: null, hidden: false });
+const N = i => i === YOU ? "You" : "Giratina";
 
-// Placeholder rows for both boards.
-for (const panel of document.querySelectorAll('[role="tabpanel"]')) {
-  const table = document.createElement('table');
-  table.className = 'board';
+function log(text, kind = "") {
+  const box = $("#log"), line = el("p", kind, text);
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+function hint(text) { $("#hint").textContent = text; }
+function shake() {
+  const arena = $("#arena");
+  arena.classList.remove("shake");
+  void arena.offsetWidth;
+  arena.classList.add("shake");
+}
+
+function begin(mode, test, bet = 0, betId = null) {
+  g = { id: ++run, mode, test, bet, betId, hard: mode === "hard", round: 0, wins: [0, 0],
+        s: [fighter("You"), fighter("Giratina")], shells: [], loaded: [0, 0], spent: [], turn: YOU, busy: true, over: false };
+  lastStart = { mode, test, bet };
+  $("#lobby").hidden = true;
+  $("#table").hidden = false;
+  $("#result").hidden = true;
+  $("#log").replaceChildren();
+  $("#leave").textContent = "Leave table";
+  $("#leave").dataset.confirm = "";
+  $("#foe-forme").textContent = MODES[mode].forme;
+  $("#mode-label").textContent = MODES[mode].level + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " coins");
+  log(test ? "Test game against " + MODES[mode].name + ". No coins are on the table." : "You bet " + bet.toLocaleString("en-US") + " coins against " + MODES[mode].name + ".", "you");
+  if (g.hard) log("Origin Giratina is in its own world: Shadow Force, Pressure and the Griseous Orb are on.", "status");
+  startRound();
+}
+
+function startRound() {
+  g.round++;
+  const hp = RULES.hp[g.round - 1];
+  for (const s of g.s) Object.assign(s, { hp, max: hp, items: [], band: false, para: false, waveLock: false, knows: null, hidden: false });
+  if (g.hard && g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
+  log("Round " + g.round + ". " + hp + " HP each" + (g.hard && g.round === 3 ? ", and Giratina draws 1 extra max HP from the Distortion World." : "."), "round");
+  g.turn = YOU;
+  reload();
+  render();
+  beginTurn();
+}
+
+function give(i, key) {
+  if (g.s[i].items.length >= RULES.maxItems) return false;
+  g.s[i].items.push(key);
+  return true;
+}
+function deal(i, count) {
+  const got = [];
+  for (let k = 0; k < count; k++) { const key = pick(POOL); if (give(i, key)) got.push(ITEMS[key].name); }
+  if (got.length) log((i === YOU ? "You get " : "Giratina gets ") + got.join(" and ") + ".");
+  else log((i === YOU ? "Your" : "Giratina's") + " hands are full: no new items.");
+}
+function reload() {
+  const total = rand(2, 8), live = rand(1, total - 1);
+  g.shells = shuffle(Array.from({ length: total }, (_, k) => k < live));
+  g.loaded = [live, total - live];
+  g.spent = [];
+  for (const s of g.s) s.knows = null;
+  log("Loaded " + live + " live / " + (total - live) + " blank. The shells go in shuffled.", "status");
+  deal(YOU, g.hard ? 1 : 2);
+  if (g.hard) log("Pressure: you only get 1 item this load.");
+  deal(FOE, 2);
+  if (g.hard && give(FOE, "orb")) log("Giratina gets a Griseous Orb.");
+}
+
+/* ── Turns ────────────────────────────────────────────────────────────── */
+async function beginTurn() {
+  if (!g || g.over) return;
+  const id = g.id;
+  if (!g.shells.length) {
+    log("The gun is empty.");
+    reload();
+    render();
+    await wait(900);
+    if (!alive(id)) return;
+  }
+  const me = g.s[g.turn];
+  // Shadow Force lasts until Giratina's next turn, skipped or not.
+  if (g.turn === FOE) me.hidden = false;
+  if (me.para) {
+    me.para = false;
+    log(g.turn === YOU ? "You're paralyzed! You can't move this turn." : "Giratina is paralyzed! It can't move this turn.", "status");
+    render();
+    await wait(1000);
+    if (!alive(id)) return;
+    g.turn = 1 - g.turn;
+    return beginTurn();
+  }
+  if (g.turn === FOE) {
+    g.busy = true;
+    hint("Giratina is thinking...");
+    if (g.hard && Math.random() < RULES.shadowForce) {
+      me.hidden = true;
+      log("Giratina used Shadow Force and vanished! Your shots miss until its next turn.", "status");
+    }
+    render();
+    return foeTurn(id);
+  }
+  g.busy = false;
+  hint("Your turn. Use any items you like, then shoot.");
+  render();
+}
+
+async function fire(i, atSelf) {
+  const id = g.id, me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
+  g.busy = true;
+  const dmg = me.band ? 2 : 1, banded = me.band;
+  me.band = false;
+  // The other side's Thunder Wave lock lifts once this side takes a real turn.
+  other.waveLock = false;
+  hint("");
+  log(i === YOU ? (atSelf ? "You point the gun at yourself..." : "You aim at Giratina...") : (atSelf ? "Giratina points the gun at itself..." : "Giratina aims at you..."), i === YOU ? "you" : "");
+  render();
+  await wait(1000);
+  if (!alive(id)) return;
+  const live = g.shells.shift();
+  g.spent.push(live);
+  for (const s of g.s) s.knows = null;
+  if (!live) log("*click* Blank." + (banded ? " The Choice Band is wasted." : ""));
+  else if (i === YOU && !atSelf && other.hidden) log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status");
+  else {
+    target.hp = Math.max(0, target.hp - dmg);
+    shake();
+    log("*BANG* Live! " + (target === g.s[YOU] ? "You lose " : "Giratina loses ") + dmg + " HP" + (banded ? " (Choice Band)." : "."), "live");
+  }
+  render();
+  await wait(live ? 1000 : 700);
+  if (!alive(id)) return;
+  if (g.s[YOU].hp <= 0 || g.s[FOE].hp <= 0) return endRound(g.s[YOU].hp <= 0 ? FOE : YOU);
+  if (atSelf && !live) log(i === YOU ? "You keep the turn." : "Giratina keeps the turn.");
+  else g.turn = 1 - i;
+  return beginTurn();
+}
+
+function useItem(i, index) {
+  const me = g.s[i], other = g.s[1 - i], key = me.items[index], mine = i === YOU;
+  const refuse = text => { if (mine) log(text); render(); return false; };
+  switch (key) {
+    case "potion":
+      if (me.hp >= me.max) return refuse("You're already at full HP.");
+      me.hp++;
+      log(N(i) + " used a Potion. +1 HP.", mine ? "you" : "");
+      break;
+    case "scope":
+      me.knows = g.shells[0];
+      log(mine ? "Scope Lens: the shell in the chamber is " + (g.shells[0] ? "live." : "blank.") : "Giratina used Scope Lens and peered into the chamber.", mine ? "secret" : "");
+      break;
+    case "eject": {
+      const shell = g.shells.shift();
+      g.spent.push(shell);
+      for (const s of g.s) s.knows = null;
+      log(N(i) + " used an Eject Button. Out pops a " + (shell ? "live" : "blank") + " shell.", mine ? "you" : "");
+      break;
+    }
+    case "band":
+      if (me.band) return refuse("Your Choice Band is already on.");
+      me.band = true;
+      log(N(i) + " put on a Choice Band. The next live shot does 2 damage.", mine ? "you" : "");
+      break;
+    case "wave":
+      if (other.para) return refuse("Giratina is already paralyzed.");
+      if (me.waveLock) return refuse("You can't use Thunder Wave two turns in a row.");
+      other.para = true;
+      me.waveLock = true;
+      log(N(i) + " used Thunder Wave! " + (mine ? "Giratina skips" : "You skip") + " the next turn.", mine ? "you" : "status");
+      break;
+    case "trick":
+    case "orb":
+      g.shells[0] = !g.shells[0];
+      for (const s of g.s) if (s.knows !== null) s.knows = !s.knows;
+      log(N(i) + " used " + ITEMS[key].name + ". The shell in the chamber flips.", mine ? "you" : "status");
+      break;
+    default: return false;
+  }
+  me.items.splice(index, 1);
+  if (!g.shells.length) { log("The gun is empty."); reload(); }
+  render();
+  return true;
+}
+
+/* ── Giratina ─────────────────────────────────────────────────────────── */
+// Tracks the live and blank shells left. Plays a known shell correctly;
+// otherwise shoots you above 50% live, itself below, and flips a coin at 50%.
+async function foeTurn(id) {
+  const me = g.s[FOE], you = g.s[YOU];
+  const chance = () => me.knows !== null ? (me.knows ? 1 : 0) : g.shells.filter(Boolean).length / g.shells.length;
+  await wait(900);
+  for (let step = 0; step < 10; step++) {
+    if (!alive(id)) return;
+    const p = chance(), has = key => me.items.includes(key);
+    const flip = has("orb") ? "orb" : has("trick") ? "trick" : null;
+    let key = null;
+    if (has("potion") && me.hp < me.max) key = "potion";
+    else if (has("scope") && p > 0 && p < 1) key = "scope";
+    else if (p === 1 && has("band") && !me.band) key = "band";
+    else if (p === 0 && flip && Math.random() < 0.6) key = flip;
+    else if (p >= 0.4 && p <= 0.6 && has("eject") && Math.random() < 0.3) key = "eject";
+    else if (p > 0 && p < 0.5 && flip && Math.random() < 0.35) key = flip;
+    else if (has("wave") && !you.para && !me.waveLock && Math.random() < 0.4) key = "wave";
+    if (!key) break;
+    useItem(FOE, me.items.indexOf(key));
+    await wait(900);
+  }
+  if (!alive(id)) return;
+  const p = chance();
+  return fire(FOE, p === 0.5 ? Math.random() < 0.5 : p < 0.5);
+}
+
+/* ── Rounds and the end ───────────────────────────────────────────────── */
+async function endRound(winner) {
+  const id = g.id;
+  g.wins[winner]++;
+  g.busy = true;
+  log(winner === YOU ? "Giratina fainted! You take round " + g.round + "." : "You fainted. Giratina takes round " + g.round + ".", "round");
+  render();
+  await wait(1500);
+  if (!alive(id)) return;
+  if (g.wins[winner] === 2) return endGame(winner === YOU);
+  startRound();
+}
+
+async function endGame(won, forfeit = false) {
+  const game = g;
+  game.over = true;
+  game.busy = true;
+  render();
+  let text;
+  if (game.test) text = "Test game. No coins moved and nothing went on the board.";
+  else {
+    const reply = await ask("settle", { betId: game.betId, mode: game.mode, won, forfeit });
+    if (!reply || !reply.ok) {
+      console.log("Shotgun Roulette: the arcade did not confirm this result.", reply && reply.reason);
+      text = won ? "The arcade didn't confirm the payout. Check your wallet in Poké Gacha." : "Your bet of " + game.bet.toLocaleString("en-US") + " coins is gone.";
+    } else {
+      if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
+      text = won
+        ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " coins" + (reply.capped ? ", trimmed to stay under the 3,000-coin daily limit." : ".")
+        : "Your bet of " + game.bet.toLocaleString("en-US") + " coins is gone.";
+      if (reply.streak != null) text += " " + MODES[game.mode].level + " win streak: " + reply.streak + ".";
+    }
+    loadBoard(game.mode);
+    refreshCoins();
+  }
+  if (forfeit || g !== game) return;
+  $("#result-title").textContent = won ? "You beat " + MODES[game.mode].name + "." : MODES[game.mode].name + " wins.";
+  $("#result-text").textContent = text;
+  $("#again").textContent = game.test ? "Play another test game" : "Play again, bet " + game.bet.toLocaleString("en-US");
+  $("#result").hidden = false;
+  hint("");
+  $("#again").focus();
+}
+
+/* ── Drawing ──────────────────────────────────────────────────────────── */
+function drawHp(side, s) {
+  const share = s.max ? s.hp / s.max : 0, fill = $("#" + side + "-fill");
+  fill.style.width = (share * 100) + "%";
+  fill.className = "fill" + (share <= 0.25 ? " low" : share <= 0.5 ? " mid" : "");
+  $("#" + side + "-hp").textContent = s.hp + "/" + s.max;
+}
+function flags(s) {
+  return [s.para && "Paralyzed", s.band && "Choice Band on", s.hidden && "Vanished"].filter(Boolean).join(", ");
+}
+function render() {
+  if (!g) return;
+  const you = g.s[YOU], foe = g.s[FOE], mine = g.turn === YOU && !g.busy && !g.over;
+  $("#round-label").textContent = "Round " + g.round + " of 3";
+  $("#score-label").textContent = "You " + g.wins[YOU] + ", Giratina " + g.wins[FOE];
+  drawHp("you", you);
+  drawHp("foe", foe);
+  $("#you-flags").textContent = flags(you);
+  $("#foe-flags").textContent = flags(foe);
+  $("#foe-items").textContent = foe.items.length ? "Holding " + foe.items.map(k => ITEMS[k].name).join(", ") + "." : "Holding nothing.";
+
+  const shells = $("#shells");
+  shells.replaceChildren(
+    ...g.spent.map(live => el("span", "shell spent " + (live ? "live" : "blank"))),
+    ...g.shells.map(() => el("span", "shell unknown")));
+  const chamber = $("#chamber");
+  chamber.replaceChildren();
+  const loadedLine = el("span");
+  loadedLine.append("This load: ", el("b", "", g.loaded[0] + " live / " + g.loaded[1] + " blank"), ". " + g.shells.length + " left in the gun.");
+  chamber.appendChild(loadedLine);
+  if (you.knows !== null) chamber.appendChild(el("span", "seen", "Scope Lens: the shell in the chamber is " + (you.knows ? "live." : "blank.")));
+
+  const box = $("#you-items");
+  box.replaceChildren(...you.items.map((key, index) => {
+    const b = el("button", "item", ITEMS[key].name);
+    b.type = "button";
+    b.title = ITEMS[key].tip;
+    b.disabled = !mine || (key === "potion" && you.hp >= you.max) || (key === "band" && you.band) ||
+      (key === "wave" && (foe.para || you.waveLock));
+    b.onclick = () => { if (g.turn === YOU && !g.busy && !g.over) useItem(YOU, index); };
+    return b;
+  }));
+  if (!you.items.length) box.appendChild(el("span", "holding", "No items."));
+  $("#shoot-self").disabled = !mine;
+  $("#shoot-foe").disabled = !mine;
+}
+
+/* ── The lobby ────────────────────────────────────────────────────────── */
+const note = text => { $("#lobby-note").textContent = text; };
+const REFUSED = {
+  coins: "You don't have enough coins for that bet.",
+  cap: "You've won 3,000 coins today, the daily limit. Come back tomorrow, or play a test game.",
+  range: "Bets run from 10 to 500 coins.",
+  signin: "Sign in to bet coins."
+};
+async function startReal(mode, bet) {
+  if (!(Number.isInteger(bet) && bet >= RULES.minBet && bet <= RULES.maxBet)) return note(REFUSED.range);
+  if (coins !== null && bet > coins) return note(REFUSED.coins);
+  note("Placing your bet...");
+  for (const b of document.querySelectorAll(".islands button")) b.disabled = true;
+  const reply = await ask("bet", { mode, bet });
+  for (const b of document.querySelectorAll(".islands button")) b.disabled = false;
+  if (!reply) return note("Coin bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
+  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your coins weren't touched.");
+  if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
+  note("");
+  begin(mode, false, bet, reply.betId);
+}
+for (const button of document.querySelectorAll(".island[data-mode]")) {
+  button.onclick = () => startReal(button.dataset.mode, Math.floor(Number($("#bet").value)));
+}
+$("#test-start").onclick = () => { note(""); begin(document.querySelector('input[name="test-mode"]:checked').value, true); };
+
+function toLobby() {
+  g = null;
+  $("#table").hidden = true;
+  $("#lobby").hidden = false;
+  refreshCoins();
+}
+$("#to-lobby").onclick = toLobby;
+$("#again").onclick = () => {
+  if (!lastStart) return toLobby();
+  if (lastStart.test) return begin(lastStart.mode, true);
+  toLobby();
+  startReal(lastStart.mode, lastStart.bet);
+};
+$("#leave").onclick = () => {
+  if (!g) return toLobby();
+  if (g.over || g.test) return toLobby();
+  // A real game in progress costs the bet: ask once more before leaving.
+  if (!$("#leave").dataset.confirm) {
+    $("#leave").dataset.confirm = "1";
+    $("#leave").textContent = "Leave and lose your bet";
+    return;
+  }
+  const game = g;
+  toLobby();
+  game.id = -1;
+  g = game;
+  endGame(false, true);
+  g = null;
+};
+$("#shoot-self").onclick = () => { if (g && g.turn === YOU && !g.busy && !g.over) fire(YOU, true); };
+$("#shoot-foe").onclick = () => { if (g && g.turn === YOU && !g.busy && !g.over) fire(YOU, false); };
+$("#back").onclick = () => parent.postMessage({ type: "bored:close" }, "*");
+
+/* ── Leaderboard ──────────────────────────────────────────────────────── */
+const boards = { normal: [], hard: [] };
+let boardMode = "normal";
+function drawBoard(mode) {
+  const panel = $("#board-" + mode), rows = boards[mode];
+  const table = el("table", "board");
   table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Coins won</th><th class="n">Best streak</th></tr></thead>';
-  const body = document.createElement('tbody');
-  for (let rank = 1; rank <= 5; rank++) {
-    const row = body.insertRow();
-    [rank, '—', '—', '—'].forEach((text, i) => {
+  const body = document.createElement("tbody");
+  for (let rank = 1; rank <= 10; rank++) {
+    const row = body.insertRow(), entry = rows[rank - 1];
+    const cells = entry ? [rank, String(entry.handle || "unnamed"), Number(entry.coins_won || 0).toLocaleString("en-US"), String(entry.best_streak || 0)] : [rank, "—", "—", "—"];
+    cells.forEach((text, k) => {
       const cell = row.insertCell();
       cell.textContent = text;
-      cell.className = i === 0 ? 'rank' : i > 1 ? 'n' : '';
+      cell.className = k === 0 ? "rank" : k > 1 ? "n" : "";
     });
   }
   table.appendChild(body);
-  panel.appendChild(table);
+  panel.replaceChildren(table);
+  if (mode === boardMode) $("#board-empty").hidden = rows.length > 0;
 }
-
-const tabs = [...document.querySelectorAll('.tab')];
+async function loadBoard(mode) {
+  const reply = await ask("board", { mode }, 4000);
+  if (!reply) console.log("Shotgun Roulette: no leaderboard yet (the arcade did not answer).");
+  else if (!reply.ok) console.log("Shotgun Roulette: leaderboard unavailable.", reply.reason);
+  boards[mode] = reply && reply.ok && Array.isArray(reply.rows) ? reply.rows.slice(0, 10) : [];
+  drawBoard(mode);
+}
+const tabs = [...document.querySelectorAll(".tab")];
 for (const tab of tabs) tab.onclick = () => {
   for (const other of tabs) {
     const on = other === tab;
-    other.setAttribute('aria-selected', String(on));
-    document.getElementById(other.getAttribute('aria-controls')).hidden = !on;
+    other.setAttribute("aria-selected", String(on));
+    document.getElementById(other.getAttribute("aria-controls")).hidden = !on;
   }
+  boardMode = tab.id === "tab-hard" ? "hard" : "normal";
+  $("#board-empty").hidden = boards[boardMode].length > 0;
 };
+drawBoard("normal");
+drawBoard("hard");
+loadBoard("normal");
+loadBoard("hard");
 
-// The hub reads this. Unscored for now: no run, nothing finished.
-window.__boredSnapshot = () => ({ slug: 'shotgun-roulette', rounds: 0, finished: false });
+// The hub reads this. Unscored in the arcade: rounds you've won this game, and whether it ended.
+window.__boredSnapshot = () => ({ slug: "shotgun-roulette", rounds: g ? g.wins[YOU] : 0, finished: !!(g && g.over) });
 }
 </script>
 </body>
