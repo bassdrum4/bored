@@ -2,15 +2,29 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 734,
+  "count": 748,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f71e597","date":"2026-11-21","author":"Claude","subject":"Add Shotgun Roulette shell game"},
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
   {"sha":"f08d974","date":"2026-11-20","author":"Daniel Lowe","subject":"Allow vetted Shotgun Roulette game-only PRs to auto-merge after test job"},
+  {"sha":"e702637","date":"2026-11-20","author":"Daniel Lowe","subject":"Create safe read-only Shotgun Roulette leaderboard until scores can be validated"},
+  {"sha":"394adc3","date":"2026-11-20","author":"Daniel Lowe","subject":"Keep merged hub search selector test fix in preview branch"},
+  {"sha":"c535397","date":"2026-11-20","author":"Daniel Lowe","subject":"Correct admin preview authorization bootstrap script tag"},
+  {"sha":"ba9d904","date":"2026-11-20","author":"Daniel Lowe","subject":"Use read-only wallet messages in sandboxed admin preview"},
+  {"sha":"28eb816","date":"2026-11-20","author":"Daniel Lowe","subject":"Sandbox admin preview so game code cannot access parent account or wallet"},
+  {"sha":"70fc863","date":"2026-11-20","author":"Daniel Lowe","subject":"Test that guest players cannot discover or launch admin-only preview"},
+  {"sha":"0e4381e","date":"2026-11-20","author":"Daniel Lowe","subject":"Fix admin preview HTML validation regex"},
+  {"sha":"f73b59f","date":"2026-11-20","author":"Daniel Lowe","subject":"Deny direct, unauthenticated preview loads"},
+  {"sha":"7757dc1","date":"2026-11-20","author":"Daniel Lowe","subject":"Add admin-only preview link to Bored footer"},
+  {"sha":"8017f1f","date":"2026-11-20","author":"Daniel Lowe","subject":"Gate Shotgun Roulette launch on verified admin access and add admin preview entry"},
+  {"sha":"dede4f0","date":"2026-11-20","author":"Daniel Lowe","subject":"Validate hidden admin preview files without publishing them"},
+  {"sha":"d781f23","date":"2026-11-20","author":"Daniel Lowe","subject":"Remove admin preview from discovery and preview registration"},
+  {"sha":"060d694","date":"2026-11-20","author":"Daniel Lowe","subject":"Keep Shotgun Roulette out of the public game catalog"},
   {"sha":"0e04ff9","date":"2026-11-20","author":"PenguinV360","subject":"poke-gacha: owner's Bug shot and burst art","pr":275},
   {"sha":"de9fd25","date":"2026-11-20","author":"PenguinV360","subject":"Fix the hub search test: read every matching card, not one","pr":276},
   {"sha":"90c9977","date":"2026-11-20","author":"Daniel Lowe","subject":"Retry alternate archive dates automatically when crossword candidates are unusable"},
