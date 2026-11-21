@@ -439,14 +439,16 @@ test('browser regressions', async t => {
     const names = await page.$$eval('.card .name', els => els.map(el => el.firstChild.textContent));
     assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b)));
     await page.select('#sort', 'popular');
-    await page.click('[aria-label="Add Memory to favorites"]');
+    // The popularity refresh can rebuild cards between Puppeteer's element lookup
+    // and its coordinate click. Dispatch from within the page to the current node.
+    await page.$eval('[aria-label="Add Memory to favorites"]', el => el.click());
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);
     await page.reload();
     await settleBoard();
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);
-    await page.click('[aria-label="Remove Memory from favorites"]');
+    await page.$eval('[aria-label="Remove Memory from favorites"]', el => el.click());
     assert.equal(await page.$$eval('.card', els => els.length), 0);
     assert.equal(await page.evaluate(() => document.activeElement.dataset.filter), 'Favorites');
     await filter('All');
