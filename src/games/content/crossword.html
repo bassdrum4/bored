@@ -37,10 +37,10 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    max-width: 980px;
+    max-width: 1180px;
     height: 100vh;
     height: 100dvh;
-    padding: 10px 12px 12px;
+    padding: 10px 16px 14px;
     gap: 8px;
   }
   header {
@@ -84,7 +84,8 @@
   .tool:hover:enabled { border-color: var(--ink); }
   .tool:disabled { color: var(--muted); cursor: default; }
   .tool[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-  #board { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; gap: 12px; }
+  /* The clues sit well clear of the grid, and the gap grows with the window. */
+  #board { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; gap: clamp(16px, 4vw, 64px); }
   #gridWrap {
     position: relative;
     flex: 1 1 auto;
@@ -145,7 +146,7 @@
   }
   .cell.bad .ltr { color: var(--warn); }
   #clues {
-    flex: 0 0 min(46%, 380px);
+    flex: 0 0 clamp(260px, 34%, 420px);
     min-width: 0;
     display: flex;
     gap: 14px;
@@ -570,6 +571,8 @@ function checkSolved() {
   }
   solved = true;
   solvedSeconds = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 1000)) : 0;
+  // A finished grid is not something to offer back on the next visit.
+  if (window.__boredResume) window.__boredResume.clear();
   timeEl.textContent = clock(solvedSeconds);
   bylineEl.textContent = 'Solved in ' + clock(solvedSeconds) + ' \u00b7 ' + puzzle.label;
   paint();
@@ -596,7 +599,7 @@ function fitGrid() {
   const width = wrap.clientWidth - 2;
   const height = wrap.clientHeight - 2;
   if (width <= 0 || height <= 0) return;
-  const size = Math.max(12, Math.min(44, Math.floor(Math.min(width / puzzle.cols, height / puzzle.rows))));
+  const size = Math.max(12, Math.min(56, Math.floor(Math.min(width / puzzle.cols, height / puzzle.rows))));
   gridEl.style.setProperty('--cell', size + 'px');
   gridEl.style.gridTemplateColumns = 'repeat(' + puzzle.cols + ', ' + size + 'px)';
 }
@@ -699,7 +702,7 @@ function setBusy(busy) {
 }
 
 async function load(isDaily, startMs) {
-  if (loading) return;
+  if (loading) return false;
   setBusy(true);
   if (!puzzle) {
     showNote(isDaily ? 'Fetching today\u2019s grid\u2026' : 'Fetching a grid\u2026');
@@ -708,6 +711,7 @@ async function load(isDaily, startMs) {
   try {
     const built = await fetchPuzzle(startMs);
     renderPuzzle(built, isDaily);
+    return true;
   } catch (error) {
     const offline = error && error.message === 'offline';
     if (puzzle) {
@@ -719,9 +723,54 @@ async function load(isDaily, startMs) {
         ? 'The archive could not be reached. This game reads the New York Times crossword archive over the internet.'
         : 'No usable grid turned up near that date. Try Today or Another.');
     }
+    return false;
   } finally {
     setBusy(false);
   }
+}
+
+/* ── Resume ───────────────────────────────────────────────────────────────── */
+
+// The hub injects __boredResume into every game document. One save per game:
+// the grid being worked on, its letters and the clock, offered back on reload.
+function savedRun() {
+  if (!puzzle || solved) return null;
+  let filled = 0;
+  for (let i = 0; i < fill.length; i++) if (fill[i]) filled++;
+  if (!filled) return null;
+  return {
+    label: puzzle.label + ' \u00b7 ' + filled + '/' + puzzle.total + ' filled',
+    state: {
+      ms: puzzle.ms,
+      daily: daily === true,
+      fill: fill.slice(),
+      sel: sel,
+      dir: dir,
+      elapsed: secondsNow()
+    }
+  };
+}
+
+async function restoreRun(pending) {
+  const state = pending && pending.state;
+  if (!state || !Number.isFinite(state.ms)) return false;
+  const loaded = await load(state.daily === true, state.ms);
+  if (!loaded || !puzzle || puzzle.ms !== state.ms) return false;
+  const saved = Array.isArray(state.fill) ? state.fill : [];
+  for (let i = 0; i < fill.length; i++) {
+    const letter = typeof saved[i] === 'string' ? saved[i].toUpperCase() : '';
+    if (!puzzle.black[i] && /^[A-Z]$/.test(letter)) fill[i] = letter;
+  }
+  if (Number.isInteger(state.sel) && state.sel >= 0 && state.sel < fill.length && !puzzle.black[state.sel]) {
+    sel = state.sel;
+  }
+  dir = state.dir === 'down' ? 'down' : 'across';
+  const elapsed = Math.max(0, Math.min(86400, Number(state.elapsed) || 0));
+  startedAt = Date.now() - elapsed * 1000;
+  timeEl.textContent = clock(secondsNow());
+  paint();
+  checkSolved();
+  return true;
 }
 
 /* ── Input ────────────────────────────────────────────────────────────────── */
@@ -746,8 +795,14 @@ typingEl.addEventListener('input', () => {
 });
 
 $('#check').addEventListener('click', () => { if (puzzle) flagWrong(); });
-$('#today').addEventListener('click', () => load(true, dailyStart()));
+// Choosing a different grid abandons the saved one; the autosave writes the
+// new position as soon as there is something worth keeping.
+$('#today').addEventListener('click', () => {
+  if (window.__boredResume) window.__boredResume.clear();
+  load(true, dailyStart());
+});
 $('#another').addEventListener('click', () => {
+  if (window.__boredResume) window.__boredResume.clear();
   load(false, FIRST_DAY + Math.floor(Math.random() * SPAN) * DAY);
 });
 
@@ -775,7 +830,20 @@ window.__boredSnapshot = () => {
   };
 };
 
-load(true, dailyStart());
+async function boot() {
+  await load(true, dailyStart());
+  const resume = window.__boredResume;
+  if (!resume) return;
+  const pending = resume.read();
+  if (pending) {
+    resume.ask(pending.label, () => {
+      restoreRun(pending).then(restored => { if (!restored) resume.clear(); });
+    }, () => {});
+  }
+  resume.arm(savedRun);
+}
+
+boot();
 </script>
 </body>
 </html>

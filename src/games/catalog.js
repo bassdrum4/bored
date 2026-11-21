@@ -68,7 +68,7 @@ export const LAUNCHED = {
   "deep": "2026-10-20"
 };
 export const META = {
-  "crossword": ["Puzzle", "The New York Times archive, one grid at a time. Everyone gets the same puzzle each morning; pull another whenever you like. Internet required."],
+  "crossword": ["Puzzle", "The New York Times archive, one grid at a time. Everyone gets the same puzzle each morning; pull another whenever you like. Needs a connection to fetch a grid."],
   "imposter": ["Online", "Fill tasks or hunt the crew. A public room is always open; private rooms use a four-letter code."],
   "sudoku": ["Puzzle", "Nine by nine, three levels: fill every row, column and box without a repeat."],
   "photo-puzzle": ["Puzzle", "Upload a picture, break it into tiles, then swap them back into place."],
