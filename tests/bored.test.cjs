@@ -368,6 +368,31 @@ test('browser regressions', async t => {
     }
   });
 
+  await t.test('admin preview launcher opens a sandboxed game without entering public recents', async () => {
+    // Simulate only the successful authorization decision, not an actual admin
+    // session: this verifies routing/rendering separately from RLS auth.
+    await page.evaluate(() => {
+      window.__originalPreviewGuard = window.__boredAdminPreviewAllowed;
+      window.__boredAdminPreviewAllowed = slug => slug === 'shotgun-roulette';
+      openGame('shotgun-roulette', null, document.querySelector('#admin-preview-link'));
+    });
+    try {
+      await page.waitForFunction(() =>
+        document.querySelector('#frame')?.contentDocument === null ||
+        document.querySelector('#frame')?.title === 'Shotgun Roulette');
+      assert.equal(await page.$eval('#frame', el => el.getAttribute('sandbox')), 'allow-scripts');
+      assert.equal(await page.evaluate(() => window.current), 'shotgun-roulette');
+      assert.equal(await page.evaluate(() => document.querySelectorAll('#recent-list [data-slug="shotgun-roulette"]').length), 0);
+      assert.equal(await page.evaluate(() => document.querySelectorAll('.card[data-slug="shotgun-roulette"]').length), 0);
+    } finally {
+      await page.evaluate(() => {
+        window.__boredAdminPreviewAllowed = window.__originalPreviewGuard;
+        delete window.__originalPreviewGuard;
+        closeGame({ force: true });
+      });
+    }
+  });
+
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
     // Counts come from the catalog so adding a game does not have to touch this
     // file: the suite checks the wiring, not the catalogue's contents.
