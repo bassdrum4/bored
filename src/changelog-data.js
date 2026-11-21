@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 730,
+  "count": 731,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"90c9977","date":"2026-11-20","author":"Daniel Lowe","subject":"Retry alternate archive dates automatically when crossword candidates are unusable"},
   {"sha":"77f32f9","date":"2026-11-20","author":"Daniel Lowe","subject":"Style chart-first analytics and expandable raw data"},
   {"sha":"6d42a11","date":"2026-11-20","author":"Daniel Lowe","subject":"Hide game analytics raw tables behind expandable details"},
   {"sha":"50e5958","date":"2026-11-20","author":"Daniel Lowe","subject":"Let history game chart compare selected metrics instead of forcing a wide table"},
