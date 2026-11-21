@@ -241,7 +241,8 @@
 /* Shotgun Roulette. You and Giratina take turns firing a shotgun loaded with
    live and blank shells, best of three rounds. The whole game runs here; the
    frame is sandboxed, so coins and the leaderboard go through the hub with
-   postMessage ("bored:roulette" requests, "bored:roulette-result" replies).
+   postMessage ("bored:roulette" requests, "bored:roulette-result" replies),
+   answered by src/hub/roulette.js, which enforces the bet range, payouts and cap.
    Test games never send a coin or board request. If the hub does not answer,
    real games stay closed and the board stays empty: the game itself never breaks.
    This is a static GitHub Pages file, so the bytes are public. The hub still
@@ -310,8 +311,22 @@ function setCoins(value) {
   $("#coins").textContent = value.toLocaleString("en-US");
 }
 const refreshCoins = () => parent.postMessage({ type: "bored:admin-preview-wallet-request" }, "*");
+// Today's winnings against the daily cap, from the hub. No answer leaves the plain rule text up.
+async function refreshStatus() {
+  const reply = await ask("status");
+  if (!reply || !reply.ok) return;
+  if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
+  showCap(reply);
+}
+function showCap(reply) {
+  if (!Number.isSafeInteger(reply.wonToday)) return;
+  $("#cap-line").textContent = reply.capLeft > 0
+    ? "Bets run from 10 to 500 coins. You've won " + reply.wonToday.toLocaleString("en-US") + " of today's 3,000-coin limit."
+    : "You've won 3,000 coins today, the daily limit. Test games are still open.";
+}
 refreshCoins();
-addEventListener("focus", refreshCoins);
+refreshStatus();
+addEventListener("focus", () => { refreshCoins(); refreshStatus(); });
 
 /* ── Game state ───────────────────────────────────────────────────────── */
 let g = null, run = 0, lastStart = null;
@@ -550,9 +565,12 @@ async function endGame(won, forfeit = false) {
   if (game.test) text = "Test game. No coins moved and nothing went on the board.";
   else {
     const reply = await ask("settle", { betId: game.betId, mode: game.mode, won, forfeit });
+    if (reply) showCap(reply);
     if (!reply || !reply.ok) {
       console.log("Shotgun Roulette: the arcade did not confirm this result.", reply && reply.reason);
-      text = won ? "The arcade didn't confirm the payout. Check your wallet in Poké Gacha." : "Your bet of " + game.bet.toLocaleString("en-US") + " coins is gone.";
+      text = !won ? "Your bet of " + game.bet.toLocaleString("en-US") + " coins is gone."
+        : reply && reply.reason === "early" ? "That game finished too fast to pay out, so the bet is lost."
+        : "The arcade didn't confirm the payout. Check your wallet in Poké Gacha.";
     } else {
       if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
       text = won
@@ -635,6 +653,7 @@ async function startReal(mode, bet) {
   const reply = await ask("bet", { mode, bet });
   for (const b of document.querySelectorAll(".islands button")) b.disabled = false;
   if (!reply) return note("Coin bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
+  showCap(reply);
   if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your coins weren't touched.");
   if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
   note("");

@@ -19,6 +19,7 @@ import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js'
 import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
+import { createRouletteBridge } from './hub/roulette.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -687,6 +688,8 @@ window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); r
   td: tdBridge({ onChange: () => requestCloudPush() }) };
 // Pokédoku asks this for the look a player's line wears (normal, shiny or an SP skin).
 window.__boredLooks = storedLooks();
+// Shotgun Roulette asks over postMessage (see the bored:roulette case below); the wallet stays here.
+const roulette = createRouletteBridge({ onChange: () => requestCloudPush() });
 
 // SP skins are hand-made art listed in games/content/poke-gacha/sp/skins.json.
 // Until the list loads (or if it is empty) nothing rolls or sells SP.
@@ -1031,6 +1034,16 @@ addEventListener('message', event => {
         event.source.postMessage({
           type: 'bored:admin-preview-wallet', coins: walletBalance(readWallet()).coins || 0
         }, '*');
+      }
+      break;
+    case 'bored:roulette':
+      // Shotgun Roulette's bets, payouts and board. The sandboxed frame only asks;
+      // src/hub/roulette.js enforces every limit, and only for a verified admin.
+      if (activeSlug === 'shotgun-roulette' && Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) {
+        const frame = event.source, id = event.data.id;
+        roulette(event.data).then(reply => {
+          if (gameFrame.contentWindow === frame) frame.postMessage({ type: 'bored:roulette-result', id, ...reply }, '*');
+        });
       }
       break;
     case 'bored:close':
