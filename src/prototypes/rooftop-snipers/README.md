@@ -8,7 +8,7 @@ and no C# left in the payload, so the only faithful source of the game's behavio
 asm.js program itself. That is what is here — the whole program, unbundled, formatted and
 indexed — plus the class model that IL2CPP kept in its metadata.
 
-Nothing in the game itself was changed to make this. The folder sits in `src/prototypes/`,
+The original decompilation was token-identical to the shipped game. The Bored build now makes one intentional gameplay change: every round receives at least one nonzero randomizer modifier (the ordinary-round branch is removed). The folder sits in `src/prototypes/`,
 so once it is pushed the files below can be read straight from the deployed site:
 `https://bassdrum4.github.io/bored/prototypes/rooftop-snipers/` (for example
 `…/source/rooftop-snipers.code.js`).
@@ -21,7 +21,8 @@ so once it is pushed the files below can be read straight from the deployed site
 | `functions.tsv` | Index of every function in that file: name, line, parameters, nesting depth. |
 | `il2cpp/classes.md` | The recovered C# class model: 302 no-namespace types with exact field names, method names, parameter counts and metadata tokens (`Gamemanager`, `Shoot`, `ShootAI`, `Jump`, `Sniper`, `SlowMo`, …). |
 | `il2cpp/string-literals.txt` | The `ldstr` string table from `global-metadata.dat` (2,842 entries). |
-| `decompile.mjs` | Unpacks the payload, rebuilds this folder, `--check`s it, and `--rebuild`s edits into a playable document. |
+| `decompile.mjs` | Unpacks the original payload, checks the extraction, and rebuilds edits into a playable document. |
+| `patch-random-only.mjs` | Applies the single verified `Gamemanager.Start` asm.js edit to an unmodified decompilation (normal rounds disabled). |
 
 ## Edit and run it
 
@@ -47,7 +48,7 @@ Regenerate this whole folder from the shipped document (no network, no other inp
 
 ```bash
 node src/prototypes/rooftop-snipers/decompile.mjs          # rewrite the source tree
-node src/prototypes/rooftop-snipers/decompile.mjs --check  # verify it still is the shipped program
+node src/prototypes/rooftop-snipers/decompile.mjs --check  # only for untouched original source (before gameplay edits)
 ```
 
 ## Why the code looks like this
@@ -72,11 +73,11 @@ look for.
 
 ## What was verified
 
-- **Same program, not a reimplementation.** The formatted source is compared token by token
+- **Original extraction is not a reimplementation.** Before the intentional random-only patch, the formatted source was compared token by token
   against the decompressed shipped payload: 17,977,346 tokens, identical stream and identical
   SHA-256 digest (`--check`). Formatting is whitespace only.
 - **It parses.** `node --check` accepts the whole file.
-- **It runs.** The rebuilt document was booted in headless Chrome next to the shipped one:
+- **It runs.** The original rebuilt document was booted in headless Chrome next to the shipped one:
   both reach `__boredSnapshot().loaded === true`, hide the cover, paint a 960×540 canvas and
   show the identical title screen (see the two captures below), with no page or console
   errors on either.
@@ -93,3 +94,15 @@ The only differences between the two captures are the animating clouds.
   bundle), not in this code. Asset edits need UnityPy or the Unity editor, not this folder.
 - `src/games/content/rooftop-snipers.html` is unchanged by this work; this folder and the
   repacker are additive.
+
+## Random-only rounds in Bored
+
+The game now excludes ordinary rounds. Reverse-mapping the original IL2CPP
+method table identifies `Gamemanager.Start` as asm.js function `lXk`. Its old
+branch sometimes overwrote every rolled modifier with zero. That branch was
+removed, and an all-zero roll now receives a uniformly selected eligible
+nonzero modifier. Other modifier choices, scoring, controls and match flow
+remain in their original functions. The executable source is rebuilt into
+`src/games/content/rooftop-snipers.html`; targeted seeded tests are in
+`tests/rooftop-random-only.test.cjs` and the full Unity boot test is
+`npm run test:rooftop`.
