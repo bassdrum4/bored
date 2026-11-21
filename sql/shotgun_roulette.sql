@@ -1,5 +1,5 @@
 -- Shotgun Roulette scores (Pokémon Gambling).
--- Not applied yet: run this in the Supabase SQL editor when the game is ready.
+-- Safe preview schema: create the board, but keep writes server-only until scoring is validated.
 --
 -- One row per finished run. The leaderboard reads the best rows per mode.
 
@@ -27,12 +27,13 @@ create policy "shotgun roulette scores are public"
   to anon, authenticated
   using (true);
 
--- A signed-in player may only insert rows for themselves. No updates or deletes from the client.
-drop policy if exists "players insert their own shotgun roulette scores" on public.shotgun_roulette_scores;
-create policy "players insert their own shotgun roulette scores"
-  on public.shotgun_roulette_scores for insert
-  to authenticated
-  with check (auth.uid() = user_id);
+-- Placeholder only. The game has no validated, authoritative scoring yet.
+-- Do not accept arbitrary client-submitted coin totals/streaks in production.
+drop policy if exists "players insert their own shotgun roulette scores"
+  on public.shotgun_roulette_scores;
 
+-- Existing Supabase projects may give new public tables broad default grants.
+-- Remove them explicitly, then allow only read access for the empty leaderboard.
+revoke all on public.shotgun_roulette_scores from anon, authenticated;
 grant select on public.shotgun_roulette_scores to anon, authenticated;
-grant insert on public.shotgun_roulette_scores to authenticated;
+-- Future server-validated submissions must be implemented behind trusted server code.
