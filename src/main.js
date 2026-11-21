@@ -16,7 +16,7 @@ import {
   syncScores, onScoresPosted, boardLeaders
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
-import { readWallet, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
+import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
 import { submitDailyResult } from './hub/daily-sync.js';
@@ -265,6 +265,12 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   closeMenu();
   activeChallenge = challenge;
   const external = EXTERNS[slug];
+  const adminPreview = Object.hasOwn(ADMIN_PREVIEWS, slug);
+  // Admin preview content can be updated independently by a contributor.
+  // Give it an opaque origin: even an XSS inside this game cannot read the
+  // parent's session, call parent functions, or modify the Poké Gacha wallet.
+  if (adminPreview) gameFrame.setAttribute('sandbox', 'allow-scripts');
+  else gameFrame.removeAttribute('sandbox');
   activeSlug = previousSlug = slug;
   // Ordinary games have shareable URLs; multiplayer sessions remain private.
   if (!multiplayer && location.hash !== '#' + slug) {
@@ -335,7 +341,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
         '#cover > p.muted:last-child{display:none!important}' +
         '@media(pointer:fine){footer{display:none!important}}' +
         '</style>' : '';
-      gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
+      gameFrame.srcdoc = injectHead(html, adminPreview
+        ? '<script>window.__boredPreviewAuthorized=true;<\\/script>' + head
+        : resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
       const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player'
@@ -1013,6 +1021,14 @@ addEventListener('message', event => {
   if (activeTracks) activeTracks.message(event);
   if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
+    case 'bored:admin-preview-wallet-request':
+      // The untrusted sandbox has only this read-only, narrowly scoped bridge.
+      if (Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) {
+        event.source.postMessage({
+          type: 'bored:admin-preview-wallet', coins: walletBalance(readWallet()).coins || 0
+        }, '*');
+      }
+      break;
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
       break;
