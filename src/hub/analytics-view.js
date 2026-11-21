@@ -383,7 +383,7 @@ function render() {
   renderPopularity();
   table('#games-table', gameColumns, gameRows(report.games));
   renderF14(rows);
-  rankedChart('#players-chart', report.players, p=>p.label, p=>p.active, 10);
+  rankedChart('#players-chart', report.players, p=>p.label, p=>p.sessions, 10);
   table('#players-table', ['Player','Sessions','Games','Days active','Active time','Avg / session','Last seen'], report.players.map(p => [
     action(p.label, () => { $('#person').value = p.id === 'Unidentified guests' ? 'guest' : p.id; page = 0; render(); }),
     p.sessions, p.games.size, p.days.size, duration(p.active), duration(p.active / p.sessions), dateTime(p.last)
