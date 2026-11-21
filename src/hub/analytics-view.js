@@ -100,6 +100,22 @@ function renderPopularity() {
   }
   const selectedGame = $('#game').value;
   const rows = popularitySummary.games.filter(r => !selectedGame || r.game === selectedGame);
+  // Compare launches, not Together reopen events: the latter can repeatedly
+  // count the same multiplayer game and would distort the ranking.
+  const leaders = [...rows].sort((a,b) => b.standalone_launches - a.standalone_launches).slice(0, 12);
+  const maxLaunches = Math.max(1, ...leaders.map(r => Number(r.standalone_launches) || 0));
+  const popularityChart = $('#popularity-chart');
+  popularityChart.replaceChildren(...leaders.map(row => {
+    const line = el('div'); line.className = 'analytics-bar-row';
+    const label = el('span', names[row.game] || row.game); label.className = 'analytics-bar-label'; label.title = label.textContent;
+    const track = el('div'); track.className = 'analytics-bar-track'; track.setAttribute('aria-hidden', 'true');
+    const bar = el('div'); bar.className = 'analytics-bar';
+    bar.style.width = (100 * (Number(row.standalone_launches) || 0) / maxLaunches) + '%';
+    track.append(bar);
+    const value = el('span', Number(row.standalone_launches || 0).toLocaleString()); value.className = 'analytics-bar-value';
+    line.append(label, track, value); return line;
+  }));
+  if (!leaders.length) popularityChart.append(el('p', 'No launches recorded yet.'));
   table('#game-popularity', ['Game','Standalone launches','Standalone browser IDs','Together opens','Organic matches','Organic turns'],
     rows.map(r => [names[r.game] || r.game, r.standalone_launches, r.standalone_browsers,
       r.together_opens, r.matches_started, r.turns_played]));
