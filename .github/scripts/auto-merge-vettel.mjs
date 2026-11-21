@@ -8,6 +8,12 @@ const allowedExact = new Set([
   'src/games/content/pokedoku.html',
   'src/games/content/poke-idle.html',
   'src/games/content/poke-gacha.html',
+  // Shotgun Roulette is sandboxed as an admin-only preview. Contributor changes
+  // to its document, preview art and own tests require the normal test job;
+  // public catalog, hub permissions and SQL are deliberately NOT allowlisted.
+  'src/games/content/shotgun-roulette.html',
+  'src/games/previews/shotgun-roulette.svg',
+  'tests/shotgun-roulette.test.cjs',
   // The Poké Gacha engine: the dex/egg/skin wallet, the tower-defense rules and
   // their logic tests. Nothing outside Poké Gacha imports these modules.
   'src/hub/gacha.js',
