@@ -38,3 +38,14 @@
 .analytics-donut-key strong{font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 @media(max-width:900px){.analytics-donut-layout{grid-template-columns:1fr;justify-items:start;gap:12px}.analytics-donut{width:165px}.analytics-donut-legend{width:100%}}
 @media(max-width:650px){.analytics-donut-layout{grid-template-columns:minmax(100px,130px) minmax(0,1fr);gap:12px}.analytics-donut{width:100%}.analytics-donut-key{grid-template-columns:9px minmax(0,1fr);gap:5px}.analytics-donut-key strong{grid-column:2;text-align:left;font-size:11px}}
+
+/* Two-part daily visitor / cohort comparisons share the existing bar scales. */
+.analytics-stacked{display:flex;overflow:hidden;height:17px;background:#e5e0d7}
+.analytics-stack-first{background:#456653;height:100%;flex:none}
+.analytics-stack-second{background:#bd694b;height:100%;flex:none}
+#engagement-games-chart,#engagement-visitors-chart,#engagement-together-chart,
+#history-games-chart,#history-sources-chart,#history-ui-chart,#history-cohorts-chart,
+#players-chart,#sessions-errors-chart,#daily-chart,#sources-chart,#actions-chart,
+#discovery-chart{margin:16px 0 22px;max-width:940px}
+#history-ui-chart .analytics-bar-row,#engagement-together-chart .analytics-bar-row{grid-template-columns:minmax(150px,245px) 1fr 80px}
+@media(max-width:650px){#history-ui-chart .analytics-bar-row,#engagement-together-chart .analytics-bar-row{grid-template-columns:minmax(100px,130px) 1fr 55px}}
