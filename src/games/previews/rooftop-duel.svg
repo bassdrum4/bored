@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240">
+  <rect width="384" height="240" fill="#f5f2ea"/>
+  <rect x="12" y="12" width="360" height="216" rx="12" fill="#fffdf7" stroke="#d8d2c4"/>
+  <g transform="translate(28 34)">
+    <!-- left rooftop -->
+    <rect x="0" y="128" width="136" height="62" fill="#ccc2ae" stroke="#191713"/>
+    <g fill="#fffdf7" stroke="#191713">
+      <rect x="16" y="150" width="18" height="18"/><rect x="52" y="150" width="18" height="18"/>
+      <rect x="88" y="150" width="18" height="18"/><rect x="16" y="182" width="18" height="18"/>
+      <rect x="52" y="182" width="18" height="18"/><rect x="88" y="182" width="18" height="18"/>
+    </g>
+    <!-- right rooftop -->
+    <rect x="196" y="128" width="136" height="62" fill="#ccc2ae" stroke="#191713"/>
+    <g fill="#fffdf7" stroke="#191713">
+      <rect x="212" y="150" width="18" height="18"/><rect x="248" y="150" width="18" height="18"/>
+      <rect x="284" y="150" width="18" height="18"/><rect x="212" y="182" width="18" height="18"/>
+      <rect x="248" y="182" width="18" height="18"/><rect x="284" y="182" width="18" height="18"/>
+    </g>
+    <!-- the street between them -->
+    <path d="M136 190 L196 190" stroke="#6b6558" stroke-dasharray="4 4"/>
+    <!-- player one, accent red -->
+    <g fill="#b3261e">
+      <rect x="86" y="98" width="16" height="30"/>
+      <rect x="80" y="94" width="28" height="3"/>
+      <circle cx="94" cy="89" r="6"/>
+      <rect x="102" y="106" width="14" height="3"/>
+    </g>
+    <!-- player two, ink, aiming back -->
+    <g fill="#191713">
+      <rect x="240" y="98" width="16" height="30"/>
+      <rect x="234" y="94" width="28" height="3"/>
+      <circle cx="248" cy="89" r="6"/>
+      <rect x="226" y="106" width="14" height="3"/>
+    </g>
+    <!-- the shot in flight -->
+    <circle cx="166" cy="107" r="4" fill="#b3261e"/>
+  </g>
+  <text x="192" y="222" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" fill="#6b6558">FIRST TO 5 &#183; A/D + W + F</text>
+</svg>
