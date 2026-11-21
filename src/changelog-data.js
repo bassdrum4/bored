@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 750,
+  "count": 752,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -11,6 +11,8 @@ export const CHANGELOG_META = {
 export const CHANGELOG = [
   {"sha":"f71e597","date":"2026-11-21","author":"Claude","subject":"Add Shotgun Roulette shell game"},
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"9b193d4","date":"2026-11-20","author":"Daniel Lowe","subject":"Regression-test hidden admin preview launcher and public recent shelf"},
+  {"sha":"a95eee4","date":"2026-11-20","author":"Daniel Lowe","subject":"Fix admin-only preview launch without leaking into recent games"},
   {"sha":"cbf8905","date":"2026-11-20","author":"Daniel Lowe","subject":"Assert absent admin previews with querySelectorAll instead of single-element selectors"},
   {"sha":"d3b642b","date":"2026-11-20","author":"Daniel Lowe","subject":"Fix admin-preview negative selector assertions after #277 merge"},
   {"sha":"f08d974","date":"2026-11-20","author":"Daniel Lowe","subject":"Allow vetted Shotgun Roulette game-only PRs to auto-merge after test job"},
