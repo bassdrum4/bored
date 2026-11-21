@@ -1462,7 +1462,7 @@ test('attack effects come from one sprite sheet: every frame is inside it, sheet
       if (!k.startsWith('shot') && n * ms >= 300) long.push(k);
     }
     const types = Object.keys(TYPE_HEX);
-    return { bad, long, src: FX_SHEET.src, slash: types.filter(t => !packFx('slash', t)), heal: !!packFx('heal', ''), none: packFx('shot', 'Bug') };
+    return { bad, long, src: FX_SHEET.src, slash: types.filter(t => !packFx('slash', t)), heal: !!packFx('heal', ''), none: packFx('burst', 'Fairy'), bug: [packFx('shot', 'Bug'), packFx('burst', 'Bug')].map(a => a && [a[2], a[3], a[4], a[8] && a[8].naturalWidth, !!a[9]]) };
   });
   assert.deepEqual(r.bad, [], 'every frame lies inside the sheet, on whole pixels');
   assert.deepEqual(r.long, [], 'sheet animations finish under 300 ms');
@@ -1470,6 +1470,7 @@ test('attack effects come from one sprite sheet: every frame is inside it, sheet
   assert.deepEqual(r.slash, [], 'every type has its own melee slash');
   assert.ok(r.heal, 'medics heal with the sheet');
   assert.equal(r.none, null, 'a type the sheet does not cover gets null, so the drawn effect is used');
+  assert.deepEqual(r.bug, [[16, 16, 5, 80, true], [64, 64, 7, 448, false]], 'Bug uses the owner\'s own shot (pointing left) and burst strips');
   assert.deepEqual(errors, []);
 });
 test('hatch results: every egg of a big hatch is listed (NEW first, then rarest), and the list scrolls by wheel or Down', async t => {
