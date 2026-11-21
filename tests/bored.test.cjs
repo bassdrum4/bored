@@ -345,8 +345,8 @@ test('browser regressions', async t => {
 
   await t.test('admin-only preview stays hidden and rejects guest and direct launches', async () => {
     assert.equal(await page.$eval('#admin-preview-link', el => el.hidden), true);
-    assert.equal(await page.$eval('.card[data-slug="shotgun-roulette"]', els => els.length), 0);
-    assert.equal(await page.$eval('#recent-list [data-slug="shotgun-roulette"]', els => els.length), 0);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('.card[data-slug="shotgun-roulette"]').length), 0);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#recent-list [data-slug="shotgun-roulette"]').length), 0);
     assert.equal(await page.evaluate(() => ORDER.some(([id]) => id === 'shotgun-roulette')), false);
 
     // Neither the public window.openGame function nor an ordinary deep link can open it.
@@ -362,7 +362,7 @@ test('browser regressions', async t => {
     try {
       await directPage.goto(new URL('games/content/shotgun-roulette.html', url).href);
       assert.match(await directPage.$eval('body', el => el.textContent), /Admin access required/);
-      assert.equal(await directPage.$('button[data-mode]').then(els => els.length), 0);
+      assert.equal(await directPage.evaluate(() => document.querySelectorAll('button[data-mode]').length), 0);
     } finally {
       await directPage.close();
     }
