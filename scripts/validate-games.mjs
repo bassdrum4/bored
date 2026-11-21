@@ -105,7 +105,17 @@ for (const [id, spec] of specs) {
 for (const id of challenges) check(!online.has(id), id + ': daily challenge needs a local game');
 const legacyFiles = (await import('node:fs')).readdirSync(join(root, 'src/games/content'))
   .filter(file => file.endsWith('.html')).map(file => file.slice(0, -5));
-for (const id of legacyFiles) check(PAYLOAD_SLUGS.includes(id) || Object.hasOwn(ADMIN_PREVIEWS, id), id + ': orphan HTML game (not registered)');
+// Retained source documents can be deliberately unlisted without becoming public games.
+// Keep this explicit: genuinely forgotten HTML files should still fail CI.
+const UNLISTED_DOCUMENTS = new Set(['rooftop-duel']);
+for (const id of UNLISTED_DOCUMENTS) {
+  check(legacyFiles.includes(id), id + ': missing intentionally unlisted HTML document');
+  check(!idSet.has(id) && !Object.hasOwn(META, id) && !Object.hasOwn(DISCOVERY, id) &&
+    !Object.hasOwn(PREVIEWS, id) && !Object.hasOwn(ADMIN_PREVIEWS, id),
+    id + ': intentionally unlisted game leaked into public catalog or preview');
+}
+for (const id of legacyFiles) check(PAYLOAD_SLUGS.includes(id) || Object.hasOwn(ADMIN_PREVIEWS, id) ||
+  UNLISTED_DOCUMENTS.has(id), id + ': orphan HTML game (not registered)');
 
 if (errors.length) {
   console.error('Game contract failed (' + errors.length + '):\n' + errors.map(e => '  - ' + e).join('\n'));
