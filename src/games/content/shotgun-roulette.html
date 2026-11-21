@@ -13,7 +13,7 @@
           --mono: ui-monospace, SFMono-Regular, Menlo, monospace; --display: "Fraunces", Georgia, "Times New Roman", serif; }
   * { margin: 0; padding: 0; box-sizing: border-box }
   html { color-scheme: dark }
-  body { min-height: 100vh; background: var(--void); color: var(--ink); font: 17px/1.6 Georgia, "Times New Roman", serif;
+  body { visibility: hidden; min-height: 100vh; background: var(--void); color: var(--ink); font: 17px/1.6 Georgia, "Times New Roman", serif;
          padding: 24px clamp(16px, 3vw, 44px) 48px }
   button { font: inherit; color: inherit; touch-action: manipulation }
   button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
@@ -107,6 +107,21 @@
    The balance comes from the hub's wallet through parent.__boredGacha, the
    same bridge Poké Gacha reads. Scores will go to shotgun_roulette_scores
    (sql/shotgun_roulette.sql) once the game exists. */
+// This is a static GitHub Pages file, so the actual bytes are public. The
+// hub still requires a verified admin session to open the preview, and a
+// standalone/direct load displays a denial instead of activating its UI.
+const authorized = (() => {
+  try {
+    return parent !== window && parent.__boredAdminPreviewAllowed?.('shotgun-roulette') === true;
+  } catch { return false; }
+})();
+if (!authorized) {
+  const message = document.createElement('p');
+  message.textContent = 'Admin access required. Open this preview from Bored while signed in as an admin.';
+  document.body.replaceChildren(message);
+  document.body.style.visibility = 'visible';
+} else {
+  document.body.style.visibility = 'visible';
 const $ = s => document.querySelector(s);
 const G = (() => { try { return parent !== window && parent.__boredGacha ? parent.__boredGacha : null; } catch { return null; } })();
 
@@ -156,6 +171,7 @@ for (const tab of tabs) tab.onclick = () => {
 
 // The hub reads this. Unscored for now: no run, nothing finished.
 window.__boredSnapshot = () => ({ slug: 'shotgun-roulette', rounds: 0, finished: false });
+}
 </script>
 </body>
 </html>
