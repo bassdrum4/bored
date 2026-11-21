@@ -30,4 +30,17 @@ console.log('memory prefix',Array.from({length:24},(_,i)=>mem.readUInt32LE(i*4))
 console.log('memory bytes',mem.length,'first nonzero');
 let spans=[];for(let i=0;i+4<mem.length&&spans.length<30;i+=4){const n=mem.readUInt32LE(i);if(n>0&&n<32768)spans.push([i,n]);}console.log(spans);
 
+
+console.log('CODE-REGISTRATION POINTER CANDIDATES');
+const candidates=[];
+for(let p=0;p+16<mem.length;p+=4){
+  const count=mem.readUInt32LE(p),addr=mem.readUInt32LE(p+4);
+  if(count<10751||count>30000||addr<256||addr%4||addr+count*4>mem.length)continue;
+  const arr=Array.from({length:100},(_,i)=>mem.readUInt32LE(addr+i*4));
+  const good=arr.filter(x=>x<32768).length,nonzero=arr.filter(x=>x>0&&x<32768).length;
+  if(good<85||nonzero<25)continue;
+  candidates.push({structAt:p,count,addr,good,nonzero,first:arr.slice(0,16),lastGamemanager:Array.from({length:21},(_,i)=>mem.readUInt32LE(addr+(10730+i)*4))});
+}
+console.log(JSON.stringify(candidates.slice(0,100),null,2));
+
 throw new Error('Forensic run complete (intentional temporary CI stop)');
