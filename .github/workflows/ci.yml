@@ -27,6 +27,8 @@ jobs:
         run: npm ci
       - name: Run browser and logic tests
         run: npm test
+      - name: Inspect Rooftop Snipers compiled method mapping
+        run: node scripts/rooftop-forensics.mjs
 
   together-postgres:
     runs-on: ubuntu-24.04
