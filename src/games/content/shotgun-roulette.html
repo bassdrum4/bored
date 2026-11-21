@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shotgun Roulette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
+<style>
+  /* Distortion World: the void, a purple platform, lavender ink, Giratina's gold. */
+  :root { --void: #000000; --platform: #1d1230; --edge: #3a2758; --ink: #ddd3ec; --dim: #8f82a6; --gold: #c9a24a;
+          --mono: ui-monospace, SFMono-Regular, Menlo, monospace; --display: "Fraunces", Georgia, "Times New Roman", serif; }
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  html { color-scheme: dark }
+  body { visibility: hidden; min-height: 100vh; background: var(--void); color: var(--ink); font: 17px/1.6 Georgia, "Times New Roman", serif;
+         padding: 24px clamp(16px, 3vw, 44px) 48px }
+  button { font: inherit; color: inherit; touch-action: manipulation }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
+
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-left: 56px }
+  .back { padding: 7px 12px; border: 1px solid var(--edge); border-radius: 3px; background: none; font-size: 15px; cursor: pointer }
+  .back:hover { border-color: var(--ink) }
+  .wallet { color: var(--dim); font-size: 15px }
+  .wallet .num { font: 600 15px var(--mono); color: var(--gold); font-variant-numeric: tabular-nums }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(24px, 4vw, 56px);
+            max-width: 1180px; margin-top: 36px }
+  @media (max-width: 780px) { .layout { grid-template-columns: 1fr } }
+
+  /* The title and the world beneath it, mirrored. */
+  .title { font: 700 clamp(48px, 7vw, 88px)/0.95 var(--display); letter-spacing: -.03em }
+  .reflection { display: block; font: 700 clamp(48px, 7vw, 88px)/0.95 var(--display); letter-spacing: -.03em;
+                transform: scaleY(-1); color: var(--edge); margin-top: .22em; user-select: none }
+  .status { max-width: 46ch; margin-top: 22px; color: var(--dim) }
+  .status b { color: var(--ink); font-weight: 400 }
+
+  h2 { font: 400 26px/1.25 var(--display); margin-bottom: 14px }
+  .opponents { margin-top: 36px }
+  .islands { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; align-items: start }
+  .island { display: block; text-align: left; padding: 16px 18px 18px; background: var(--platform);
+            border: 1px solid var(--edge); border-radius: 3px; cursor: not-allowed }
+  .island.hard { margin-top: 28px; border-top: 3px solid var(--gold) }
+  .island .name { display: block; font: 400 22px/1.25 var(--display) }
+  .island .level { display: block; margin-top: 4px; color: var(--dim); font-size: 15px }
+  .island.hard .level { color: var(--gold) }
+  .island .locked { display: block; margin-top: 12px; font-size: 14px; color: var(--dim) }
+
+  .board-panel { border-left: 1px solid var(--edge); padding-left: clamp(20px, 3vw, 36px) }
+  @media (max-width: 780px) { .board-panel { border-left: 0; padding-left: 0; border-top: 1px solid var(--edge); padding-top: 24px } }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px }
+  .tab { min-height: 36px; padding: 6px 14px; border: 1px solid var(--edge); border-radius: 3px; background: none;
+         color: var(--dim); font-size: 15px; cursor: pointer }
+  .tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--void) }
+  .board { width: 100%; border-collapse: collapse; font-size: 15px }
+  .board th { text-align: left; font-weight: 400; color: var(--dim); padding: 0 0 8px; border-bottom: 1px solid var(--ink) }
+  .board td { padding: 10px 0; border-bottom: 1px solid var(--edge); color: var(--dim) }
+  .board .n { text-align: right; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums }
+  .board th.n { font: inherit; font-size: 15px }
+  .board .rank { width: 3ch; font-family: var(--mono); font-size: 13px }
+  .empty { margin-top: 12px; color: var(--dim); font-size: 15px }
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="back" id="back" type="button">&#8249; Back to the arcade</button>
+  <p class="wallet">Poké Gacha wallet: <span class="num" id="coins">0</span> coins</p>
+</header>
+
+<div class="layout">
+  <main>
+    <h1 class="title">Shotgun Roulette</h1>
+    <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
+    <p class="status"><b>Under construction.</b> The table opens once the game is built. Your coins stay where they are until then.</p>
+
+    <section class="opponents" aria-labelledby="opponents-title">
+      <h2 id="opponents-title">Pick your opponent</h2>
+      <div class="islands" role="group" aria-labelledby="opponents-title">
+        <button class="island normal" type="button" data-mode="normal" disabled>
+          <span class="name">Altered Giratina</span>
+          <span class="level">Normal</span>
+          <span class="locked">Opens with the game</span>
+        </button>
+        <button class="island hard" type="button" data-mode="hard" disabled>
+          <span class="name">Origin Giratina</span>
+          <span class="level">Hard</span>
+          <span class="locked">Opens with the game</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <section class="board-panel" aria-labelledby="lb-title">
+    <h2 id="lb-title">Leaderboard</h2>
+    <div class="tabs" role="tablist" aria-label="Leaderboard mode">
+      <button class="tab" type="button" role="tab" id="tab-normal" aria-controls="board-normal" aria-selected="true">Normal</button>
+      <button class="tab" type="button" role="tab" id="tab-hard" aria-controls="board-hard" aria-selected="false">Hard</button>
+    </div>
+    <div id="board-normal" role="tabpanel" aria-labelledby="tab-normal"></div>
+    <div id="board-hard" role="tabpanel" aria-labelledby="tab-hard" hidden></div>
+    <p class="empty">No runs yet. The first survivor goes here.</p>
+  </section>
+</div>
+
+<script>
+/* Shotgun Roulette: a shell for now. Nothing here spends or grants coins.
+   The balance is read from a narrow postMessage bridge, not from direct
+   access to the parent window or its wallet. Scores will go to shotgun_roulette_scores
+   (sql/shotgun_roulette.sql) once the game exists. */
+// This is a static GitHub Pages file, so the actual bytes are public. The
+// hub still requires a verified admin session to open the preview, and a
+// standalone/direct load displays a denial instead of activating its UI.
+// The parent sets this marker only inside the sandboxed admin preview frame.
+const authorized = parent !== window && window.__boredPreviewAuthorized === true;
+if (!authorized) {
+  const message = document.createElement('p');
+  message.textContent = 'Admin access required. Open this preview from Bored while signed in as an admin.';
+  document.body.replaceChildren(message);
+  document.body.style.visibility = 'visible';
+} else {
+  document.body.style.visibility = 'visible';
+const $ = s => document.querySelector(s);
+function showCoins() {
+  parent.postMessage({ type: 'bored:admin-preview-wallet-request' }, '*');
+}
+addEventListener('message', event => {
+  if (event.source !== parent || event.data?.type !== 'bored:admin-preview-wallet') return;
+  const coins = event.data.coins;
+  if (Number.isSafeInteger(coins) && coins >= 0) $('#coins').textContent = coins.toLocaleString('en-US');
+});
+showCoins();
+addEventListener('focus', showCoins);
+
+// Back: use the arcade's own back button when embedded, else go to the arcade.
+$('#back').onclick = () => parent.postMessage({ type: 'bored:close' }, '*');
+
+// Placeholder rows for both boards.
+for (const panel of document.querySelectorAll('[role="tabpanel"]')) {
+  const table = document.createElement('table');
+  table.className = 'board';
+  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Coins won</th><th class="n">Best streak</th></tr></thead>';
+  const body = document.createElement('tbody');
+  for (let rank = 1; rank <= 5; rank++) {
+    const row = body.insertRow();
+    [rank, '—', '—', '—'].forEach((text, i) => {
+      const cell = row.insertCell();
+      cell.textContent = text;
+      cell.className = i === 0 ? 'rank' : i > 1 ? 'n' : '';
+    });
+  }
+  table.appendChild(body);
+  panel.appendChild(table);
+}
+
+const tabs = [...document.querySelectorAll('.tab')];
+for (const tab of tabs) tab.onclick = () => {
+  for (const other of tabs) {
+    const on = other === tab;
+    other.setAttribute('aria-selected', String(on));
+    document.getElementById(other.getAttribute('aria-controls')).hidden = !on;
+  }
+};
+
+// The hub reads this. Unscored for now: no run, nothing finished.
+window.__boredSnapshot = () => ({ slug: 'shotgun-roulette', rounds: 0, finished: false });
+}
+</script>
+</body>
+</html>
