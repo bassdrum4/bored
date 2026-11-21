@@ -87,6 +87,40 @@ function donut(target, rows, label, value, format = n => n.toLocaleString()) {
   });
   figure.append(wheel, legend); host.replaceChildren(figure);
 }
+
+function rankedChart(target, rows, label, value, limit = 12) {
+  const host = $(target); if (!host) return;
+  const data = rows.map(row => ({ label: String(label(row)), value: Math.max(0, Number(value(row)) || 0) }))
+    .filter(row => row.value > 0).sort((a,b) => b.value - a.value).slice(0,limit);
+  const maximum = Math.max(1,...data.map(row => row.value));
+  host.replaceChildren(...data.map(row => {
+    const line = el('div'); line.className = 'analytics-bar-row';
+    const name = el('span',row.label); name.className = 'analytics-bar-label'; name.title = row.label;
+    const track = el('div'); track.className = 'analytics-bar-track'; track.setAttribute('aria-hidden','true');
+    const fill = el('div'); fill.className = 'analytics-bar'; fill.style.width = 100 * row.value / maximum + '%'; track.append(fill);
+    const count = el('span', row.value.toLocaleString()); count.className = 'analytics-bar-value';
+    line.append(name,track,count); return line;
+  }));
+  if (!data.length) host.append(el('p','No activity recorded yet.'));
+}
+function stackedDays(target, rows, key, first, second, labels = ['New','Returning']) {
+  const host = $(target); if (!host) return;
+  const data = [...rows].sort((a,b) => String(key(a)).localeCompare(String(key(b))));
+  const max = Math.max(1,...data.map(row => Math.max(0,Number(first(row))||0) + Math.max(0,Number(second(row))||0)));
+  host.replaceChildren(...data.map(row => {
+    const a = Math.max(0,Number(first(row))||0), b = Math.max(0,Number(second(row))||0);
+    const line = el('div'); line.className = 'analytics-bar-row';
+    const name = el('span',String(key(row))); name.className = 'analytics-bar-label';
+    const track = el('div'); track.className = 'analytics-bar-track analytics-stacked'; 
+    track.setAttribute('aria-label',labels[0]+': '+a+'; '+labels[1]+': '+b);
+    const left = el('div'); left.className = 'analytics-stack-first'; left.style.width = 100*a/max+'%';
+    const right = el('div'); right.className = 'analytics-stack-second'; right.style.width = 100*b/max+'%';
+    track.append(left,right);
+    const count = el('span',(a+b).toLocaleString()); count.className = 'analytics-bar-value';
+    line.append(name,track,count); return line;
+  }));
+  if (!data.length) host.append(el('p','No activity recorded yet.'));
+}
 function gameRows(games) {
   return games.map(g => [names[g.id] || g.id, g.sessions, g.users.size, duration(g.active), duration(g.visible), duration(g.active / g.sessions), g.completed, g.errors]);
 }
@@ -139,9 +173,11 @@ function renderEngagement(rows) {
   $('#engagement-kpis').replaceChildren(...stats.map(([label,value]) => {
     const n=el('div');n.className='analytics-stat';n.append(el('strong',value),el('span',label));return n;
   }));
+  rankedChart('#engagement-games-chart', data.games, g => names[g.game] || g.game, g => g.meaningful);
   table('#engagement-games',
     ['Game','Opens','Meaningful sessions','Engaged players','Repeat players (matured)'],
     data.games.map(g => [names[g.game]||g.game,g.sessions,g.meaningful,g.engagedPlayers,g.repeatPlayers]));
+  stackedDays('#engagement-visitors-chart', data.visitorsByDay, d => d.day, d => d.new, d => d.returning);
   table('#engagement-visitors',['Detroit date','New tracked visitors','Returning tracked visitors'],
     data.visitorsByDay.map(d=>[d.day,d.new,d.returning]));
   const match = togetherSummary && !Array.isArray(togetherSummary) ? togetherSummary : {};
@@ -164,10 +200,12 @@ function renderEngagement(rows) {
   const counts = new Map();
   for (const e of products) if (labels[e.kind]) counts.set(e.kind,(counts.get(e.kind)||0)+1);
   for (const [kind,label] of Object.entries(labels)) multiplayer.push([label,counts.get(kind)||0]);
+  rankedChart('#engagement-together-chart', Object.entries(labels).map(([kind,label]) => ({label,count:counts.get(kind)||0})),r=>r.label,r=>r.count);
   table('#engagement-together',['Measure','Value'],multiplayer);
   const sentiment = [['Responses',data.survey.responses],
     ['Positive (4 or 5)',data.survey.positive],
     ['Positive share',percent(data.survey.positive,data.survey.responses)]];
+  donut('#engagement-feedback-chart', [{id:'Positive (4–5)',count:data.survey.positive},{id:'Other ratings',count:Math.max(0,data.survey.responses-data.survey.positive)}],r=>r.id,r=>r.count);
   table('#engagement-feedback',['Measure','Value'],sentiment);
   table('#engagement-comments',['Date','Type','Rating','Player','Game','Feedback',''],feedback
     .slice(-50).reverse()
@@ -260,7 +298,7 @@ function renderHistory() {
   const totals = aggregateSummary?.totals;
   if (!totals) {
     $('#history-totals').replaceChildren(el('p', 'Aggregated history is unavailable.'));
-    for (const id of ['#history-games','#history-sources','#history-ui','#history-cohorts'])
+    for (const id of ['#history-games','#history-sources','#history-ui','#history-cohorts','#history-games-chart','#history-sources-chart','#history-ui-chart','#history-cohorts-chart'])
       $(id).replaceChildren(el('p', 'No aggregate data available.'));
     return;
   }
@@ -303,15 +341,19 @@ function renderHistory() {
     table('#history-games', ['Game','All-mode opens','Meaningful','Meaningful rate',
       'Browser IDs','Active time','Median active','Errors'], gameRows);
   }
+  rankedChart('#history-games-chart', popularGames || aggregateSummary.games || [], r => names[r.game] || r.game, r => popularGames ? r.standalone_launches : r.launches);
+  donut('#history-sources-chart',aggregateSummary.sources || [],r=>r.source,r=>r.launches);
   table('#history-sources', ['Launch source','Launches','Meaningful','Active time'],
     (aggregateSummary.sources || []).map(r => [r.source,r.launches,r.meaningful,duration(r.active_ms)]));
   const actions = (aggregateSummary.ui_events || [])
     .filter(e => e.kind !== 'visit')
     .sort((a,b) => b.events-a.events || a.kind.localeCompare(b.kind))
     .slice(0,100);
+  rankedChart('#history-ui-chart', actions, e => [e.kind,e.action_name].filter(Boolean).join(' · '), e => e.events);
   table('#history-ui',['Event','Game','Surface','Action','Count','Browser IDs'], actions.map(e => [
     e.kind, names[e.game] || e.game || '—',e.surface || '—',e.action_name || '—',e.events,e.browsers
   ]));
+  stackedDays('#history-cohorts-chart',aggregateCohorts.filter(c=>c.d1_returned!=null),c=>c.first_day,c=>c.d1_returned,c=>Math.max(0,c.cohort-c.d1_returned),['D1 returned','Did not return D1']);
   table('#history-cohorts',['First visit','Browsers','D1 returns','D7 returns','Next school day','School-day returns'],
     aggregateCohorts.map(c => [c.first_day,c.cohort,
       c.d1_returned == null ? 'Not mature' : c.d1_returned + ' (' + percentage(c.d1_returned,c.cohort) + ')',
@@ -341,6 +383,7 @@ function render() {
   renderPopularity();
   table('#games-table', gameColumns, gameRows(report.games));
   renderF14(rows);
+  rankedChart('#players-chart', report.players, p=>p.label, p=>p.active, 10);
   table('#players-table', ['Player','Sessions','Games','Days active','Active time','Avg / session','Last seen'], report.players.map(p => [
     action(p.label, () => { $('#person').value = p.id === 'Unidentified guests' ? 'guest' : p.id; page = 0; render(); }),
     p.sessions, p.games.size, p.days.size, duration(p.active), duration(p.active / p.sessions), dateTime(p.last)
@@ -354,6 +397,9 @@ function render() {
 function renderSessions() {
   $('#session-detail').hidden = true;
   const sessions = report.sessions.filter(s => !$('#errors-only').checked || s.errors);
+  const errorsByGame = new Map();
+  for (const session of sessions) if (session.errors) errorsByGame.set(session.game,(errorsByGame.get(session.game)||0)+session.errors);
+  rankedChart('#sessions-errors-chart',[...errorsByGame].map(([game,count])=>({game,count})),r=>names[r.game]||r.game,r=>r.count);
   const pages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE)); page = Math.min(page, pages - 1);
   $('#session-note').textContent = sessions.length + ' sessions · latest first · Detroit time';
   table('#sessions-table', ['Player','Game','First received','Active','Visible','Status','Result','Device','Errors','Detail'], sessions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(s => [
