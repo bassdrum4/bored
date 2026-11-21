@@ -14,7 +14,7 @@ match = re.search(r'<script id="unity-build" type="application/json">(.*?)</scri
 assert match, "Missing embedded Unity build"
 build = json.loads(match.group(1))
 blob = gzip.decompress(base64.b64decode(build["assets"]["rooftop-snipers.data.unityweb"]))
-magic = b"UnityWebData1.0\\0"
+magic = b"UnityWebData1.0" + bytes([0])
 assert blob.startswith(magic), "Not UnityWebData1.0"
 header_end = struct.unpack_from("<i", blob, len(magic))[0]
 files = {}
