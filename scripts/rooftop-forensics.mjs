@@ -29,3 +29,5 @@ console.log('METADATA',Object.fromEntries(['methods','typeDefinitions','images',
 console.log('memory prefix',Array.from({length:24},(_,i)=>mem.readUInt32LE(i*4)));
 console.log('memory bytes',mem.length,'first nonzero');
 let spans=[];for(let i=0;i+4<mem.length&&spans.length<30;i+=4){const n=mem.readUInt32LE(i);if(n>0&&n<32768)spans.push([i,n]);}console.log(spans);
+
+throw new Error('Forensic run complete (intentional temporary CI stop)');
