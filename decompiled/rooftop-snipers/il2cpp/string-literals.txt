@@ -1,0 +1,2865 @@
+element
+attributeType
+Type is not derived from System.Attribute.
+Element is not a constructor, method, property, event, type or field.
+targetType
+Value is not a System.Int32
+s
+Value is too large
+With AllowHexSpecifier only AllowLeadingWhite and AllowTrailingWhite are permitted.
+Not a valid number style
+Value too large or too small.
+Input string was not in the correct format
+Value is not a System.Int64
+Input string was not in the correct format: s.Length==0.
+Input string was not in the correct format: Has Negative Sign.
+Input string was not in the correct format: Has Positive Sign.
+Input string was not in the correct format: nDigits == 0.
+Input string was not in the correct format: no space between number and currency symbol.
+Input string was not in the correct format: No room for close parens.
+Input string was not in the correct format: Did not parse entire string. pos = 
+ s.Length = 
+Value is not a System.UInt32.
+Negative number
+Value is not a System.UInt64.
+Value is not a System.Byte.
+Value too large.
+Value is not a System.SByte.
+Value is not a System.Int16
+Value is not a System.UInt16.
+Value is not a System.Char
+The value of index is less than zero, or greater than or equal to the length of s.
+s contains more than one character.
+culture
+
+type
+destination
+sourceIndex
+Cannot be negative
+destinationIndex
+Cannot be negative.
+count
+sourceIndex + count > Length
+destinationIndex + count > destination.Length
+startIndex
+< 0
+length
+Must be greater than the length of the string.
+Count cannot be less than zero.
+Illegal enum value: 
+.
+Cannot exceed length of string.
+startIndex + length > this.length
+value
+Count cannot be negative, and startIndex + count must be less than length of the string.
+Invalid value '{0}' for StringComparison
+comparisonType
+startIndex > this.length
+Cannot be negative and must be< 0
+startIndex + count > this.length
+Cannot be negative, and should not exceed length of string.
+Cannot be negative, and should point to location in string.
+Cannot be negative, and should be less than length of string.
+< 0 || >= this.Length
+< 0 || > this.Length
+startIndex - count + 1 < 0
+totalWidth
+oldValue
+oldValue is the empty string.
+format
+args
+Index (zero based) must be greater than or equal to zero and less than the size of the argument list.
+Input string was not in a correct format.
+values
+Cannot be negative and must be less than or equal to length of string.
+startIndex + count > value.length
+idx
+newLength
+newLength as to be <= length
+ptr
+Value does not refer to a valid string.
+Non-negative number required.
+Value, startIndex and length do not refer to a valid string.
+Value is not a System.Single.
+Value is not a System.Double
+Double doesn't support parsing with '{0}'.
+AllowHexSpecifier
+How did this happen?
+Unknown char: 
+Unknown char
+scale must be between 0 and 28
+Value {0} is greater than Decimal.MaxValue or less than Decimal.MinValue
+Overflow on adding decimal number
+Overflow on subtracting decimal numbers (
+)
+Value is not a System.Decimal
+Invalid character at position {0}
+Invalid exponent
+No digits found
+Closing Parentheses not found
+Decimal.TryParse does not accept AllowHexSpecifier
+style
+Error in System.Decimal.Parse
+79228162514264337593543950335
+1
+G
+False
+True
+Object is not a Boolean.
+Value is not equivalent to either TrueString or FalseString.
+info
+This isn't a 64bits machine.
+pointer
+Incompatible Delegate Types.
+method
+type is not a subclass of Multicastdelegate
+Invoke
+method return type is incompatible
+method argument length mismatch
+method arguments are incompatible
+type is not subclass of MulticastDelegate.
+Couldn't bind to method '
+'.
+target
+enumType
+enumType is not an Enum type.
+The value parameter is not the correct type.It must be type String or the same type as the underlying typeof the Enum.
+typeCode is not a valid type code for an Enum
+An empty string is not considered a valid value.
+The requested value was not found.
+The requested value '{0}' was not found.
+Object must be the same type as the enum. The type passed in was {0}; the enum type was {1}.
+X2
+x2
+X4
+x4
+X8
+x8
+X16
+x16
+Invalid type code for enumeration.
+0
+, 
+Enum underlying type and the object must be the same type or object. Type passed in was {0}; the enum underlying type was {1}.
+Format String can be only "G","g","X","x","F","f","D" or "d".
+index
+Only single dimension arrays are supported.
+Collection is read-only
+array
+Destination array was not long enough. Check destIndex and length, and the array's lower bounds.
+Value has to be >= 0.
+Array was not a one-dimensional array.
+Index has to be between upper and lower bound of the array.
+Value must be >= 0 and <= Int32.MaxValue.
+index1
+index2
+index3
+Index has to be >= lower bound and <= upper bound of the array.
+elementType
+lengths
+Type must be a type provided by the runtime.
+Array type can not be void
+Array type can not be an open generic type
+lowerBounds
+Arrays must contain >= 1 elements.
+Arrays must be of same size.
+Each value has to be >= 0.
+Length + bound must not exceed Int32.MaxValue.
+Each value has to be >= 0 and <= Int32.MaxValue.
+indices
+value does not support IComparable.
+comparer is null and value does not support IComparable.
+index is less than the lower bound of array.
+index and length do not specify a valid range in array.
+value does not support IComparable
+Comparer threw an exception.
+length < 0
+index < lower bound
+index + length > size
+sourceArray
+destinationArray
+Destination array was not long enough. Check destIndex and length, and the array's lower bounds
+(Types: source={0};  target={1})
+Must be in the Int32 range.
+keys
+The comparer threw an exception.
+comparison
+Comparison threw an exception.
+No IComparable or IComparable<{0}> interface found.
+match
+action
+converter
+Enumeration has not started. Call MoveNext
+Enumeration already finished
+Enumeration has not started.
+Enumeration has already ended
+This collection is read-only.
+TypeName
+Error loading '
+'
+name
+types
+Derived classes must provide an implementation.
+not a generic type definition
+typeArguments
+The type or method has {0} generic parameter(s) but {1} generic argument(s) where provided. A generic argument must be provided for each generic parameter.
+ClassName
+Message
+HelpURL
+StackTraceString
+RemoteStackTraceString
+RemoteStackIndex
+HResult
+Source
+InnerException
+Data
+Exception of type '{0}' was thrown.
+{0}  {1} 
+at
+<unknown method>
+  {0} 
+<0x{0:x5}> {1}
+ <0x{0:x5}> 
+ [0x{0:x5}] 
+in {0}:{1} 
+ExceptionMethod
+: 
+ ---> 
+  --- End of inner exception stack trace ---
+[
+,
+]
+ (
+ 
+FieldObj
+Insufficient state.
+Object fields may not be properly initialized
+TypeObj
+This operation is not supported for this type.
+ArgIterator does not support Equals.
+Nullable object must have a value.
+collation.core.bin
+collation.tailoring.bin
+Mono INTERNAL ERROR (Should not happen): Collation tailoring table is broken for culture {0} ({1}) at 0x{2:X}
+zh-CHS
+zh-CHT
+ja
+ko
+cjkCHS
+cjkCHT
+cjkJA
+cjkKO
+collation.{0}.bin
+collation.cjkKOlv2.bin
+MONO_COLLATION_QUICK_CHECK_DISABLED
+yes
+MONO internal error. Failed to get TailContraction. start = {0} end = {1} string = '{2}'
+CompareInfo Internal Error: Should not happen. {0} {1} {2} {3} {4} {5}
+CompareInfo Internal Error: Should not happen. '{0}' {2} {3} '{1}' {4} {5}
+sortkey1
+sortkey2
+SortKey - 
+The Rabin-Miller test can not be executed in a way such that its results are provable
+confidence
+bitNum out of range
+0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ
+charSet length less than radix
+characterSet
+There is no such thing as radix one notation
+radix
+Operation would return a negative value
+bi1 out of range
+bi2 out of range
+x out of range
+No inverse!
+blob
+blob is too small.
+Invalid blob header
+Invalid blob.
+rsa
+Keypair was disposed
+no private key to export
+Missing mandatory DSA parameters (P, Q or G).
+Missing both public (Y) and private (X) keys.
+rgbHash
+invalid hash length
+no private key available for signature
+rgbSignature
+invalid signature length
+couldn't compute signature verification
+parameters
+[{0}][{1}][{2}].xml
+.mono
+keypairs
+Could not create user key store '{0}'.
+Improperly protected user's key pairs in '{0}'.
+Could not create machine key store '{0}'.
+Improperly protected machine's key pairs in '{0}'.
+default
+KeyPair
+KeyValue
+<KeyPair>{0}	<Properties>{0}		<Provider 
+Name="{0}" 
+Type="{0}" />{1}		<Container 
+Name="{0}" />{1}	</Properties>{1}	<KeyValue
+ Id="{0}" 
+>{1}		{0}{1}	</KeyValue>{1}</KeyPair>{1}
+message too long
+bad hash length for 
+invalid PrivateKeyInfo
+invalid version
+invalid algorithm
+missing algorithm OID
+invalid private key format
+missing version
+not enough key parameters
+invalid EncryptedPrivateKeyInfo
+invalid encryptionAlgorithm
+invalid parameters
+invalid salt
+invalid iterationCount
+invalid EncryptedData
+private key
+Missing private key to decrypt value.
+public key
+Missing private key
+Missing Exponent
+Missing Modulus
+Private/public key mismatch
+<RSAKeyValue>
+<Modulus>
+</Modulus>
+<Exponent>
+</Exponent>
+<P>
+</P>
+<Q>
+</Q>
+<DP>
+</DP>
+<DQ>
+</DQ>
+<InverseQ>
+</InverseQ>
+<D>
+</D>
+</RSAKeyValue>
+IV is too small ({0} bytes), it should be {1} bytes long.
+Unkown CipherMode
+OFB isn't supported by the framework
+CTS isn't supported by the framework
+inputBuffer
+inputOffset
+inputCount
+Overflow
+Object is disposed
+outputBuffer
+outputOffset
+Invalid input block size.
+Bad {0} padding.
+ Invalid length {0}.
+ Error found at position {0}.
+invalid block length
+invalid data
+invalid PFX version
+1.2.840.113549.1.7.1
+invalid authenticated safe
+invalid MAC
+1.3.14.3.2.26
+unsupported HMAC
+missing MAC salt
+invalid MAC iteration
+Invalid MAC - file may have been tampered!
+1.2.840.113549.1.7.6
+1.2.840.113549.1.7.3
+public key encrypted
+unknown authenticatedSafe
+1.2.840.113549.1.12.10.1.3
+1.2.840.113549.1.5.1
+1.2.840.113549.1.5.3
+1.2.840.113549.1.5.4
+1.2.840.113549.1.5.6
+1.2.840.113549.1.5.10
+1.2.840.113549.1.5.11
+1.2.840.113549.1.12.1.1
+1.2.840.113549.1.12.1.2
+1.2.840.113549.1.12.1.3
+1.2.840.113549.1.12.1.4
+1.2.840.113549.1.12.1.5
+1.2.840.113549.1.12.1.6
+MD2
+DES
+MD5
+RC2
+SHA1
+RC4
+TripleDES
+unknown oid 
+Unknown private key format
+invalid safeBag
+invalid safeBag id
+1.2.840.113549.1.12.10.1.1
+1.2.840.113549.1.12.10.1.2
+1.2.840.113549.1.12.10.1.4
+1.2.840.113549.1.12.10.1.5
+1.2.840.113549.1.12.10.1.6
+1.2.840.113549.1.9.22.1
+unsupport certificate type
+unknown safeBag oid
+invalid safeBag attributes id
+invalid PKCS12 attributes id
+invalid attribute id
+1.2.840.113549.1.9.20
+1.2.840.113549.1.9.21
+invalid attribute value id
+C=
+O=
+OU=
+CN=
+L=
+S=
+STREET=
+DC=
+UID=
+E=
+dnQualifier=
+T=
+SN=
+G=
+I=
+OID.
+=
+"
+CERTIFICATE
+Input data cannot be coded as a valid certificate.
+Missing key algorithm parameters.
+raw
+-----BEGIN {0}-----
+-----END {0}-----
+Invalid X.509 extension.
+   
+  
+Invalid extensions format
+Undefined length encoding.
+Tag: {0} {1}
+Length: {0} {1}
+Value: 
+{0} 
+oid
+asn1
+Only integer can be converted
+time
+yyMMddHHmmZ
+19
+20
+yyyyMMddHHmmssZ
+{0}{1}{2}{3}{4}:{5}{6}
+yyyyMMddHHmmsszzz
+Invalid ASN1
+Invalid contentType
+Invalid content
+Invalid EncryptedData
+Invalid version
+missing EncryptedContentInfo
+missing EncryptedContentInfo.ContentType
+missing EncryptedContentInfo.ContentEncryptionAlgorithmIdentifier
+missing EncryptedContentInfo.EncryptedContent
+Unexpected end of stream. Element stack content is {0}
+Whitespace is expected.
+Expected '{0}' but got {1}
+XML name start character is expected.
+Valid XML name is expected.
+Insufficient close tag: {0}
+CDATA
+Invalid declaration markup
+DOCTYPE
+Invalid declaration markup.
+This parser does not support document type.
+?
+End tag mismatch: expected {0} but found {1}
+amp
+quot
+apos
+lt
+gt
+General non-predefined entity reference is not supported in this parser.
+Invalid attribute value markup.
+xml:space
+'--' is not allowed inside comment markup.
+{0}. At ({1},{2})
+does not implement right interface
+key
+capacity
+index larger than largest valid index of array
+Destination array cannot hold the requested elements!
+Cannot copy source collection elements to destination array
+An element with the same key already exists in the dictionary.
+Version
+Comparer
+HashSize
+KeyValuePairs
+not of type: 
+out of sync
+Current is not valid
+dictionary
+this is a read-only collection
+The given key was not present in the dictionary.
+item
+collection
+Collection was modified; enumeration operation may not execute.
+list
+c
+The initial capacity can't be smaller than zero.
+Index is less than 0 or more than or equal to the list count.
+Capacity
+Must be more than count.
+Does not specify valid index.
+Can't be less than 0.
+Start index and count do not specify a valid range.
+Index must be >= 0 and <= Count.
+Less than 0 or more than list count.
+Must have only 1 dimensions.
+List has changed.
+Enumerator not started
+Enumerator ended
+Can't add or remove from a fixed-size list.
+Can't modify a readonly list.
+bits
+Array rank must be 1
+index is greater than array.Length
+Unsupported type
+Enum not started
+Enum Ended
+obj
+The element cannot be found.
+CollectionBase.OnValidate: Invalid parameter value passed to method: null
+Neither 'a' nor 'b' implements IComparable.
+CompareInfo
+negative capacity
+loadFactor
+load factor
+Size is too big
+null key
+arrayIndex
+array is multidimensional
+arrayIndex is equal to or greater than array.Length
+Not enough room from arrayIndex to end of array for this Hashtable
+LoadFactor
+KeyComparer
+HashCodeProvider
+Keys
+Values
+equalityComparer
+Keys and values of uneven size
+table
+Key duplication when adding: 
+Hashtable.Enumerator: snapshot out of sync.
+should never happen
+not enough space
+ParentTable
+SortedList is Read Only.
+Key not found and SortedList is fixed size.
+capacity too small
+array is multi-dimensional
+arrayIndex is greater than or equal to array.Length
+Not enough space in array from arrayIndex to end of array
+index out of range
+Key '{0}' already exists in list.
+SortedList::internal error (
+) at [
+SortedList.Enumerator: snapshot out of sync.
+ is not a supported mode.
+col
+initialCapacity
+<filename unknown>
+ at 
+<unknown offset>
+offset 
+ in file:line:column 
+:{0}:{1}
+e
+skipFrames
+{0}   {1} 
+ in {0}:line {1}
+   {0} 
+{0}.{1}
+(
+ ByRef
+ {0}
+This Calendar is read-only.
+Internal: M_EraNames not initialized!
+MONO_DISABLE_MANAGED_COLLATION
+options
+Offsets and lengths must not be less than zero
+Offset1 is greater than or equal to the length of string1
+Offset2 is greater than or equal to the length of string2
+Length1 is greater than the number of characters from offset1 to the end of string1
+Length2 is greater than the number of characters from offset2 to the end of string2
+Now allowed CompareOptions.
+source
+prefix
+suffix
+CompareInfo - 
+Positive number required.
+Culture ID {0} (0x{0:X4}) is not a supported culture.
+Culture name 
+ is not supported.
+This instance is read only
+Culture "
+" is a neutral culture. It can not be used in formatting and parsing and therefore cannot be set as the thread's current culture.
+NumberFormat
+DateTimeFormat
+zh-hans
+zh-hant
+zh-chs
+zh-cht
+Invariant Language (Invariant Country)
+IVL
+iv
+en_US_POSIX
+AM
+PM
+/
+:
+MM/dd/yyyy
+dddd, dd MMMM yyyy
+HH:mm
+HH:mm:ss
+MMMM dd
+yyyy MMMM
+dddd, dd MMMM yyyy HH:mm:ss
+ddd, dd MMM yyyy HH':'mm':'ss 'GMT'
+yyyy'-'MM'-'dd'T'HH':'mm':'ss
+yyyy'-'MM'-'dd HH':'mm':'ss'Z'
+An array with exactly 13 elements is needed
+An array with exactly 7 elements is needed
+Sun
+Mon
+Tue
+Wed
+Thu
+Fri
+Sat
+Sunday
+Monday
+Tuesday
+Wednesday
+Thursday
+Friday
+Saturday
+Jan
+Feb
+Mar
+Apr
+May
+Jun
+Jul
+Aug
+Sep
+Oct
+Nov
+Dec
+January
+February
+March
+April
+June
+July
+August
+September
+October
+November
+December
+Su
+Mo
+Tu
+We
+Th
+Fr
+Sa
+era
+yyyy'-'MM'-'dd'T'HH':'mm':'ss.fffffffK
+Format specifier was invalid.
+hh:mm tt
+H:mm
+h:mm tt
+AD
+A.D.
+#
+$
+NaN
+-Infinity
+-
+%
+‰
+Infinity
++
+2
+3
+4
+5
+6
+7
+8
+9
+The value specified for the property is less than 0 or greater than 15
+The current instance is read-only and a set operation was attempted
+TextInfo - 
+str
+An Isolated storage operation failed.
+Input or Encoding is a null reference.
+The stream doesn't support reading.
+BinaryReader
+Cannot read from a closed BinaryReader.
+Stream is invalid
+buffer is null
+index is less than 0
+count is less than 0
+buffer is too small
+Too many bytes in what should have been a 7 bit encoded Int32.
+Invalid binary file (string len < 0)
+path
+Path is empty
+Path contains invalid chars
+Only blank characters in path
+Cannot create 
+ because a file with the same name already exists.
+Only ':' In path
+The Path does not have a valid format
+Path contains invalid characters
+Pattern contains invalid characters
+pattern
+Directory '
+' not found.
+Pattern is invalid
+searchPattern
+Path is invalid
+Directory not found
+Failed to read past end of stream.
+{0} is a directory
+Could not find a part of the path "{0}".
+I/O Error
+FileLoad_FileName
+FileLoad_FusionLog
+: {0}
+ : {0}
+ ----> {0}
+Unable to find the specified file.
+FileNotFound_FileName
+FileNotFound_FusionLog
+Could not load file or assembly '{0}' or one of its dependencies. The system cannot find the file specified.
+File name: '{0}'
+ ---> {0}
+[Unknown]
+handle
+Invalid.
+access
+Invalid handle.
+bufferSize
+mode
+Enum value was out of legal range.
+Enum value for FileAccess was out of legal range.
+Enum value for FileShare was out of legal range.
+share
+Name has invalid chars
+Access to the path '{0}' is denied.
+Append access can be requested only in write-only mode.
+Combining FileMode: {0} with FileAccess: {1} is invalid.
+Could not find file "{0}".
+Stream has been closed
+The stream does not support seeking
+Attempt to set the position to a negative value
+Stream does not support reading
+Stream does not support writing
+offset
+destination offset is beyond array size
+Reading would overrun buffer
+This stream does not support reading
+numBytes
+Must be >= 0
+Buffer too small. numBytes/offset wrong.
+asyncResult
+Invalid IAsyncResult
+This stream does not support writing
+array too small. numBytes/offset wrong.
+origin
+Invalid SeekOrigin
+Attempted to Seek before the beginning of the stream
+Can't seek back over pre-existing data in append mode
+The stream does not support writing
+value is less than 0
+FullPath
+OriginalPath
+An empty file name is not valid.
+Illegal characters in path.
+buffer
+index or count is less than 0.
+index+count
+The size of the buffer is less than index + count.
+MemoryStream
+Cannot expand this MemoryStream
+New capacity cannot be negative or less than the current capacity 
+Position cannot be negative
+Position must be non-negative and less than 2^31 - 1 - origin
+offset or count less than zero.
+offset+count
+The size of the buffer is less than offset + count.
+Offset out of range. 
+Attempted to seek before start of MemoryStream.
+loc
+Expanding this MemoryStream is not supported
+Cannot write to this MemoryStream
+Cannot write to this stream.
+Access to the path is denied.
+Cannot create a file that already exist.
+Could not find file "{0}"
+Too many open files
+Could not find a part of the path "{0}"
+Access to the path "{0}" is denied.
+Invalid handle to path "{0}"
+Could not find the drive  '{0}'. The drive might not be ready or might not be mapped.
+Could not create file "{0}". File already exists.
+Path is too long. Path: {0}
+Invalid parameter
+Write fault on path {0}
+Sharing violation on path {0}
+Lock violation on path {0}
+Disk full. Path {0}
+Directory {0} is not empty
+Encryption failed
+Path {0} is a directory
+Source and destination are not on the same device
+Win32 IO returned {0}. Path: {1}
+path1
+path2
+Invalid path
+Argument string consists of whitespace characters only.
+The specified path is not of a legal form (empty).
+UNC paths should be of the form \\server\share.
+\\
+The specified path is not of a legal form.
+..
+Pathname is longer than the maximum length
+EndRead already called.
+EndWrite already called.
+Empty path not allowed
+path contains invalid characters
+encoding
+The minimum size of the buffer must be positive
+stream
+Cannot read stream
+StreamReader
+Cannot read from a closed StreamReader
+index + count > buffer.Length
+Can not write to stream
+StreamWriter
+StringReader
+Cannot read from a closed StringReader
+reader is null
+writer is null
+dest_buffer
+index + count > dest_buffer.Length
+The stream is closed
+The position is larger than Int32.MaxValue.
+The length of the buffer array minus the offset parameter is less than the count parameter
+An attempt was made to seek before the beginning of the stream
+Invalid SeekOrigin option
+Unable to expand length of this stream beyond its capacity.
+Stream does not support writing.
+The buffer parameter is a null reference
+The current position is at the end of the capacity of the stream
+The invoked member is not supported in a dynamic module.
+Elements of the parameterTypes array cannot be null
+parameterTypes
+ConstructorBuilder ['
+']
+Method '
+' does not have a method body.
+The type is not yet created.
+&
+Cannot create a byref type of an already byref type
+Label not marked
+Method '{0}' override '{1}' but it is not virtual
+Method '{0}.{1}' does not have a method body.
+MethodBuilder [
+::
+nop
+break
+ldarg.0
+ldarg.1
+ldarg.2
+ldarg.3
+ldloc.0
+ldloc.1
+ldloc.2
+ldloc.3
+stloc.0
+stloc.1
+stloc.2
+stloc.3
+ldarg.s
+ldarga.s
+starg.s
+ldloc.s
+ldloca.s
+stloc.s
+ldnull
+ldc.i4.m1
+ldc.i4.0
+ldc.i4.1
+ldc.i4.2
+ldc.i4.3
+ldc.i4.4
+ldc.i4.5
+ldc.i4.6
+ldc.i4.7
+ldc.i4.8
+ldc.i4.s
+ldc.i4
+ldc.i8
+ldc.r4
+ldc.r8
+dup
+pop
+jmp
+call
+calli
+ret
+br.s
+brfalse.s
+brtrue.s
+beq.s
+bge.s
+bgt.s
+ble.s
+blt.s
+bne.un.s
+bge.un.s
+bgt.un.s
+ble.un.s
+blt.un.s
+br
+brfalse
+brtrue
+beq
+bge
+bgt
+ble
+blt
+bne.un
+bge.un
+bgt.un
+ble.un
+blt.un
+switch
+ldind.i1
+ldind.u1
+ldind.i2
+ldind.u2
+ldind.i4
+ldind.u4
+ldind.i8
+ldind.i
+ldind.r4
+ldind.r8
+ldind.ref
+stind.ref
+stind.i1
+stind.i2
+stind.i4
+stind.i8
+stind.r4
+stind.r8
+add
+sub
+mul
+div
+div.un
+rem
+rem.un
+and
+or
+xor
+shl
+shr
+shr.un
+neg
+not
+conv.i1
+conv.i2
+conv.i4
+conv.i8
+conv.r4
+conv.r8
+conv.u4
+conv.u8
+callvirt
+cpobj
+ldobj
+ldstr
+newobj
+castclass
+isinst
+conv.r.un
+unbox
+throw
+ldfld
+ldflda
+stfld
+ldsfld
+ldsflda
+stsfld
+stobj
+conv.ovf.i1.un
+conv.ovf.i2.un
+conv.ovf.i4.un
+conv.ovf.i8.un
+conv.ovf.u1.un
+conv.ovf.u2.un
+conv.ovf.u4.un
+conv.ovf.u8.un
+conv.ovf.i.un
+conv.ovf.u.un
+box
+newarr
+ldlen
+ldelema
+ldelem.i1
+ldelem.u1
+ldelem.i2
+ldelem.u2
+ldelem.i4
+ldelem.u4
+ldelem.i8
+ldelem.i
+ldelem.r4
+ldelem.r8
+ldelem.ref
+stelem.i
+stelem.i1
+stelem.i2
+stelem.i4
+stelem.i8
+stelem.r4
+stelem.r8
+stelem.ref
+ldelem
+stelem
+unbox.any
+conv.ovf.i1
+conv.ovf.u1
+conv.ovf.i2
+conv.ovf.u2
+conv.ovf.i4
+conv.ovf.u4
+conv.ovf.i8
+conv.ovf.u8
+refanyval
+ckfinite
+mkrefany
+ldtoken
+conv.u2
+conv.u1
+conv.i
+conv.ovf.i
+conv.ovf.u
+add.ovf
+add.ovf.un
+mul.ovf
+mul.ovf.un
+sub.ovf
+sub.ovf.un
+endfinally
+leave
+leave.s
+stind.i
+conv.u
+prefix7
+prefix6
+prefix5
+prefix4
+prefix3
+prefix2
+prefix1
+prefixref
+arglist
+ceq
+cgt
+cgt.un
+clt
+clt.un
+ldftn
+ldvirtftn
+ldarg
+ldarga
+starg
+ldloc
+ldloca
+stloc
+localloc
+endfilter
+unaligned.
+volatile.
+tail.
+initobj
+constrained.
+cpblk
+initblk
+rethrow
+sizeof
+refanytype
+readonly.
+Enumeration type is not defined.
+Parent does not have a default constructor. The default constructor must be explicitly defined.
+<Module>
+Could not load type '
+' from assembly '
+' because the parent type is sealed.
+' because it is an enum with methods.
+Type is concrete but has abstract method 
+Interface must be declared abstract.
+Unable to change after type has been created.
+Type is not generic
+Ambiguous matching in method resolution
+Name cannot be empty
+Name can't be empty
+version
+_Name
+_CodeBase
+_Version
+_PublicKey
+_PublicKeyToken
+_HashAlgorithm
+_StrongNameKeyPair
+_VersionCompatibility
+_Flags
+_CultureInfo
+, Version=
+, Culture=
+neutral
+, PublicKeyToken=null
+, PublicKeyToken=
+, Retargetable=Yes
+The public key is not valid.
+_HashAlgorithmForControl
+_HashForControl
+No properties provided
+.ctor
+.cctor
+)]
+ = 
+typeof (
+The handle is invalid.
+This method should not be called
+AssemblyName
+Name
+Signature
+MemberType
+GenericArguments
+Could not find constructor '{0}' in type '{1}'
+Could not find method '{0}' in type '{1}'
+Could not find field '{0}' in type '{1}'
+Could not find property '{0}' in type '{1}'
+Could not find event '{0}' in type '{1}'
+Unhandled MemberType {0}
+Cannot resolve method because it's declared in a generic class.
+Method is not a builder method
+*
+Non-static field requires a target
+Field {0} defined on type {1} is not a field on the target object which is of type {2}.
+{0} {1}
+Cannot set a constant field
+Object type 
+ cannot be converted to target type: 
+val
+Late bound operations cannot be performed on fields with types for which Type.ContainsGenericParameters is true.
+parameters do not match signature
+failed to convert parameters
+Late bound operations cannot be performed on types or methods for which ContainsGenericParameters is true.
+...
+methodInstantiation
+The method has {0} generic parameter(s) but {1} generic argument(s) were provided.
+Cannot create an instance of 
+ because Type.ContainsGenericParameters is true.
+Cannot create an instance of {0} because it is an abstract class
+Void 
+, ...
+StaticGetterAdapterFrame
+GetterAdapterFrame
+Get Method not found for '
+Set Method not found for '
+Pointer deserializatioon not supported.
+_publicKey
+_keyPairContainer
+_keyPairExported
+_keyPairArray
+Unable to invoke an invalid target.
+Exception has been thrown by the target of an invocation.
+Number of parameter does not match expected count.
+culture is null
+Stream was not readable.
+Stream is not a valid .resources file, magic=0x{0:x}
+System.Resources.ResourceReader
+This .resources file requires reader class 
+System.Resources.RuntimeResourceSet
+This .resources file requires set class 
+This .resources file requires unsupported set class version: 
+PAD
+Malformed .resources file (padding values incorrect)
+Stream is not a valid .resources file!  It was possibly truncated.
+Deserialized object is wrong type
+ResourceReader is closed.
+Enumeration has not started. Call MoveNext.
+ResourceSet is closed.
+{0} (0x{1:x}): {2} {3}{4}{5}
+External exception
+Handle is not allocated
+Unsupported MarshalAsAttribute found
+Activation attribute does not implement the IContextAttribute interface
+__CrossContext
+Novell.Zenworks.Zmd.Public.UnixServerChannel
+Novell.Zenworks.Zmd.Public.UnixChannel
+chnl
+Channel {0} is not securable while ensureSecurity is specified as true
+Channel 
+ already registered
+Type '
+' not found
+ is not a valid channel type
+ does not have a valid constructor
+true
+An instance of provider '
+' could not be created: 
+MONOCAD
+Can't create a named channel via crossappdomain
+ProcessMessageInDomain
+Either obj or ctx must be null
+IContextProperty
+Can not add properties to default context
+Context is Frozen
+ContextID: 
+A context property did not approve the candidate context for activating the object
+Another property by this name already exists
+A property with the name 
+ was not found
+ctorMsg
+ctx
+Synchronization
+flag
+__Activator
+__CallSiteActivationAttributes
+__ActivationType
+__ContextProperties
+__ActivationTypeName
+__Uri
+__MethodName
+__TypeName
+__MethodSignature
+__Args
+__CallContext
+key was invalid
+__RemotingData
+__GenericArguments
+Requested service not found
+. No receiver for uri 
+Cannot cast from client type '
+' to server type '
+Method 
+ not found in 
+The remoting infrastructure does not support open generic methods.
+]]
+__OutArgs
+__Return
+The enumerator is positioned before the first element of the collection or after the last element
+Do not use RemotingSurrogateSelector when deserializating
+Response
+return
+object must be MarshalByRef
+stub is not used in Mono
+GetType
+GetHashCode
+Type not found: 
+uri
+typeInfo
+channelInfo
+envoyInfo
+fIsMarshalled
+objrefFlags
+Attempt to redirect activation of type '
+' which is already redirected.
+Channel template '
+Provider template '
+mode attribute is required
+on
+off
+remoteonly
+Invalid custom error mode: 
+Element 
+ not allowed in this context
+/configuration/system.runtime.remoting
+Error in element 
+application
+lifetime
+channels
+channel
+serverProviders
+clientProviders
+provider
+formatter
+client
+service
+wellknown
+activated
+soapInterop
+interopXmlType
+interopXmlElement
+preLoad
+debug
+channelSinkProviders
+customErrors
+system.runtime.remoting
+application/channels/channel/serverProviders
+channels/channel/serverProviders
+application/channels/channel/clientProviders
+channels/channel/clientProviders
+channelSinkProviders/serverProviders
+channelSinkProviders/clientProviders
+url
+Element '
+' is not valid in system.remoting.configuration section
+leaseTime
+sponsorshipTimeout
+renewOnCallTime
+leaseManagerPollTime
+Invalid attribute: 
+Invalid time value
+S
+Invalid time value: 
+D
+H
+M
+MS
+Invalid time unit: 
+ref
+delayLoadAsClientChannel
+id
+id attribute is required
+root
+url attribute is required in client element when it contains activated entries
+objectUri
+SingleCall
+Singleton
+wellknown object mode '
+' is invalid
+clr
+xml
+assembly
+Type and assembly attributes cannot be specified together
+Either type or assembly attributes must be specified
+ attribute is required
+RemoteActivationService.rem
+FieldSetter
+FieldGetter
+Cannot get the real proxy from an object that is not a transparent proxy.
+Cannot create channel sink to connect to URL {0}. An appropriate channel has probably not been registered.
+Cannot create channel sink to connect to the remote object. An appropriate channel has probably not been registered.
+Uri already in use: 
+http://schemas.microsoft.com/clr/assem/
+http://schemas.microsoft.com/clr/ns/
+http://schemas.microsoft.com/clr/nsassem/
+%2C
+%20
+%3D
+MONO_REFLECTION_SERIALIZER
+no
+serializationStream
+serializationStream supports seeking, but its length is 0
+Invalid format. Expected BinaryElement.MethodCall, found 
+Invalid format
+Invalid format. Expected BinaryElement.MethodResponse, found 
+Unexpected binary element: 
+Invalid binary format
+Unsupported primitive type: 
+Serializable objects must be marked with the Serializable attribute
+Field "
+" not found in class 
+Couldn't find type '
+System.RuntimeType
+System.RuntimeType[]
+Could not find type '{0}'.
+[]
+Unknow type tag
+value is null.
+Uninitialized Strings cannot be created.
+There are some fixups that refer to objects that have not been registered
+The object with ID 
+ could not be resolved
+The object with Id 
+ has not been registered
+objectID
+The objectID parameter is less than or equal to zero
+arrayToBeFixed
+The arrayToBeFixed parameter is less than or equal to zero
+objectRequired
+The objectRequired parameter is less than or equal to zero
+objectToBeFixed
+The objectToBeFixed parameter is less than or equal to zero
+memberName
+member
+An object with Id 
+ has already been registered
+The obj parameter is null.
+An object with ID 
+ was included in a fixup, but it has not been registered
+Cannot perform fixup
+The constructor to deserialize an object of type 
+ was not found.
+No surrogate selector was found for type 
+The implementation of the IObjectReference interface returns too many nested references to other objects that implement IObjectReference.
+Type '{0}' has more than one method with the following attribute: '{1}'.
+An error occurred during (de)serialization
+Null argument
+name is null
+type is null
+Value has been serialized already.
+name is null.
+No element named 
+ could be found.
+type is null.
+RawData
+Certificate instance is empty.
+[Subject]{0}  {1}{0}{0}
+[Issuer]{0}  {1}{0}{0}
+[Not Before]{0}  {1}{0}{0}
+[Not After]{0}  {1}{0}{0}
+[Thumbprint]{0}  {1}{0}
+Unable to decode certificate.
+Key size not supported by algorithm.
+<
+>
+</
+SHA
+System.Security.Cryptography.SHA1CryptoServiceProvider
+System.Security.Cryptography.SHA1
+System.Security.Cryptography.HashAlgorithm
+System.Security.Cryptography.MD5CryptoServiceProvider
+System.Security.Cryptography.MD5
+SHA256
+System.Security.Cryptography.SHA256Managed
+SHA-256
+System.Security.Cryptography.SHA256
+SHA384
+System.Security.Cryptography.SHA384Managed
+SHA-384
+System.Security.Cryptography.SHA384
+SHA512
+System.Security.Cryptography.SHA512Managed
+SHA-512
+System.Security.Cryptography.SHA512
+RSA
+System.Security.Cryptography.RSACryptoServiceProvider
+System.Security.Cryptography.RSA
+System.Security.Cryptography.AsymmetricAlgorithm
+DSA
+System.Security.Cryptography.DSACryptoServiceProvider
+System.Security.Cryptography.DSA
+System.Security.Cryptography.DESCryptoServiceProvider
+System.Security.Cryptography.DES
+3DES
+System.Security.Cryptography.TripleDESCryptoServiceProvider
+Triple DES
+System.Security.Cryptography.TripleDES
+System.Security.Cryptography.RC2CryptoServiceProvider
+System.Security.Cryptography.RC2
+Rijndael
+System.Security.Cryptography.RijndaelManaged
+System.Security.Cryptography.Rijndael
+System.Security.Cryptography.SymmetricAlgorithm
+RandomNumberGenerator
+System.Security.Cryptography.RNGCryptoServiceProvider
+System.Security.Cryptography.RandomNumberGenerator
+System.Security.Cryptography.KeyedHashAlgorithm
+System.Security.Cryptography.HMACSHA1
+HMACSHA1
+MACTripleDES
+System.Security.Cryptography.MACTripleDES
+RIPEMD160
+System.Security.Cryptography.RIPEMD160Managed
+RIPEMD-160
+System.Security.Cryptography.RIPEMD160
+System.Security.Cryptography.HMAC
+HMACMD5
+System.Security.Cryptography.HMACMD5
+HMACRIPEMD160
+System.Security.Cryptography.HMACRIPEMD160
+HMACSHA256
+System.Security.Cryptography.HMACSHA256
+HMACSHA384
+System.Security.Cryptography.HMACSHA384
+HMACSHA512
+System.Security.Cryptography.HMACSHA512
+http://www.w3.org/2000/09/xmldsig#dsa-sha1
+System.Security.Cryptography.DSASignatureDescription
+http://www.w3.org/2000/09/xmldsig#rsa-sha1
+System.Security.Cryptography.RSAPKCS1SHA1SignatureDescription
+http://www.w3.org/2000/09/xmldsig#sha1
+http://www.w3.org/TR/2001/REC-xml-c14n-20010315
+System.Security.Cryptography.Xml.XmlDsigC14NTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments
+System.Security.Cryptography.Xml.XmlDsigC14NWithCommentsTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2000/09/xmldsig#base64
+System.Security.Cryptography.Xml.XmlDsigBase64Transform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/TR/1999/REC-xpath-19991116
+System.Security.Cryptography.Xml.XmlDsigXPathTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/TR/1999/REC-xslt-19991116
+System.Security.Cryptography.Xml.XmlDsigXsltTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2000/09/xmldsig#enveloped-signature
+System.Security.Cryptography.Xml.XmlDsigEnvelopedSignatureTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2001/10/xml-exc-c14n#
+System.Security.Cryptography.Xml.XmlDsigExcC14NTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2001/10/xml-exc-c14n#WithComments
+System.Security.Cryptography.Xml.XmlDsigExcC14NWithCommentsTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2002/07/decrypt#XML
+System.Security.Cryptography.Xml.XmlDecryptionTransform, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2001/04/xmlenc#sha256
+http://www.w3.org/2001/04/xmlenc#sha512
+http://www.w3.org/2001/04/xmldsig-more#hmac-sha256
+http://www.w3.org/2001/04/xmldsig-more#hmac-sha384
+http://www.w3.org/2001/04/xmldsig-more#hmac-sha512
+http://www.w3.org/2001/04/xmldsig-more#hmac-ripemd160
+http://www.w3.org/2000/09/xmldsig# X509Data
+System.Security.Cryptography.Xml.KeyInfoX509Data, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2000/09/xmldsig# KeyName
+System.Security.Cryptography.Xml.KeyInfoName, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2000/09/xmldsig# KeyValue/DSAKeyValue
+System.Security.Cryptography.Xml.DSAKeyValue, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2000/09/xmldsig# KeyValue/RSAKeyValue
+System.Security.Cryptography.Xml.RSAKeyValue, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+http://www.w3.org/2000/09/xmldsig# RetrievalMethod
+System.Security.Cryptography.Xml.KeyInfoRetrievalMethod, System.Security, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+2.5.29.14
+System.Security.Cryptography.X509Certificates.X509SubjectKeyIdentifierExtension, System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
+2.5.29.15
+System.Security.Cryptography.X509Certificates.X509KeyUsageExtension, System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
+2.5.29.19
+System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension, System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
+2.5.29.37
+System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension, System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
+X509Chain
+System.Security.Cryptography.X509Certificates.X509Chain, System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089
+System.Security.Cryptography.SHA1Managed
+1.2.840.113549.2.5
+2.16.840.1.101.3.4.2.1
+2.16.840.1.101.3.4.2.2
+2.16.840.1.101.3.4.2.3
+TripleDESKeyWrap
+1.2.840.113549.1.9.16.3.6
+1.3.14.3.2.7
+1.2.840.113549.3.7
+1.2.840.113549.3.2
+OID must have at least two parts
+Invalid OID
+OID > 127 bytes
+Part of OID doesn't fit in Int32
+Error occured during a cryptographic operation.
+Unexpected error occured during a cryptographic operation.
+Null Key
+Wrong Key Length
+Key
+Weak Key
+Semi Weak Key
+This is a known weak, or semi-weak, key.
+xmlString
+P
+Q
+J
+Y
+X
+Seed
+PgenCounter
+<DSAKeyValue>
+<G>
+</G>
+<Y>
+</Y>
+<J>
+</J>
+<Seed>
+</Seed>
+<PgenCounter>
+AA==
+</PgenCounter>
+<X>
+</X>
+</DSAKeyValue>
+Cannot export private key
+strName
+DSA requires SHA1
+missing key
+HMAC
+legacyHMACMode
+HashAlgorithm
+offset + count
+No hash value computed.
+outputOffset + inputCount
+inputOffset + inputCount
+Key can't be changed at this state.
+Key is too small ({0} bytes), it should be between {1} and {2} bytes long.
+Couldn't access random source.
+data
+DP
+DQ
+InverseQ
+Exponent
+Modulus
+Couldn't decode XML
+Missing D parameter for the private key.
+Missing some CRT parameters for the private key.
+Incomplete private key - missing CRT.
+cannot export private key
+rgbData
+No RSA key specified
+No public key available.
+Missing hash algorithm.
+No key pair available.
+key is null
+IV length is invalid ({0} bytes), it should be {1} bytes long.
+Key is too small ({0} bytes), it should be {1}, {2} or {3} bytes long.
+System.Security.Cryptography.DSASignatureDeformatter
+System.Security.Cryptography.DSASignatureFormatter
+System.Security.Cryptography.RSAPKCS1SignatureDeformatter
+System.Security.Cryptography.RSAPKCS1SignatureFormatter
+block size not supported by algorithm
+IV
+IV length is different than block size
+Key size not supported by algorithm
+Cipher mode not available
+Padding mode not available
+TransformBlock
+TransformFinalBlock
+Invalid input length
+This is a known weak key.
+Invalid flags {0}
+SecurityPermissionFlag
+Unrestricted
+Flags
+No assembly data.
+m_userToken
+m_name
+Token-Name mismatch.
+Token doesn't match a user.
+m_type
+m_acctType
+m_isAuthenticated
+IPermission
+class
+Invalid permission type '{0}', expected type '{1}'.
+tag
+Invalid XML string
+Duplicate attribute : 
+child
+&lt;
+&gt;
+&quot;
+&apos;
+&amp;
+="
+/>
+Invalid XML attribute name
+Invalid XML attribute value
+A security error has been detected.
+PermissionState
+{0}Type: {1}
+{0}Method: {1} {2}.{3}
+{0}State: {1}
+{0}Granted: {1}
+{0}Refused: {1}
+{0}Demanded: {1}
+{0}Failed Permission: {1}
+{0}Evidences:
+{0}	{1}
+Frame: {0}{1}
+	AppDomain: {0}{1}
+	Assembly: {0}{1}
+	Assert: {0}{1}
+	Deny: {0}{1}
+	PermitOnly: {0}{1}
+Invalid metadata format.
+Unknown metadata format.
+us-ascii
+US-ASCII
+chars
+ArgRange_Array
+bytes
+charIndex
+charCount
+byteIndex
+Arg_InsufficientSpace
+ArgRange_StringIndex
+ArgRange_StringRange
+byteCount
+ArgRange_NonNegative
+bytecount is less than the number of bytes required
+�
+fallback
+bytesUnknown
+Reentrant Fallback method invocation occured. It might be because either this FallbackBuffer is incorrectly shared by multiple threads, invoked inside Encoding recursively, or Reset invocation is forgotten.
+ascii
+us_ascii
+us
+ansi_x3.4_1968
+ansi_x3.4_1986
+cp367
+csascii
+ibm367
+iso_ir_6
+iso646_us
+iso_646.irv:1991
+utf_7
+csunicode11utf7
+unicode_1_1_utf_7
+unicode_2_0_utf_7
+x_unicode_1_1_utf_7
+x_unicode_2_0_utf_7
+utf_8
+unicode_1_1_utf_8
+unicode_2_0_utf_8
+x_unicode_1_1_utf_8
+x_unicode_2_0_utf_8
+utf_16
+UTF_16LE
+ucs_2
+unicode
+iso_10646_ucs2
+unicodefffe
+utf_16be
+utf_32
+UTF_32LE
+ucs_4
+UTF_32BE
+iso_8859_1
+latin1
+This Encoding is readonly.
+I18N, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756
+I18N.Common.Manager
+PrimaryManager
+codepage
+Valid values are between 0 and 65535, inclusive.
+GetEncoding
+System.Text.CP
+CodePage {0} not supported
+System.Text.ENC
+Encoding name '{0}' not supported
+byteCount is less that the number of bytes produced
+StartIndex cannot be less than zero.
+Length cannot be less than zero.
+capacity must be greater than zero.
+maxCapacity
+maxCapacity is less than one.
+Capacity exceeds maximum capacity.
+StartIndex and length must refer to a location within the string.
+m_StringValue
+m_MaxCapacity
+m_currentThread
+Capacity must be larger than length
+Should be less than or equal to MaxCapacity
+The old value cannot be null.
+The old value cannot be zero length.
+size
+capacity was less than the current size.
+utf-32BE
+UTF-32 (Big-Endian)
+utf-32
+UTF-32
+utf-7
+Unicode (UTF-7)
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+Arg_InvalidUTF7
+utf-8
+Unicode (UTF-8)
+Insufficient Space
+unicodeFFFE
+Unicode (Big-Endian)
+utf-16
+Unicode
+Object is not synchronized
+millisecondsTimeout
+timeout out of range
+Mutex is not owned
+Synchronization Error
+Null ThreadStart
+Thread creation failed.
+Thread was being aborted
+Thread interrupted
+callBack
+Thread State Error
+Due time too large
+Period too large
+dueTime
+period
+Timer-Scheduler
+Attempted to read or write protected memory. This is often an indication that other memory has been corrupted.
+ is an open generic type
+(unknown)
+No constructor found for {0}::.ctor({1})
+Type '{0}' doesn't derive from MarshalByRefObject.
+Default constructor not found.
+.ctor() of 
+CreateInstance cannot be used to create this type ({0}).
+Cannot create an abstract class '{0}'.
+assemblyString
+assemblyString cannot have zero length
+An application exception has occurred.
+Value does not fall within the expected range.
+ParamName
+Parameter name: 
+Argument cannot be null.
+Argument is out of range.
+ActualValue
+Overflow or underflow in the arithmetic operation.
+Source array type cannot be assigned to destination array type.
+Index was out of range. Must be non-negative and less than the size of the collection.
+Destination array is not long enough to copy all the items in the collection. Check array index and length.
+byteArray
+Value must be positive.
+startIndex + length > value.Length
+Object must be an array of primitives.
+src
+dst
+srcOffset
+dstOffset
+Offset and length were out of bounds for the array or count is greater than the number of elements from index to the end of the source collection.
+The position is not valid.
+inArray
+offset < 0 || length < 0
+offset + length > array.Length
+Value is greater than Byte.MaxValue
+Value is greater than Byte.MaxValue or less than Byte.MinValue
+Value is equal to Double.NaN, Double.PositiveInfinity, or Double.NegativeInfinity
+Value is greater than Byte.MaxValue or less than Byte.Minalue
+Value is equal to Single.NaN, Single.PositiveInfinity, or Single.NegativeInfinity
+Value is less than Byte.MinValue
+Value is greater than Char.MaxValue or less than Char.MinValue
+This conversion is not supported.
+Value is less than Char.MinValue
+Value is greater than Char.MaxValue
+Value is greater than Int16.MaxValue
+Value is greater than Int16.MaxValue or less than Int16.MinValue
+Value is greater than Int32.MaxValue or less than Int32.MinValue
+Value is greater than Int32.MaxValue
+Value is greater than Int64.MaxValue or less than Int64.MinValue
+Value is greater than Int64.MaxValue
+Value is greater than SByte.MaxValue
+Value is greater than SByte.MaxValue or less than SByte.MinValue
+Value is greater than SByte.MaxValue or less than SByte.Minalue
+Value is greater than UInt16.MaxValue or less than UInt16.MinValue
+Value is less than UInt16.MinValue
+Value is greater than UInt16.MaxValue
+Value is greater than UInt32.MaxValue or less than UInt32.MinValue
+Value is less than UInt32.MinValue
+Value is greater than UInt32.MaxValue
+Value is greater than UInt64.MaxValue or less than UInt64.MinValue
+Value is less than UInt64.MinValue
+conversionType
+Null object can not be converted to a value type.
+Cannot cast to destination type.
+Cannot cast to DBNull, it's not IConvertible
+Value is not a convertible object: 
+ to 
+Value {0} is outside the valid range [{1},{2}].
+ticks
+Parameters describe an unrepresentable DateTime.
+H:m:s.fffffffzzz
+H:m:s.fffffff
+H:m:s tt zzz
+H:m:szzz
+H:m:s
+H:mzzz
+H:m
+H tt
+H'時'm'分's'秒'
+yyyy/M/dT
+M/yyyy/dT
+yyyy'年'M'月'd'日
+yyyy/d/MMMM
+yyyy/MMM/d
+d/MMMM/yyyy
+MMM/d/yyyy
+d/yyyy/MMMM
+MMM/yyyy/d
+yy/d/M
+yyyy/MMMM/d
+yyyy/d/MMM
+MMMM/d/yyyy
+d/MMM/yyyy
+MMMM/yyyy/d
+d/yyyy/MMM
+yy/MMMM/d
+yy/d/MMM
+MMM/yy/d
+d/MMMM/yy
+yy/MMM/d
+d/yy/MMM
+MMM/d/yy
+MMMM/d/yy
+d/MMM/yy
+MMMM/d
+d/MMM
+yyyy/MMMM
+d/MMMM
+MMM/yy
+Value is not a System.DateTime
+Invalid DateTimeKind value.
+kind
+String was not recognized as a valid DateTime.
+Order of month and date is not defined by {0}
+Order of year, month and date is not defined by {0}
+Order of date, year and month defined by {0} is not supported
+Order of month, year and date defined by {0} is not supported
+GMT
+formats
+The DateTimeStyles value RoundtripKind cannot be used with the values AssumeLocal, Asersal or AdjustToUniversal.
+The DateTimeStyles values AssumeLocal and AssumeUniversal cannot be used together.
+Invalid format string
+format is not one of the format specifier characters defined for DateTimeFormatInfo
+The UTC date and time that results from applying the offset is earlier than MinValue or later than MaxValue.
+dateTime.Kind equals Utc and offset does not equal zero.
+dateTime.Kind equals Local and offset does not equal the offset of the system's local time zone.
+offset is not specified in whole minutes.
+offset is less than -14 hours or greater than 14 hours.
+The UtcDateTime property is earlier than MinValue or later than MaxValue.
+DateTime
+OffsetMinutes
+ zzz
+Un-ended quote
+Invalid Format String
+00
+% at end of date time string
+%% in date string
+\ at end of date time string
+Delegate
+Unexpected proxy type.
+Division by zero
+DLL not found.
+Cannot load class because of missing entry method.
+user-dirs.dirs
+$HOME/
+XDG_DATA_HOME
+.local
+XDG_CONFIG_HOME
+.config
+XDG_DESKTOP_DIR
+Desktop
+XDG_MUSIC_DIR
+Music
+XDG_PICTURES_DIR
+Pictures
+/usr/share
+Invalid SpecialFolder
+Internal error occurred.
+Attempt to access a private/protected field failed.
+Invalid format.
+Value cannot be null.
+Array should be exactly {0} bytes long.
+Argument of System.Guid.CompareTo should be a Guid.
+b
+p
+n
+d
+Argument to Guid.ToString(string format) should be "b", "B", "d", "D", "n", "N", "p" or "P"
+Invalid format for Guid.Guid(string).
+Array index is out of range.
+Cannot cast from source type to destination type.
+Operation is not valid due to the current state of the object
+Value is too small.
+Cannot access a class member.
+Attempt to access a private/protected method failed.
+Cannot find requested field.
+Field '{0}.{1}' not found.
+Cannot find the requested class member.
+MMClassName
+MMMemberName
+MMSignature
+Member {0}.{1} not found.
+Cannot find the requested method.
+Method not found: '{0}.{1}'.
+'{0}' has more than one attribute of type '{1}
+Duplicate AttributeUsageAttribute cannot be specified on an attribute type.
+bindingFlags
+Cannot specify both Get and Set on a field.
+Cannot specify both Get and Set on a property.
+Cannot specify Set on a field and Invoke on a method.
+Cannot specify Set on a property and Invoke on a method.
+namedParameters cannot be more than named arguments in number
+Must specify binding flags describing the invoke operation required.
+Constructor on type '
+The best match for method 
+ has some invalid parameter.
+Cannot find method 
+Used Missing.Value for argument without default value
+providedArgs
+Only the field value can be specified to set a field value.
+Cannot find variable 
+This operation cannot be performed with the specified delagates.
+The requested feature is not implemented.
+Operation is not supported.
+A null value was found where an object instance was required.
+The specified format '
+The object was used after being disposed.
+ObjectName
+_platform
+_version
+_servicePack
+Microsoft Windows NT
+Microsoft Win32S
+Microsoft Windows 98
+Microsoft Windows CE
+Unix
+XBox
+OSX
+<unknown>
+Out of memory.
+Number overflow.
+This platform is not supported.
+Two arrays must have the same number of dimensions.
+MethodObj
+A system exception has occurred.
+The timespan is too big or too small.
+Resulting timespan is too big.
+Argument has to be a TimeSpan.
+This TimeSpan value is MinValue so you cannot get the duration.
+Value cannot be NaN.
+Outside range [MinValue,MaxValue]
+This TimeSpan value is MinValue and cannot be negated.
+D2
+D7
+daylightTimes
+Can't get timezone name.
+year
+ is not in a range between 1 and 9999.
+Can't get timezone data for 
+A type load exception has occurred.
+TypeLoadClassName
+TypeLoadAssemblyName
+Could not load type '{0}' from assembly '{1}'.
+Could not load type '{0}'.
+TypeLoadMessageArg
+TypeLoadResourceID
+Access to the requested resource is not authorized.
+UnityType
+UnitySerializationHolder does not support this type.
+There must be 2, 3 or 4 components in the version string.
+major
+minor
+build
+revision
+Argument to Version.CompareTo must be a Version.
+TrackResurrection
+TrackedObject
+Attempted lookup for a null key.
+Array cannot be null.
+index is too large
+Not enough room in the array
+Duplicate key in add.
+The ListDictionary's contents changed after this enumerator was instantiated.
+Enumerator is positioned before the collection's first element or after the last element.
+HashProvider
+ReadOnly
+Count
+The comparer is null
+keys is null
+values is null
+Not enough room from arrayIndex to end of array for this KeysCollection
+GET
+headers
+proxy
+connectionGroupName
+contentLength
+timeout
+fileAccess
+preauthenticate
+RETR
+APPE
+DELE
+LIST
+MDTM
+MKD
+NLST
+PWD
+RENAME
+RMD
+SIZE
+STOR
+STOU
+SSL authentication error: 
+requestUri
+actualUri
+allowAutoRedirect
+allowBuffering
+certificates
+connectionGroup
+webHeaders
+keepAlive
+maxAutoRedirect
+mediaType
+initialMethod
+pipelined
+sendChunked
+redirects
+255.255.255.255
+127.0.0.1
+::1
+An invalid IP address was specified.
+ipString
+The attempted operation is not supported for the type of object referenced
+addr
+prefixLength
+Not a valid IPv6 address
+ffff:
+{0:x}
+{0:X4}:
+{0:X4}
+address
+https
+http
+Proxy scheme not supported.
+://
+maximum number of service points reached
+k
+v
+accept
+connection
+content-length
+content-type
+date
+expect
+host
+if-modified-since
+range
+referer
+transfer-encoding
+user-agent
+proxy-connection
+Content-Length
+Transfer-Encoding
+WWW-Authenticate
+accept-charset
+accept-encoding
+accept-language
+accept-ranges
+allow
+authorization
+cache-control
+content-encoding
+content-language
+if-match
+if-none-match
+proxy-authenticate
+public
+upgrade
+vary
+via
+warning
+www-authenticate
+set-cookie
+set-cookie2
+This header must be modified with the appropiate property.
+invalid header name: 
+headerName
+invalid header value: 
+headerValue
+empty string
+Invalid character in header
+
+
+_ProxyAddress
+_BypassOnLocal
+_BypassList
+_UseDefaultCredentials
+localhost
+loopback
+HttpRequestCreator
+file
+FileWebRequestCreator
+ftp
+FtpRequestCreator
+System.Net.
+This method must be implemented in derived classes
+1.2.840.113549.1.1.1
+1.2.840.10040.4.1
+Cannot decode public key from unknown OID '{0}'.
+Missing DSA Y integer.
+Missing DSA parameters.
+Invalid DSA parameters.
+Error decoding the ASN.1 structure.
+Missing RSA modulus and exponent.
+Missing RSA modulus.
+Missing RSA public exponent.
+encodedDistinguishedName
+; 
+Basic Constraints
+pathLengthConstraint
+Badly encoded extension.
+asnEncodedData
+Wrong type.
+Information Not Available
+Unknown Key Usage ({0})
+Subject Type=
+CA
+End Entity
+Path Length Constraint=
+None
+Unable to decode public key.
+nameType
+System.Security.Cryptography.X509Certificates.X509Certificate2
+[Version]{0}  V{1}{0}{0}
+[Serial Number]{0}  {1}{0}{0}
+[Thumbprint]{0}  {1}{0}{0}
+[Signature Algorithm]{0}  {1}({2}){0}{0}
+[Public Key]{0}  Algorithm: 
+{0}  Length: {1}{0}  Key Blob: 
+{0}  Parameters: 
+negative index
+index >= Count
+certificate
+findValue
+Invalid find value type '{0}', expected '{1}'.
+string
+X509KeyUsageFlags
+Invalid OID value '{0}'.
+X509DateTime
+Invalid find type '{0}'.
+2.5.29.35
+X02
+Invalid revocation mode.
+2.5.29.20
+2.5.29.21
+Enhanced Key Usage
+encodedData
+Invalid ASN.1 Tag
+1.3.6.1.5.5.7.3.1
+Server Authentication (
+Unknown Key Usage (
+Expected a X509Extension instance.
+index >= array.Length
+Key Usage
+Digital Signature
+Non-Repudiation
+Key Encipherment
+Data Encipherment
+Key Agreement
+Certificate Signing
+Off-line CRL Signing, CRL Signing
+Encipher Only
+Decipher Only
+storeName
+storeLocation
+Invalid store name (null or empty).
+Root
+Trust
+Store {0} doesn't exists.
+Subject Key Identifier
+subjectKeyIdentifier
+algorithm
+2.5.29.17
+2.16.840.1.113730.1.1
+RFC822 Name=
+DNS Name=
+Unknown ({0})=
+SSL Client Authentication
+SSL Server Authentication
+SMIME
+Unknown cert type
+SSL CA
+SMIME CA
+Signature CA
+ ({0})
+1.2.840.113549.1.9.3
+1.2.840.113549.1.9.4
+1.2.840.113549.1.9.5
+PKCS 7 Data
+Content Type
+Message Digest
+Signing Time
+3des
+Subject Alternative Name
+Netscape Cert Type
+md5
+sha1
+Scan method must be implemented in derived classes
+i
+too many matches
+'Current' called before 'MoveNext()'
+MatchCollection in invalid state
+'Current' called after 'MoveNext()' returned false
+input
+startat
+('
+', [
+])
+Is
+can only truncate the stack
+Unexpected end of pattern.
+invalid state
+Too many | in (?()|).
+Bad quantifier.
+Too many )'s.
+Not enough )'s.
+Bad options
+Bad group name.
+Bad balancing group name.
+Bad conditional.
+Unterminated (?#...) comment.
+Bad grouping construct.
+character range cannot have category \
+] range in reverse order.
+Unterminated [] set.
+Illegal {x, y} - maximum of 2147483647.
+Illegal {x, y} with x > y.
+Incomplete \p{X} character escape.
+Unknown property '
+Malformed \k<...> named backreference.
+Parsing "{0}" - Illegal \ at end of pattern.
+Insufficient hex digits
+Unrecognized control character.
+Reference to undefined group 
+number 
+name 
+parsing "
+" - 
+overlapping?
+Shouldn't happen
+AbsoluteUri
+Invalid URI: The format of the URI could not be determined.
+Invalid URI: The format of the URI could not be determined because the parameter 'uriString' represents an absolute URI.
+Invalid UriKind value '{0}'.
+Invalid URI: The format of the URI could not be determined: 
+0123456789ABCDEF
+gopher
+mailto
+news
+nntp
+net.pipe
+net.tcp
+baseUri
+./
+/../
+/..
+digit
+character
+<>%"{}|\^`
+;/?:@&=+$,
+%23
+%25
+%3F
+\
+Relative file path is not allowed.
+uriString
+Absolute URI is too short
+URI scheme must start with a letter.
+URI scheme must start with a letter and must consist of one of alphabet, digits, '+', '-' or '.' character.
+Invalid URI: The Authority/Host could not be parsed.
+Absolute URI when we expected a relative one
+Invalid URI: Invalid port number
+//
+Invalid URI: The hostname could not be parsed
+Invalid URI: The hostname could not be parsed. (
+This operation is not supported for a relative URI.
+Invalid URI format
+^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?
+^(([^@]+)@)?(.*?)(:([0-9]+))?$
+The argument Uri's scheme does not match
+ldap
+MD4
+1.2.840.113549.1.1.2
+1.2.840.113549.1.1.3
+1.2.840.113549.1.1.4
+1.2.840.113549.1.1.5
+1.3.14.3.2.29
+1.2.840.10040.4.3
+1.2.840.113549.1.1.11
+1.2.840.113549.1.1.12
+1.2.840.113549.1.1.13
+Unsupported hash algorithm: 
+aa
+Unknown Asymmetric Algorithm 
+crl
+Input data cannot be coded as a valid CRL.
+ [Non-matching signature algorithms in CRL]
+x509
+serialNumber
+extension
+*.cer
+*.crl
+certs
+Invalid AuthorityKeyIdentifier extension
+KeyID=
+Invalid BasicConstraints extension
+Invalid ExtendedKeyUsage extension
+1.3.6.1.5.5.7.3.2
+1.3.6.1.5.5.7.3.3
+1.3.6.1.5.5.7.3.4
+1.3.6.1.5.5.7.3.8
+1.3.6.1.5.5.7.3.9
+Server Authentication
+Client Authentication
+Code Signing
+Email Protection
+Time Stamping
+OCSP Signing
+unknown
+ ({0}){1}
+Directory Address: 
+URL=
+IP Address=
+Invalid KeyUsage extension
+ , 
+CRL Signing
+Encipher Only 
+Invalid NetscapeCertType extension
+Object Signing
+Object Signing CA
+Invalid SubjectAltName extension
+Cannot change key during hash operation.
+MD5SHA1
+The authentication or decryption has failed.
+Unsupported security protocol type.
+Unsupported security protocol type
+TLS_RSA_WITH_AES_256_CBC_SHA
+TLS_RSA_WITH_AES_128_CBC_SHA
+TLS_RSA_WITH_3DES_EDE_CBC_SHA
+TLS_RSA_WITH_RC4_128_SHA
+TLS_RSA_WITH_RC4_128_MD5
+TLS_RSA_WITH_DES_CBC_SHA
+TLS_RSA_EXPORT_WITH_RC4_40_MD5
+TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5
+TLS_RSA_EXPORT_WITH_DES40_CBC_SHA
+TLS_RSA_EXPORT_WITH_RC4_56_MD5
+TLS_RSA_EXPORT_WITH_RC2_CBC_56_MD5
+TLS_RSA_EXPORT_WITH_DES_CBC_56_SHA
+TLS_RSA_EXPORT_WITH_RC4_56_SHA
+SSL_RSA_WITH_AES_256_CBC_SHA
+SSL_RSA_WITH_3DES_EDE_CBC_SHA
+SSL_RSA_WITH_RC4_128_SHA
+SSL_RSA_WITH_RC4_128_MD5
+SSL_RSA_WITH_DES_CBC_SHA
+SSL_RSA_EXPORT_WITH_RC4_40_MD5
+SSL_RSA_EXPORT_WITH_RC2_CBC_40_MD5
+SSL_RSA_EXPORT_WITH_DES40_CBC_SHA
+SSL_RSA_EXPORT_WITH_RC4_56_MD5
+SSL_RSA_EXPORT_WITH_RC2_CBC_56_MD5
+SSL_RSA_EXPORT_WITH_DES_CBC_56_SHA
+SSL_RSA_EXPORT_WITH_RC4_56_SHA
+Unknown client handshake message type: 
+Unknown server handshake message received ({0})
+MONO_TLS_SESSION_CACHE_TIMEOUT
+Cache session information were disposed.
+Incorrect protocol version received from server
+The session is finished and it's no longer valid.
+Unknown record received from server.
+Either the provided async result is null or was not created by this RecordProtocol.
+buffer underrun
+Received 0 bytes from stream. It must be closed.
+Invalid protocol version on message received
+Bad record MAC
+SSL_
+TLS_
+Insuficient Security
+RSA_WITH_RC4_128_MD5
+RSA_EXPORT_WITH_RC4_40_MD5
+RSA_EXPORT_WITH_RC2_CBC_40_MD5
+The key is a null reference
+The hash algorithm is a null reference.
+The rgbHash parameter is a null reference.
+Specfied key is not an RSA key
+targetHost is null or an empty string.
+The server stopped the handshake.
+A
+BB
+CCC
+stream is null.
+stream is not both readable and writable.
+buffer is a null reference.
+offset is less than 0.
+offset is greater than the length of buffer.
+count is less than 0.
+count is less than the length of buffer minus the value of the offset parameter.
+IO exception during read.
+IO exception during Write.
+asyncResult is null or was not obtained by calling BeginRead.
+Couldn't complete EndRead
+asyncResult is null or was not obtained by calling BeginWrite.
+Couldn't complete EndWrite
+The Stream is closed.
+master secret
+key expansion
+client write key
+server write key
+IV block
+8 bytes maximum
+Read operations are not allowed by this stream
+Write operations are not allowed by this stream
+Client certificate Private Key unavailable.
+client finished
+2.16.840.1.113730.4.1
+0x{0:x}
+Invalid certificate received from server. Error code: 
+Invalid certificate received from server.
+CN\s*=\s*([^,]*)
+Invalid ServerFinished message received.
+server finished
+Invalid cipher suite received from server
+Data was not signed with the server certificate.
+HashSet have been modified while it was iterated over
+predicate
+null
+\"
+
+
+\n
+
+\r
+ 
+ 
+ 
+"\""
+new Array(
+RectOffset (l:{0} r:{1} t:{2} b:{3})
+Invalid Vector3 index!
+({0:F1}, {1:F1}, {2:F1})
+({0:F1}, {1:F1}, {2:F1}, {3:F1})
+Invalid matrix index!
+{0:F5}	{1:F5}	{2:F5}	{3:F5}
+{4:F5}	{5:F5}	{6:F5}	{7:F5}
+{8:F5}	{9:F5}	{10:F5}	{11:F5}
+{12:F5}	{13:F5}	{14:F5}	{15:F5}
+
+Center: {0}, Extents: {1}
+GetUVChannel called for bad uvIndex
+uvIndex
+DefaultDimensionForChannel called for bad channel
+The uv index is invalid (must be in [0..3]
+Could not store preference value
+_MainTex
+The Object you want to instantiate is null.
+Cannot instantiate a ScriptableObject with a position and rotation
+0123456789abcdef
+@&;:<>=?"'/\!#%+$,{}|^[]`
+&;=?"'%+_
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+Calling GetLocalCorners with an array that is null or has less than 4 elements.
+Calling GetWorldCorners with an array that is null or has less than 4 elements.
+AnimationEvent was not fired by Animation component, you shouldn't use AnimationEvent.animationState
+AnimationEvent was not fired by Animator component, you shouldn't use AnimationEvent.animatorStateInfo
+AnimationEvent was not fired by Animator component, you shouldn't use AnimationEvent.animatorClipInfo
+clips
+Font size and style overrides are only supported for dynamic fonts. Font '{0}' is not dynamic.
+BestFit is only supported for dynamic fonts. Font '{0}' is not dynamic.
+Font '{0}' is not dynamic, which is required to override its size
+Font '{0}' is not dynamic, which is required to override its style
+Event:{0}   Character:\0   Modifiers:{1}   KeyCode:{2}
+Event:
+   Character:
+   Modifiers:
+   KeyCode:
+Event: {0}   Position: {1} Modifiers: {2}
+Event: {0}  "{1}"
+Box
+repeatButton
+Toggle
+ButtonGrid
+Slider
+BeginGroup
+scrollView
+ Margins: 
+ {
+
+}
+{1}-{0} (x:{2}-{3}, y:{4}-{5})
+NULL
+   -   W: 
+, H: 
+custom styles is null
+button
+toggle
+label
+window
+textfield
+textarea
+horizontalslider
+horizontalsliderthumb
+verticalslider
+verticalsliderthumb
+horizontalscrollbar
+horizontalscrollbarthumb
+horizontalscrollbarleftbutton
+horizontalscrollbarrightbutton
+verticalscrollbar
+verticalscrollbarthumb
+verticalscrollbarupbutton
+verticalscrollbardownbutton
+scrollview
+Unable to find style '
+' in skin '
+' 
+GUISkin is NULL
+Style.Draw may not be called with GUIContent that is null.
+Unable to use a named GUIStyle without a current skin. Most likely you need to move your GUIStyle initialization code to OnGUI
+GUIStyle '{0}'
+You can only call GUI functions from inside OnGUI.
+^\s*\w+(?:\.\w+)+\s*$
+RGBA({0:F3}, {1:F3}, {2:F3}, {3:F3})
+RGBA({0}, {1}, {2}, {3})
+Return value address cannot be 0.
+returnValueAddress
+OnMouseDown
+OnMouseUpAsButton
+OnMouseUp
+OnMouseDrag
+OnMouseOver
+OnMouseExit
+OnMouseEnter
+Origin: {0}, Dir: {1}
+(x:{0:F2}, y:{1:F2}, width:{2:F2}, height:{3:F2})
+UnityEditor.
+UnityEngine.
+System.
+UnityScript.Lang.
+Boo.Lang.
+UnityEngine.SetupCoroutine
+ExtractStringFromExceptionInternal called with null exception
+ExtractStringFromExceptionInternal called with an exceptoin that was not of type System.Exception
+Rethrow as 
+in (unmanaged)
+UnityEditor.EditorGUIUtility:RenderGameViewCameras
+ (at
+(wrapper managed-to-native)
+(wrapper delegate-invoke)
+at <0x00000> <unknown method>
+at 
+[0x
+  in <filename unknown>:0
+  in 
+ (at 
+Debug
+UnityEngine
+Logger
+DebugLogHandler
+Assert
+UnityEngine.Assertions
+print
+MonoBehaviour
+A Unity Runtime error occurred!
+function
+Passed argument 'args[0]' is of the wrong type. Type:{0} Expected:{1}
+Passed argument 'args' is invalid size. Expected size is 1
+Invalid Vector2 index!
+({0:F1}, {1:F1})
+Invalid Vector4 index!
+Null
+{0}
+No actions found for messageId: 
+Attempting to select 
+while already selecting an object.
+<b>Selected:</b>
+No module
+Invalid type: {0} passed to event expecting {1}
+Type {0} expected {1} received.
+Results array is null
+results
+Name: 
+
+module: 
+
+distance: 
+
+index: 
+
+depth: 
+
+worldNormal: 
+
+worldPosition: 
+
+screenPosition: 
+
+module.sortOrderPriority: 
+
+module.renderOrderPriority: 
+
+sortingLayer: 
+
+sortingOrder: 
+<b>Position</b>: 
+<b>delta</b>: 
+<b>eligibleForClick</b>: 
+<b>pointerEnter</b>: 
+<b>pointerPress</b>: 
+<b>lastPointerPress</b>: 
+<b>pointerDrag</b>: 
+<b>Use Drag Threshold</b>: 
+<b>Current Rayast:</b>
+<b>Press Rayast:</b>
+<b>Pointer Input Module of type: </b>
+<B>Pointer:</b> 
+Horizontal
+Vertical
+Submit
+Cancel
+Input: Faked
+Input: Touch
+
+eventCamera: 
+
+sortOrderPriority: 
+
+renderOrderPriority: 
+Coroutine container not configured... did you forget to call Init?
+Normal
+Highlighted
+Pressed
+Disabled
+Trying to add {0} for graphic rebuild while we are already inside a graphic rebuild loop. This is not supported.
+Trying to remove {0} from rebuild list while we are already inside a rebuild loop. This is not supported.
+Panel
+Button
+Text
+New Text
+Image
+RawImage
+Background
+Fill Area
+Fill
+Handle Slide Area
+Handle
+Scrollbar
+Sliding Area
+Checkmark
+Label
+InputField
+Placeholder
+Enter text...
+Dropdown
+Arrow
+Template
+Viewport
+Content
+Item
+Item Background
+Item Checkmark
+Item Label
+Option A
+Option B
+Option C
+Scroll View
+Scrollbar Horizontal
+Scrollbar Vertical
+The dropdown template is not assigned. The template needs to be assigned and must have a child GameObject with a Toggle component serving as the item.
+The dropdown template is not valid. The template must have a child GameObject with a Toggle component serving as the item.
+The dropdown template is not valid. The child GameObject with a Toggle component (the item) must have a RectTransform on its parent.
+The dropdown template is not valid. The Item Text must be on the item GameObject or children of it.
+The dropdown template is not valid. The Item Image must be on the item GameObject or children of it.
+Dropdown List
+Blocker
+Item 
+Shared UI Mesh
+Too many sprite tiles on Image "
+". The tile size will be increased. To remove the limit on the number of tiles, convert the Sprite to an Advanced texture, remove the borders, clear the Packing tag and set the Wrap mode to Repeat.
+Using alphaHitTestMinimumThreshold greater than 0 on Image whose sprite texture cannot be read. 
+ Also make sure to disable sprite packing for this sprite.
+	
+SelectAll
+ Input Caret
+!#$%&'*+-/=?^_`{|}~
+Attempting to use a stencil mask with depth > 8
+_Stencil
+Material 
+ doesn't have _Stencil property
+_StencilOp
+ doesn't have _StencilOp property
+_StencilComp
+ doesn't have _StencilComp property
+_StencilReadMask
+ doesn't have _StencilReadMask property
+_StencilWriteMask
+ doesn't have _StencilWriteMask property
+_ColorMask
+ doesn't have _ColorMask property
+Stencil Id:{0}, Op:{1}, Comp:{2}, WriteMask:{3}, ReadMask:{4}, ColorMask:{5} AlphaClip:{6} ({7})
+_UseAlphaClip
+UNITY_UI_ALPHACLIP
+Arial.ttf
+Toggle {0} is not part of ToggleGroup {1}
+(Layout Rebuilder for) 
+Random Insertion is semantically invalid, since this structure does not guarantee ordering.
+Internal error. Trying to destroy object that is already released to pool.
+Raycast
+RaycastAll
+GetRayIntersectionAll
+Mesh can not have more than 65000 vertices
+/n
+Parallax
+<LineBreak>
+Civilians
+ButtonHolder
+ + 
+http://twitter.com/home?status=
+%20customization%20on%20Rooftop%20Snipers:%20
+%20@neweichgames
+FavoriteCustomization
+Play tweeted
+Slippery
+Athlete
+First to 
+ wins
+Endless
+ArmPivot
+Shoe
+Death
+UpdateScores
+Drop
+GameOver
+showPoint
+wrapRound
+<color=red>
+</color> To <color=blue>
+</color>
+Point Blue
+Do
+Red
+Blue
+WinName
+Blue Wins!
+Wins
+<winColor>
+<loseColor>
+if(typeof(kongregateUnitySupport) != 'undefined'){
+        kongregateUnitySupport.initAPI('KongregateAPI', 'OnKongregateAPILoaded');
+      };
+kongregate.stats.submit
+Kongregate User Info: 
+, userId: 
+soundObj
+PlaySong
+https://itunes.apple.com/app/id1189491293
+https://sites.google.com/site/neweichgames
+checkFullScreen
+disableError
+Trash
+Intractable
+Head
+Face
+Arm
+Hand
+BodyCostume
+LegCostume
+Shoot
+unfreezeArm
+speedUp
+shootSpot
+Trail
+Shoot self
+Player
+EnableSprite
+changeLayer
+WaterObjects
