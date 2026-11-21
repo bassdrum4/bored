@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 718,
+  "count": 720,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,8 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"b09a090","date":"2026-11-20","author":"Daniel Lowe","subject":"Clear popularity graph when authoritative summary is unavailable"},
+  {"sha":"8a26dcc","date":"2026-11-20","author":"Daniel Lowe","subject":"Chart top standalone game launches while preserving detailed popularity table"},
   {"sha":"adf1b1a","date":"2026-11-20","author":"Daniel Lowe","subject":"Add ranked popularity chart before detailed analytics table"},
   {"sha":"d47b083","date":"2026-11-20","author":"Daniel Lowe","subject":"Style responsive analytics donut charts"},
   {"sha":"94550e1","date":"2026-11-20","author":"Daniel Lowe","subject":"Visualize categorical analytics with accessible donut charts"},
