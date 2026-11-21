@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 759,
+  "count": 761,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"602b7f1","date":"2026-11-21","author":"Daniel Lowe","subject":"Remove unlisted rooftop duel from discovery metadata"},
+  {"sha":"f36984a","date":"2026-11-21","author":"Daniel Lowe","subject":"Unlist editable Rooftop Snipers from public catalog"},
   {"sha":"04fe1fa","date":"2026-11-21","author":"Codebuff","subject":"Move the Rooftop Snipers decompilation into src/prototypes"},
   {"sha":"92ae9e0","date":"2026-11-21","author":"Codebuff","subject":"Decompile the shipped Rooftop Snipers build into editable source"},
   {"sha":"91e59b0","date":"2026-11-21","author":"Codebuff","subject":"Restore the repo's own Rooftop Snipers as editable source"},
