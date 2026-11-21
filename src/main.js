@@ -287,9 +287,13 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (slug === 'poke-gacha' && !multiplayer) {
     try { if (activateStoredWallet()) requestCloudPush(); } catch {}
   }
-  recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
-  saveLibrary();
-  renderRecent();
+  // Hidden admin previews are intentionally absent from ORDER. Keep them out
+  // of Jump Back In, where shelfGame requires public catalog metadata.
+  if (!adminPreview) {
+    recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
+    saveLibrary();
+    renderRecent();
+  }
   const name = ADMIN_PREVIEWS[slug] || ORDER.find(([id]) => id === slug)[1];
   gameFrame.title = name;
   $('#challenge-progress').hidden = !challenge;
