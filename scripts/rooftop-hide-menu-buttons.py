@@ -123,7 +123,8 @@ new_html = html[:match.start(2)] + json.dumps(build, separators=(",", ":")) + ht
 HTML.write_text(new_html, encoding="utf8")
 
 test = TEST.read_text(encoding="utf8")
-assert old_hash in test, "Preserved-data assertion changed; review before updating"
+if old_hash not in test and new_hash not in test:
+    raise AssertionError("Unrecognized pinned data hash; review before updating")
 TEST.write_text(test.replace(old_hash, new_hash).replace(
     "// Prevent accidentally swapping the actual game for the native remake or a",
     "// The Unity scene disables promotional title controls (see scripts/rooftop-hide-menu-buttons.py).\n"
