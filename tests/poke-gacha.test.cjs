@@ -2357,6 +2357,51 @@ test('ranged units turn to face whoever they act on now, and keep that way when 
   assert.deepEqual(errors, []);
 });
 
+test('projectiles point along their path in 8 directions and follow a moving target', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null;
+    const pick = cls => S.owned.find(n => T.classOf(n) === cls); setSquad([pick('sniper'), pick('blocker')].filter(Boolean)); squadStart(); battle.talk = []; battleTalk(); battle.paused = true; battle.b.energy = 99; });
+  const r = await game.evaluate(() => {
+    const st = battle.stage, b = battle.b, slot = b.squad.findIndex(u => u.cls === 'sniper');
+    if (slot < 0) return { skip: true };
+    let spot = null; st.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H' && x >= 3 && x <= T.W - 4 && y >= 2 && y <= st.map.length - 3 && !spot) spot = [x, y]; }));
+    if (!spot) return { skip: true };
+    T.deploy(b, slot, spot[0], spot[1]);
+    const u = b.units[b.units.length - 1];
+    // Above, below, behind (left) and the four diagonals, all around the sniper.
+    const at = [[0, -2], [0, 2], [-2, 0], [2, 0], [-2, -2], [2, 2], [2, -2], [-2, 2]];
+    b.enemies = at.map(([dx, dy], i) => ({ id: 950 + i, num: 52, x: u.x + dx, y: u.y + dy, hp: 50, maxHp: 50, path: [[u.x + dx, u.y + dy], [u.x + dx, u.y + dy + 1]], seg: 0, types: ['Normal'], flying: false }));
+    const a = packFx('shot', 'Bug'), now = performance.now();
+    // Halfway along and held there, so the frame can be looked at.
+    battle.fx = b.enemies.map(e => ({ kind: 'packshot', a, from: feetOf(battle, u), to: feetOf(battle, e), eid: e.id, t0: now - 5e5, dur: 1e6 }));
+    return new Promise(done => { const imgs = [spriteFor(52, 'normal'), spriteFor(u.num, u.look), a[8] || FX_SHEET]; let n = 0;
+      const wait = () => imgs.every(i => i.complete && i.naturalWidth) || n++ > 60 ? done() : setTimeout(wait, 50); wait(); }).then(() => {
+    const dirs = battle.fx.map(f => fxDir(f.to[0] - f.from[0], f.to[1] - f.from[1]));
+    const frames = dirs.map(d => !!aimedFrame(a, 0, d));
+    // Turned frames hold the art: about as many opaque pixels at every angle.
+    const ink = c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) n += d[k] > 16; return n; };
+    const inks = [0, 1, 2, 3, 4, 5, 6, 7].map(d => ink(aimedFrame(a, 0, d)));
+    drawField(now);
+    const box = battle.sprites.find(q => q.id === 'u' + u.id), rect = document.querySelector('#field').getBoundingClientRect();
+    // The target walks one tile; the projectile follows it.
+    const e0 = b.enemies[0], before = battle.fx[0].to.slice(); e0.x += 1; drawField(now + 1);
+    const moved = battle.fx[0].to[0] !== before[0]; e0.x -= 1; drawField(now + 2);
+    return { dirs, frames, inks, moved, cx: box.x + box.w / 2, cy: box.y + box.h / 2, rect: [rect.x, rect.y, rect.width / document.querySelector('#field').width] };
+    });
+  });
+  assert.ok(!r.skip, 'the stage has the layout this test needs');
+  assert.deepEqual(r.dirs, [6, 2, 4, 0, 5, 1, 7, 3], 'up, down, left, right and the diagonals');
+  assert.deepEqual(r.frames, r.frames.map(() => true), 'every direction has a turned frame');
+  const lo = Math.min(...r.inks), hi = Math.max(...r.inks);
+  assert.ok(hi - lo <= hi * 0.2, 'turning keeps the art whole: ' + r.inks.join(', '));
+  assert.ok(r.moved, 'the projectile follows its target');
+  if (process.env.SHOT_DIR) {
+    const fr = await (await tab.$('#frame')).boundingBox(), [x0, y0, k] = r.rect;
+    await tab.screenshot({ path: path.join(process.env.SHOT_DIR, 'aimed-shots.png'), clip: { x: fr.x + x0 + (r.cx - 130) * k, y: fr.y + y0 + (r.cy - 120) * k, width: 260 * k, height: 230 * k } });
+  }
+  assert.deepEqual(errors, []);
+});
+
 test('the Wiki tab: the full type chart, every foe kind with its icon, classes, skills, items with sprites, candy and eggs', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await key(tab, '8');
