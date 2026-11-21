@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   test:
+    permissions:
+      contents: write # temporary, for the Rooftop Snipers regeneration branch
     # Pinned to the current LTS image: `ubuntu-latest` is mid-rollout to 26.04
     # (Oct 19 – Nov 19, 2026), and browser runs flip between images otherwise.
     runs-on: ubuntu-24.04
@@ -25,8 +27,19 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Inspect Rooftop Snipers compiled method mapping
-        run: node scripts/rooftop-forensics.mjs
+      - name: Rebuild and test original Rooftop Snipers with random-only rounds
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/rooftop-random-only'
+        run: |
+          git fetch origin refs/heads/fix/rooftop-random-only
+          git checkout -B fix/rooftop-random-only FETCH_HEAD
+          node scripts/rooftop-apply-and-build.mjs
+          git config user.name "bored-automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/prototypes/rooftop-snipers/source/rooftop-snipers.code.js src/games/content/rooftop-snipers.html tests/rooftop-snipers.test.cjs
+          if ! git diff --cached --quiet; then
+            git commit -m "Make all Rooftop Snipers rounds randomized"
+            git push origin HEAD:fix/rooftop-random-only
+          fi
       - name: Run browser and logic tests
         run: npm test
 
