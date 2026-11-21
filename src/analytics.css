@@ -24,3 +24,36 @@
 .announcement-admin-item .announcement-meta{font:11px var(--mono);color:var(--dim)}
 .announcement-admin-item .action{margin-top:8px}
 @media(max-width:650px){.announcement-form-row{grid-template-columns:1fr}.announcement-form{padding:12px}}
+
+/* Compact, accessible categorical breakdowns (counts remain visible in legend). */
+.analytics-donut-layout{display:grid;grid-template-columns:minmax(130px,190px) minmax(0,1fr);align-items:center;gap:20px;margin:16px 0 22px}
+.analytics-donut{aspect-ratio:1;width:100%;max-width:190px;border-radius:50%;display:grid;place-items:center}
+.analytics-donut-middle{width:62%;aspect-ratio:1;border-radius:50%;background:var(--paper,#faf8f2);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;box-sizing:border-box}
+.analytics-donut-middle strong{font-size:clamp(13px,1.4vw,19px);overflow-wrap:anywhere;line-height:1.2}
+.analytics-donut-middle span{font-size:11px;color:var(--dim,#666)}
+.analytics-donut-legend{display:grid;gap:8px;min-width:0}
+.analytics-donut-key{display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;gap:8px;font-size:12px;min-width:0}
+.analytics-donut-key i{display:block;width:10px;height:10px;border-radius:2px}
+.analytics-donut-key span{overflow-wrap:anywhere}
+.analytics-donut-key strong{font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+@media(max-width:900px){.analytics-donut-layout{grid-template-columns:1fr;justify-items:start;gap:12px}.analytics-donut{width:165px}.analytics-donut-legend{width:100%}}
+@media(max-width:650px){.analytics-donut-layout{grid-template-columns:minmax(100px,130px) minmax(0,1fr);gap:12px}.analytics-donut{width:100%}.analytics-donut-key{grid-template-columns:9px minmax(0,1fr);gap:5px}.analytics-donut-key strong{grid-column:2;text-align:left;font-size:11px}}
+
+/* Two-part daily visitor / cohort comparisons share the existing bar scales. */
+.analytics-stacked{display:flex;overflow:hidden;height:17px;background:#e5e0d7}
+.analytics-stack-first{background:#456653;height:100%;flex:none}
+.analytics-stack-second{background:#bd694b;height:100%;flex:none}
+#engagement-games-chart,#engagement-visitors-chart,#engagement-together-chart,
+#history-games-chart,#history-sources-chart,#history-ui-chart,#history-cohorts-chart,
+#players-chart,#sessions-errors-chart,#daily-chart,#sources-chart,#actions-chart,
+#discovery-chart{margin:16px 0 22px;max-width:940px}
+#history-ui-chart .analytics-bar-row,#engagement-together-chart .analytics-bar-row{grid-template-columns:minmax(150px,245px) 1fr 80px}
+@media(max-width:650px){#history-ui-chart .analytics-bar-row,#engagement-together-chart .analytics-bar-row{grid-template-columns:minmax(100px,130px) 1fr 55px}}
+
+/* Charts are the default; detailed numeric tables are available on demand. */
+.analytics-raw-data{margin:12px 0 24px}
+.analytics-raw-data>summary{display:list-item;width:fit-content;cursor:pointer;color:var(--ink,#242424);font-size:12px;text-decoration:underline;text-underline-offset:3px;padding:7px 4px}
+.analytics-raw-data>summary:hover{color:#456653}
+.analytics-raw-data[open]{border-top:1px solid var(--rule,#d5d0c5);padding-top:8px}
+.analytics-metric-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:15px 0 8px;font-size:13px}
+.analytics-metric-picker select{font:inherit;padding:7px 9px;background:var(--paper,#faf8f2);color:var(--ink,#242424);border:1px solid var(--rule,#aaa);max-width:100%}

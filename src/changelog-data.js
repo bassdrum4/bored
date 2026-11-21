@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 715,
+  "count": 733,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,24 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"28e0e36","date":"2026-11-21","author":"Codebuff","subject":"feat(crossword): resume an unfinished grid and give the board more room"},
+  {"sha":"0e04ff9","date":"2026-11-20","author":"PenguinV360","subject":"poke-gacha: owner's Bug shot and burst art","pr":275},
+  {"sha":"de9fd25","date":"2026-11-20","author":"PenguinV360","subject":"Fix the hub search test: read every matching card, not one","pr":276},
+  {"sha":"90c9977","date":"2026-11-20","author":"Daniel Lowe","subject":"Retry alternate archive dates automatically when crossword candidates are unusable"},
+  {"sha":"77f32f9","date":"2026-11-20","author":"Daniel Lowe","subject":"Style chart-first analytics and expandable raw data"},
+  {"sha":"6d42a11","date":"2026-11-20","author":"Daniel Lowe","subject":"Hide game analytics raw tables behind expandable details"},
+  {"sha":"50e5958","date":"2026-11-20","author":"Daniel Lowe","subject":"Let history game chart compare selected metrics instead of forcing a wide table"},
+  {"sha":"f7abc29","date":"2026-11-20","author":"Daniel Lowe","subject":"Make charts primary and collapse detailed analytics number tables"},
+  {"sha":"f4e3f10","date":"2026-11-20","author":"Daniel Lowe","subject":"Style stacked visitor and cohort charts across analytics pages"},
+  {"sha":"114ea14","date":"2026-11-20","author":"Daniel Lowe","subject":"Show charts alongside raw tables in game-specific analytics"},
+  {"sha":"571f548","date":"2026-11-20","author":"Daniel Lowe","subject":"Visualize daily activity sources and event counts on scoped game analytics"},
+  {"sha":"cb2dba7","date":"2026-11-20","author":"Daniel Lowe","subject":"Use session counts in player ranking chart"},
+  {"sha":"ff52ff7","date":"2026-11-20","author":"Daniel Lowe","subject":"Display analytic charts on engagement history players and sessions tabs"},
+  {"sha":"8d18719","date":"2026-11-20","author":"Daniel Lowe","subject":"Add meaningful comparison and retention charts across analytics tabs"},
+  {"sha":"b09a090","date":"2026-11-20","author":"Daniel Lowe","subject":"Clear popularity graph when authoritative summary is unavailable"},
+  {"sha":"8a26dcc","date":"2026-11-20","author":"Daniel Lowe","subject":"Chart top standalone game launches while preserving detailed popularity table"},
+  {"sha":"adf1b1a","date":"2026-11-20","author":"Daniel Lowe","subject":"Add ranked popularity chart before detailed analytics table"},
+  {"sha":"d47b083","date":"2026-11-20","author":"Daniel Lowe","subject":"Style responsive analytics donut charts"},
+  {"sha":"94550e1","date":"2026-11-20","author":"Daniel Lowe","subject":"Visualize categorical analytics with accessible donut charts"},
   {"sha":"584be3c","date":"2026-11-20","author":"Daniel Lowe","subject":"test: validate search coverage and hub focus without brittle counts"},
   {"sha":"dd6057c","date":"2026-11-20","author":"Daniel Lowe","subject":"test(analytics): keep standalone popularity separate from multiplayer opens"},
   {"sha":"731ffc3","date":"2026-11-20","author":"Daniel Lowe","subject":"feat(analytics): use server-side solo launches and real Together counts"},

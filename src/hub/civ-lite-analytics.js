@@ -51,6 +51,59 @@ function renderTable(target, headings, rows) {
   });
   table.append(head, body); wrapper.append(table); root.append(wrapper);
 }
+
+function scopedBars(target,rows,label,value,limit=12) {
+  const root=$(target), data=rows.map(r=>({name:String(label(r)),count:Math.max(0,Number(value(r))||0)}))
+    .filter(r=>r.count>0).sort((a,b)=>b.count-a.count).slice(0,limit);
+  const max=Math.max(1,...data.map(r=>r.count));
+  root.replaceChildren(...data.map(r=>{
+    const line=document.createElement('div');line.className='analytics-bar-row';
+    const name=makeCell('span',r.name);name.className='analytics-bar-label';name.title=r.name;
+    const track=document.createElement('div');track.className='analytics-bar-track';track.setAttribute('aria-hidden','true');
+    const fill=document.createElement('div');fill.className='analytics-bar';fill.style.width=100*r.count/max+'%';track.append(fill);
+    const count=makeCell('span',formatNumber(r.count));count.className='analytics-bar-value';
+    line.append(name,track,count);return line;
+  }));
+  if(!data.length)root.append(makeCell('p','No recorded activity for this period.'));
+}
+function scopedDaily(target,rows) {
+  const root=$(target),data=[...rows].sort((a,b)=>a.date.localeCompare(b.date));
+  const max=Math.max(1,...data.map(r=>Number(r.sessions)||0));
+  root.replaceChildren(...data.map(r=>{
+    const line=document.createElement('div');line.className='analytics-bar-row';
+    const name=makeCell('span',r.date);name.className='analytics-bar-label';
+    const track=document.createElement('div');track.className='analytics-bar-track';track.setAttribute('aria-hidden','true');
+    const fill=document.createElement('div');fill.className='analytics-bar';fill.style.width=100*(Number(r.sessions)||0)/max+'%';track.append(fill);
+    const count=makeCell('span',formatNumber(r.sessions));count.className='analytics-bar-value';
+    line.append(name,track,count);return line;
+  }));
+  if(!data.length)root.append(makeCell('p','No recorded activity for this period.'));
+}
+function scopedDonut(target,rows) {
+  const root=$(target);
+  const data=rows.map(r=>({name:String(r.label),count:Math.max(0,Number(r.count)||0)}))
+    .filter(r=>r.count>0).sort((a,b)=>b.count-a.count);
+  const total=data.reduce((sum,r)=>sum+r.count,0);
+  if(!total){root.replaceChildren(makeCell('p','No recorded activity for this period.'));return;}
+  const kept=data.slice(0,7);
+  if(data.length>7)kept.push({name:'Other',count:data.slice(7).reduce((n,r)=>n+r.count,0)});
+  const palette=['#456653','#bd694b','#d1a04b','#648da5','#8a75a5','#779a6d','#b67c94','#8b8b80'];
+  let offset=0;
+  const stops=kept.map((r,i)=>{const start=100*offset/total;offset+=r.count;return palette[i]+' '+start+'% '+100*offset/total+'%';});
+  const layout=document.createElement('div');layout.className='analytics-donut-layout';
+  const wheel=document.createElement('div');wheel.className='analytics-donut';wheel.style.background='conic-gradient('+stops.join(',')+')';
+  wheel.setAttribute('role','img');wheel.setAttribute('aria-label',kept.map(r=>r.name+': '+r.count).join('; '));
+  const center=document.createElement('div');center.className='analytics-donut-middle';
+  center.append(makeCell('strong',formatNumber(total)),makeCell('span','Total'));wheel.append(center);
+  const legend=document.createElement('div');legend.className='analytics-donut-legend';
+  kept.forEach((r,i)=>{
+    const line=document.createElement('div');line.className='analytics-donut-key';
+    const square=document.createElement('i');square.style.backgroundColor=palette[i];square.setAttribute('aria-hidden','true');
+    const name=makeCell('span',r.name),value=makeCell('strong',formatNumber(r.count)+' · '+(100*r.count/total).toFixed(1)+'%');
+    line.append(square,name,value);legend.append(line);
+  });
+  layout.append(wheel,legend);root.replaceChildren(layout);
+}
 function render(report) {
   const t = report.totals;
   const metrics = [
@@ -71,6 +124,10 @@ function render(report) {
     item.append(makeCell('strong', value), makeCell('span', label));
     return item;
   }));
+  scopedDaily('#daily-chart',report.daily||[]);
+  scopedDonut('#sources-chart',report.sources||[]);
+  scopedBars('#actions-chart',report.actions||[],r=>r.label,r=>r.count);
+  scopedBars('#discovery-chart',report.discovery||[],r=>r.label,r=>r.count);
   renderTable('#daily', ['Date','Sessions','Players','Active time','Errors'],
     (report.daily || []).map(d => [d.date,formatNumber(d.sessions),formatNumber(d.players),formatTime(d.activeMs),formatNumber(d.errors)]));
   renderTable('#sources', ['Source','Launches'],

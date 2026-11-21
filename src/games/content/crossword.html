@@ -246,6 +246,7 @@ const LAST_DAY = Date.UTC(2014, 11, 31);
 const DAY = 86400000;
 const SPAN = Math.round((LAST_DAY - FIRST_DAY) / DAY) + 1;
 const ATTEMPTS = 16;
+const FALLBACK_ATTEMPTS = 12; // Different archive dates after the nearby candidates are exhausted.
 
 const $ = selector => document.querySelector(selector);
 const gridEl = $('#grid');
@@ -403,25 +404,44 @@ function buildPuzzle(data, ms) {
   };
 }
 
-async function fetchPuzzle(startMs) {
-  let ms = startMs;
-  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    if (ms < FIRST_DAY) ms = LAST_DAY;
-    if (new Date(ms).getUTCDay() !== 0) {
-      let response = null;
-      try {
-        response = await fetch(urlFor(ms));
-      } catch (error) {
-        throw new Error('offline');
-      }
-      if (response.ok) {
-        let data = null;
-        try { data = await response.json(); } catch (error) { data = null; }
-        const built = data && buildPuzzle(data, ms);
-        if (built) return built;
-      }
+// Deterministic candidates keep the shared daily puzzle identical for everyone.
+// First search nearby dates; if an archive period is missing or malformed,
+// spread the remaining attempts across the archive rather than giving up.
+async function fetchPuzzle(startMs, exact = false) {
+  const dayIndex = Math.max(0, Math.min(SPAN - 1, Math.floor((startMs - FIRST_DAY) / DAY)));
+  const tried = new Set();
+  const candidates = [];
+  const add = index => {
+    const normalized = ((index % SPAN) + SPAN) % SPAN;
+    if (!tried.has(normalized)) { tried.add(normalized); candidates.push(normalized); }
+  };
+  add(dayIndex);
+  if (!exact) {
+    for (let attempt = 1; attempt < ATTEMPTS; attempt++) add(dayIndex - attempt);
+    // The offset depends only on the chosen starting day. No Math.random:
+    // a daily seed must not give different players different crosswords.
+    for (let attempt = 0; attempt < FALLBACK_ATTEMPTS; attempt++) {
+      add((hash(String(dayIndex) + ':' + attempt) % SPAN));
     }
-    ms -= DAY;
+  }
+  for (const index of candidates) {
+    const ms = FIRST_DAY + index * DAY;
+    if (new Date(ms).getUTCDay() === 0) continue; // Sunday 21x21 grids are unsupported.
+    let response;
+    try {
+      response = await fetch(urlFor(ms));
+    } catch {
+      throw new Error('offline'); // Network outage: trying 28 dates won't fix connectivity.
+    }
+    if (!response.ok) {
+      // Missing archive entry: keep searching. Other server failures may be temporary.
+      if (response.status !== 404 && response.status !== 410) throw new Error('offline');
+      continue;
+    }
+    let data = null;
+    try { data = await response.json(); } catch { /* malformed candidate */ }
+    const built = data && buildPuzzle(data, ms);
+    if (built) return built;
   }
   throw new Error('empty');
 }
@@ -701,7 +721,7 @@ function setBusy(busy) {
   tools.forEach(button => { button.disabled = busy; });
 }
 
-async function load(isDaily, startMs) {
+async function load(isDaily, startMs, exact = false) {
   if (loading) return false;
   setBusy(true);
   if (!puzzle) {
@@ -709,7 +729,7 @@ async function load(isDaily, startMs) {
     bylineEl.textContent = 'New York Times archive';
   }
   try {
-    const built = await fetchPuzzle(startMs);
+    const built = await fetchPuzzle(startMs, exact);
     renderPuzzle(built, isDaily);
     return true;
   } catch (error) {
@@ -754,7 +774,7 @@ function savedRun() {
 async function restoreRun(pending) {
   const state = pending && pending.state;
   if (!state || !Number.isFinite(state.ms)) return false;
-  const loaded = await load(state.daily === true, state.ms);
+  const loaded = await load(state.daily === true, state.ms, true);
   if (!loaded || !puzzle || puzzle.ms !== state.ms) return false;
   const saved = Array.isArray(state.fill) ? state.fill : [];
   for (let i = 0; i < fill.length; i++) {

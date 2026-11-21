@@ -375,7 +375,7 @@ test('browser regressions', async t => {
     assert.equal(await page.$$eval('.card', els => els.length), catalog.puzzle);
     await filter('All');
     await page.type('#q', 'internet required');
-    const onlineMatches = await page.$eval('.card', els => els.map(el => el.dataset.slug));
+    const onlineMatches = await page.$$eval('.card', els => els.map(el => el.dataset.slug));
     assert.deepEqual(
       (await page.evaluate(() => Object.keys(EXTERNS))).filter(slug => !onlineMatches.includes(slug)),
       [],

@@ -50,6 +50,77 @@ function bars(target, rows, label) {
   }));
   if (!rows.length) $(target).append(el('p', 'No activity recorded yet.'));
 }
+// Proportions are more readable as a donut than as a long list of small bars.
+// Keep the raw numbers alongside percentages and exclude zero-only categories.
+function donut(target, rows, label, value, format = n => n.toLocaleString()) {
+  const entries = rows.map(row => ({ name: String(label(row)), amount: Math.max(0, Number(value(row)) || 0) }))
+    .filter(row => row.amount > 0).sort((a, b) => b.amount - a.amount);
+  const total = entries.reduce((sum, row) => sum + row.amount, 0);
+  const host = $(target);
+  if (!host) return;
+  if (!total) { host.replaceChildren(el('p', 'No activity recorded yet.')); return; }
+  // Tiny categories remain represented, but get grouped to keep the key readable.
+  const kept = entries.slice(0, 7);
+  if (entries.length > 7) kept.push({ name: 'Other', amount: entries.slice(7).reduce((sum, row) => sum + row.amount, 0) });
+  const palette = ['#456653','#bd694b','#d1a04b','#648da5','#8a75a5','#779a6d','#b67c94','#8b8b80'];
+  let cursor = 0;
+  const stops = kept.map((row, i) => {
+    const start = cursor / total * 100;
+    cursor += row.amount;
+    return `${palette[i]} ${start}% ${cursor / total * 100}%`;
+  });
+  const figure = el('div'); figure.className = 'analytics-donut-layout';
+  const wheel = el('div'); wheel.className = 'analytics-donut';
+  wheel.style.background = 'conic-gradient(' + stops.join(',') + ')';
+  wheel.setAttribute('role', 'img');
+  wheel.setAttribute('aria-label', kept.map(row => row.name + ': ' + format(row.amount) + ' (' + Math.round(row.amount / total * 100) + '%)').join('; '));
+  const middle = el('div'); middle.className = 'analytics-donut-middle';
+  middle.append(el('strong', format(total)), el('span', 'Total'));
+  wheel.append(middle);
+  const legend = el('div'); legend.className = 'analytics-donut-legend';
+  kept.forEach((row, i) => {
+    const line = el('div'); line.className = 'analytics-donut-key';
+    const dot = el('i'); dot.style.backgroundColor = palette[i]; dot.setAttribute('aria-hidden', 'true');
+    const name = el('span', row.name); name.title = row.name;
+    const number = el('strong', format(row.amount) + ' · ' + (row.amount / total * 100).toFixed(1) + '%');
+    line.append(dot, name, number); legend.append(line);
+  });
+  figure.append(wheel, legend); host.replaceChildren(figure);
+}
+
+function rankedChart(target, rows, label, value, limit = 12, format = n => n.toLocaleString()) {
+  const host = $(target); if (!host) return;
+  const data = rows.map(row => ({ label: String(label(row)), value: Math.max(0, Number(value(row)) || 0) }))
+    .filter(row => row.value > 0).sort((a,b) => b.value - a.value).slice(0,limit);
+  const maximum = Math.max(1,...data.map(row => row.value));
+  host.replaceChildren(...data.map(row => {
+    const line = el('div'); line.className = 'analytics-bar-row';
+    const name = el('span',row.label); name.className = 'analytics-bar-label'; name.title = row.label;
+    const track = el('div'); track.className = 'analytics-bar-track'; track.setAttribute('aria-hidden','true');
+    const fill = el('div'); fill.className = 'analytics-bar'; fill.style.width = 100 * row.value / maximum + '%'; track.append(fill);
+    const count = el('span', format(row.value)); count.className = 'analytics-bar-value';
+    line.append(name,track,count); return line;
+  }));
+  if (!data.length) host.append(el('p','No activity recorded yet.'));
+}
+function stackedDays(target, rows, key, first, second, labels = ['New','Returning']) {
+  const host = $(target); if (!host) return;
+  const data = [...rows].sort((a,b) => String(key(a)).localeCompare(String(key(b))));
+  const max = Math.max(1,...data.map(row => Math.max(0,Number(first(row))||0) + Math.max(0,Number(second(row))||0)));
+  host.replaceChildren(...data.map(row => {
+    const a = Math.max(0,Number(first(row))||0), b = Math.max(0,Number(second(row))||0);
+    const line = el('div'); line.className = 'analytics-bar-row';
+    const name = el('span',String(key(row))); name.className = 'analytics-bar-label';
+    const track = el('div'); track.className = 'analytics-bar-track analytics-stacked'; 
+    track.setAttribute('aria-label',labels[0]+': '+a+'; '+labels[1]+': '+b);
+    const left = el('div'); left.className = 'analytics-stack-first'; left.style.width = 100*a/max+'%';
+    const right = el('div'); right.className = 'analytics-stack-second'; right.style.width = 100*b/max+'%';
+    track.append(left,right);
+    const count = el('span',(a+b).toLocaleString()); count.className = 'analytics-bar-value';
+    line.append(name,track,count); return line;
+  }));
+  if (!data.length) host.append(el('p','No activity recorded yet.'));
+}
 function gameRows(games) {
   return games.map(g => [names[g.id] || g.id, g.sessions, g.users.size, duration(g.active), duration(g.visible), duration(g.active / g.sessions), g.completed, g.errors]);
 }
@@ -58,11 +129,28 @@ const gameColumns = ['Game','Sessions','Accounts','Active time','Visible time','
 // iframe is not a new match and does not improve a game's solo rank.
 function renderPopularity() {
   if (!Array.isArray(popularitySummary?.games)) {
+    $('#popularity-chart').replaceChildren();
     $('#game-popularity').replaceChildren(el('p', 'Authoritative popularity breakdown is unavailable.'));
     return;
   }
   const selectedGame = $('#game').value;
   const rows = popularitySummary.games.filter(r => !selectedGame || r.game === selectedGame);
+  // Compare launches, not Together reopen events: the latter can repeatedly
+  // count the same multiplayer game and would distort the ranking.
+  const leaders = [...rows].sort((a,b) => b.standalone_launches - a.standalone_launches).slice(0, 12);
+  const maxLaunches = Math.max(1, ...leaders.map(r => Number(r.standalone_launches) || 0));
+  const popularityChart = $('#popularity-chart');
+  popularityChart.replaceChildren(...leaders.map(row => {
+    const line = el('div'); line.className = 'analytics-bar-row';
+    const label = el('span', names[row.game] || row.game); label.className = 'analytics-bar-label'; label.title = label.textContent;
+    const track = el('div'); track.className = 'analytics-bar-track'; track.setAttribute('aria-hidden', 'true');
+    const bar = el('div'); bar.className = 'analytics-bar';
+    bar.style.width = (100 * (Number(row.standalone_launches) || 0) / maxLaunches) + '%';
+    track.append(bar);
+    const value = el('span', Number(row.standalone_launches || 0).toLocaleString()); value.className = 'analytics-bar-value';
+    line.append(label, track, value); return line;
+  }));
+  if (!leaders.length) popularityChart.append(el('p', 'No launches recorded yet.'));
   table('#game-popularity', ['Game','Standalone launches','Standalone browser IDs','Together opens','Organic matches','Organic turns'],
     rows.map(r => [names[r.game] || r.game, r.standalone_launches, r.standalone_browsers,
       r.together_opens, r.matches_started, r.turns_played]));
@@ -85,9 +173,11 @@ function renderEngagement(rows) {
   $('#engagement-kpis').replaceChildren(...stats.map(([label,value]) => {
     const n=el('div');n.className='analytics-stat';n.append(el('strong',value),el('span',label));return n;
   }));
+  rankedChart('#engagement-games-chart', data.games, g => names[g.game] || g.game, g => g.meaningful);
   table('#engagement-games',
     ['Game','Opens','Meaningful sessions','Engaged players','Repeat players (matured)'],
     data.games.map(g => [names[g.game]||g.game,g.sessions,g.meaningful,g.engagedPlayers,g.repeatPlayers]));
+  stackedDays('#engagement-visitors-chart', data.visitorsByDay, d => d.day, d => d.new, d => d.returning);
   table('#engagement-visitors',['Detroit date','New tracked visitors','Returning tracked visitors'],
     data.visitorsByDay.map(d=>[d.day,d.new,d.returning]));
   const match = togetherSummary && !Array.isArray(togetherSummary) ? togetherSummary : {};
@@ -110,10 +200,12 @@ function renderEngagement(rows) {
   const counts = new Map();
   for (const e of products) if (labels[e.kind]) counts.set(e.kind,(counts.get(e.kind)||0)+1);
   for (const [kind,label] of Object.entries(labels)) multiplayer.push([label,counts.get(kind)||0]);
+  rankedChart('#engagement-together-chart', Object.entries(labels).map(([kind,label]) => ({label,count:counts.get(kind)||0})),r=>r.label,r=>r.count);
   table('#engagement-together',['Measure','Value'],multiplayer);
   const sentiment = [['Responses',data.survey.responses],
     ['Positive (4 or 5)',data.survey.positive],
     ['Positive share',percent(data.survey.positive,data.survey.responses)]];
+  donut('#engagement-feedback-chart', [{id:'Positive (4–5)',count:data.survey.positive},{id:'Other ratings',count:Math.max(0,data.survey.responses-data.survey.positive)}],r=>r.id,r=>r.count);
   table('#engagement-feedback',['Measure','Value'],sentiment);
   table('#engagement-comments',['Date','Type','Rating','Player','Game','Feedback',''],feedback
     .slice(-50).reverse()
@@ -198,19 +290,15 @@ function renderF14(rows) {
     }
     return [...map.values()].sort((a,b) => b.count-a.count || b.active-a.active);
   };
-  table('#f14-modes', ['Mode','Sorties','Active time'],
-    group('mode').map(s => [s.id,s.count,duration(s.active)]));
-  table('#f14-aircraft', ['Vehicle','Sorties','Active time'],
-    group('aircraft').map(s => [s.id,s.count,duration(s.active)]));
-  const outcomes = group('outcome');
-  table('#f14-outcomes', ['Outcome','Sorties'],
-    outcomes.map(s => [s.id,s.count]));
+  donut('#f14-modes', group('mode'), s => s.id, s => s.count);
+  donut('#f14-aircraft', group('aircraft'), s => s.id, s => s.count);
+  donut('#f14-outcomes', group('outcome'), s => s.id, s => s.count);
 }
 function renderHistory() {
   const totals = aggregateSummary?.totals;
   if (!totals) {
     $('#history-totals').replaceChildren(el('p', 'Aggregated history is unavailable.'));
-    for (const id of ['#history-games','#history-sources','#history-ui','#history-cohorts'])
+    for (const id of ['#history-games','#history-sources','#history-ui','#history-cohorts','#history-games-chart','#history-sources-chart','#history-ui-chart','#history-cohorts-chart'])
       $(id).replaceChildren(el('p', 'No aggregate data available.'));
     return;
   }
@@ -253,15 +341,46 @@ function renderHistory() {
     table('#history-games', ['Game','All-mode opens','Meaningful','Meaningful rate',
       'Browser IDs','Active time','Median active','Errors'], gameRows);
   }
+  // Ranking is the primary interface; raw cross-metric data is optional below.
+  // Preserve the selected metric when the date filters refresh the report.
+  const picker = $('#history-game-metric');
+  const drawGameComparison = () => {
+    const metric = picker.value;
+    const rows = popularGames || aggregateSummary.games || [];
+    const value = r => {
+      const detail = byGame.get(r.game) || {};
+      switch (metric) {
+        case 'browsers': return popularGames ? r.standalone_browsers : r.browsers;
+        case 'meaningful': return detail.meaningful ?? r.meaningful ?? 0;
+        case 'active': return detail.active_ms ?? r.active_ms ?? 0;
+        case 'together': return popularGames ? r.together_opens : 0;
+        case 'matches': return popularGames ? r.matches_started : 0;
+        case 'turns': return popularGames ? r.turns_played : 0;
+        default: return popularGames ? r.standalone_launches : r.launches;
+      }
+    };
+    rankedChart('#history-games-chart', rows, r => names[r.game] || r.game, value, 15, metric === 'active' ? duration : n => n.toLocaleString());
+  };
+  for (const option of picker.options) {
+    if (['together','matches','turns'].includes(option.value)) option.disabled = !popularGames;
+    if (option.value === 'launches') option.textContent = popularGames ? 'Standalone launches' : 'All-mode opens';
+    if (option.value === 'browsers') option.textContent = popularGames ? 'Standalone browsers' : 'Browser IDs';
+  }
+  if (!popularGames && ['together','matches','turns'].includes(picker.value)) picker.value = 'launches';
+  picker.onchange = drawGameComparison;
+  drawGameComparison();
+  donut('#history-sources-chart',aggregateSummary.sources || [],r=>r.source,r=>r.launches);
   table('#history-sources', ['Launch source','Launches','Meaningful','Active time'],
     (aggregateSummary.sources || []).map(r => [r.source,r.launches,r.meaningful,duration(r.active_ms)]));
   const actions = (aggregateSummary.ui_events || [])
     .filter(e => e.kind !== 'visit')
     .sort((a,b) => b.events-a.events || a.kind.localeCompare(b.kind))
     .slice(0,100);
+  rankedChart('#history-ui-chart', actions, e => [e.kind,e.action_name].filter(Boolean).join(' · '), e => e.events);
   table('#history-ui',['Event','Game','Surface','Action','Count','Browser IDs'], actions.map(e => [
     e.kind, names[e.game] || e.game || '—',e.surface || '—',e.action_name || '—',e.events,e.browsers
   ]));
+  stackedDays('#history-cohorts-chart',aggregateCohorts.filter(c=>c.d1_returned!=null),c=>c.first_day,c=>c.d1_returned,c=>Math.max(0,c.cohort-c.d1_returned),['D1 returned','Did not return D1']);
   table('#history-cohorts',['First visit','Browsers','D1 returns','D7 returns','Next school day','School-day returns'],
     aggregateCohorts.map(c => [c.first_day,c.cohort,
       c.d1_returned == null ? 'Not mature' : c.d1_returned + ' (' + percentage(c.d1_returned,c.cohort) + ')',
@@ -279,9 +398,9 @@ function render() {
   $('#totals').replaceChildren(...stats.map(([label, value]) => { const n = el('div'); n.className = 'analytics-stat'; n.append(el('strong', value), el('span', label)); return n; }));
   bars('#game-chart', report.games, r => names[r.id] || r.id);
   bars('#day-chart', report.days, r => r.id);
-  bars('#source-chart', report.sources, r => r.id + ' · ' + r.sessions + ' sessions');
-  bars('#device-chart', report.devices, r => r.id);
-  bars('#mode-chart', report.modes, r => r.id);
+  donut('#source-chart', report.sources, r => r.id, r => r.active, duration);
+  donut('#device-chart', report.devices, r => r.id, r => r.active, duration);
+  donut('#mode-chart', report.modes, r => r.id, r => r.active, duration);
   const maxHour = Math.max(1, ...report.hours.map(h => h.active));
   $('#hour-chart').replaceChildren(...report.hours.map(h => {
     const n = el('div'); n.className = 'analytics-hour';
@@ -291,6 +410,7 @@ function render() {
   renderPopularity();
   table('#games-table', gameColumns, gameRows(report.games));
   renderF14(rows);
+  rankedChart('#players-chart', report.players, p=>p.label, p=>p.sessions, 10);
   table('#players-table', ['Player','Sessions','Games','Days active','Active time','Avg / session','Last seen'], report.players.map(p => [
     action(p.label, () => { $('#person').value = p.id === 'Unidentified guests' ? 'guest' : p.id; page = 0; render(); }),
     p.sessions, p.games.size, p.days.size, duration(p.active), duration(p.active / p.sessions), dateTime(p.last)
@@ -304,6 +424,9 @@ function render() {
 function renderSessions() {
   $('#session-detail').hidden = true;
   const sessions = report.sessions.filter(s => !$('#errors-only').checked || s.errors);
+  const errorsByGame = new Map();
+  for (const session of sessions) if (session.errors) errorsByGame.set(session.game,(errorsByGame.get(session.game)||0)+session.errors);
+  rankedChart('#sessions-errors-chart',[...errorsByGame].map(([game,count])=>({game,count})),r=>names[r.game]||r.game,r=>r.count);
   const pages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE)); page = Math.min(page, pages - 1);
   $('#session-note').textContent = sessions.length + ' sessions · latest first · Detroit time';
   table('#sessions-table', ['Player','Game','First received','Active','Visible','Status','Result','Device','Errors','Detail'], sessions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(s => [
