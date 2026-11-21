@@ -1,0 +1,19 @@
+name: Investigate Rooftop Snipers Unity menu
+on:
+  push:
+    branches: [fix/rooftop-menu-cleanup]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'UnityPy>=1.20,<2'
+      - name: Inventory embedded Unity scenes and menu UI
+        run: python scripts/rooftop-menu-inspect.py
