@@ -125,9 +125,11 @@ HTML.write_text(new_html, encoding="utf8")
 test = TEST.read_text(encoding="utf8")
 if old_hash not in test and new_hash not in test:
     raise AssertionError("Unrecognized pinned data hash; review before updating")
-TEST.write_text(test.replace(old_hash, new_hash).replace(
-    "// Prevent accidentally swapping the actual game for the native remake or a",
-    "// The Unity scene disables promotional title controls (see scripts/rooftop-hide-menu-buttons.py).\n"
-    "  // Prevent accidentally swapping the actual game for the native remake or a"
-), encoding="utf8")
+if "The Unity scene disables promotional title controls" not in test:
+    test = test.replace(
+        "// Prevent accidentally swapping the actual game for the native remake or a",
+        "// The Unity scene disables promotional title controls (see scripts/rooftop-hide-menu-buttons.py).\n"
+        "  // Prevent accidentally swapping the actual game for the native remake or a",
+    )
+TEST.write_text(test.replace(old_hash, new_hash), encoding="utf8")
 print("Disabled controls:", sorted(set(modified)), flush=True)
