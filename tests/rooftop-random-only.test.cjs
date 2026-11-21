@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gunzipSync } = require('node:zlib');
+const { createHash } = require('node:crypto');
 
 const source = fs.readFileSync(path.join(__dirname, '../src/prototypes/rooftop-snipers/source/rooftop-snipers.code.js'), 'utf8');
 const methodStart = source.indexOf('  function lXk(b, e) {');
@@ -51,4 +53,16 @@ test('only eligible modifier categories can be selected as fallback', () => {
   const bounds = [1, 1, 3, 1, 1];
   for (let seed = 0; seed < 35; seed++)
     assert.deepEqual(runRound([0, 0, 0, 0, 0], bounds, seed).map(Boolean), [false, false, true, false, false]);
+});
+
+test('the published Unity game actually embeds the edited prototype program', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../src/games/content/rooftop-snipers.html'), 'utf8');
+  const tag = '<script id="unity-build" type="application/json">';
+  const begin = html.indexOf(tag) + tag.length;
+  assert.ok(begin >= tag.length);
+  const build = JSON.parse(html.slice(begin, html.indexOf('</script>', begin)));
+  const compiled = gunzipSync(Buffer.from(build.assets['rooftop-snipers.asm.code.unityweb'], 'base64'));
+  const prototype = Buffer.from(source.slice(source.indexOf('(function(global')), 'utf8');
+  const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+  assert.equal(hash(compiled), hash(prototype), 'the playable build must match the edited asm.js source exactly');
 });
