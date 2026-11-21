@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, join } from 'node:path';
-import { ORDER, META, EXTERNS, NEW_GAMES, FRESH_GAMES, UNSCORED_GAMES, PAYLOAD_SLUGS } from '../src/games/catalog.js';
+import { ORDER, META, EXTERNS, NEW_GAMES, FRESH_GAMES, UNSCORED_GAMES, PAYLOAD_SLUGS, ADMIN_PREVIEWS } from '../src/games/catalog.js';
 import { DISCOVERY, PREVIEWS } from '../src/games/discovery.js';
 import { LB_GAMES, HIGH_SCORE_GAMES } from '../src/hub/scores.js';
 import { CHALLENGES, installDailyAdapter } from '../src/daily.js';
@@ -25,6 +25,20 @@ check(!duplicates(NEW_GAMES).length && !duplicates(FRESH_GAMES).length, 'duplica
 check(FRESH_GAMES.length <= 4, 'NEW badge must have at most four games');
 check(!duplicates(LB_GAMES.map(game => game.id)).length, 'duplicate leaderboard score spec');
 check(!duplicates(challenges).length, 'duplicate daily challenge slug');
+
+// Admin previews must never appear in the public catalog or its discoverability data.
+for (const [slug, name] of Object.entries(ADMIN_PREVIEWS)) {
+  check(!idSet.has(slug), slug + ': admin preview leaked into public catalog');
+  check(!META[slug] && !DISCOVERY[slug] && !PREVIEWS[slug] &&
+    !FRESH_GAMES.includes(slug) && !UNSCORED_GAMES.includes(slug) && !rules[slug],
+    slug + ': admin preview leaked into public game metadata');
+  const file = join(root, 'src/games/content', slug + '.html');
+  check(existsSync(file), slug + ': missing admin preview document');
+  if (existsSync(file)) {
+    const html = readFileSync(file, 'utf8');
+    check(/<html[\\s>]/i.test(html) && /<\\/html>/i.test(html), slug + ': invalid admin preview HTML');
+  }
+}
 
 for (const [id, name] of ORDER) {
   check(/^[a-z0-9][a-z0-9-]*$/.test(id), id + ': invalid slug');
@@ -91,7 +105,7 @@ for (const [id, spec] of specs) {
 for (const id of challenges) check(!online.has(id), id + ': daily challenge needs a local game');
 const legacyFiles = (await import('node:fs')).readdirSync(join(root, 'src/games/content'))
   .filter(file => file.endsWith('.html')).map(file => file.slice(0, -5));
-for (const id of legacyFiles) check(PAYLOAD_SLUGS.includes(id), id + ': orphan HTML game (not registered)');
+for (const id of legacyFiles) check(PAYLOAD_SLUGS.includes(id) || Object.hasOwn(ADMIN_PREVIEWS, id), id + ': orphan HTML game (not registered)');
 
 if (errors.length) {
   console.error('Game contract failed (' + errors.length + '):\n' + errors.map(e => '  - ' + e).join('\n'));
