@@ -302417,21 +302417,33 @@
       f = b + 116 | 0; e = 0; while (1) {
         g = c [f >> 2] | 0; if ((e | 0) >=(c [g + 12 >> 2] | 0)) break a; q = o3i(0, 0, c [g + 16 +(e << 2) >> 2] | 0, 0) | 0; Frg(o, q, c [382959] | 0); e = e + 1 | 0
       }
-    }  while (0); if ((o3i(0, 1, 4, 0) | 0) != 3) {
-      e = c [382831] | 0; q = e + 177 | 0; if (((d [q >> 0] | d [q + 1 >> 0] << 8) & 256) != 0 ?(c [e + 96 >> 2] | 0) == 0 : 0) {
-        Skl(e); e = c [382831] | 0
-      }
-      if (a [c [e + 80 >> 2] >> 0] | 0) h = 28
-    }  else h = 28; b : do if ((h | 0) == 28) {
-      e = c [382832] | 0; q = e + 177 | 0; if (((d [q >> 0] | d [q + 1 >> 0] << 8) & 256) != 0 ?(c [e + 96 >> 2] | 0) == 0 : 0) {
-        Skl(e); e = c [382832] | 0
-      }
-      if (!(a [(c [e + 80 >> 2] | 0) + 8 >> 0] | 0)) {
-        e = 0; while (1) {
-          if ((e | 0) >=(DVi(o, c [383386] | 0) | 0)) break b; isg(o, e, 0, c [383419] | 0); e = e + 1 | 0
+    }  while (0); // Always use a randomized round: original code sometimes zeroed the
+    // entire randomizer array. Check for a nonzero rolled modifier.
+    e = 0; h = 0;
+    while (1) {
+      if ((e | 0) >= (DVi(o, c [383386] | 0) | 0)) break;
+      if ((hsg(o, e, c [383420] | 0) | 0) != 0) { h = 1; break }
+      e = e + 1 | 0
+    }
+    if ((h | 0) == 0) {
+      // All five categories can roll zero. Pick an eligible category
+      // uniformly by reservoir sampling and reroll it to a nonzero value.
+      e = 0; q = -1; g = 0;
+      while (1) {
+        if ((e | 0) >= (DVi(o, c [383386] | 0) | 0)) break;
+        f = c [(c [b + 116 >> 2] | 0) + 16 + (e << 2) >> 2] | 0;
+        if ((f | 0) > 1) {
+          g = g + 1 | 0;
+          if ((o3i(0, 0, g | 0, 0) | 0) == 0) q = e
         }
+        e = e + 1 | 0
       }
-    }  while (0); e = c [381728] | 0; q = e + 177 | 0; if (((d [q >> 0] | d [q + 1 >> 0] << 8) & 256) != 0 ?(c [e + 96 >> 2] | 0) == 0 : 0) {
+      if ((q | 0) >= 0) {
+        f = c [(c [b + 116 >> 2] | 0) + 16 + (q << 2) >> 2] | 0;
+        isg(o, q | 0, o3i(0, 1, f | 0, 0) | 0, c [383419] | 0)
+      }
+    }
+    e = c [381728] | 0; q = e + 177 | 0; if (((d [q >> 0] | d [q + 1 >> 0] << 8) & 256) != 0 ?(c [e + 96 >> 2] | 0) == 0 : 0) {
       Skl(e); e = c [381728] | 0
     }
     h = c [c [e + 80 >> 2] >> 2] | 0; e = 0; while (1) {
