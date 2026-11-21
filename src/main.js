@@ -1039,7 +1039,8 @@ addEventListener('message', event => {
     case 'bored:roulette':
       // Shotgun Roulette's bets, payouts and board. The sandboxed frame only asks;
       // src/hub/roulette.js enforces every limit, and only for a verified admin.
-      if (activeSlug === 'shotgun-roulette' && Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) {
+      if (event.source === gameFrame.contentWindow && activeSlug === 'shotgun-roulette' &&
+          Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) {
         const frame = event.source, id = event.data.id;
         roulette(event.data).then(reply => {
           if (gameFrame.contentWindow === frame) frame.postMessage({ type: 'bored:roulette-result', id, ...reply }, '*');
