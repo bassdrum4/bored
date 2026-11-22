@@ -1,0 +1,99 @@
+/* A quiet invitation immediately before the full catalog. No homepage takeover. */
+#game-finder {
+  margin: 22px 0 0;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--red);
+  background: var(--surface);
+}
+#game-finder[hidden] { display: none; }
+#game-finder .eyebrow { margin-bottom: 3px; }
+#game-finder .game-finder-copy { font-size: 14px; line-height: 1.5; color: var(--dim); }
+#game-finder .game-finder-copy strong { font-weight: 400; color: var(--ink); font-family: var(--display); font-size: 18px; }
+#game-finder-open { flex: none; white-space: nowrap; }
+
+#game-finder-dialog {
+  width: min(660px, calc(100vw - 28px));
+  max-width: min(660px, calc(100vw - 28px));
+  max-height: min(92dvh, 820px);
+  overflow: auto;
+  padding: 24px;
+  margin: auto;
+}
+#game-finder-dialog .finder-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  border-bottom: 1px solid var(--rule); padding-bottom: 15px; margin-bottom: 16px;
+}
+#game-finder-dialog .finder-head h2 {
+  font: 400 29px/1.2 var(--display); margin: 4px 0 0;
+}
+#game-finder-close, #game-finder-dialog .finder-back {
+  background: transparent; color: var(--dim); border: 1px solid var(--rule);
+  padding: 8px 10px; font: 11px/1.4 var(--mono); cursor: pointer;
+}
+#game-finder-close:hover, #game-finder-dialog .finder-back:hover {
+  border-color: var(--ink); color: var(--ink);
+}
+#game-finder-progress {
+  font: 10px/1.6 var(--mono); letter-spacing: .06em; color: var(--red);
+  margin-bottom: 11px;
+}
+#game-finder-dialog .finder-question {
+  font: 400 clamp(23px, 4vw, 30px)/1.22 var(--display);
+  margin-bottom: 18px;
+}
+#game-finder-dialog .finder-options { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+#game-finder-dialog .finder-option {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  min-height: 76px; padding: 13px 14px; background: var(--surface);
+  color: var(--ink); border: 1px solid var(--rule);
+  font: 15px/1.35 Georgia, 'Times New Roman', serif; cursor: pointer;
+}
+#game-finder-dialog .finder-option:hover, #game-finder-dialog .finder-option:focus-visible {
+  border-color: var(--ink); background: var(--field-wash);
+}
+#game-finder-dialog .finder-letter {
+  flex: none; display: grid; place-items: center; height: 28px; width: 28px;
+  border: 1px solid var(--rule); color: var(--dim); font: 11px var(--mono);
+}
+#game-finder-dialog .finder-controls {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap; margin-top: 18px;
+}
+#game-finder-dialog .finder-footnote {
+  font: 10px/1.5 var(--mono); color: var(--dim); margin-left: auto;
+}
+#game-finder-dialog .finder-explainer { font-size: 13px; color: var(--dim); margin: -8px 0 15px; }
+#game-finder-dialog .finder-results { display: grid; gap: 10px; }
+#game-finder-dialog .finder-result {
+  display: grid; grid-template-columns: 125px minmax(0, 1fr) auto;
+  align-items: center; gap: 13px; padding: 10px;
+  border: 1px solid var(--rule); background: var(--surface);
+}
+#game-finder-dialog .finder-result-art {
+  width: 125px; aspect-ratio: 3/2; background: var(--field); overflow: hidden;
+}
+#game-finder-dialog .finder-result-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+#game-finder-dialog .finder-result-info { min-width: 0; }
+#game-finder-dialog .finder-result-info h4 {
+  font: 400 19px/1.25 var(--display); margin: 3px 0 5px;
+}
+#game-finder-dialog .finder-why { font-size: 12px; line-height: 1.4; color: var(--dim); }
+#game-finder-dialog .finder-play { flex: none; white-space: nowrap; padding: 10px 12px; }
+#game-finder-dialog button:focus-visible, #game-finder-open:focus-visible {
+  outline: 2px solid var(--red); outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  #game-finder { align-items: stretch; padding: 13px; flex-direction: column; gap: 10px; }
+  #game-finder-open { align-self: flex-start; }
+  #game-finder-dialog { padding: 17px; max-height: calc(100dvh - 24px); }
+  #game-finder-dialog .finder-options { grid-template-columns: 1fr; gap: 7px; }
+  #game-finder-dialog .finder-option { min-height: 58px; }
+  #game-finder-dialog .finder-result { grid-template-columns: 88px minmax(0, 1fr); gap: 10px; }
+  #game-finder-dialog .finder-result-art { width: 88px; }
+  #game-finder-dialog .finder-play { grid-column: 2; justify-self: start; }
+}
