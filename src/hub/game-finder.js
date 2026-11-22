@@ -47,6 +47,8 @@ const GROUPS = Object.fromEntries(Object.entries({
 }).map(([key, slugs]) => [key, new Set(slugs.split(' '))]));
 
 const ONLINE_MULTIPLAYER = new Set(['imposter', 'f-14']);
+// Some local-duel games offer a CPU opponent, others require a second person.
+const SOLO_CPU_DUELS = new Set(['getaway-shootout', 'rooftop-snipers', 'basket-random', 'chess', 'connect-four']);
 const NOT_A_GAME = new Set(['klang']);
 const reasonCopy = {
   score: 'You can keep chasing a better score.',
@@ -67,8 +69,12 @@ function canPlay(slug, social) {
   const players = DISCOVERY[slug]?.players || '';
   if (social === 'online') return ONLINE_MULTIPLAYER.has(slug);
   if (social === 'local') return /2 local/.test(players) || slug === 'getaway-shootout';
-  // Among Us requires another human. Online F-14 can also be flown alone.
-  if (social === 'solo') return slug !== 'imposter';
+  // Do not offer a two-person-only game to someone playing alone.
+  // Among Us requires other humans; F-14 can also be flown solo.
+  if (social === 'solo') {
+    if (slug === 'imposter') return false;
+    if (players === '2 local' && !SOLO_CPU_DUELS.has(slug)) return false;
+  }
   return true;
 }
 
@@ -168,7 +174,7 @@ export function createGameFinder({ openGame, track = () => {} }) {
         answers.length = step + 1;
         step++;
         if (step === FINDER_QUESTIONS.length) {
-          track('library_action', { surface: 'library', action: 'click', step: 6, results: 3 });
+          track('library_action', { surface: 'library', action: 'click', step: 6, results: recommendGames(answers).length });
           drawResults();
         } else drawQuestion();
       });
@@ -185,7 +191,7 @@ export function createGameFinder({ openGame, track = () => {} }) {
     const results = recommendGames(answers, { exclude: excluded });
     progress.textContent = 'YOUR RESULTS';
     body.replaceChildren(el('h3', 'finder-question', 'We found your kind of trouble.'));
-    body.append(el('p', 'finder-explainer', 'Try one of these. The third is a bit of a wildcard.'));
+    body.append(el('p', 'finder-explainer', results.length < 3 ? 'These are the multiplayer options that match your answers.' : 'Try one of these. The third is a bit of a wildcard.'));
     const list = el('div', 'finder-results');
     results.forEach((game, index) => {
       const item = el('article', 'finder-result');
