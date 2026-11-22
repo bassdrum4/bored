@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 775,
+  "count": 777,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1388294","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: execute Getaway Shootout source recovery on GitHub Actions"},
+  {"sha":"93fe96b","date":"2026-11-21","author":"Daniel Lowe","subject":"tools: inspect Getaway Shootout Unity scenes and UI objects"},
   {"sha":"763f140","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: adapt Rooftop Snipers Unity decompiler to Getaway Shootout"},
   {"sha":"efe1b9f","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed Getaway Shootout import workflow"},
   {"sha":"df8434e","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: self-host verified Getaway Shootout Unity build"},
