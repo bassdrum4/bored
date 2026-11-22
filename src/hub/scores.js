@@ -522,6 +522,10 @@ let careerRetryAfter = 0;
 export function queueTrackboundCareer(records) {
   const user = getSession()?.user?.id;
   if (!backendReady() || !user || !Array.isArray(records)) return;
+  // The hub's player storage must match this account before local campaign
+  // records can be attributed to it on the public leaderboard.
+  try { if (localStorage.getItem('bored.player.active') !== 'user:' + user) return; }
+  catch { return; }
   const clean = records.filter(record => record && /^[a-z0-9-]{2,30}$/.test(record.track) &&
     Number.isInteger(record.ms) && record.ms > 0 && record.ms <= 1200000 &&
     typeof record.layout === 'string' && record.layout.length > 0 && record.layout.length <= 400);
