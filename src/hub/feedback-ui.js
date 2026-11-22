@@ -1,14 +1,20 @@
 import { backendReady, getSession } from './backend.js';
 import { sendFeedback, feedbackErrorMessage } from './feedback.js';
-export function createFeedbackUI() {
+export function createFeedbackUI({ onSent = () => {} } = {}) {
 const $ = selector => document.querySelector(selector);
 /* ── Feedback ─────────────────────────────────────────────────────────────── */
 
 let feedbackBusy = false;
+let feedbackGame = null;
+const generalBlurb = $('#feedback-blurb').textContent;
 
-function openFeedbackDialog() {
+function openFeedbackDialog(game = null) {
   if (!backendReady()) return;
   const dialog = $('#feedback-dialog');
+  feedbackGame = game?.slug || null;
+  $('#feedback-blurb').textContent = feedbackGame
+    ? `Feedback about ${game.title || feedbackGame}. Found a bug or have an idea? Tell me.`
+    : generalBlurb;
   $('#feedback-status').textContent = '';
   $('#feedback-email').value = getSession()?.user?.email || '';
   if (!dialog.open) {
@@ -22,6 +28,7 @@ function closeFeedbackDialog() {
   const dialog = $('#feedback-dialog');
   if (dialog.close) dialog.close();
   else dialog.removeAttribute('open');
+  feedbackGame = null;
 }
 
 async function submitFeedback(event) {
@@ -36,13 +43,17 @@ async function submitFeedback(event) {
   $('#feedback-submit').disabled = true;
   status.textContent = 'Sending…';
   try {
-    await sendFeedback({ message, email });
+    const submittedGame = feedbackGame;
+    await sendFeedback({ message, email, game: submittedGame });
     $('#feedback-text').value = '';
     closeFeedbackDialog();
-    const button = $('#feedback-open');
-    button.textContent = 'Got it. Thanks.';
-    button.disabled = true;
-    setTimeout(() => { button.textContent = 'Send feedback'; button.disabled = false; }, 4000);
+    if (submittedGame) onSent(submittedGame);
+    else {
+      const button = $('#feedback-open');
+      button.textContent = 'Got it. Thanks.';
+      button.disabled = true;
+      setTimeout(() => { button.textContent = 'Send feedback'; button.disabled = false; }, 4000);
+    }
   } catch (err) {
     status.textContent = feedbackErrorMessage(err);
   } finally {
@@ -52,14 +63,15 @@ async function submitFeedback(event) {
 }
 
 function initFeedback() {
-  $('#feedback-open').onclick = openFeedbackDialog;
+  $('#feedback-open').onclick = () => openFeedbackDialog();
   $('#feedback-cancel').onclick = closeFeedbackDialog;
   $('#feedback-form').addEventListener('submit', submitFeedback);
+  $('#feedback-dialog').addEventListener('close', () => { feedbackGame = null; });
   $('#feedback-dialog').addEventListener('click', event => {
     if (event.target === $('#feedback-dialog')) closeFeedbackDialog();
   });
 }
 
 
-return { initFeedback };
+return { initFeedback, openFeedbackDialog };
 }

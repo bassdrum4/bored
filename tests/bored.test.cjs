@@ -481,6 +481,52 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#player').hidden);
   });
 
+
+  await t.test('in-game feedback opens a dialog, tags the game, and keeps the game running', async () => {
+    await open('2048');
+    assert.equal(await page.$('#resume'), null, 'the old Resume menu action is gone');
+    await page.click('#menu-toggle');
+    await page.click('#game-feedback');
+    assert.equal(await page.$eval('#player-actions', el => el.hidden), true, 'opening feedback closes the waffle menu');
+    assert.equal(await page.$eval('#feedback-dialog', el => el.open), true, 'a modal appears above the game');
+    assert.match(await text(page, '#feedback-blurb'), /Feedback about 2048/);
+    await page.click('#feedback-cancel');
+    assert.equal(await page.$eval('#feedback-dialog', el => el.open), false);
+    assert.equal(await page.$eval('#player', el => el.hidden), false, 'cancel leaves the game open');
+
+    // Stub only the feedback POST: this verifies the submitted row without sending real feedback.
+    await page.evaluate(() => {
+      const fetchBeforeFeedbackTest = window.fetch;
+      window.__feedbackPosts = [];
+      window.fetch = (input, options) => {
+        if (String(input).includes('/rest/v1/feedback_entries') && options?.method === 'POST') {
+          window.__feedbackPosts.push(JSON.parse(options.body));
+          return Promise.resolve(new Response('', { status: 201 }));
+        }
+        return fetchBeforeFeedbackTest(input, options);
+      };
+      window.__restoreFeedbackFetch = () => { window.fetch = fetchBeforeFeedbackTest; };
+    });
+    try {
+      await page.click('#menu-toggle');
+      await page.click('#game-feedback');
+      await page.type('#feedback-text', 'A tile gets stuck after I move.');
+      await page.click('#feedback-submit');
+      await page.waitForFunction(() => !document.querySelector('#feedback-dialog').open);
+      const payload = await page.evaluate(() => window.__feedbackPosts.at(-1));
+      assert.equal(payload.kind, 'note');
+      assert.equal(payload.game, '2048', 'the analytics feedback queue knows which game was open');
+      assert.equal(payload.body, 'A tile gets stuck after I move.');
+      assert.equal(await page.$eval('#player', el => el.hidden), false);
+    } finally {
+      await page.evaluate(() => window.__restoreFeedbackFetch());
+    }
+    await close();
+    await page.click('#feedback-open');
+    assert.match(await text(page, '#feedback-blurb'), /Something broken\?/, 'general hub feedback is still general');
+    await page.click('#feedback-cancel');
+  });
+
   await t.test('overall ranking groups scores by account, respects lower-is-better and ties', async () => {
     const rankings = await page.evaluate(() => accountStandings([
       { game: '2048', handle: 'Ada', value: 300 },
@@ -509,7 +555,7 @@ test('browser regressions', async t => {
     await openTitle('tetris', 'Tetris');
     await page.click('#menu-toggle');
     assert.equal(await page.$('#fullscreen'), null);
-    await page.click('#resume');
+    await page.keyboard.press('Escape');
     await page.keyboard.down('Shift');
     await page.keyboard.press('F');
     await page.keyboard.up('Shift');
@@ -1746,21 +1792,33 @@ test('browser regressions', async t => {
     const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
-      // A sandboxed game (SANDBOXED_GAMES) has an opaque origin, so its window
-      // cannot be read from here by design; it is covered by its own test.
-      if (await page.$eval('#frame', frame => frame.hasAttribute('sandbox'))) { await close(); continue; }
-      // A populated iframe can still be the loading stand-in. Wait for the
-      // current document's title and seed, not a fixed delay or live metrics
-      // (some snapshot metrics are initialized only when a run starts).
-      await page.waitForFunction(() => {
-        const frame = document.querySelector('#frame');
-        const expected = new DOMParser().parseFromString(frame.srcdoc, 'text/html').title;
-        return frame.contentDocument?.title === expected && Number.isFinite(frame.contentWindow.__boredSeed?.seed);
-      });
-      const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
-      assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
-      seeds.add(seed.date + ':' + seed.seed);
-      await close();
+      try {
+        // A sandboxed game (SANDBOXED_GAMES) has an opaque origin, so its window
+        // cannot be read from here by design; it is covered by its own test.
+        if (slug === 'getaway-shootout') {
+          // Unity must use a direct document URL, never srcdoc; it has no injected seed.
+          assert.match(await page.$eval('#frame', frame => frame.src), /\/games\/content\/getaway-shootout\.html/);
+          continue;
+        }
+        if (await page.$eval('#frame', frame => frame.hasAttribute('sandbox'))) continue;
+        // A populated iframe can still be the loading stand-in. Wait for the
+        // current document's title and seed, not a fixed delay or live metrics
+        // (some snapshot metrics are initialized only when a run starts).
+        try {
+          await page.waitForFunction(() => {
+            const frame = document.querySelector('#frame');
+            const expected = new DOMParser().parseFromString(frame.srcdoc, 'text/html').title;
+            return frame.contentDocument?.title === expected && Number.isFinite(frame.contentWindow.__boredSeed?.seed);
+          });
+        } catch (error) {
+          throw new Error(slug + ' did not reach a seeded game document: ' + error.message);
+        }
+        const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
+        assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
+        seeds.add(seed.date + ':' + seed.seed);
+      } finally {
+        await close();
+      }
     }
     assert.equal(seeds.size, 1, 'every game receives the same daily seed');
     assert.deepEqual(errors, [], 'no uncaught JavaScript errors');
@@ -1770,12 +1828,19 @@ test('browser regressions', async t => {
     await page.setViewport({ width: 320, height: 740, isMobile: true, hasTouch: true });
     await filter('New');
     await noOverflow();
-    await page.click('#random');
+    await page.$eval('#random', button => button.click());
     await page.waitForFunction(() => !document.querySelector('#player').hidden);
     assert.ok(await page.evaluate(() => FRESH_GAMES.includes(current)));
     await close();
-    await page.evaluate(day => { window.originalDailyDate ||= dailyDate; dailyDate = () => day; renderDaily(); }, dateFor('memory'));
-    await page.click('#daily-play');
+    // Open the daily challenge directly: this test measures the narrow layout,
+    // while the Daily Play button is exercised by the dedicated interaction tests.
+    await page.evaluate(day => {
+      window.originalDailyDate ||= dailyDate;
+      dailyDate = () => day;
+      renderDaily();
+      const challenge = dailyChallenge(day);
+      openGame(challenge.slug, challenge);
+    }, dateFor('memory'));
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelectorAll('.memory-card').length === 16);
     await noOverflow();
     const progress = await (await page.$('#challenge-progress')).boundingBox();
