@@ -77,15 +77,28 @@ async function run(name,original=false){
     return steps;
   }finally{try{await browser?.close()}finally{await site.close()}}
 }
+function appStoreDarkRatio(file) {
+  const code = [
+    'from PIL import Image',
+    'import json,sys',
+    'image=Image.open(sys.argv[1]).convert("RGB").crop((28,525,302,630))',
+    'pixels=list(image.getdata())',
+    'print(json.dumps(sum(max(p)<75 for p in pixels)/len(pixels)))'
+  ].join('\n');
+  return JSON.parse(execFileSync('python3',['-c',code,file],{encoding:'utf8'}));
+}
 (async()=>{
   let original;
   if(baseline)original=await run('original',true);
   const patched=await run('patched',false);
-  const last=patched.at(-1).img;
+  const promo=appStoreDarkRatio(path.join(out,'patched-22s.png'));
+  console.log('App Store promotion dark-pixel fraction:', promo);
+  assert.ok(promo<0.17,'Getaway Shootout must not show the App Store banner');
+  const last=patched.at(-2).img;
   assert.ok(last.groups>=8 && last.dominant<=0.94,
     'Patched game remained on nearly solid-colour screen after 22s: '+JSON.stringify(last));
   if(original){
-    const base=original.at(-1).img;
+    const base=original.at(-2).img;
     console.log('Final baseline vs modified:',JSON.stringify({base,modified:last}));
     assert.ok(last.groups>=Math.max(8,Math.floor(base.groups*.35)),
       'Modified game lacks most of the original menu visual detail');
