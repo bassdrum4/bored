@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const puppeteer = require('puppeteer-core');
 const {serve} = require('./serve.cjs');
+const {execFileSync} = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 test('diagnose the actual Getaway Shootout Bored hash route and iframe startup', {timeout:145000},async t=>{
@@ -51,6 +52,27 @@ test('diagnose the actual Getaway Shootout Bored hash route and iframe startup',
    await page.screenshot({path:path.join(screenshots,name+'.png')});
    console.log(name+' DIAGNOSTICS '+JSON.stringify(diag));
  }
+ const finalShot = path.join(screenshots,'settled.png');
+ const stats = JSON.parse(execFileSync('python3',['-c',[
+   'import json,sys',
+   'from PIL import Image',
+   'from collections import Counter',
+   'im=Image.open(sys.argv[1]).convert("RGB").resize((100,75))',
+   'colors=Counter(tuple(v//24 for v in p) for p in im.getdata())',
+   'print(json.dumps({"groups":len(colors),"topFraction":colors.most_common(1)[0][1]/7500}))'
+ ].join('\n'),finalShot],{encoding:'utf8'}));
+ console.log('FINAL SCREEN PIXELS '+JSON.stringify(stats));
+ assert.ok(stats.groups>30 && stats.topFraction<0.78,
+   'Getaway Shootout still displays a mostly uniform blue screen: '+JSON.stringify(stats));
+ const state=await page.evaluate(()=>{
+   const f=document.querySelector('#frame');
+   return {source:f.getAttribute('src'),srcdoc:f.getAttribute('srcdoc'),
+     loaded:f.contentWindow.__boredSnapshot?.().loaded===true};
+ });
+ assert.ok(state.source?.includes('/games/content/getaway-shootout.html'),
+   'Unity game must load as its own iframe document');
+ assert.equal(state.srcdoc,null,'Unity game must not run in srcdoc');
+ assert.ok(state.loaded,'Unity runtime must load in the hub');
  console.log('BROWSER LOGS '+JSON.stringify(messages.slice(-25)));
  console.log('FAILED REQUESTS '+JSON.stringify(badRequests.slice(-25)));
  assert.ok(await page.evaluate(()=>!document.querySelector('#player').hidden),'player should be visible');
