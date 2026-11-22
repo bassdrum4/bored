@@ -6,10 +6,10 @@
 <title>Getaway Shootout</title>
 <meta name="theme-color" content="#25b8e8">
 <link rel="icon" href="data:,">
-<!-- New Eich Games' Getaway Shootout. Bored's plain shell intentionally omits
-     the third-party portal's advertising, branding script and external links.
-     Game data is still the original Unity build, loaded from a pinned CDN mirror.
-     The Unity runtime must initialize before the actual game menu appears. -->
+<!-- Getaway Shootout by New Eich Games. Bored omits the third-party portal's
+     advertising, branding script and links. The original Unity build is served
+     from Bored itself after the pinned asset import; the pinned CDN is a
+     development fallback. Unity startup is necessary before the game menu. -->
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#202e35}
@@ -32,7 +32,6 @@
     padding:18px;background:#202e35;color:#fff;text-align:center;font-size:14px}
   #error.visible{display:flex}
 </style>
-<script src="https://cdn.jsdelivr.net/gh/mamayaya1/game@f3a882424a8f28d07bdf456b251d889725c4c1e4/projects/getaway-shootout/Build/UnityLoader.js" crossorigin="anonymous"></script>
 </head>
 <body>
 <div id="gameContainer" role="application" aria-label="Getaway Shootout game"></div>
@@ -44,7 +43,10 @@
   const stage = document.getElementById('gameContainer');
   const status = document.getElementById('status');
   const error = document.getElementById('error');
-  const base = 'https://cdn.jsdelivr.net/gh/mamayaya1/game@f3a882424a8f28d07bdf456b251d889725c4c1e4/projects/getaway-shootout';
+  const mirror = 'https://cdn.jsdelivr.net/gh/mamayaya1/game@f3a882424a8f28d07bdf456b251d889725c4c1e4/projects/getaway-shootout';
+  const standalone = (() => { try { return new URL(document.baseURI).pathname.endsWith('/getaway-shootout.html'); } catch { return false; } })();
+  const local = new URL(standalone ? 'getaway-shootout/' : 'games/content/getaway-shootout/', document.baseURI).href.replace(/\/$/, '');
+  let base = mirror;
   let started = false, loaded = false;
 
   // The mirrored portal's script is NOT loaded. Prevent in-game calls to
@@ -68,12 +70,34 @@
   };
 
   function fail() { status.hidden = true; error.classList.add('visible'); }
-  function boot() {
+  function loadRuntime(url) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  async function boot() {
     if (started) return;
     started = true;
-    if (!window.UnityLoader || typeof UnityLoader.instantiate !== 'function') {
-      fail(); return;
+    try {
+      const localCheck = await fetch(local + '/Build/UnityLoader.js', {method:'HEAD'});
+      if (localCheck.ok) base = local;
+    } catch (error) { /* local assets are optional in source checkouts */ }
+    try { await loadRuntime(base + '/Build/UnityLoader.js'); }
+    catch (error) {
+      if (base === mirror) { fail(); return; }
+      base = mirror;
+      try { await loadRuntime(base + '/Build/UnityLoader.js'); }
+      catch (fallbackError) { fail(); return; }
     }
+    config.dataUrl = base + '/unity/GetawayShootout.data.unityweb';
+    config.asmCodeUrl = base + '/unity/GetawayShootout.asm.code.unityweb';
+    config.asmMemoryUrl = base + '/unity/GetawayShootout.asm.memory.unityweb';
+    config.asmFrameworkUrl = base + '/unity/GetawayShootout.asm.framework.unityweb';
+    if (!window.UnityLoader || typeof UnityLoader.instantiate !== 'function') { fail(); return; }
     try {
       const url = URL.createObjectURL(new Blob([JSON.stringify(config)], {type:'application/json'}));
       UnityLoader.instantiate('gameContainer', url, {
