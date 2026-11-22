@@ -149,6 +149,15 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 .lb-line-versus{grid-column:1/-1;grid-row:2;font:10px/1.8 var(--mono);color:var(--dim)}
 /* Their number stays dark inside the quiet line so it can be read and compared. */
 .lb-line-versus b{color:var(--ink);font-weight:400}
+/* Trackbound's second metric remains quiet unless someone opens a profile. */
+#lb-list .lb-breakdown .lb-career-pace{grid-column:1/-1;grid-row:3;
+  color:var(--dim);font:10px/1.7 var(--mono)}
+#lb-list .lb-breakdown .lb-pace-details{grid-column:1/-1;grid-row:4;min-width:0;
+  font:10px/1.6 var(--mono);color:var(--dim)}
+#lb-list .lb-pace-details summary{cursor:pointer;width:max-content;max-width:100%}
+#lb-list .lb-pace-list{list-style:none;margin:5px 0 0;padding:0}
+#lb-list .lb-pace-details .lb-pace-list li{display:block;padding:3px 0 3px 10px;
+  border:0;border-left:1px solid var(--rule);font:10px/1.6 var(--mono)}
 .lb-play{grid-column:3;grid-row:1;justify-self:end;background:none;border:1px solid var(--rule);
   color:var(--dim);font:10px var(--mono);padding:2px 8px;cursor:pointer;white-space:nowrap}
 .lb-play:hover,.lb-play:focus-visible{border-color:var(--ink);color:var(--ink)}
