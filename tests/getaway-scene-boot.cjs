@@ -62,6 +62,14 @@ async function run(name,original=false){
       }));
       steps.push({seconds,img,diagnostics});
     }
+    // Go beyond loading: click the large original Play arrow in the 960×650 title
+    // and confirm the next screen is not the reported solid-blue dead end.
+    await page.mouse.click(475, 558);
+    await new Promise(resolve => setTimeout(resolve, 7000));
+    const afterPlay = path.join(out, name + '-after-play.png');
+    await page.screenshot({path:afterPlay});
+    const afterPlayStats = imageStats(afterPlay);
+    steps.push({seconds:'after-play',img:afterPlayStats});
     console.log(JSON.stringify({name,steps,errors,msgs:msgs.slice(-10),remote},null,2));
     assert.deepEqual(errors,[],name+' page errors');
     assert.ok(remote.every(url => /^https:\/\/(?:config\.uca\.cloud\.unity3d\.com|cdp\.cloud\.unity3d\.com)\//.test(url)),
