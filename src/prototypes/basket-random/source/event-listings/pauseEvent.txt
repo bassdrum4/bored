@@ -1,0 +1,49 @@
+VARIABLE pause = 0
+EVENT #1 [0,false,null,825090527993167]
+  IF  Touch#175([[4,20]])
+  DO  Audio#73([[2,["buttonx",false]],[3,0],[0,[69]],[1,[132]]])
+  DO  Browser#176([[1,[257]],[1,[258]]])
+EVENT #2 [0,false,null,104936265089412]
+  IF  Touch#175([[4,16]])
+  IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+  IF  pause#177([])
+  IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+  DO  System#47([[11,"pause"],[7,[5]]])
+  DO  System#134([[5,[133]],[3,1]])
+  DO  System#129([[5,[127]],[0,[259]]])
+  DO  System#72([[0,[4]]])
+  DO  System#137([[4,48],[5,[134]],[0,[144]],[0,[192]]])
+  DO  System#137([[4,48],[5,[134]],[0,[260]],[0,[192]]])
+  DO  pauseButtons#102([[0,[16]]])
+  DO  System#137([[4,48],[5,[134]],[0,[143]],[0,[192]]])
+  DO  pauseButtons#102([[0,[5]]])
+  DO  Audio#178([[3,0]])
+EVENT #3 [0,false,null,380752203964988]
+  IF  Touch#179([])
+  IF  Touch#105([[4,48]])
+  IF  pauseButtons#25([[10,0],[8,0],[7,[4]]])
+  EVENT #4 [0,false,null,421532680566161]
+    IF  pauseButtons#180([[8,0],[0,[4]]])
+    DO  GameDistributionSDK#181([])
+    DO  Audio#178([[3,1]])
+    DO  System#134([[5,[133]],[3,0]])
+    DO  System#47([[11,"pause"],[7,[4]]])
+    DO  TPG#71([[3,1]])
+    EVENT #5 [0,false,null,907273234062272]
+      IF  System#182([[4,48]])
+      DO  pauseButtons#107([])
+      DO  System#72([[0,[5]]])
+  EVENT #6 [0,false,null,512289786308736]
+    IF  System#40([])
+    IF  pauseButtons#180([[8,0],[0,[5]]])
+    DO  GameDistributionSDK#181([])
+    DO  Audio#178([[3,1]])
+    DO  Audio#183([])
+    DO  System#184([])
+    DO  System#75([])
+  EVENT #7 [0,false,null,207121579631934]
+    IF  System#40([])
+    IF  pauseButtons#180([[8,0],[0,[16]]])
+    DO  Browser#176([[1,[257]],[1,[258]]])
+  EVENT #8 [0,false,null,883798968650037]
+    DO  Audio#73([[2,["buttonx",false]],[3,0],[0,[69]],[1,[132]]])

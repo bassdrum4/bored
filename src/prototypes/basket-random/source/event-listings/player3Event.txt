@@ -1,0 +1,190 @@
+GROUP [true,"P3"]
+  IF  System#21([[1,[42]]])
+  EVENT #2 [0,false,null,750940904585247]
+    IF  System#22([])
+    DO  body3.Physics#23([[7,[1]],[4,29],[0,[2]],[0,[3]]])
+    DO  p3Collision.Pin#24([[4,30],[3,0]])
+    EVENT #3 [0,false,null,406554981337087]
+      IF  playerLine#25([[10,0],[8,0],[7,[43]]])
+      DO  playerLine.Pin#24([[4,30],[3,0]])
+    EVENT #4 [0,false,null,230304047653791]
+      IF  headLine#25([[10,0],[8,0],[7,[43]]])
+      DO  headLine.Pin#24([[4,29],[3,0]])
+  EVENT #5 [0,false,null,495465135205289]
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    EVENT #6 [0,true,null,162831961513535]
+      IF  body3#27([[4,8]])
+      EVENT #7 [0,false,null,391179812726916]
+        IF  System#28([])
+        EVENT #8 [0,false,null,642074166115191]
+          IF  pause#25([[10,0],[8,0],[7,[5]]])
+          DO  body3.Physics#29([[0,[6,[0,30,"Physics",30,false]]],[0,[4]],[7,[4]]])
+        EVENT #9 [0,false,null,452498062896228]
+          IF  body3#31([[8,5],[0,[7,[1,30,32,false]]]])
+          DO  body3#33([[10,2],[7,[44,[4,34],[3,"angularMinRND"],[3,"angularMaxRND"],[2,30,false,1]]]])
+        EVENT #10 [0,false,null,624334190989661]
+          IF  body3#31([[8,2],[0,[7,[1,30,32,false]]]])
+          DO  body3#33([[10,2],[7,[45,[4,34],[3,"angularMinRND"],[3,"angularMaxRND"],[2,30,false,1]]]])
+        EVENT #11 [0,false,null,726912204335243]
+          DO  body3#33([[10,1],[7,[5]]])
+      EVENT #12 [0,false,null,660856117128697]
+        IF  body3#25([[10,3],[8,0],[7,[5]]])
+        DO  body3#33([[10,3],[7,[4]]])
+        DO  body3#33([[10,4],[7,[4]]])
+      EVENT #13 [0,true,null,775070453295281]
+        IF  body3#35([[8,2],[0,[7,[1,30,36,false]]]])
+        EVENT #14 [0,false,null,469878728707629]
+          IF  body3#31([[8,4],[0,[7,[1,30,32,false]]]])
+          DO  body3#33([[10,2],[7,[10,[3,"wooble"]]]])
+        EVENT #15 [0,false,null,527961531609936]
+          IF  body3#31([[8,2],[0,[7,[1,30,32,false]]]])
+          DO  body3#33([[10,2],[7,[11,[3,"wooble"]]]])
+      EVENT #16 [0,false,null,355005122068944]
+        DO  body3.Physics#37([[0,[12,[2,30,false,2]]]])
+        DO  body3#33([[10,2],[7,[13,[2,30,false,2],[4,38]]]])
+      EVENT #17 [0,false,null,413112317691649]
+        IF  body3#39([[0,[2]],[0,[3]]])
+        DO  body3#33([[10,2],[7,[14,[2,30,false,2],[4,38]]]])
+      EVENT #18 [0,false,null,168904531703449]
+        IF  System#40([])
+        EVENT #19 [0,false,null,539764860680307]
+          IF  body3#31([[8,4],[0,[7,[1,30,32,false]]]])
+          DO  body3#41([[10,2],[7,[10,[3,"angularSub"]]]])
+        EVENT #20 [0,false,null,338316626035163]
+          IF  body3#31([[8,2],[0,[7,[1,30,32,false]]]])
+          DO  body3#42([[10,2],[7,[10,[3,"angularSub"]]]])
+GROUP [true,"Control P3"]
+  IF  System#21([[1,[46]]])
+  VARIABLE upArrow = 0
+  VARIABLE speed = -10
+  EVENT #22 [0,false,null,959982859373032]
+    IF  System#26([[11,"P2Control"],[8,0],[7,[5]]])
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    IF  System#28([])
+    EVENT #23 [0,false,null,776863589070610]
+      IF  arm3#25([[10,1],[8,0],[7,[4]]])
+      IF  arm3#25([[10,0],[8,0],[7,[5]]])
+      DO  arm3#33([[10,1],[7,[5]]])
+  EVENT #24 [0,false,null,614108099515919]
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    EVENT #25 [0,false,null,708787583945531]
+      IF  System#26([[11,"P2Control"],[8,0],[7,[5]]])
+      EVENT #26 [0,false,null,938692439628333]
+        IF  balls#25([[10,4],[8,0],[7,[47]]])
+        EVENT #27 [0,false,null,686639762964698]
+          IF  body3#25([[10,4],[8,2],[7,[17]]])
+          DO  body3.Physics#43([[0,[3]],[0,[7,[1,30,32,false]]],[0,[7,[1,30,36,false]]],[7,[4]]])
+          DO  body3#41([[10,4],[7,[5]]])
+        EVENT #28 [0,false,null,845085860845074]
+          IF  System#44([[7,[48,[4,63],[1,78,45,false]]],[8,4],[7,[4]]])
+          DO  arm3#46([[0,[20,[1,78,45,false],[3,"speed"]]]])
+        EVENT #29 [0,false,null,347270919383244]
+          IF  System#40([])
+          DO  arm3#46([[0,[19]]])
+    EVENT #30 [0,false,null,444358040598881]
+      IF  System#40([])
+      DO  System#47([[11,"upArrow"],[7,[4]]])
+      EVENT #31 [0,false,null,901743096349906]
+        IF  System#44([[7,[18,[1,78,45,false]]],[8,4],[7,[5]]])
+        DO  arm3#46([[0,[21,[1,78,45,false],[3,"speed"]]]])
+      EVENT #32 [0,false,null,874298186925040]
+        IF  System#40([])
+        DO  arm3#46([[0,[4]]])
+      EVENT #33 [0,false,null,955404500653853]
+        IF  System#28([])
+        EVENT #34 [0,false,null,607054488240373]
+          IF  arm3#25([[10,1],[8,0],[7,[5]]])
+          EVENT #35 [0,false,null,606011255588960]
+            IF  balls#25([[10,4],[8,0],[7,[43]]])
+            IF  balls#25([[10,2],[8,0],[7,[5]]])
+            DO  balls#33([[10,2],[7,[4]]])
+            DO  arm3#33([[10,1],[7,[4]]])
+            DO  arm3#33([[10,0],[7,[4]]])
+            DO  balls#33([[10,4],[7,[22]]])
+            DO  balls.Physics#48([[3,1]])
+            DO  balls#33([[10,3],[7,[4]]])
+            DO  balls.Physics#49([[0,[22]],[0,[4]]])
+            DO  potaP.Physics#50([[4,104],[3,0]])
+            DO  balls.Timer#51([[0,[23]],[3,0],[1,[24]]])
+            DO  balls.Physics#52([[0,[49,[1,104,53,false],[4,63],[1,78,45,false],[4,34]]],[0,[50,[1,104,54,false],[4,63],[1,78,45,false],[4,34]]]])
+    EVENT #36 [0,false,null,711176531458092]
+      IF  System#26([[11,"P2Control"],[8,0],[7,[5]]])
+      IF  System#26([[11,"upArrow"],[8,0],[7,[4]]])
+      IF  body3.Timer#55([[1,[27]]])
+      IF  body3#25([[10,3],[8,0],[7,[4]]])
+      IF  balls#25([[10,4],[8,0],[7,[47]]])
+      DO  System#47([[11,"upArrow"],[7,[5]]])
+      EVENT #37 [0,false,null,261883133179083]
+        IF  System#28([])
+        DO  body3#33([[10,2],[7,[4]]])
+        DO  body3#33([[10,3],[7,[5]]])
+        DO  body3.Timer#51([[0,[28]],[3,0],[1,[27]]])
+        EVENT #38 [0,false,null,957415264246228]
+          IF  body3#27([[4,8]])
+          DO  body3.Physics#43([[0,[29]],[0,[7,[1,30,32,false]]],[0,[7,[1,30,36,false]]],[7,[4]]])
+          DO  body3.Physics#52([[0,[4]],[0,[4]]])
+          DO  body3.Physics#37([[0,[4]]])
+        EVENT #39 [0,false,null,976573415600737]
+          IF  body3#31([[8,5],[0,[7,[1,30,32,false]]]])
+          DO  body3#33([[10,2],[7,[30,[1,30,53,false],[1,30,32,false]]]])
+        EVENT #40 [0,false,null,552479425602948]
+          IF  body3#31([[8,2],[0,[7,[1,30,32,false]]]])
+          DO  body3#33([[10,2],[7,[30,[1,30,53,false],[1,30,32,false]]]])
+GROUP [true,"Skin P3"]
+  IF  System#21([[1,[51]]])
+  EVENT #42 [0,false,null,292576625897886]
+    IF  System#22([])
+    EVENT #43 [0,false,null,843181496733442]
+      IF  hair#25([[10,0],[8,0],[7,[43]]])
+      DO  hair.Pin#24([[4,29],[3,0]])
+    EVENT #44 [0,false,null,152800731014898]
+      IF  rightShoe#25([[10,0],[8,0],[7,[43]]])
+      DO  rightShoe.Pin#24([[4,30],[3,0]])
+    EVENT #45 [0,false,null,324650356231595]
+      IF  rightShort#25([[10,0],[8,0],[7,[43]]])
+      DO  rightShort.Pin#24([[4,30],[3,0]])
+    EVENT #46 [0,false,null,372794028518337]
+      IF  tshirt#25([[10,0],[8,0],[7,[43]]])
+      DO  tshirt.Pin#24([[4,30],[3,0]])
+  EVENT #47 [0,false,null,249597469668388]
+    IF  playerShadow#25([[10,0],[8,0],[7,[43]]])
+    DO  playerShadow#56([[0,[32,[1,30,32,false]]]])
+    DO  playerShadow#57([[0,[33,[4,58],[4,59],[1,15,54,false],[1,30,54,false]]]])
+GROUP [true,"Arm P3"]
+  IF  System#21([[1,[52]]])
+  EVENT #49 [0,false,null,281081181704851]
+    DO  arm3#60([[0,[35,[1,30,32,false]]],[0,[35,[1,30,36,false]]]])
+  EVENT #50 [0,false,null,878395293571307]
+    DO  handCollision3#60([[0,[7,[1,78,32,false]]],[0,[7,[1,78,36,false]]]])
+  EVENT #51 [0,false,null,421934924615076]
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    EVENT #52 [0,false,null,331829015607001]
+      IF  balls#61([[4,81]])
+      IF  balls#35([[8,5],[0,[36]]])
+      IF  balls#25([[10,3],[8,0],[7,[4]]])
+      DO  ballLine#62([[3,1],[4,78]])
+      DO  balls#33([[10,4],[7,[43]]])
+      DO  balls.Physics#48([[3,0]])
+      DO  balls#33([[10,3],[7,[5]]])
+    EVENT #53 [0,false,null,195488097128689]
+      IF  balls#25([[10,3],[8,0],[7,[5]]])
+      IF  balls#25([[10,4],[8,0],[7,[43]]])
+      IF  balls#25([[10,2],[8,0],[7,[4]]])
+      DO  balls#60([[0,[37,[1,104,53,false],[1,78,32,false],[4,38]]],[0,[37,[1,104,54,false],[1,78,36,false],[4,38]]]])
+    EVENT #54 [0,false,null,516970325463967]
+      IF  balls#25([[10,2],[8,0],[7,[5]]])
+      IF  balls#25([[10,4],[8,0],[7,[43]]])
+      DO  balls#60([[0,[7,[1,78,32,false]]],[0,[7,[1,78,36,false]]]])
+      DO  ballLine#60([[0,[7,[1,78,32,false]]],[0,[7,[1,78,36,false]]]])
+      EVENT #55 [0,false,null,491747086550335]
+        IF  System#28([])
+        DO  object#-2#createBallFX([])
+    EVENT #56 [0,false,null,297649759483332]
+      IF  arm3#61([[4,104]])
+      IF  balls#25([[10,4],[8,1],[7,[47]]])
+      DO  object#-2#createBallFX2([])
+      DO  balls#33([[10,2],[7,[5]]])
+      DO  ballLine#62([[3,1],[4,78]])
+      DO  balls#33([[10,4],[7,[43]]])
+      DO  balls.Physics#48([[3,0]])
+      DO  arm3#33([[10,0],[7,[5]]])

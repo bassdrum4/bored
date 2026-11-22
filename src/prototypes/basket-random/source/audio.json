@@ -1,0 +1,178 @@
+[
+  [
+    "buttonx",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        1594
+      ]
+    ],
+    false
+  ],
+  [
+    "start",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        21451
+      ]
+    ],
+    false
+  ],
+  [
+    "win",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        29710
+      ]
+    ],
+    false
+  ],
+  [
+    "jump",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        1873
+      ]
+    ],
+    false
+  ],
+  [
+    "intro-button",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        12499
+      ]
+    ],
+    false
+  ],
+  [
+    "intro-sound",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        38492
+      ]
+    ],
+    false
+  ],
+  [
+    "bup",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        3362
+      ]
+    ],
+    false
+  ],
+  [
+    "bellsoc",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        1875
+      ]
+    ],
+    false
+  ],
+  [
+    "goasoc",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        22282
+      ]
+    ],
+    false
+  ],
+  [
+    "refsoc",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        6254
+      ]
+    ],
+    false
+  ],
+  [
+    "file",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        5268
+      ]
+    ],
+    false
+  ],
+  [
+    "wrong",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        5314
+      ]
+    ],
+    false
+  ],
+  [
+    "menu",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        41953
+      ]
+    ],
+    false
+  ],
+  [
+    "press",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        3216
+      ]
+    ],
+    false
+  ],
+  [
+    "music",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        290354
+      ]
+    ],
+    false
+  ],
+  [
+    "metal",
+    [
+      [
+        "audio/webm; codecs=opus",
+        ".webm",
+        3958
+      ]
+    ],
+    false
+  ]
+]
