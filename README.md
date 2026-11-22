@@ -130,8 +130,8 @@ Browser tests should continue mocking analytics requests as defense in depth.
 - Star games to save favorites and revisit the last four recently played games.
 - **Surprise me** chooses from the current results. Remote entries are excluded
   unless you deliberately select **Online**.
-- The **waffle menu** in the top-right holds **Resume**, **Restart**, and
-  **All games**. **Esc** closes the menu first, then leaves an offline game.
+- The **waffle menu** in the top-left holds **Give feedback**, **Restart**, and
+  **All games**. Feedback from a game opens a small dialog and records which game it concerns. **Esc** closes the menu first, then leaves an offline game.
   Remote pages run on another origin, so use the menu when they have focus.
 - **Shift+R** restarts and **Shift+F** toggles fullscreen inside offline games.
   **Esc** leaves fullscreen without leaving the game. Fullscreen is no longer a
