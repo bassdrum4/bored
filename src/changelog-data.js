@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 768,
+  "count": 769,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c34670d","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: add Getaway Shootout with clean Unity game shell"},
   {"sha":"78ebad8","date":"2026-11-21","author":"Daniel Lowe","subject":"Recover Basket Random source; skip intro and remove promotional links"},
   {"sha":"0d0c1c4","date":"2026-11-21","author":"Daniel Lowe","subject":"fix(scrabble): finish after two consecutive passes without breaking saves"},
   {"sha":"6e17206","date":"2026-11-21","author":"Claude","subject":"Shotgun Roulette: first-person table redesign, and open it to everyone"},
