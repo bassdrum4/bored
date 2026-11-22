@@ -2,13 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 780,
+  "count": 783,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1089d14","date":"2026-11-21","author":"Daniel Lowe","subject":"docs: explain Getaway Shootout source recovery and actual Unity menu edits"},
+  {"sha":"7392fe5","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: verify direct Unity scene branding patch before proposing it"},
+  {"sha":"2968e02","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: edit Getaway Shootout Unity scene to hide embedded host branding"},
   {"sha":"5222cc8","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: recover editable Getaway Shootout Unity source"},
   {"sha":"2c4d51a","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: retry source recovery when its extraction tools change"},
   {"sha":"94a0a66","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: distinguish decimal ternaries from optional chaining during Unity asm.js recovery"},
