@@ -1122,7 +1122,8 @@ addEventListener('message', event => {
       if ((Object.hasOwn(ADMIN_PREVIEWS, activeSlug) && adminPreviewAccess && hasIdentity()) ||
           SANDBOXED_GAMES.includes(activeSlug)) {
         event.source.postMessage({
-          type: 'bored:admin-preview-wallet', coins: walletBalance(readWallet()).coins || 0
+          // Shotgun Roulette plays for casino chips; `coins` repeats them for a page from before chips.
+          type: 'bored:admin-preview-wallet', chips: walletBalance(readWallet()).chips || 0, coins: walletBalance(readWallet()).chips || 0
         }, '*');
       }
       break;
