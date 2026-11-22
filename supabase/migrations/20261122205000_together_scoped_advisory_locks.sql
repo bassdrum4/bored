@@ -26,7 +26,7 @@ begin
     perform pg_advisory_xact_lock(210425, kb);
     perform pg_advisory_xact_lock(210425, ka);
   end if;
-end
+end;
 $function$;
 
 create or replace function bored_together.lock_scope(u uuid, action text, args jsonb)
@@ -50,7 +50,7 @@ begin
   else
     perform pg_advisory_xact_lock(210425, hashtext(u::text));
   end if;
-end
+end;
 $function$;
 
 -- Patch only the obsolete lock statement in existing RPC bodies, leaving all
@@ -84,5 +84,5 @@ begin
   elsif position('perform pg_advisory_xact_lock(210425,hashtext(actor::text));' in definition) = 0 then
     raise exception 'bored_together.pool_commit has an unrecognized lock implementation';
   end if;
-end
+end;
 $patch$;
