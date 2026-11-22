@@ -738,8 +738,13 @@ export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {
 
    Pacing, simulated with 10-pulls and dust spent on the cheapest missing species, sets paying
    chips as they complete: about 140 days to 1025 at 600 chips a day, 85 at 1000, 280 on
-   login chips alone. 15 dust a shard makes the 50-a-week cap 750 dust, about a dedicated
-   player's weekly dust over the first three months, so a 300-shard skin is six weeks either way.
+   login chips alone.
+
+   Shards from dust are 25 dust each, at most 30 a week (750 dust, the same weekly dust as before
+   but fewer shards). Simulated over 16 weeks with every shard source (TD duplicates, the coin
+   shop's 50, the weekly challenge's 50): a normal player's skin goes from 5.1 weeks to 4.7 (2.8 to
+   2.6 using the coin shop), a strong casino player's from 2.8 to 2.2. At 15 a shard and 50 a week
+   the casino player's fell to 1.9. Dust alone makes a skin in 10 weeks.
 
    Sets pay chips once (col:set:<id>) and show as badges on the Trainer card; 'all' is the
    Full Dex itself and has a badge of its own. */
@@ -748,7 +753,7 @@ export const COLLECTOR = Object.freeze({
   rates: [204, 44, 7, 1],
   dust: [20, 40, 80, 200],
   price: [10, 20, 50, 100],
-  shards: { dust: 150, shards: 10, perWeek: 50 },
+  shards: { dust: 250, shards: 10, perWeek: 30 },
   history: 30
 });
 export const COL_TIERS = ['Common', 'Rare', 'Epic', 'Legendary'];

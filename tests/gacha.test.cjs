@@ -729,11 +729,11 @@ test('dust buys a missing species by tier, once, and shards up to 50 a week apar
   assert.equal(buyCollectorMon(mew.wallet, 151, opts()).reason, 'owned');
   assert.equal(buyCollectorMon(fund(fresh({}), { dust: 99 }), 151, opts()).reason, 'dust');
   w = fund(fresh({}), { dust: 2000 });
-  for (let i = 0; i < 5; i++) { const r = buyDustShards(w, opts()); assert.equal(r.ok, true); w = r.wallet; }
-  assert.deepEqual([walletBalance(w).shards, walletBalance(w).dust], [50, 2000 - 750]);
+  for (let i = 0; i < 3; i++) { const r = buyDustShards(w, opts()); assert.equal(r.ok, true); w = r.wallet; }
+  assert.deepEqual([walletBalance(w).shards, walletBalance(w).dust], [30, 2000 - 750]);
   assert.equal(buyDustShards(w, opts()).reason, 'limit');
   assert.equal(buyDustShards(w, { today: '2026-11-23', now: later() }).ok, true, 'a new week');
-  assert.equal(COLLECTOR.shards.dust / COLLECTOR.shards.shards, 15);
+  assert.equal(COLLECTOR.shards.dust / COLLECTOR.shards.shards, 25);
 });
 
 test('sets pay their chips once when complete and become badges; the Full Dex is a set of its own', () => {

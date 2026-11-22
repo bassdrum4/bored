@@ -327,6 +327,7 @@
   <div class="lobby" id="lobby">
     <main>
       <div class="corner left" style="position:static;margin:-48px 0 26px"><button class="plain" id="back" type="button">&#8249; Back to the arcade</button>
+        <button class="plain" id="to-gacha" type="button">&#8592; Poké Gacha</button>
         <span>Casino chips: <span class="num" id="coins">0</span></span></div>
       <h1 class="title">Shotgun Roulette</h1>
       <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
@@ -1269,6 +1270,8 @@ $("#leave").onclick = () => {
   g = null;
 };
 $("#back").onclick = () => parent.postMessage({ type: "bored:close" }, "*");
+// Chips are spent in Poké Gacha's Collector: the hub opens it again (bored:open-game, Poké Gacha only).
+$("#to-gacha").onclick = () => parent.postMessage({ type: "bored:open-game", slug: "poke-gacha" }, "*");
 
 /* ── Leaderboard ──────────────────────────────────────────────────────── */
 const boards = { normal: [], hard: [] };
