@@ -304,10 +304,17 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (challenge) $('#challenge-progress').textContent = challenge.goal;
   hubRoot.inert = true;
 
-  if (external) {
+  if (external || slug === 'getaway-shootout') {
+    // Unity WebGL's loader uses its document URL and scene lifecycle. In a
+    // srcdoc frame the compiled Getaway Shootout build can finish loading but
+    // remain on an empty blue scene. The normal same-origin HTML document
+    // works (and is how the original Unity export was built to run).
+    // Keep this exception narrow: all other catalog games retain the normal
+    // document injection, saving and analytics bridges.
     gameFrame.removeAttribute('srcdoc');
-    gameFrame.src = external;
-    showHint('Internet required · use All games to return');
+    gameFrame.src = external || new URL('./games/content/getaway-shootout.html', document.baseURI).href;
+    showHint(external ? 'Internet required · use All games to return' :
+      'Getaway Shootout · Esc leaves · Shift+R restarts');
   } else {
     const native = NEW_GAMES.includes(slug);
     const token = ++loadToken;
