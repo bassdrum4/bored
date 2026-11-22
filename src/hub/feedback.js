@@ -31,7 +31,7 @@ export function feedbackErrorMessage(err) {
   return message;
 }
 
-export async function sendFeedback({ message, email } = {}) {
+export async function sendFeedback({ message, email, game } = {}) {
   const text = String(message || '').trim();
   if (text.length < 4) throw new Error('Tell us a little more first.');
   if (text.length > 2000) throw new Error('Keep it under 2000 characters.');
@@ -47,6 +47,7 @@ export async function sendFeedback({ message, email } = {}) {
     prefer: 'return=minimal',
     body: {
       kind: 'note',
+      game: typeof game === 'string' && /^[a-z0-9-]{1,80}$/.test(game) ? game : null,
       body: text,
       email: address || null,
       page: (location.pathname + location.search).slice(0, 200),
