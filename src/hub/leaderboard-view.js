@@ -140,7 +140,14 @@ function renderLeaderboard() {
     score.textContent = row.points + ' pts';
     const open = state.lbOpenPlayer === key;
     button.setAttribute('aria-expanded', String(open));
-    button.onclick = () => { state.lbOpenPlayer = open ? '' : key; renderLeaderboard(); };
+    button.onclick = () => {
+      state.lbOpenPlayer = open ? '' : key;
+      renderLeaderboard();
+      // Only fetch the detailed records when a player actually opens a
+      // Trackbound entry; homepage and multiplayer never make this request.
+      if (!open && all.some(entry => entry.game === 'trackbound' &&
+          String(entry.handle || '').toLowerCase() === key)) void loadCareerDetails();
+    };
     const detail = element('ul', 'lb-breakdown');
     detail.hidden = !open;
     if (open) {
@@ -174,17 +181,19 @@ function renderLeaderboard() {
         if (spec.id === 'trackbound') {
           const pace = all.find(row => row.game === TRACKBOUND_PACE_ID &&
             String(row.handle || '').toLowerCase() === key);
-          const completed = Array.isArray(pace?.records) ? pace.records.length : 0;
+          const detailsRow = (state.lbCache.get('career')?.rows || []).find(row =>
+            String(row.handle || '').toLowerCase() === key);
+          const records = Array.isArray(detailsRow?.records) ? detailsRow.records : [];
           const basisPoints = Number(pace?.value);
-          const ready = completed === 15 && Number.isInteger(basisPoints) && basisPoints > 0;
+          const ready = Number.isInteger(basisPoints) && basisPoints > 0;
           line.appendChild(element('span', 'lb-career-pace',
             ready ? 'Career pace ' + (basisPoints / 100).toFixed(2) + '% of author · 15/15 tracks'
-              : 'Career pace pending · ' + completed + '/15 tracks synced'));
-          if (completed) {
+              : 'Career pace pending · ' + (detailsRow ? records.length + '/15 tracks synced' : 'open the game to sync tracks')));
+          if (records.length) {
             const details = element('details', 'lb-pace-details');
-            details.appendChild(element('summary', '', 'Best campaign times (' + completed + '/15)'));
+            details.appendChild(element('summary', '', 'Best campaign times (' + records.length + '/15)'));
             const times = element('ul', 'lb-pace-list');
-            for (const best of pace.records) {
+            for (const best of records) {
               const ms = Number(best.ms);
               const author = Number(best.author_ms);
               if (!Number.isInteger(ms) || ms <= 0 || typeof best.name !== 'string') continue;
@@ -279,6 +288,28 @@ function buddyImage(key) {
   return img;
 }
 
+// Detailed times are intentionally lazy. The ordinary leaderboard view already
+// includes the tiny computed pace score, so landing on the homepage makes no
+// new network requests and existing multiplayer tests remain isolated.
+let careerLoading = null;
+async function loadCareerDetails() {
+  const cached = state.lbCache.get('career');
+  if (cached && Date.now() - cached.at < 60000) return;
+  if (careerLoading) return careerLoading;
+  careerLoading = (async () => {
+    try {
+      const rows = await request('/rest/v1/rpc/trackbound_campaign_board', {
+        method: 'POST', body: {}, token: ANON_TOKEN
+      });
+      state.lbCache.set('career', { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
+    } catch {
+      state.lbCache.set('career', { rows: [], at: Date.now() });
+    }
+    renderLeaderboard();
+  })();
+  try { await careerLoading; } finally { careerLoading = null; }
+}
+
 async function loadLeaderboard(force = false) {
   if (!backendReady()) { renderLeaderboard(); return; }
   const key = 'overall';
@@ -310,20 +341,6 @@ async function loadLeaderboard(force = false) {
       if (page.length < pageSize) break;
       if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
     }
-    // Supplemental, public per-track times. The legacy points board remains
-    // available even if the optional pace RPC is offline or not deployed.
-    try {
-      const career = await request('/rest/v1/rpc/trackbound_campaign_board', {
-        method: 'POST', body: {}, token: ANON_TOKEN
-      });
-      if (Array.isArray(career)) for (const record of career) {
-        if (!record || typeof record.handle !== 'string' ||
-            !Array.isArray(record.records)) continue;
-        rows.push({ game: TRACKBOUND_PACE_ID, handle: record.handle,
-          value: Number.isInteger(record.pace_bp) ? record.pace_bp : 0,
-          records: record.records });
-      }
-    } catch { /* A missing pace service must not hide ordinary scores. */ }
     state.lbCache.set(key, { rows, at: Date.now() });
   } catch (err) {
     state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
