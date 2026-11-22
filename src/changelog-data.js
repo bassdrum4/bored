@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 765,
+  "count": 766,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6e17206","date":"2026-11-21","author":"Claude","subject":"Shotgun Roulette: first-person table redesign, and open it to everyone"},
   {"sha":"9cf8377","date":"2026-11-21","author":"Daniel Lowe","subject":"Remove Rooftop Snipers title-screen promotional controls","pr":281},
   {"sha":"dabf983","date":"2026-11-21","author":"PenguinV360","subject":"Shotgun Roulette: full game, test mode, hub-side bets and server-checked board","pr":280},
   {"sha":"15b7618","date":"2026-11-21","author":"PenguinV360","subject":"Poké Gacha: projectiles aim at their target in 8 directions","pr":279},
