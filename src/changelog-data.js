@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 810,
+  "count": 812,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"fbca733","date":"2026-11-22","author":"Daniel Lowe","subject":"style: large high-contrast Bored player loading screen and progress bar"},
+  {"sha":"742e56d","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: add host-owned Getaway Shootout loading overlay to Bored player"},
   {"sha":"0fd926c","date":"2026-11-22","author":"Codebuff","subject":"Rocket Chicken: open the shop from the start screen and steer on touch"},
   {"sha":"cffad83","date":"2026-11-22","author":"Codebuff","subject":"Recover Rocket Chicken's Flash source and port it into the arcade"},
   {"sha":"5766801","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: invalidate cached Bored launcher module after Getaway Shootout iframe repair"},
