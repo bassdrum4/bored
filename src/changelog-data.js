@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 770,
+  "count": 771,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"531d978","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: route vendored Getaway Shootout assets through a PR"},
   {"sha":"7e48cd7","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: import pinned Getaway Shootout runtime into Bored"},
   {"sha":"c34670d","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: add Getaway Shootout with clean Unity game shell"},
   {"sha":"78ebad8","date":"2026-11-21","author":"Daniel Lowe","subject":"Recover Basket Random source; skip intro and remove promotional links"},
