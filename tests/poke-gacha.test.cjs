@@ -179,10 +179,10 @@ test('roster cut: an owned cut line is refunded once with a note, and leaves the
 test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1-1 clear pays and unlocks 1-2', async t => {
   const { tab, game, errors } = await openWithMons(t);
   const tabs = await game.$$eval('#tabs [data-tab]', nodes => nodes.map(n => n.dataset.tab));
-  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests', 'card', 'wiki'], 'Story is the first of eight tabs, Wiki the last');
+  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'full', 'shop', 'quests', 'card', 'wiki'], 'Story is the first of nine tabs, Wiki the last');
   // The tab bar and the purse fit on one line inside the frame.
   const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), last = await rect(game, '#tabs [data-tab="wiki"]'), help = await rect(game, '#tabs .help');
-  assert.ok(purse.r <= bar.r + 0.5 && last.r <= help.l && help.r <= purse.l, 'eight tabs, help and the purse fit');
+  assert.ok(purse.r <= bar.r + 0.5 && last.r <= help.l && help.r <= purse.l, 'nine tabs, help and the purse fit');
 
   await key(tab, '1');
   assert.equal(await game.evaluate(() => tab), 'story');
@@ -253,7 +253,7 @@ test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1
   assert.doesNotMatch((await game.$$eval('#story-list > div', rows => rows.map(r => r.textContent)))[1], /locked/, '1-2 unlocks');
 
   // Quests: 4 daily and 5 weekly battle missions above the starters; the clear ticked "Clear any stage".
-  await key(tab, '6');
+  await key(tab, '7');
   const quests = await game.evaluate(() => questItems().map(q => ({ label: q.label, done: !!q.done, off: !!q.off })));
   if (quests.some(q => /daily missions/.test(q.label))) {
     assert.ok(quests.find(q => q.label === 'Clear any stage')?.done ?? true, 'a clear ticks "Clear any stage" when it is drawn today');
@@ -587,7 +587,7 @@ test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Ra
 test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real reward icons; done rows sink; trophies group by game', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { for (const st of T.allStages.slice(0, 3)) T.finish({ stage: st.id, stars: 3, team: [S.owned[0]], waves: 1 }); refreshTop(); });
-  await key(tab, '6');
+  await key(tab, '7');
   const tabs = await game.$$eval('#quest-tabs > span', n => n.map(t => [t.dataset.qtab, t.querySelector('.num').textContent, t.querySelector('.clock')?.textContent || '']));
   assert.deepEqual(tabs.map(t => t[0]), ['daily', 'weekly', 'starter', 'trophies']);
   for (const [, count] of tabs) assert.match(count, /^\d+\/(\d+|\?)$/);
@@ -804,7 +804,7 @@ test('coin shop: shards and preset slots, each with a confirm step and its limit
   if (!await game.evaluate(() => !!G.coinShop)) return t.skip('the hub has no coin shop');
   await game.evaluate(() => { const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
     w.entries['test:coins'] = { at: now - 100, g: { coins: 20000 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); });
-  await key(tab, '5');
+  await key(tab, '6');
   const labels = await game.evaluate(() => shopItems().map(i => i.kind + ':' + i.label));
   assert.ok(labels.includes('shards:10 shards · 50/50 a week') && labels.includes('preset:Squad preset 4 of 5'));
   assert.ok(!labels.some(l => l.startsWith('candy:')), 'no candy row: candy is bought in the Dex, where it is spent');
@@ -1107,8 +1107,8 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
 /* ── The hatch: the owner's egg-hatch frames ───────────────────────────── */
 test('trainer card: buddy with its look, Dex %, chapters, stars, trophies, weekly risk, boss; the tab bar still fits', async t => {
   const { tab, game, errors } = await openWithMons(t);
-  await key(tab, '7');
-  assert.equal(await game.evaluate(() => tab), 'card', 'the seventh tab, on key 7');
+  await key(tab, '8');
+  assert.equal(await game.evaluate(() => tab), 'card', 'the eighth tab, on key 8');
   const stat = id => game.evaluate(i => cardStats().find(x => x.id === i), id);
   const dex = await stat('dex');
   assert.equal(dex.value, await game.evaluate(() => BASES.filter(n => S.lines[n]).length));
@@ -2014,7 +2014,7 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   for (let i = 0; i < 6 && await game.evaluate(() => battle && battle.talk.length); i++) await key(tab, 'Enter');
   await key(tab, 'Enter');
   // Pull's tips were read in the hand-over after the loop.
-  for (const [k, id, n] of [['3', 'eggs', 1], ['4', 'dex', 2], ['6', 'quests', 1]]) {
+  for (const [k, id, n] of [['3', 'eggs', 1], ['4', 'dex', 2], ['7', 'quests', 1]]) {
     await key(tab, k);
     await game.waitForFunction(i => tutor && tutor.id === i, {}, id);
     for (let i = 0; i < n; i++) await key(tab, 'Enter');
@@ -2156,7 +2156,7 @@ test('Pull shows each machine\'s rates and my pity; Eggs and Quests get a dot wh
   // Quests: a dot for rewards paid since the last visit, gone once it is opened.
   await game.evaluate(() => { pref.questsSeen = 0; keep(); refreshTop(); });
   assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 1);
-  await key(tab, '6');
+  await key(tab, '7');
   assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 0);
   assert.deepEqual(errors, []);
 });
@@ -2403,9 +2403,82 @@ test('projectiles point along their path in 8 directions and follow a moving tar
   assert.deepEqual(errors, []);
 });
 
+test('the Collector: a fourth machine paid in chips, the Full Dex with dust and sets, badges and buddy on the card, never TD', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // Screenshots (SHOT_DIR) can use the real pixel font (FONT_FILE, a local Jersey 10); the suite aborts webfonts.
+  if (process.env.FONT_FILE) await game.evaluate(async b64 => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const f = new FontFace('Jersey 10', bin.buffer);
+    await f.load(); document.fonts.add(f); document.querySelector('#frame').classList.remove('no-pixel'); refreshTop(); }, fs.readFileSync(process.env.FONT_FILE).toString('base64'));
+  const shot = async name => { if (process.env.SHOT_DIR) await (await tab.$('#frame')).screenshot({ path: path.join(process.env.SHOT_DIR, name + '.png') }); };
+  await game.evaluate(() => { const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); w.entries['test:chips'] = { at: Math.floor(Date.now() / 1000), g: { chips: 5000, dust: 1000 } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); });
+  const before = await game.evaluate(() => ({ owned: S.owned.length, pulls: S.pulls, eggs: S.eggs.length, chips: CS.chips, coins: S.balance.coins }));
+  assert.ok(before.chips >= 5000);
+  // The fourth machine: chips, not vouchers.
+  await game.evaluate(() => { go('pull'); while (machine !== 'collector') switchMachine(1); menuOpen = true; cursor = 1; message = null; updateScene(); });
+  assert.deepEqual(await game.$$eval('#menu > div', ns => ns.map(n => n.textContent.replace(/\s+/g, ' ').trim())), ['x11Pull', 'x1010Pulls', 'Cancel']);
+  assert.match(await game.$eval('#counts', n => n.textContent), /\/1025/);
+  await pause(300); await shot('collector-machine');
+  await game.evaluate(() => choose(1));
+  await pause(2600); await shot('collector-reveal');
+  await game.evaluate(() => { if (reveal) endReveal(); });
+  const after = await game.evaluate(() => ({ owned: S.owned.length, pulls: S.pulls, eggs: S.eggs.length, count: CS.count, chips: CS.chips, coins: S.balance.coins }));
+  assert.deepEqual([after.owned, after.pulls, after.eggs, after.coins], [before.owned, before.pulls, before.eggs, before.coins], 'tower defense and coins are untouched');
+  assert.equal(after.chips, before.chips - 900);
+  assert.ok(after.count >= 1 && after.count <= 10);
+  // Its own rates, pity and history.
+  await game.evaluate(() => toggleRates('history'));
+  assert.equal(await game.$$eval('#rates .hist > div', ns => ns.length), 10);
+  assert.match(await game.$eval('#rates', n => n.textContent), /COLLECTOR HISTORY[\s\S]*Pity: Rare/);
+  await game.evaluate(() => toggleRates('rates'));
+  assert.match(await game.$eval('#rates', n => n.textContent), /Legendary[\s\S]*0\.39%[\s\S]*Shiny[\s\S]*1 in 64/);
+  await game.evaluate(() => toggleRates('rates'));
+
+  // The Full Dex: 1025 rows; dust buys the three birds, which completes a set and pays its chips.
+  await game.evaluate(() => { go('full'); fullMode = 'dex'; fullFilter = 'all'; fullAt = 0; fullUpdate(); });
+  assert.equal(await game.$$eval('#full-rows > div', ns => ns.length), 1025);
+  assert.match(await game.$eval('#full-title', n => n.textContent), /FULL DEX \d+\/1025/);
+  const birds = await game.evaluate(() => {
+    const chips = CS.chips, out = [];
+    for (const n of [144, 145, 146]) if (!CS.owned.includes(n)) { fullAt = n - 1; fullFocus = 'acts'; fullActAt = 0; fullUpdate(); out.push(fullActions(n)[0].label); runFull(fullActions(n)[0]); }
+    return { out, owned: [144, 145, 146].every(n => CS.owned.includes(n)), chips: CS.chips - chips, badges: CS.badges, msg: document.querySelector('#msg').textContent };
+  });
+  assert.ok(birds.owned, 'the three birds are in the Full Dex');
+  assert.ok(birds.out.every(l => l === 'Buy for 100 dust'), 'legendaries cost 100 dust');
+  assert.ok(birds.badges.includes('birds'));
+  assert.ok(birds.chips >= 300, 'the set paid its chips');
+  assert.match(birds.msg, /Legendary birds \+300 chips/);
+  // A Full Dex mon (not owned in TD) as the buddy.
+  const buddy = await game.evaluate(() => { fullAt = 143; fullFocus = 'acts'; fullActAt = 0; fullUpdate(); runFull(fullActions(144)[0]); return S.buddy && S.buddy.species; });
+  assert.equal(buddy, 144);
+  await game.evaluate(() => { fullFocus = 'list'; fullUpdate(); });
+  await shot('full-dex');
+  await game.evaluate(() => { fullMode = 'sets'; setAt = CS.sets.findIndex(s => s.id === 'birds'); fullUpdate(); });
+  await shot('full-sets');
+  // The dust shop: 10 shards for 150 dust.
+  const shards = await game.evaluate(() => { const a = S.balance.shards; fullMode = 'shop'; fullUpdate(); fullKey({ key: 'Enter', preventDefault() {} }); return S.balance.shards - a; });
+  assert.equal(shards, 10);
+  await shot('dust-shop');
+  // The card: the Full Dex count, the birds badge and the buddy, all inside the panel.
+  await game.evaluate(() => go('card'));
+  await shot('card');
+  const card = await game.evaluate(() => {
+    const box = document.querySelector('#card-stats').getBoundingClientRect(), last = [...document.querySelectorAll('#card-stats .stat, #card-stats .badges')].pop().getBoundingClientRect();
+    return { full: cardStats().find(x => x.id === 'full'), badge: !!document.querySelector('#card-stats [data-badge="birds"]'), inside: last.bottom <= box.bottom + 0.5, name: document.querySelector('#card-buddy').textContent };
+  });
+  assert.equal(card.full.of, 1025);
+  assert.ok(card.badge, 'the birds badge');
+  assert.ok(card.inside, 'the stats and badges fit the card');
+  assert.match(card.name, /Articuno/);
+  if (process.env.FONT_FILE) {
+    const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse');
+    assert.ok(purse.r <= bar.r + 0.5, 'nine tabs fit in the pixel font');
+  }
+  assert.deepEqual(errors, []);
+});
+
 test('the Wiki tab: the full type chart, every foe kind with its icon, classes, skills, items with sprites, candy and eggs', async t => {
   const { tab, game, errors } = await openWithMons(t);
-  await key(tab, '8');
+  await key(tab, '9');
   assert.equal(await game.evaluate(() => tab), 'wiki', 'Wiki is tab 8');
   assert.deepEqual(await game.$$eval('#wiki-tabs [data-wtab]', n => n.map(x => x.dataset.wtab)), ['types', 'foes', 'classes', 'skills', 'items', 'candy', 'eggs']);
   assert.equal(await game.$$eval('#wiki-box .wchart .c', n => n.length), 18 * 18, 'an 18 by 18 chart');

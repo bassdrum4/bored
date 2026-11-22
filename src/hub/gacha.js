@@ -16,6 +16,10 @@
 //   gacha:cut:<line>    the one-time refund for an owned line cut from the egg roster (claimCutRefund):
 //                         g = vouchers and coins, less the candy left on it; x = { l, s, c, k }
 //                         line, its old star, the candy and the level coins it was paid for
+//   spend:col:<uuid>    a Collector pull, paid in chips: x = { cp, n, d } (see the Collector below)
+//   spend:cbuy:<num>    a Collector species bought with dust: x = { cb }
+//   spend:cdust:<monday>:<slot>  10 shards bought with dust
+//   col:set:<id>        a Collector set's chips, paid once
 //   cfg:starter         the starter pick, once per account: x = { s, c } the chosen starter and
 //                         the three gifted commons. The id is fixed, so it is written once and
 //                         a second device's pick loses to the earlier one in a merge.
@@ -28,7 +32,7 @@ import { DEX, DEX_TYPES, DEX_LEGACY } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import {
   mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList, bossStreak,
-  addAchievements, achievement, claimTrophies
+  addAchievements, achievement, claimTrophies, claimDailyChips, CHIPS
 } from './rewards.js';
 
 // Egg tiers: 0 Common 3★, 1 Rare 4★, 2 Epic 5★, 3 Legendary 6★, 4 the banner legendary (6★).
@@ -421,7 +425,10 @@ export function gachaState(wallet, today = dailyDate()) {
     l.coins = paid ? Number(object(paid.x).k) || 0 : l.coins || 0;
     l.refund = cutRefundOf(l);
   }
-  if (buddy && !owned.has(buddy.species)) buddy = null;
+  // A buddy may come from the Collector's Full Dex too (shiny only if pulled shiny there).
+  const full = collectorOwned(entries);
+  if (buddy && !owned.has(buddy.species) && !full.has(buddy.species)) buddy = null;
+  if (buddy && buddy.shiny && !owned.has(buddy.species) && !full.get(buddy.species)) buddy.shiny = false;
   if (buddy && buddy.skin && !(lines[lineOf(buddy.species)]?.skins.includes(buddy.skin) && skinCovers(buddy.skin, buddy.species))) buddy.skin = null;
   return {
     balance, eggs, hatched, owned: [...owned].sort((a, b) => a - b), lines,
@@ -644,8 +651,12 @@ export function buySp(wallet, skinId, { today = dailyDate(), now = Date.now() } 
 /** Equip one owned mon as the buddy, in a look the player has unlocked. */
 export function setBuddy(wallet, species, { shiny = false, skin = null, today = dailyDate(), now = Date.now() } = {}) {
   const state = gachaState(wallet, today);
-  if (!state.owned.includes(species)) return refuse(wallet, 'not-owned');
-  const held = state.lines[lineOf(species)] || {};
+  // Owned in tower defense, or pulled (or bought) for the Full Dex. A Full Dex buddy wears
+  // shiny only if it was pulled shiny there, and never an SP skin (skins belong to TD lines).
+  const td = state.owned.includes(species), full = collectorOwned(mergeWallet(wallet).entries);
+  if (!td && !full.has(species)) return refuse(wallet, 'not-owned');
+  const held = td ? state.lines[lineOf(species)] || {} : { shiny: full.get(species), skins: [] };
+  if (td && shiny && !held.shiny && full.get(species)) held.shiny = true;
   if ((shiny && !held.shiny) || (skin && !((held.skins || []).includes(skin) && skinCovers(skin, species)))) return refuse(wallet, 'locked');
   const next = mergeWallet(wallet);
   const x = { s: species };
@@ -699,13 +710,223 @@ export function lookFor(state, num) {
   return skinCovers(line.look, num) ? line.look : 'normal';
 }
 
-/** Three Regulars, once a day. */
+/** Three Regulars and the day's casino chips, once a day. */
 export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {}) {
   if (!mergeWallet(wallet).entries.on) return refuse(wallet, 'inactive');
-  const result = grantOnce(wallet, 'gacha:login:' + today, LOGIN, { now });
+  const chips = claimDailyChips(wallet, { today, now });
+  const result = grantOnce(chips.wallet, 'gacha:login:' + today, LOGIN, { now });
+
   // An account that picked its starter before the welcome pack existed gets it once, here.
   const welcome = result.wallet.entries['cfg:starter'] ? grantOnce(result.wallet, WELCOME_ID, WELCOME, { now }) : { wallet: result.wallet, changed: false };
-  return { wallet: welcome.wallet, ok: result.changed || welcome.changed, login: result.changed, welcome: welcome.changed ? { ...WELCOME } : null };
+  return { wallet: welcome.wallet, ok: result.changed || chips.changed || welcome.changed, login: result.changed, chips: chips.changed ? CHIPS.login : 0,
+    welcome: welcome.changed ? { ...WELCOME } : null };
+}
+
+/* ── The Collector ───────────────────────────────────────────────────────
+   A fourth machine, apart from tower defense: it pulls any of the 1025 species straight
+   into the Full Dex, paid in casino chips (CHIPS.login a day, Shotgun Roulette winnings).
+   Nothing it gives reaches TD: no line, no candy, no squad. A Full Dex mon can be the buddy.
+
+   Tiers, out of 256 per pull like an egg: Legendary is every legendary and mythical,
+   Epic the Ultra Beasts, the Paradox mons and anything else with a base stat total of
+   530 or more, Rare 450 to 529, Common the rest. The rarity pity is the eggs' (RARITY_PITY),
+   a 10-pull holds at least one Rare, and 1 in SHINY_ODDS.shiny is shiny, as on Shiny UP.
+
+   A species pulled again is a dupe and pays dust by tier; a shiny of one held only plain
+   is not a dupe, it adds the shiny. Dust buys any missing species (priced by tier) or shards
+   (COLLECTOR.shards, a weekly limit of its own beside the coin shop's).
+
+   Pacing (scripts in the PR): about 140 days to 1025 at 600 chips a day, 85 at 1000, 280 on
+   login chips alone. 15 dust a shard makes the 50-a-week cap 750 dust, about a dedicated
+   player's weekly dust over the first three months, so a 300-shard skin is six weeks either way.
+
+   Sets pay chips once (col:set:<id>) and show as badges on the Trainer card; 'all' is the
+   Full Dex itself and has a badge of its own. */
+export const COLLECTOR = Object.freeze({
+  pull: 100, ten: 900, batch: 10,
+  rates: [204, 44, 7, 1],
+  dust: [20, 40, 80, 200],
+  price: [10, 20, 50, 100],
+  shards: { dust: 150, shards: 10, perWeek: 50 },
+  history: 30
+});
+export const COL_TIERS = ['Common', 'Rare', 'Epic', 'Legendary'];
+const ULTRA_BEASTS = [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806];
+const PARADOX = [984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 1005, 1006, 1009, 1010, 1020, 1021, 1022, 1023];
+const bstOf = row => row[2] + row[3] + row[4] + row[5] + row[6] + row[7];
+/** A species' Collector tier, 0 Common to 3 Legendary. */
+export function colTier(num) {
+  const row = DEX[num - 1];
+  if (!row) return -1;
+  if (row[10] === 'lg' || row[10] === 'my') return 3;
+  if (ULTRA_BEASTS.includes(num) || PARADOX.includes(num) || bstOf(row) >= 530) return 2;
+  return bstOf(row) >= 450 ? 1 : 0;
+}
+let colPoolCache = null;
+export function colPools() {
+  if (!colPoolCache) { colPoolCache = [[], [], [], []]; for (let n = 1; n <= DEX.length; n++) colPoolCache[colTier(n)].push(n); }
+  return colPoolCache;
+}
+
+// The sets. Each pays its chips once, when every species in it is in the Full Dex.
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+const GENS = [[1, 151, 'Kanto'], [152, 251, 'Johto'], [252, 386, 'Hoenn'], [387, 493, 'Sinnoh'], [494, 649, 'Unova'],
+  [650, 721, 'Kalos'], [722, 809, 'Alola'], [810, 905, 'Galar'], [906, 1025, 'Paldea']];
+const withLine = bases => { const out = []; const add = n => { out.push(n); for (const c of evolutionsOf(n)) add(c); }; bases.forEach(add); return out; };
+let setCache = null;
+export function collectorSets() {
+  if (setCache) return setCache;
+  const list = [];
+  const set = (id, group, name, chips, nums) => list.push({ id, group, name, chips, nums: [...new Set(nums)].sort((a, b) => a - b) });
+  GENS.forEach(([a, b, region], i) => set('gen' + (i + 1), 'Generations', 'Gen ' + (i + 1) + ': ' + region, 1000, range(a, b)));
+  for (const type of DEX_TYPES) set('type-' + type.toLowerCase(), 'Types', type, 500, range(1, DEX.length).filter(n => DEX[n - 1][1].split('/').includes(type)));
+  GENS.forEach(([, , region], i) => set('starters-' + region.toLowerCase(), 'Starters', region + ' starters', 300, withLine(STARTER_LINES.slice(i * 3, i * 3 + 3))));
+  const kind = k => range(1, DEX.length).filter(n => DEX[n - 1][10] === k);
+  set('birds', 'Legends', 'Legendary birds', 300, [144, 145, 146]);
+  set('beasts', 'Legends', 'Legendary beasts', 300, [243, 244, 245]);
+  set('eon', 'Legends', 'Eon duo', 200, [380, 381]);
+  set('weather', 'Legends', 'Weather trio', 300, [382, 383, 384]);
+  set('regis', 'Legends', 'Regis', 500, [377, 378, 379, 486, 894, 895]);
+  set('lakes', 'Legends', 'Lake guardians', 300, [480, 481, 482]);
+  set('creation', 'Legends', 'Creation trio', 300, [483, 484, 487]);
+  set('swords', 'Legends', 'Swords of Justice', 300, [638, 639, 640, 647]);
+  set('forces', 'Legends', 'Forces of Nature', 300, [641, 642, 645, 905]);
+  set('tao', 'Legends', 'Tao trio', 300, [643, 644, 646]);
+  set('tapus', 'Legends', 'Island guardians', 300, [785, 786, 787, 788]);
+  set('ruin', 'Legends', 'Treasures of Ruin', 300, [1001, 1002, 1003, 1004]);
+  set('loyal', 'Legends', 'Loyal Three', 300, [1014, 1015, 1016]);
+  set('legendary', 'Legends', 'Every legendary', 2000, kind('lg'));
+  set('mythical', 'Legends', 'Every mythical', 2000, kind('my'));
+  set('eevee', 'Families', 'Eeveelutions', 500, [133, 134, 135, 136, 196, 197, 470, 471, 700]);
+  set('fossils', 'Families', 'Fossils', 500, [138, 139, 140, 141, 142, 345, 346, 347, 348, 408, 409, 410, 411, 564, 565, 566, 567, 696, 697, 698, 699, 880, 881, 882, 883]);
+  set('babies', 'Families', 'Babies', 500, [172, 173, 174, 175, 236, 238, 239, 240, 298, 360, 406, 433, 438, 439, 440, 446, 447, 458, 848]);
+  set('mice', 'Families', 'Electric mice', 300, [25, 26, 172, 311, 312, 417, 587, 702, 777, 877, 921, 922, 923]);
+  set('pseudo', 'Families', 'Pseudo-legendary lines', 1000, kind('pseudo'));
+  set('ultra', 'Families', 'Ultra Beasts', 1000, ULTRA_BEASTS);
+  set('paradox', 'Families', 'Paradox', 1000, PARADOX);
+  set('all', 'Full Dex', 'Full Dex', 5000, range(1, DEX.length));
+  return (setCache = list);
+}
+
+// Entry readers. A pull's x.cp is [[species, flags], …]: flags 1 new, 2 shiny, 4 a new shiny.
+const COL_PULL = /^spend:col:/, COL_BUY = /^spend:cbuy:(\d{1,4})$/;
+function readColPull(id, entry) {
+  const x = object(entry.x);
+  if (!COL_PULL.test(id) || !Array.isArray(x.cp) || !x.cp.length || x.cp.length > COLLECTOR.batch) return null;
+  const mons = x.cp.filter(p => Array.isArray(p) && validNum(p[0]) && Number.isInteger(p[1]) && p[1] >= 0 && p[1] <= 7);
+  if (mons.length !== x.cp.length) return null;
+  return { id, at: entry.at, n: Number(x.n) || 0, day: typeof x.d === 'string' ? x.d : '', mons: mons.map(([s, f]) => ({ species: s, tier: colTier(s), fresh: !!(f & 1), shiny: !!(f & 2), newShiny: !!(f & 4) })),
+    chips: -(Number(entry.g?.chips) || 0), dust: Number(entry.g?.dust) || 0 };
+}
+/** Species in the Full Dex, to whether one is shiny. Cheap; gachaState uses it for the buddy. */
+export function collectorOwned(entries) {
+  const out = new Map();
+  for (const [id, entry] of Object.entries(entries)) {
+    const buy = id.match(COL_BUY);
+    if (buy) { const num = Number(buy[1]); if (validNum(num) && object(entry.x).cb === num && !out.has(num)) out.set(num, false); continue; }
+    const pull = COL_PULL.test(id) && readColPull(id, entry);
+    if (pull) for (const m of pull.mons) out.set(m.species, out.get(m.species) || m.shiny);
+  }
+  return out;
+}
+const colCounters = pulls => {
+  const count = { rare: 0, epic: 0, legendary: 0 };
+  for (const p of pulls) for (const m of p.mons) countEgg(count, m.tier, 'collector');
+  return count;
+};
+/** Everything the Collector shows, from the wallet. */
+export function collectorState(wallet, today = dailyDate()) {
+  const merged = mergeWallet(wallet), entries = merged.entries, balance = walletBalance(merged);
+  const pulls = Object.entries(entries).map(([id, e]) => readColPull(id, e)).filter(Boolean)
+    .sort((a, b) => a.n - b.n || a.at - b.at || (a.id < b.id ? -1 : 1));
+  const owned = collectorOwned(entries);
+  const bought = Object.keys(entries).filter(id => COL_BUY.test(id)).length;
+  const monday = mondayOfDay(today);
+  let shardsWeek = 0;
+  for (const id of Object.keys(entries)) if (id.startsWith('spend:cdust:' + monday + ':')) shardsWeek += COLLECTOR.shards.shards;
+  const sets = collectorSets().map(set => {
+    const have = set.nums.filter(n => owned.has(n)).length;
+    return { id: set.id, group: set.group, name: set.name, chips: set.chips, need: set.nums.length, have,
+      complete: have === set.nums.length, claimed: !!entries['col:set:' + set.id] };
+  });
+  return {
+    owned: [...owned.keys()].sort((a, b) => a - b), shiny: [...owned].filter(([, sh]) => sh).map(([n]) => n).sort((a, b) => a - b),
+    total: DEX.length, count: owned.size, bought,
+    chips: balance.chips || 0, dust: balance.dust || 0,
+    pity: colCounters(pulls), pulls: pulls.reduce((t, p) => t + p.mons.length, 0),
+    history: pulls.slice(-COLLECTOR.history).reverse(),
+    shop: { monday, shardsWeek, shardsLeft: Math.max(0, COLLECTOR.shards.perWeek - shardsWeek) },
+    sets, badges: sets.filter(s => s.claimed).map(s => s.id),
+    active: !!entries.on, login: !!entries['chips:login:' + today]
+  };
+}
+
+/** Pull 1 (100 chips) or 10 (900 chips, at least one Rare). Dupes pay dust in the same entry. */
+export function pullCollector(wallet, { count = 1, today = dailyDate(), now = Date.now(), rand = Math.random } = {}) {
+  if (count !== 1 && count !== COLLECTOR.batch) return refuse(wallet, 'unknown');
+  const state = collectorState(wallet, today);
+  if (!state.active) return refuse(wallet, 'inactive');
+  const cost = count === 1 ? COLLECTOR.pull : COLLECTOR.ten;
+  if (state.chips < cost) return refuse(wallet, 'chips');
+  const pools = colPools(), pity = { ...state.pity }, tiers = [];
+  for (let i = 0; i < count; i++) {
+    let roll = Math.floor(rand() * 256), tier = 0;
+    for (; tier < 3 && roll >= COLLECTOR.rates[tier]; tier++) roll -= COLLECTOR.rates[tier];
+    if (tier === 0) {
+      if (pity.legendary >= RARITY_PITY[2]) tier = 3;
+      else if (pity.epic >= RARITY_PITY[1]) tier = 2;
+      else if (pity.rare >= RARITY_PITY[0]) tier = 1;
+    }
+    tiers.push(tier);
+    countEgg(pity, tier, 'collector');
+  }
+  if (count === COLLECTOR.batch && Math.max(...tiers) < 1) tiers[tiers.indexOf(0)] = 1;
+  const held = new Map(state.owned.map(n => [n, state.shiny.includes(n)]));
+  let dust = 0;
+  const mons = tiers.map(tier => {
+    const pool = pools[tier], species = pool[Math.floor(rand() * pool.length)];
+    const shiny = rand() < 1 / SHINY_ODDS.shiny, has = held.has(species), hadShiny = held.get(species);
+    let flags = shiny ? 2 : 0;
+    if (!has) flags |= 1;
+    else if (shiny && !hadShiny) flags |= 4;
+    else dust += COLLECTOR.dust[tier];
+    held.set(species, hadShiny || shiny);
+    return [species, flags];
+  });
+  const r = spendFrom(wallet, { chips: cost }, { id: 'col:' + uuid(), now, gain: dust ? { dust } : {}, x: { cp: mons, n: state.pulls, d: today } });
+  if (!r.ok) return refuse(wallet, 'chips');
+  const paid = claimCollectorSets(r.wallet, { today, now });
+  return { wallet: paid.wallet, ok: true, dust, sets: paid.sets,
+    mons: mons.map(([species, f]) => ({ species, tier: colTier(species), fresh: !!(f & 1), shiny: !!(f & 2), newShiny: !!(f & 4) })) };
+}
+/** Buy one missing species for the Full Dex with dust, priced by its tier. */
+export function buyCollectorMon(wallet, species, { today = dailyDate(), now = Date.now() } = {}) {
+  if (!validNum(species)) return refuse(wallet, 'unknown');
+  const state = collectorState(wallet, today);
+  if (!state.active) return refuse(wallet, 'inactive');
+  if (state.owned.includes(species)) return refuse(wallet, 'owned');
+  const price = COLLECTOR.price[colTier(species)];
+  const r = spendFrom(wallet, { dust: price }, { id: 'cbuy:' + species, now, x: { cb: species } });
+  if (!r.ok) return refuse(wallet, 'dust');
+  const paid = claimCollectorSets(r.wallet, { today, now });
+  return { wallet: paid.wallet, ok: true, price, sets: paid.sets };
+}
+/** 10 shards for 150 dust, up to 50 shards a week (Monday to Sunday), apart from the coin shop's 50. */
+export function buyDustShards(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = collectorState(wallet, today), c = COLLECTOR.shards;
+  if (state.shop.shardsLeft < c.shards) return refuse(wallet, 'limit');
+  const merged = mergeWallet(wallet);
+  let slot = 0;
+  while (merged.entries['spend:cdust:' + state.shop.monday + ':' + slot]) slot++;
+  const r = spendFrom(merged, { dust: c.dust }, { id: 'cdust:' + state.shop.monday + ':' + slot, now, gain: { shards: c.shards } });
+  return r.ok ? { wallet: r.wallet, ok: true } : refuse(wallet, 'dust');
+}
+/** Pay every complete set not paid yet. ok when something paid; `sets` names them. */
+export function claimCollectorSets(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  let next = mergeWallet(wallet);
+  const due = collectorState(next, today).sets.filter(s => s.complete && !s.claimed);
+  for (const s of due) next = grantOnce(next, 'col:set:' + s.id, { chips: s.chips }, { now }).wallet;
+  return { wallet: next, ok: due.length > 0, sets: due.map(s => ({ id: s.id, name: s.name, chips: s.chips })) };
 }
 
 /* ── The bridge Poké Gacha's page calls through `parent.__boredGacha` ───── */
@@ -761,7 +982,16 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     bannerFor,
     // An egg of an owned line, for candy (better odds of the rare skill).
     buyCandyEgg: act((w, o) => buyCandyEgg(w, o.line, o)), candyEgg: CANDY_EGG, candyEggPrice,
-    cutRefund: CUT_REFUND, cutCandy: CUT_CANDY, isCut
+    cutRefund: CUT_REFUND, cutCandy: CUT_CANDY, isCut,
+    // The Collector: its own machine, Full Dex, dust shop and sets, paid in casino chips.
+    collector: {
+      rules: COLLECTOR, tiers: COL_TIERS, chipsPerDay: CHIPS.login, tierOf: colTier, sets: () => collectorSets(),
+      state: () => collectorState(readWallet(), dailyDate()),
+      pull: act((w, o) => pullCollector(w, o)),
+      buy: act((w, o) => buyCollectorMon(w, o.species, o)),
+      buyShards: act((w, o) => buyDustShards(w, o)),
+      claimSets: act((w, o) => claimCollectorSets(w, o))
+    }
   };
 }
 

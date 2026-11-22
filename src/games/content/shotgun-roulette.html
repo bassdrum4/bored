@@ -327,7 +327,7 @@
   <div class="lobby" id="lobby">
     <main>
       <div class="corner left" style="position:static;margin:-48px 0 26px"><button class="plain" id="back" type="button">&#8249; Back to the arcade</button>
-        <span>Poké Gacha wallet: <span class="num" id="coins">0</span> coins</span></div>
+        <span>Casino chips: <span class="num" id="coins">0</span></span></div>
       <h1 class="title">Shotgun Roulette</h1>
       <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
       <p class="status">Take turns with Giratina pointing a shotgun at yourself or each other. Some shells are live, some are blank. Win two of three rounds.</p>
@@ -335,7 +335,7 @@
         <h2 id="opponents-title">Pick your opponent</h2>
         <div class="bet-row">
           <label for="bet">Your bet<input id="bet" type="number" min="10" max="500" step="10" value="50" inputmode="numeric"></label>
-          <span id="cap-line">Bets run from 10 to 500 coins. You can win up to 3,000 coins a day.</span>
+          <span id="cap-line">Bets run from 10 to 500 chips. You can win up to 3,000 chips a day, net of losses.</span>
         </div>
         <div class="islands" role="group" aria-labelledby="opponents-title">
           <button class="island normal" type="button" data-mode="normal">
@@ -346,7 +346,7 @@
           </button>
           <div class="island test">
             <button class="island-test-start" id="test-start" type="button">
-              <span class="name">Test Game (no coins)</span>
+              <span class="name">Test Game (no chips)</span>
               <span class="level">Plays the full game. No bet, no payout, no leaderboard.</span>
             </button>
             <div class="test-pick" role="radiogroup" aria-label="Test game difficulty">
@@ -376,10 +376,10 @@
 /* Shotgun Roulette. You and Giratina take turns firing a shotgun loaded with
    live and blank shells, best of three rounds. The rules engine is the same
    as before; the fx functions below only animate what it decides.
-   The frame is sandboxed, so coins and the leaderboard go through the hub
+   The frame is sandboxed, so chips and the leaderboard go through the hub
    with postMessage ("bored:roulette" requests, "bored:roulette-result"
    replies), answered by src/hub/roulette.js, which enforces the bet range,
-   payouts and cap. Test games never send a coin or board request.
+   payouts and cap. Test games never send a chip or board request.
    Sprites: Giratina from the shared Poké sprite set (pokedoku/sprites, 487
    Altered and 10007 Origin), items from shotgun-roulette/items.
    Opened on its own (not from the arcade), test games still work; real bets
@@ -445,13 +445,16 @@ function ask(op, data = {}, timeout = 2500) {
 addEventListener("message", event => {
   if (event.source !== parent) return;
   const data = event.data || {};
-  if (data.type === "bored:admin-preview-wallet") setCoins(data.coins);
+  // Casino chips; an older hub sends only `coins`.
+  if (data.type === "bored:admin-preview-wallet") setCoins(Number.isSafeInteger(data.chips) ? data.chips : data.coins);
   if (data.type === "bored:roulette-result" && pending.has(data.id)) {
     const done = pending.get(data.id);
     pending.delete(data.id);
     done(data);
   }
 });
+// The hub's reply carries the chip balance (`chips`; an older hub only `coins`).
+const setBalance = reply => { const n = Number.isSafeInteger(reply.chips) ? reply.chips : reply.coins; if (Number.isSafeInteger(n)) setCoins(n); };
 function setCoins(value) {
   if (!Number.isSafeInteger(value) || value < 0) return;
   coins = value;
@@ -462,14 +465,16 @@ const refreshCoins = () => parent.postMessage({ type: "bored:admin-preview-walle
 async function refreshStatus() {
   const reply = await ask("status");
   if (!reply || !reply.ok) return;
-  if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
+  setBalance(reply);
   showCap(reply);
 }
 function showCap(reply) {
   if (!Number.isSafeInteger(reply.wonToday)) return;
+  // The cap is on net profit, so a day can be below zero.
+  const net = reply.wonToday, shown = (net < 0 ? "−" : "") + Math.abs(net).toLocaleString("en-US");
   $("#cap-line").textContent = reply.capLeft > 0
-    ? "Bets run from 10 to 500 coins. You've won " + reply.wonToday.toLocaleString("en-US") + " of today's 3,000-coin limit."
-    : "You've won 3,000 coins today, the daily limit. Test games are still open.";
+    ? "Bets run from 10 to 500 chips. Today you're at " + shown + " net, of a 3,000-chip limit on winnings."
+    : "You're 3,000 chips up today, the daily limit. Test games are still open.";
 }
 refreshCoins();
 refreshStatus();
@@ -659,10 +664,10 @@ function begin(mode, test, bet = 0, betId = null) {
   for (const box of [$("#you-slots"), $("#foe-slots"), $("#foe-orb")]) { box.dataset.sig = ""; box.replaceChildren(); }
   $("#leave").textContent = "Leave table";
   $("#leave").dataset.confirm = "";
-  $("#mode-label").textContent = MODES[mode].name + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " coins");
+  $("#mode-label").textContent = MODES[mode].name + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " chips");
   $("#dealer-img").src = SPRITE_DIR + MODES[mode].sprite + ".png";
   $("#dealer").classList.remove("away", "vanished");
-  log(test ? "Test game against " + MODES[mode].name + ". No coins are on the table." : "You bet " + bet.toLocaleString("en-US") + " coins against " + MODES[mode].name + ".", "you");
+  log(test ? "Test game against " + MODES[mode].name + ". No chips are on the table." : "You bet " + bet.toLocaleString("en-US") + " chips against " + MODES[mode].name + ".", "you");
   if (g.hard) log("Origin Giratina is in its own world: Shadow Force and the Griseous Orb are on.", "status");
   startRound();
 }
@@ -1041,20 +1046,20 @@ async function endGame(won, forfeit = false) {
   game.busy = true;
   render();
   let text;
-  if (game.test) text = "Test game. No coins moved and nothing went on the board.";
+  if (game.test) text = "Test game. No chips moved and nothing went on the board.";
   else {
     const reply = await ask("settle", { betId: game.betId, mode: game.mode, won, forfeit });
     if (reply) showCap(reply);
     if (!reply || !reply.ok) {
       console.log("Shotgun Roulette: the arcade did not confirm this result.", reply && reply.reason);
-      text = !won ? "Your bet of " + game.bet.toLocaleString("en-US") + " coins is gone."
+      text = !won ? "Your bet of " + game.bet.toLocaleString("en-US") + " chips is gone."
         : reply && reply.reason === "early" ? "That game finished too fast to pay out, so the bet is lost."
         : "The arcade didn't confirm the payout. Check your wallet in Poké Gacha.";
     } else {
-      if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
+      setBalance(reply);
       text = won
-        ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " coins" + (reply.capped ? ", trimmed to stay under the 3,000-coin daily limit." : ".")
-        : "Your bet of " + game.bet.toLocaleString("en-US") + " coins is gone.";
+        ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " chips" + (reply.capped ? ", trimmed to stay under the 3,000-chip daily limit." : ".")
+        : "Your bet of " + game.bet.toLocaleString("en-US") + " chips is gone.";
       if (reply.streak != null) text += " " + MODES[game.mode].level + " win streak: " + reply.streak + ".";
     }
     loadBoard(game.mode);
@@ -1204,10 +1209,11 @@ $("#shoot-foe").onclick = () => { if (g && g.holding && !g.busy && !g.over) fire
 /* ── The lobby ────────────────────────────────────────────────────────── */
 const note = text => { $("#lobby-note").textContent = text; };
 const REFUSED = {
-  coins: "You don't have enough coins for that bet.",
-  cap: "You've won 3,000 coins today, the daily limit. Come back tomorrow, or play a test game.",
-  range: "Bets run from 10 to 500 coins.",
-  signin: "Sign in to bet coins."
+  coins: "You don't have enough chips for that bet.",
+  chips: "You don't have enough chips for that bet. Poké Gacha gives 300 a day.",
+  cap: "You're 3,000 chips up today, the daily limit. Come back tomorrow, or play a test game.",
+  range: "Bets run from 10 to 500 chips.",
+  signin: "Sign in to bet chips."
 };
 async function startReal(mode, bet) {
   if (!(Number.isInteger(bet) && bet >= RULES.minBet && bet <= RULES.maxBet)) return note(REFUSED.range);
@@ -1216,10 +1222,10 @@ async function startReal(mode, bet) {
   for (const b of document.querySelectorAll(".islands button")) b.disabled = true;
   const reply = await ask("bet", { mode, bet });
   for (const b of document.querySelectorAll(".islands button")) b.disabled = false;
-  if (!reply) return note("Coin bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
+  if (!reply) return note("Chip bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
   showCap(reply);
-  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your coins weren't touched.");
-  if (Number.isSafeInteger(reply.coins)) setCoins(reply.coins);
+  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your chips weren't touched.");
+  setBalance(reply);
   note("");
   begin(mode, false, bet, reply.betId);
 }
@@ -1270,7 +1276,7 @@ let boardMode = "normal";
 function drawBoard(mode) {
   const panel = $("#board-" + mode), rows = boards[mode];
   const table = el("table", "board");
-  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Coins won</th><th class="n">Best streak</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net chips</th><th class="n">Best streak</th></tr></thead>';
   const body = document.createElement("tbody");
   for (let rank = 1; rank <= 10; rank++) {
     const row = body.insertRow(), entry = rows[rank - 1];
