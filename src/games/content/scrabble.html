@@ -125,7 +125,7 @@
     <button id="new" type="button">New game</button>
   </div>
   <p id="status" role="status" aria-live="polite">Choose one player or two.</p>
-  <p id="hint">Tap a tile, then a square. The first word crosses the centre.</p>
+  <p id="hint">Tap a tile, then a square. The first word crosses the centre. Two consecutive passes end the game.</p>
   <section id="setup" aria-label="Choose players">
     <h2>One player or two?</h2>
     <div class="choice">
@@ -9743,7 +9743,7 @@ function dailyRng() {
 let mode = '', level = 'medium', started = false, over = false, thinking = false;
 let board = new Array(225).fill(null);
 let racks = [[], []], bag = [], scores = [0, 0];
-let turn = 0, passes = 0, turns = 0;
+let turn = 0, passes = 0, passStreak = 0, turns = 0;
 let pending = [], planAxis = null, selected = null;
 let exchangeMode = false;
 const marked = new Set();
@@ -9950,6 +9950,7 @@ function commit() {
   planAxis = null;
   selected = null;
   passes = 0;
+  passStreak = 0;
   turns += 1;
   fillRack(turn);
   statusEl.textContent = '+' + total + ' \u00b7 ' + words.join(', ') + (bingo ? ' \u00b7 all seven tiles' : '');
@@ -9960,6 +9961,7 @@ function passTurn() {
   if (!started || over || !myTurn() || thinking) return;
   if (pending.length) { statusEl.textContent = 'Play or recall the tiles first.'; return; }
   passes += 1;
+  passStreak += 1;
   turns += 1;
   advance(label(turn) + ' passes.');
 }
@@ -9991,6 +9993,7 @@ function beginExchange() {
   exchangeMode = false;
   marked.clear();
   passes += 1;
+  passStreak = 0;
   turns += 1;
   advance('Swapped ' + outgoing.length + (outgoing.length === 1 ? ' tile.' : ' tiles.'));
 }
@@ -10000,7 +10003,7 @@ function advance(note) {
   const outOfTiles = bag.length === 0 && (racks[turn].length === 0 ||
     (racks[0].length === 0 && racks[1].length === 0));
   if (outOfTiles) return finish(prefix);
-  if (passes >= 4) return finish(prefix);
+  if (passStreak >= 2 || passes >= 4) return finish(prefix);
   turn = 1 - turn;
   pending = [];
   planAxis = null;
@@ -10253,6 +10256,7 @@ function scheduleComputer() {
     thinking = false;
     if (!moves.length) {
       passes += 1;
+      passStreak += 1;
       turns += 1;
       advance('The computer passes.');
       return;
@@ -10274,6 +10278,7 @@ function scheduleComputer() {
     }
     scores[1] += move.points;
     passes = 0;
+    passStreak = 0;
     turns += 1;
     fillRack(1);
     advance('The computer scores ' + move.points + '.');
@@ -10312,6 +10317,7 @@ function startGame() {
   blankChoice = null;
   pickerEl.hidden = true;
   passes = 0;
+  passStreak = 0;
   turns = 0;
   over = false;
   thinking = false;
@@ -10345,6 +10351,7 @@ function reset() {
   pickerEl.hidden = true;
   turn = 0;
   passes = 0;
+  passStreak = 0;
   turns = 0;
   modeEl.value = '';
   levelEl.value = 'medium';
@@ -10377,7 +10384,7 @@ function onlinePack() {
   return {
     board: board.map(cell => cell ? [cell.letter, cell.blank ? 1 : 0] : 0),
     racks: racks.map(list => list.map(pack)), bag: bag.map(pack),
-    scores: scores.slice(), turn, passes, turns, mode, level, over,
+    scores: scores.slice(), turn, passes, passStreak, turns, mode, level, over,
     seed: ONLINE?.context?.state?.seed ?? null
   };
 }
@@ -10427,7 +10434,7 @@ window.__boredSnapshot = () => ({
 /* Small handle for the test suite; it only exposes what the board shows. */
 window.__test = {
   state: () => ({
-    scores: scores.slice(), turn, passes, turns, over, mode, started,
+    scores: scores.slice(), turn, passes, passStreak, turns, over, mode, started,
     bag: bag.length,
     racks: racks.map(list => list.map(tile => tile.blank ? '?' : tile.letter)),
     board: board.map(cell => cell ? cell.letter : ''),
@@ -10455,6 +10462,7 @@ window.__test = {
     exchangeMode = false;
     marked.clear();
     passes = 0;
+    passStreak = 0;
     level = DIFFICULTY[position.level] ? position.level : 'hard';
     levelEl.value = level;
     modeEl.value = mode;
@@ -10483,7 +10491,7 @@ function savedRun() {
         ? list.concat(pending.filter(placement => placement.tile).map(placement => placement.tile))
         : list).map(pack)),
       bag: bag.map(pack),
-      scores: scores.slice(), turn, passes, turns, mode, level
+      scores: scores.slice(), turn, passes, passStreak, turns, mode, level
     }
   };
 }
@@ -10510,6 +10518,8 @@ function restoreRun(saved) {
     ? [Number(game.scores[0]) || 0, Number(game.scores[1]) || 0] : [0, 0];
   turn = game.turn === 1 ? 1 : 0;
   passes = Math.max(0, game.passes | 0);
+  // Older local saves and Together positions did not store this field.
+  passStreak = Math.max(0, game.passStreak | 0);
   turns = Math.max(0, game.turns | 0);
   pending = [];
   planAxis = null;

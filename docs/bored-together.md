@@ -235,7 +235,7 @@ Connect Four moves contain only a column.
 Chess sends `{board, turn, castling, ep, half, full}`; Scrabble sends the
 board, both racks, the bag, the scores and the turn; Risk sends territories,
 armies, reserves, cards and the turn. Chess adds `winner: 1|2` or `draw`, and
-Scrabble adds `winner: 1|2` when the bag or four passes end it. The dispatcher
+Scrabble adds `winner: 1|2` when the bag is exhausted and a rack empties, two consecutive passes occur, or four consecutive scoreless turns occur (exchanges included). The dispatcher
 bounds each position at 400,000 bytes and strips it from the move log.
 
 Pool sends angle (integer tenths of a degree), power (1–100) and optional legal
