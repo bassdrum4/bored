@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 795,
+  "count": 796,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"0335be0","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: restore Getaway Shootout startup scene and keep in-game branding hidden"},
   {"sha":"991a94c","date":"2026-11-21","author":"Daniel Lowe","subject":"test: fix literal newline in Getaway visual assertion"},
   {"sha":"7696e70","date":"2026-11-21","author":"Daniel Lowe","subject":"test: ignore legacy Unity analytics attempts in original Getaway comparison"},
   {"sha":"7f078f2","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: compare original and patched Getaway Shootout through actual post-load visuals"},
