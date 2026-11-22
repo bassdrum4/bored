@@ -2,13 +2,17 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 834,
+  "count": 838,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"64fe181","date":"2026-11-22","author":"Daniel Lowe","subject":"fix: invalidate cached hub module after Getaway Shootout branding cleanup"},
+  {"sha":"e1396ea","date":"2026-11-22","author":"Daniel Lowe","subject":"fix: launch cleaned Getaway Shootout HTML in Bored with new cache version"},
+  {"sha":"5ac3f0b","date":"2026-11-22","author":"Daniel Lowe","subject":"fix: version Getaway Shootout Unity assets after removing all outside logos"},
+  {"sha":"06589e2","date":"2026-11-22","author":"Daniel Lowe","subject":"fix: remove remaining Getaway Shootout external-branding textures safely"},
   {"sha":"3c804d7","date":"2026-11-22","author":"Daniel Lowe","subject":"docs: explain safe Getaway Shootout logo suppression without breaking splash transition"},
   {"sha":"c1ba16b","date":"2026-11-22","author":"Daniel Lowe","subject":"ci: verify removing remaining Getaway external logos while retaining gameplay"},
   {"sha":"2d6b6ba","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: remove all outside Unity splash and portal textures without disabling startup scene objects"},
