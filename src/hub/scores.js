@@ -360,6 +360,21 @@ export function boardLeaders(rows) {
       held.handles.sort((a, b) => a.localeCompare(b));
     }
   }
+  // A leaderboard-card co-leader is only a co-leader until the whole
+  // first-place group has verified career pace data. The same safeguard used
+  // by the overall ranking prevents an unsynced older account losing first.
+  const track = leaders.get('trackbound');
+  if (track?.handles.length > 1) {
+    const pace = new Map((rows || [])
+      .filter(row => row.game === 'trackbound-career-pace' &&
+        Number.isInteger(Number(row.value)) && Number(row.value) > 0)
+      .map(row => [String(row.handle || '').toLowerCase(), Number(row.value)]));
+    if (track.handles.every(handle => pace.has(handle.toLowerCase()))) {
+      const fastest = Math.min(...track.handles.map(handle => pace.get(handle.toLowerCase())));
+      track.handles = track.handles.filter(handle => pace.get(handle.toLowerCase()) === fastest);
+      track.handle = track.handles[0];
+    }
+  }
   return leaders;
 }
 
@@ -381,9 +396,23 @@ export function boardTop(rows, id, limit = 3) {
     const held = best.get(key);
     if (!held || (spec.lower ? value < held.value : value > held.value)) best.set(key, { handle, value });
   }
-  return [...best.values()]
-    .sort((a, b) => (spec.lower ? a.value - b.value : b.value - a.value) || a.handle.localeCompare(b.handle))
-    .slice(0, limit);
+  const ranked = [...best.values()]
+    .sort((a, b) => (spec.lower ? a.value - b.value : b.value - a.value) || a.handle.localeCompare(b.handle));
+  if (id === 'trackbound') {
+    const pace = careerPaces(rows);
+    for (let start = 0; start < ranked.length;) {
+      let end = start + 1;
+      while (end < ranked.length && ranked[end].value === ranked[start].value) end++;
+      const tied = ranked.slice(start, end);
+      if (tied.length > 1 && tied.every(entry => pace.has(entry.handle.toLowerCase()))) {
+        tied.sort((a, b) => pace.get(a.handle.toLowerCase()) - pace.get(b.handle.toLowerCase()) ||
+          a.handle.localeCompare(b.handle));
+        ranked.splice(start, tied.length, ...tied);
+      }
+      start = end;
+    }
+  }
+  return ranked.slice(0, limit);
 }
 
 /* ── Which boards the shared table can hold ───────────────────────────────── */
