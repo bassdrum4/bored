@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 806,
+  "count": 808,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -11,6 +11,8 @@ export const CHANGELOG_META = {
 export const CHANGELOG = [
   {"sha":"0fd926c","date":"2026-11-22","author":"Codebuff","subject":"Rocket Chicken: open the shop from the start screen and steer on touch"},
   {"sha":"cffad83","date":"2026-11-22","author":"Codebuff","subject":"Recover Rocket Chicken's Flash source and port it into the arcade"},
+  {"sha":"33fe205","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: bypass stale Getaway HTML document cache when opening Bored deep link"},
+  {"sha":"5d9785d","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: cache-bust Getaway Shootout Unity scenes so Chrome uses restored startup build"},
   {"sha":"cd78061","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: preserve Bored Escape/restart shortcuts for Getaway Shootout's normal iframe"},
   {"sha":"800e9ff","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: launch Getaway Shootout as a real same-origin document instead of Unity-incompatible srcdoc"},
   {"sha":"240b1f7","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: inspect Getaway Shootout inside the exact Bored #getaway-shootout route"},
