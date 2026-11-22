@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 851,
+  "count": 852,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a756350","date":"2026-11-22","author":"Daniel Lowe","subject":"Fix Supabase contention regression and redundant API writes"},
   {"sha":"d9e9c6c","date":"2026-11-22","author":"Daniel Lowe","subject":"Clarify daily seed exception comment outside callback"},
   {"sha":"234dc36","date":"2026-11-22","author":"Daniel Lowe","subject":"Exclude URL-hosted Unity game from injected daily seed assertion"},
   {"sha":"80972ea","date":"2026-11-22","author":"Daniel Lowe","subject":"Correct regex escaping in cache-busting test"},
