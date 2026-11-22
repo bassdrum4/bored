@@ -4,91 +4,31 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Basket Random</title>
-<!-- The game itself is the vendored Construct 3 build in ./basket-random/.
-     This document only frames it, so the hub can keep its iframe contract and
-     fetch the payload only when the card is opened. The original game is by
-     RHM Interactive; this copy follows the build published at
-     https://github.com/Unblocked-Games-786/Basket-Random (gh-pages). Its
-     GameDistribution ad SDK is replaced by ./basket-random/patch/js/gd-sdk.js
-     so PLAY does not depend on the old host page. -->
+<!-- Basket Random runs directly in the original Construct 3 export; there is
+     no Bored startup cover or intervening intro screen. The inner export starts
+     on its native "game" layout, which contains the actual main menu. -->
 <style>
-  :root {
-    --paper: #f5f2ea;
-    --board: #fffdf7;
-    --ink: #191713;
-    --hair: #d8d2c4;
-    --dim: #6b6558;
-    --accent: #456653;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0 }
-  html, body { height: 100%; overflow: hidden }
-  body {
-    background: var(--paper); color: var(--ink);
-    font: 13px/1.5 var(--sans); touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-  main { height: 100%; height: 100dvh; width: 100%; padding: 0 }
-  #stage {
-    position: relative; overflow: hidden; width: 100%; height: 100%; border: 0; border-radius: 0;
-    background: var(--board);
-  }
-  #game { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: var(--board) }
-  #game[hidden] { display: none }
-  #cover {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 10px;
-    padding: 20px; text-align: center; background: var(--paper);
-  }
-  #cover[hidden] { display: none }
-  h1 { font: 600 15px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase }
-  p { max-width: 36ch; color: var(--dim) }
-  .keys { color: var(--ink); font: 12px/1.8 var(--mono) }
-  .keys b { font-weight: 600 }
-  button {
-    font: 12px/1 var(--mono); padding: 10px 14px; border: 1px solid var(--hair);
-    border-radius: 2px; background: none; color: inherit; cursor: pointer;
-  }
-  button:hover:enabled { border-color: var(--ink) }
-  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
-  button:disabled { color: var(--dim); cursor: default }
-  #status { min-height: 1.5em; font-size: 11px }
-  @media (max-height: 420px) {
-    #cover { gap: 6px; padding: 10px }
-    h1 { font-size: 13px }
-    #cover p { font-size: 11px }
-    #cover .keys { display: none }
-  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #e7f3ff }
+  body { touch-action: manipulation; -webkit-tap-highlight-color: transparent }
+  main, #stage { width: 100%; height: 100%; height: 100dvh; overflow: hidden }
+  #game { display: block; width: 100%; height: 100%; border: 0; background: #e7f3ff }
 </style>
 </head>
 <body>
 <main>
   <section id="stage" aria-label="Basket Random game">
-    <iframe id="game" title="Basket Random" allow="autoplay; fullscreen" scrolling="no" hidden></iframe>
-    <div id="cover">
-      <h1>Basket Random</h1>
-      <p class="keys"><b>W</b> jumps for the left player.<br><b>&uarr;</b> jumps for the right.</p>
-      <p>Two on one keyboard, one ball, and physics with a mind of its own.</p>
-      <button id="start" type="button">Start match</button>
-      <p id="status" role="status" aria-live="polite"></p>
-    </div>
+    <iframe id="game" title="Basket Random" allow="autoplay; fullscreen" scrolling="no"></iframe>
   </section>
 </main>
 <script>
 const frame = document.getElementById('game');
-const cover = document.getElementById('cover');
-const start = document.getElementById('start');
-const status = document.getElementById('status');
-
 let ready = false, started = false;
 
-// The hub drops this document into the hub page as a srcdoc frame, so a relative
-// address there resolves against the hub. Opened on its own, the same document
-// sits beside the vendored folder instead. Browsers disagree on what a srcdoc
-// frame reports for location.href, so decide from the base URLs instead.
+// The hub loads this document in a srcdoc frame. On its own, it lives beside
+// basket-random/. Resolve both forms to the same local Construct 3 build.
 const bases = [document.baseURI];
-try { if (window.parent !== window) bases.push(window.parent.location.href); } catch (error) { /* cross-origin hub */ }
+try { if (window.parent !== window) bases.push(window.parent.location.href); } catch (error) { /* cross-origin embed */ }
 bases.push(window.location.href);
 const standalone = bases.some(base => {
   try { return new URL(base).pathname.endsWith('/basket-random.html'); } catch (error) { return false; }
@@ -97,41 +37,28 @@ const relative = (standalone ? 'basket-random' : 'games/content/basket-random') 
 
 function buildUrl() {
   for (const base of bases) {
-    try { return new URL(relative, base).href; } catch (error) { /* try the next base */ }
+    try { return new URL(relative, base).href; } catch (error) { /* try next base */ }
   }
   return null;
 }
 
-start.onclick = () => {
-  if (started) return;
-  const url = buildUrl();
-  if (!url) {
-    status.textContent = 'Could not find the game folder beside this page. Open it from the arcade.';
-    return;
-  }
-  started = true;
-  start.disabled = true;
-  status.textContent = 'Loading the field\u2026';
-  frame.hidden = false;
-  frame.src = url;
-  // The first load is a few megabytes; say so instead of spinning forever.
-  setTimeout(() => { if (started && !ready) status.textContent = 'Still loading\u2026 the first load is a few megabytes.'; }, 12000);
-};
-
+// Listen first so a cached asset doesn't beat the load handler.
 frame.addEventListener('load', () => {
-  // An iframe with no src loads a blank document first, and that load event can
-  // arrive even after this script runs — while the real build is still on its
-  // way. Only a load of the actual game may lift the cover.
   let blank = false;
-  try { if (frame.contentWindow) blank = frame.contentWindow.location.href === 'about:blank'; } catch (error) { /* opaque frame */ }
+  try { if (frame.contentWindow) blank = frame.contentWindow.location.href === 'about:blank'; }
+  catch (error) { /* opaque frame */ }
   if (!started || !frame.src || blank) return;
   ready = true;
-  cover.hidden = true;
-  try { frame.contentWindow.focus(); } catch (error) { /* the frame may already be gone */ }
+  try { frame.contentWindow.focus(); } catch (error) { /* document may be gone */ }
 });
 
-// The hub reads this: current state, integers and booleans, never null.
-// Basket Random has no score API, so this game keeps no leaderboard.
+// Load immediately: the real Basket Random title/menu is the first screen.
+const url = buildUrl();
+if (url) {
+  started = true;
+  frame.src = url;
+}
+
 window.__boredSnapshot = () => ({
   slug: 'basket-random',
   started: started,

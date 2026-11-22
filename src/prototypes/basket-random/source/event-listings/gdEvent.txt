@@ -1,0 +1,19 @@
+VARIABLE adShowed = 0
+EVENT #1 [0,false,null,952746746009018]
+  IF  GameDistributionSDK#196([])
+  IF  System#26([[11,"adShowed"],[8,0],[7,[4]]])
+  EVENT #2 [0,false,null,312567511950855]
+    IF  System#28([])
+    DO  Audio#178([[3,0]])
+    DO  System#72([[0,[4]]])
+    DO  System#47([[11,"pause"],[7,[5]]])
+    DO  System#47([[11,"adShowed"],[7,[5]]])
+EVENT #3 [0,false,null,443834136198053]
+  IF  GameDistributionSDK#197([])
+  IF  System#26([[11,"adShowed"],[8,0],[7,[5]]])
+  EVENT #4 [0,false,null,607064446761112]
+    IF  System#28([])
+    DO  Audio#178([[3,1]])
+    DO  System#72([[0,[5]]])
+    DO  System#47([[11,"pause"],[7,[4]]])
+    DO  System#47([[11,"adShowed"],[7,[4]]])

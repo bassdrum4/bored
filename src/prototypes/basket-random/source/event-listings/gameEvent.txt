@@ -1,0 +1,577 @@
+VARIABLE angularMaxRND = 150
+VARIABLE angularMinRND = 100
+VARIABLE wooble = 200
+VARIABLE angularSub = 8
+VARIABLE snowSlip = 2
+VARIABLE P1Control = 0
+VARIABLE P2Control = 0
+VARIABLE p1Score = 0
+VARIABLE p2Score = 0
+VARIABLE goal = 0
+VARIABLE CPU = 0
+VARIABLE biz = 0
+INCLUDE gdEvent
+INCLUDE menuEvent
+INCLUDE bonusEvent
+INCLUDE tailEvent
+INCLUDE player1Event
+INCLUDE pauseEvent
+INCLUDE player2Event
+INCLUDE player3Event
+INCLUDE player4Event
+GROUP [true,"Ball"]
+  IF  System#21([[1,[57]]])
+  EVENT #2 [0,false,null,748965599500532]
+    IF  balls#64([])
+    DO  balls#33([[10,4],[7,[22]]])
+    DO  balls.Physics#65([[3,1]])
+  EVENT #3 [0,false,null,769237520676871]
+    IF  System#22([])
+    DO  potaP.Physics#50([[4,100],[3,0]])
+    DO  potaP2.Physics#50([[4,100],[3,0]])
+    DO  Array#66([[0,[4]],[0,[43]],[0,[5]]])
+    DO  Array#67([[0,[4]]])
+    DO  landPhysics2.Physics#50([[4,100],[3,0]])
+  EVENT #4 [0,false,null,927581621229089]
+    DO  balls.Physics#37([[0,[58,[0,104,"Physics",30,false]]]])
+    DO  balls.Physics#52([[0,[59,[0,104,"Physics",30,false]]],[0,[59,[0,104,"Physics",68,false]]]])
+    DO  ballShadow#56([[0,[18,[1,104,53,false]]]])
+    DO  ballShadow#57([[0,[60,[4,59],[2,104,false,0],[1,14,54,false],[1,104,54,false]]]])
+    DO  ballLine#69([[0,[61,[4,58],[0,104,"Physics",30,false],[1,9,70,false]]]])
+  EVENT #5 [0,true,null,243584165705535]
+    IF  ballLine#31([[8,3],[0,[62]]])
+    IF  ballLine#31([[8,5],[0,[63]]])
+    EVENT #6 [0,false,null,891457319550746]
+      IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+      IF  System#28([])
+      DO  System#47([[11,"P1Control"],[7,[4]]])
+      DO  System#47([[11,"P2Control"],[7,[4]]])
+      DO  pause#71([[3,0]])
+      DO  System#47([[11,"goal"],[7,[5]]])
+      DO  System#72([[0,[23]]])
+      DO  Audio#73([[2,["wrong",false]],[3,0],[0,[64]],[1,[65]]])
+      DO  System#74([[0,[23]]])
+      DO  System#75([])
+  EVENT #7 [0,false,null,638899801020166]
+    DO  ballLine#60([[0,[18,[1,104,53,false]]],[0,[18,[1,104,54,false]]]])
+    DO  ballLine#46([[0,[18,[1,104,45,false]]]])
+  EVENT #8 [0,false,null,620143578555223]
+    IF  balls.Timer#76([[1,[24]]])
+    DO  potaP.Physics#50([[4,104],[3,1]])
+    DO  potaP2.Physics#50([[4,104],[3,1]])
+  EVENT #9 [0,false,null,147235815529802]
+    IF  balls#61([[4,83]])
+    IF  balls#25([[10,2],[8,0],[7,[4]]])
+    DO  ballLine#62([[3,1],[4,86]])
+  EVENT #10 [0,false,null,442781429105129]
+    IF  balls#64([])
+    DO  ballCol#60([[0,[18,[1,104,53,false]]],[0,[18,[1,104,54,false]]]])
+    DO  ballCol.Pin#77([[4,104],[16,true],[16,true],[16,false],[3,0],[3,0],[16,false]])
+    DO  ballCol#78([[0,[66,[1,104,79,false]]],[0,[66,[1,104,80,false]]]])
+  EVENT #11 [0,false,null,767087364179981]
+    IF  heavyBall#61([[4,8]])
+    IF  heavyBall#31([[8,4],[0,[67]]])
+    IF  heavyBall#31([[8,2],[0,[68]]])
+    IF  heavyBall#25([[10,5],[8,0],[7,[4]]])
+    DO  heavyBall#33([[10,5],[7,[5]]])
+    DO  Audio#73([[2,["metal",false]],[3,0],[0,[69]],[1,[65]]])
+  EVENT #12 [0,false,null,159822232518893]
+    IF  shark#64([])
+    DO  shark.Bullet#81([[0,[70,[2,98,false,0],[0,98,"Bullet",82,false]]]])
+GROUP [true,"Players"]
+  IF  System#21([[1,[71]]])
+  VARIABLE velX = 50
+  VARIABLE velAng = 150
+  EVENT #14 [0,false,null,546341842361063]
+    DO  body.Physics#52([[0,[72,[0,1,"Physics",30,false],[3,"velX"],[3,"velX"]]],[0,[73,[0,1,"Physics",68,false]]]])
+    DO  body.Physics#37([[0,[72,[0,1,"Physics",83,false],[3,"velAng"],[3,"velAng"]]]])
+    DO  body3.Physics#52([[0,[72,[0,30,"Physics",30,false],[3,"velX"],[3,"velX"]]],[0,[73,[0,30,"Physics",68,false]]]])
+    DO  body3.Physics#37([[0,[72,[0,30,"Physics",83,false],[3,"velAng"],[3,"velAng"]]]])
+    DO  body2.Physics#52([[0,[72,[0,35,"Physics",30,false],[3,"velX"],[3,"velX"]]],[0,[73,[0,35,"Physics",68,false]]]])
+    DO  body2.Physics#37([[0,[72,[0,35,"Physics",83,false],[3,"velAng"],[3,"velAng"]]]])
+    DO  body4.Physics#52([[0,[72,[0,38,"Physics",30,false],[3,"velX"],[3,"velX"]]],[0,[73,[0,38,"Physics",68,false]]]])
+    DO  body4.Physics#37([[0,[72,[0,38,"Physics",83,false],[3,"velAng"],[3,"velAng"]]]])
+  EVENT #15 [0,false,null,764559672536153]
+    EVENT #16 [0,false,null,649165148488414]
+      IF  p1Collision#61([[4,32]])
+      VARIABLE ang = 0
+      EVENT #17 [0,false,null,792380901369929]
+        DO  System#47([[11,"ang"],[7,[74,[0,1,"Physics",83,false]]]])
+        DO  body#41([[10,2],[7,[75,[0,30,"Physics",30,false],[0,30,"Physics",83,false]]]])
+        DO  body3#41([[10,2],[7,[76,[0,1,"Physics",30,false],[3,"ang"]]]])
+        DO  body.Physics#52([[0,[77,[0,1,"Physics",30,false]]],[0,[77,[0,1,"Physics",68,false]]]])
+        DO  body3.Physics#52([[0,[77,[0,30,"Physics",30,false]]],[0,[77,[0,30,"Physics",68,false]]]])
+    EVENT #18 [0,false,null,359736984035386]
+      IF  p1Collision#61([[4,36]])
+      VARIABLE ang = 0
+      EVENT #19 [0,false,null,896025223566591]
+        DO  System#47([[11,"ang"],[7,[74,[0,1,"Physics",83,false]]]])
+        DO  body#41([[10,2],[7,[75,[0,35,"Physics",30,false],[0,35,"Physics",83,false]]]])
+        DO  body2#41([[10,2],[7,[76,[0,1,"Physics",30,false],[3,"ang"]]]])
+        DO  body.Physics#52([[0,[77,[0,1,"Physics",30,false]]],[0,[77,[0,1,"Physics",68,false]]]])
+        DO  body2.Physics#52([[0,[77,[0,35,"Physics",30,false]]],[0,[77,[0,35,"Physics",68,false]]]])
+    EVENT #20 [0,false,null,118008491218958]
+      IF  p1Collision#61([[4,39]])
+      VARIABLE ang = 0
+      EVENT #21 [0,false,null,230766485872433]
+        DO  System#47([[11,"ang"],[7,[74,[0,1,"Physics",83,false]]]])
+        DO  body#41([[10,2],[7,[75,[0,38,"Physics",30,false],[0,38,"Physics",83,false]]]])
+        DO  body4#41([[10,2],[7,[76,[0,1,"Physics",30,false],[3,"ang"]]]])
+        DO  body.Physics#52([[0,[77,[0,1,"Physics",30,false]]],[0,[77,[0,1,"Physics",68,false]]]])
+        DO  body4.Physics#52([[0,[77,[0,38,"Physics",30,false]]],[0,[77,[0,38,"Physics",68,false]]]])
+  EVENT #22 [0,false,null,593021529484234]
+    EVENT #23 [0,false,null,784980221885662]
+      IF  p2Collision#61([[4,32]])
+      VARIABLE ang = 0
+      EVENT #24 [0,false,null,724464603753115]
+        DO  System#47([[11,"ang"],[7,[74,[0,35,"Physics",83,false]]]])
+        DO  body2#41([[10,2],[7,[75,[0,30,"Physics",30,false],[0,30,"Physics",83,false]]]])
+        DO  body3#41([[10,2],[7,[76,[0,35,"Physics",30,false],[3,"ang"]]]])
+        DO  body3.Physics#52([[0,[77,[0,30,"Physics",30,false]]],[0,[77,[0,30,"Physics",68,false]]]])
+        DO  body2.Physics#52([[0,[77,[0,35,"Physics",30,false]]],[0,[77,[0,35,"Physics",68,false]]]])
+    EVENT #25 [0,false,null,250125150285679]
+      IF  p2Collision#61([[4,39]])
+      VARIABLE ang = 0
+      EVENT #26 [0,false,null,322567800238941]
+        DO  System#47([[11,"ang"],[7,[74,[0,35,"Physics",83,false]]]])
+        DO  body2#41([[10,2],[7,[75,[0,38,"Physics",30,false],[0,38,"Physics",83,false]]]])
+        DO  body4#41([[10,2],[7,[76,[0,35,"Physics",30,false],[3,"ang"]]]])
+        DO  body4.Physics#52([[0,[77,[0,38,"Physics",30,false]]],[0,[77,[0,38,"Physics",68,false]]]])
+        DO  body2.Physics#52([[0,[77,[0,35,"Physics",30,false]]],[0,[77,[0,35,"Physics",68,false]]]])
+  EVENT #27 [0,false,null,367826469323220]
+    EVENT #28 [0,false,null,481706574538012]
+      IF  p4Collision#61([[4,32]])
+      VARIABLE ang = 0
+      EVENT #29 [0,false,null,318038229537712]
+        DO  System#47([[11,"ang"],[7,[74,[0,38,"Physics",83,false]]]])
+        DO  body4#41([[10,2],[7,[75,[0,30,"Physics",30,false],[0,30,"Physics",83,false]]]])
+        DO  body3#41([[10,2],[7,[76,[0,38,"Physics",30,false],[3,"ang"]]]])
+        DO  body3.Physics#52([[0,[77,[0,30,"Physics",30,false]]],[0,[77,[0,30,"Physics",68,false]]]])
+        DO  body4.Physics#52([[0,[77,[0,38,"Physics",30,false]]],[0,[77,[0,38,"Physics",68,false]]]])
+GROUP [true,"General"]
+  IF  System#21([[1,[78]]])
+  VARIABLE team1 = 0
+  VARIABLE team2 = 0
+  VARIABLE screenWidth = 0
+  VARIABLE screenHeight = 0
+  EVENT #31 [0,true,null,788476075180245]
+    IF  Browser#84([])
+    IF  System#22([])
+    DO  System#74([[0,[4]]])
+    DO  indoorBGTile3#85([[0,[79,[4,86]]]])
+    DO  tiles#87([[0,[80,[4,88],[4,89]]]])
+    DO  groundPortrait#90([[0,[81,[4,91],[1,106,92,false]]]])
+    DO  tiles#93([[0,[82,[4,89]]]])
+  EVENT #32 [0,false,null,529420948329690]
+    IF  System#22([])
+    DO  System#47([[11,"team1"],[7,[83,[4,94],[4,34]]]])
+    DO  System#47([[11,"team2"],[7,[83,[4,94],[4,34]]]])
+    EVENT #33 [0,false,null,912962769871285]
+      IF  System#95([])
+      IF  System#26([[11,"team1"],[8,0],[7,[10,[3,"team2"]]]])
+      DO  System#47([[11,"team2"],[7,[83,[4,94],[4,34]]]])
+    VARIABLE rnd = 0
+    EVENT #34 [0,false,null,231112843273018]
+      DO  System#47([[11,"rnd"],[7,[84,[4,96]]]])
+      EVENT #35 [0,false,null,580513779308491]
+        IF  System#26([[11,"rnd"],[8,0],[7,[4]]])
+        DO  starTile#97([])
+        DO  System#98([[5,[4]],[0,[85,[4,99]]]])
+        DO  buildingTile3#97([])
+        DO  buildingTile2#97([])
+      EVENT #36 [0,false,null,955047513643834]
+        IF  System#40([])
+        IF  System#26([[11,"rnd"],[8,0],[7,[5]]])
+        DO  starTile#97([])
+        DO  System#98([[5,[4]],[0,[86,[4,99]]]])
+        DO  cloudTile#100([[0,[87,[4,99]]]])
+        DO  buildingTile#97([])
+        DO  buildingTile3#97([])
+      EVENT #37 [0,false,null,709771032190233]
+        IF  System#40([])
+        IF  System#26([[11,"rnd"],[8,0],[7,[16]]])
+        DO  System#98([[5,[4]],[0,[88,[4,99]]]])
+        DO  cloudTile#100([[0,[89,[4,99]]]])
+        DO  buildingTile#101([[1,[90]],[0,[5]],[0,[91,[4,99]]]])
+        DO  buildingTile#101([[1,[92]],[0,[5]],[0,[93,[4,99]]]])
+        DO  buildingTile#101([[1,[94]],[0,[5]],[0,[95,[4,99]]]])
+        DO  buildingTile#97([])
+        DO  buildingTile2#97([])
+    EVENT #38 [0,false,null,553110365429368]
+      IF  System#26([[11,"biz"],[8,0],[7,[4]]])
+      EVENT #39 [0,true,null,831763469712396]
+        IF  rightShoe#25([[10,0],[8,0],[7,[4]]])
+        IF  rightShoe#25([[10,0],[8,0],[7,[16]]])
+        DO  rightShoe#102([[0,[10,[3,"team1"]]]])
+      EVENT #40 [0,true,null,428784197359940]
+        IF  tshirt#25([[10,0],[8,0],[7,[4]]])
+        IF  tshirt#25([[10,0],[8,0],[7,[16]]])
+        DO  tshirt#102([[0,[10,[3,"team1"]]]])
+      EVENT #50 [0,true,null,319592273196655]
+        IF  rightShort#25([[10,0],[8,0],[7,[16]]])
+        IF  rightShort#25([[10,0],[8,0],[7,[4]]])
+        EVENT #51 [0,false,null,411866599301605]
+          IF  System#26([[11,"team1"],[8,0],[7,[4]]])
+          DO  rightShort#102([[0,[5]]])
+        EVENT #52 [0,false,null,136210122486850]
+          IF  System#26([[11,"team1"],[8,0],[7,[5]]])
+          DO  rightShort#102([[0,[16]]])
+        EVENT #53 [0,false,null,930969624091244]
+          IF  System#26([[11,"team1"],[8,0],[7,[16]]])
+          DO  rightShort#102([[0,[47]]])
+        EVENT #54 [0,false,null,463160854633191]
+          IF  System#26([[11,"team1"],[8,0],[7,[43]]])
+          DO  rightShort#102([[0,[96]]])
+        EVENT #55 [0,false,null,780308030114040]
+          IF  System#26([[11,"team1"],[8,0],[7,[47]]])
+          DO  rightShort#102([[0,[97]]])
+        EVENT #56 [0,false,null,223317386223650]
+          IF  System#26([[11,"team1"],[8,0],[7,[96]]])
+          DO  rightShort#102([[0,[4]]])
+        EVENT #57 [0,false,null,626929282785905]
+          IF  System#26([[11,"team1"],[8,0],[7,[97]]])
+          DO  rightShort#102([[0,[98]]])
+        EVENT #58 [0,false,null,589375847487807]
+          IF  System#26([[11,"team1"],[8,0],[7,[98]]])
+          DO  rightShort#102([[0,[3]]])
+      EVENT #59 [0,true,null,609033571170522]
+        IF  rightShoe#25([[10,0],[8,0],[7,[43]]])
+        IF  rightShoe#25([[10,0],[8,0],[7,[47]]])
+        DO  rightShoe#102([[0,[10,[3,"team2"]]]])
+      EVENT #60 [0,true,null,103668502655185]
+        IF  tshirt#25([[10,0],[8,0],[7,[43]]])
+        IF  tshirt#25([[10,0],[8,0],[7,[47]]])
+        DO  tshirt#102([[0,[10,[3,"team2"]]]])
+      EVENT #70 [0,true,null,315386225390318]
+        IF  rightShort#25([[10,0],[8,0],[7,[47]]])
+        IF  rightShort#25([[10,0],[8,0],[7,[43]]])
+        EVENT #71 [0,false,null,265590880696004]
+          IF  System#26([[11,"team2"],[8,0],[7,[4]]])
+          DO  rightShort#102([[0,[5]]])
+        EVENT #72 [0,false,null,497797290260455]
+          IF  System#26([[11,"team2"],[8,0],[7,[5]]])
+          DO  rightShort#102([[0,[16]]])
+        EVENT #73 [0,false,null,233994169512650]
+          IF  System#26([[11,"team2"],[8,0],[7,[16]]])
+          DO  rightShort#102([[0,[47]]])
+        EVENT #74 [0,false,null,240655387705465]
+          IF  System#26([[11,"team2"],[8,0],[7,[43]]])
+          DO  rightShort#102([[0,[96]]])
+        EVENT #75 [0,false,null,345407887041898]
+          IF  System#26([[11,"team2"],[8,0],[7,[47]]])
+          DO  rightShort#102([[0,[97]]])
+        EVENT #76 [0,false,null,603000538697228]
+          IF  System#26([[11,"team2"],[8,0],[7,[96]]])
+          DO  rightShort#102([[0,[4]]])
+        EVENT #77 [0,false,null,645461628703794]
+          IF  System#26([[11,"team2"],[8,0],[7,[97]]])
+          DO  rightShort#102([[0,[98]]])
+        EVENT #78 [0,false,null,843603241640463]
+          IF  System#26([[11,"team2"],[8,0],[7,[98]]])
+          DO  rightShort#102([[0,[3]]])
+  EVENT #79 [0,false,null,673026883730784]
+    IF  hair#64([])
+    DO  hair#102([[0,[99,[4,94],[4,34],[1,11,70,false]]]])
+    DO  hair#103([[0,[100,[4,96],[4,99],[4,99],[4,99]]]])
+  EVENT #80 [0,false,null,893807174520322]
+    IF  body#64([])
+    DO  body#103([[0,[101,[4,96],[4,99],[4,99],[4,99],[4,99]]]])
+    DO  head#103([[0,[18,[1,1,104,false]]]])
+    DO  arm#103([[0,[18,[1,1,104,false]]]])
+  EVENT #81 [0,false,null,771922096649551]
+    IF  body3#64([])
+    DO  body3#103([[0,[101,[4,96],[4,99],[4,99],[4,99],[4,99]]]])
+    DO  head3#103([[0,[18,[1,30,104,false]]]])
+    DO  arm3#103([[0,[18,[1,30,104,false]]]])
+  EVENT #82 [0,false,null,554145190363898]
+    IF  body2#64([])
+    DO  body2#103([[0,[101,[4,96],[4,99],[4,99],[4,99],[4,99]]]])
+    DO  head2#103([[0,[18,[1,35,104,false]]]])
+    DO  arm2#103([[0,[18,[1,35,104,false]]]])
+  EVENT #83 [0,false,null,929222060760567]
+    IF  body4#64([])
+    DO  body4#103([[0,[101,[4,96],[4,99],[4,99],[4,99],[4,99]]]])
+    DO  head4#103([[0,[18,[1,38,104,false]]]])
+    DO  arm4#103([[0,[18,[1,38,104,false]]]])
+GROUP [true,"Control"]
+  IF  System#21([[1,[102]]])
+  EVENT #85 [0,false,null,173335466987062]
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    IF  Touch#105([[4,16]])
+    IF  Touch#105([[4,48]])
+    EVENT #86 [0,true,null,470532884080689]
+      IF  Keyboard#106([[9,38]])
+      IF  Touch#105([[4,45]])
+      DO  System#47([[11,"P1Control"],[7,[5]]])
+    EVENT #87 [0,false,null,120299978614252]
+      IF  System#40([])
+      DO  System#47([[11,"P1Control"],[7,[4]]])
+    EVENT #88 [0,false,null,285707079002661]
+      IF  System#26([[11,"CPU"],[8,0],[7,[4]]])
+      EVENT #89 [0,true,null,836703864715875]
+        IF  Keyboard#106([[9,87]])
+        IF  Touch#105([[4,46]])
+        DO  System#47([[11,"P2Control"],[7,[5]]])
+      EVENT #90 [0,false,null,958335728983498]
+        IF  System#40([])
+        DO  System#47([[11,"P2Control"],[7,[4]]])
+  EVENT #91 [0,false,null,320181907294440]
+    DO  buttonLeft#78([[0,[103,[1,46,53,false],[4,89]]],[0,[104,[4,91],[4,86]]]])
+    DO  buttonRight#78([[0,[103,[1,45,53,false],[4,89]]],[0,[104,[4,91],[4,86]]]])
+  EVENT #92 [0,false,null,727638185708018]
+    IF  System#26([[11,"P1Control"],[8,0],[7,[5]]])
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    IF  System#28([])
+    DO  Audio#73([[2,["press",false]],[3,0],[0,[69]],[1,[65]]])
+    EVENT #93 [0,false,null,355266461111034]
+      IF  tutorial#25([[10,0],[8,0],[7,[5]]])
+      DO  tutorial#107([])
+    EVENT #94 [0,false,null,469342562241231]
+      IF  scoreBG#25([[10,0],[8,0],[7,[5]]])
+      DO  scoreBG#71([[3,1]])
+    EVENT #95 [0,false,null,784813909379771]
+      IF  fontWonder#108([[10,0],[8,0],[7,[5]]])
+      DO  fontWonder#109([[3,1]])
+  EVENT #96 [0,false,null,262390943356076]
+    IF  System#26([[11,"P2Control"],[8,0],[7,[5]]])
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    IF  System#28([])
+    DO  Audio#73([[2,["press",false]],[3,0],[0,[69]],[1,[65]]])
+    EVENT #97 [0,false,null,427259355230543]
+      IF  tutorial#25([[10,0],[8,0],[7,[4]]])
+      DO  tutorial#107([])
+    EVENT #98 [0,false,null,440773771277828]
+      IF  scoreBG#25([[10,0],[8,0],[7,[4]]])
+      DO  scoreBG#71([[3,1]])
+    EVENT #99 [0,false,null,927346900137432]
+      IF  fontWonder#108([[10,0],[8,0],[7,[4]]])
+      DO  fontWonder#109([[3,1]])
+  EVENT #100 [0,false,null,248678847168057]
+    IF  System#26([[11,"P1Control"],[8,0],[7,[5]]])
+    EVENT #101 [0,false,null,601984124282181]
+      IF  System#28([])
+      EVENT #102 [0,true,null,453978799111102]
+        IF  body#27([[4,8]])
+        IF  body2#27([[4,8]])
+        EVENT #103 [0,false,null,138297631160512]
+          IF  Audio#110([[1,[105]]])
+          DO  Audio#73([[2,["jump",false]],[3,0],[0,[64]],[1,[105]]])
+  EVENT #104 [0,false,null,428784621584431]
+    IF  System#26([[11,"P2Control"],[8,0],[7,[5]]])
+    EVENT #105 [0,false,null,665713215263798]
+      IF  System#28([])
+      EVENT #106 [0,true,null,949407305767272]
+        IF  body3#27([[4,8]])
+        IF  body4#27([[4,8]])
+        EVENT #107 [0,false,null,757919200008736]
+          IF  Audio#110([[1,[106]]])
+          DO  Audio#73([[2,["jump",false]],[3,0],[0,[64]],[1,[106]]])
+GROUP [true,"Goal"]
+  IF  System#21([[1,[107]]])
+  EVENT #109 [0,false,null,958755318800767]
+    IF  System#22([])
+    EVENT #110 [0,false,null,852520426676739]
+      IF  System#44([[7,[108,[3,"p1Score"],[3,"p2Score"]]],[8,4],[7,[4]]])
+      DO  fontWonder#109([[3,1]])
+      DO  tutorial#107([])
+      DO  scoreBG#71([[3,1]])
+    EVENT #111 [0,false,null,543602788605946]
+      IF  fontWonder#108([[10,0],[8,0],[7,[5]]])
+      DO  fontWonder#111([[7,[10,[3,"p1Score"]]]])
+    EVENT #112 [0,false,null,670566705464451]
+      IF  fontWonder#108([[10,0],[8,0],[7,[4]]])
+      DO  fontWonder#111([[7,[10,[3,"p2Score"]]]])
+  EVENT #113 [0,false,null,219804282033176]
+    IF  System#112([[4,76],[0,[18,[1,9,53,false]]],[0,[18,[1,9,54,false]]]])
+    IF  balls#25([[10,2],[8,0],[7,[4]]])
+    IF  balls#25([[10,3],[8,0],[7,[4]]])
+    IF  balls.Physics#113([[3,1],[8,4],[0,[4]]])
+    IF  ballLine#35([[8,2],[0,[18,[1,76,54,false]]]])
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    IF  System#28([])
+    DO  Audio#73([[2,["file",false]],[3,0],[0,[69]],[1,[65]]])
+    DO  System#47([[11,"P1Control"],[7,[4]]])
+    DO  System#47([[11,"P2Control"],[7,[4]]])
+    DO  pause#71([[3,0]])
+    DO  System#47([[11,"goal"],[7,[5]]])
+    DO  System#72([[0,[23]]])
+    DO  System#114([[4,22],[0,[5]]])
+    DO  tutorial#107([])
+    DO  fontWonder#109([[3,1]])
+    DO  scoreBG#71([[3,1]])
+    EVENT #114 [0,false,null,890382735953284]
+      IF  System#115([[4,86]])
+      IF  scoreCollision#25([[10,0],[8,0],[7,[12,[2,86,false,0]]]])
+      DO  potaFile#116([[0,[109,[1,86,79,false]]]])
+      DO  potaFile#117([[0,[110,[1,86,80,false]]]])
+      DO  System#74([[0,[111]]])
+      DO  potaFile#57([[0,[5]]])
+    EVENT #115 [0,false,null,232067892445288]
+      IF  scoreCollision#25([[10,0],[8,0],[7,[4]]])
+      DO  System#118([[11,"p1Score"],[7,[112,[1,9,119,true]]]])
+      DO  object#-2#goalText([[0,[5]]])
+      EVENT #116 [0,false,null,302934131099967]
+        IF  fontWonder#108([[10,0],[8,0],[7,[5]]])
+        DO  fontWonder#111([[7,[10,[3,"p1Score"]]]])
+        DO  fontWonder.Timer#51([[0,[23]],[3,0],[1,[113]]])
+    EVENT #117 [0,false,null,110355254108765]
+      IF  scoreCollision#25([[10,0],[8,0],[7,[5]]])
+      DO  object#-2#goalText([[0,[4]]])
+      DO  System#118([[11,"p2Score"],[7,[112,[1,9,119,true]]]])
+      EVENT #118 [0,false,null,713517519493058]
+        IF  fontWonder#108([[10,0],[8,0],[7,[4]]])
+        DO  fontWonder#111([[7,[10,[3,"p2Score"]]]])
+        DO  fontWonder.Timer#51([[0,[23]],[3,0],[1,[113]]])
+    EVENT #119 [0,false,null,708963458766174]
+      DO  System#74([[0,[114]]])
+      DO  System#72([[0,[5]]])
+      DO  System#74([[0,[115]]])
+      DO  System#47([[11,"goal"],[7,[16]]])
+      EVENT #120 [0,false,null,523916697039557]
+        IF  System#26([[11,"p1Score"],[8,2],[7,[96]]])
+        IF  System#26([[11,"p2Score"],[8,2],[7,[96]]])
+        DO  System#120([])
+        DO  System#75([])
+      EVENT #121 [0,false,null,385326869674219]
+        IF  System#40([])
+        EVENT #122 [0,false,null,605550283910238]
+          IF  System#26([[11,"p1Score"],[8,5],[7,[96]]])
+          DO  object#-2#gameOver([[1,[116]]])
+        EVENT #123 [0,false,null,470832160460214]
+          IF  System#40([])
+          DO  object#-2#gameOver([[1,[117]]])
+  EVENT #124 [0,false,null,820567048447002]
+    IF  System#26([[11,"goal"],[8,0],[7,[5]]])
+    DO  System#121([[0,[118,[4,122],[1,9,53,false],[4,38]]],[0,[119,[4,123]]]])
+    DO  System#124([[0,[120,[4,125],[4,38]]]])
+  EVENT #125 [0,false,null,211333034083388]
+    IF  fontWonder.Timer#76([[1,[113]]])
+    DO  fontWonder#126([[0,[121]]])
+    DO  fontWonder#127([[0,[122,[4,99]]]])
+    DO  fontWonder.Timer#51([[0,[23]],[3,0],[1,[123]]])
+  EVENT #126 [0,false,null,231011438389849]
+    IF  fontWonder.Timer#76([[1,[123]]])
+    DO  fontWonder#126([[0,[5]]])
+    DO  fontWonder#127([[0,[124,[4,99]]]])
+    DO  fontWonder.Timer#51([[0,[23]],[3,0],[1,[113]]])
+GROUP [true,"End"]
+  IF  System#21([[1,[125]]])
+  EVENT #128 [0,false,null,164370333053836]
+    IF  pause.Tween#128([[1,[126]]])
+    DO  System#129([[5,[127]],[0,[128,[0,16,"Tween",130,false]]]])
+  EVENT #129 [0,false,null,966802454675834]
+    IF  pause.Tween#131([[1,[126]]])
+    DO  System#129([[5,[127]],[0,[129]]])
+  FUNCTION ["gameOver",0,[[1,"who",1,"",false,false,585962555298105,false,20]],true,false]
+    DO  Audio#73([[2,["menu",false]],[3,1],[0,[64]],[1,[130]]])
+    DO  Audio#132([[1,[131]]])
+    DO  Audio#73([[2,["win",false]],[3,0],[0,[69]],[1,[132]]])
+    DO  tutorial#107([])
+    DO  pause.Tween#133([[1,[126]],[0,[4]],[0,[129]],[0,[28]],[18,1],[3,0]])
+    DO  System#129([[5,[127]],[0,[4]]])
+    DO  System#134([[5,[133]],[3,1]])
+    DO  scoreBG#135([[5,[134]]])
+    DO  fontWonder#136([[5,[134]]])
+    DO  System#74([[0,[114]]])
+    DO  System#137([[4,51],[5,[134]],[0,[4]],[0,[135]]])
+    DO  titleBG#138([[0,[136]],[0,[137]]])
+    DO  System#137([[4,51],[5,[134]],[0,[4]],[0,[138]]])
+    DO  titleBG#138([[0,[136]],[0,[43]]])
+    DO  System#137([[4,51],[5,[134]],[0,[4]],[0,[139]]])
+    DO  titleBG#138([[0,[136]],[0,[43]]])
+    DO  System#137([[4,52],[5,[134]],[0,[140]],[0,[141]]])
+    DO  title.Tween#139([[1,[142]],[3,0],[0,[143]],[0,[28]],[18,9],[3,0]])
+    DO  System#137([[4,53],[5,[134]],[0,[144]],[0,[145]]])
+    DO  startButton#33([[10,0],[7,[5]]])
+    DO  System#137([[4,55],[5,[134]],[0,[143]],[0,[145]]])
+    DO  startButton2#33([[10,0],[7,[5]]])
+    DO  System#137([[4,54],[5,[134]],[0,[146]],[0,[145]]])
+    EVENT #131 [0,false,null,833797330398783]
+      IF  System#26([[11,"who"],[8,0],[7,[117]]])
+      EVENT #132 [0,false,null,963453263147041]
+        IF  System#26([[11,"CPU"],[8,0],[7,[4]]])
+        DO  title#102([[0,[5]]])
+      EVENT #133 [0,false,null,390730169655330]
+        IF  System#40([])
+        DO  title#102([[0,[43]]])
+    EVENT #134 [0,false,null,243855942448118]
+      IF  System#40([])
+      IF  System#26([[11,"who"],[8,0],[7,[116]]])
+      DO  title#102([[0,[16]]])
+GROUP [true,"CPU"]
+  IF  System#21([[1,[147]]])
+  EVENT #136 [0,false,null,449721042005000]
+    IF  System#26([[11,"CPU"],[8,0],[7,[5]]])
+    EVENT #137 [0,false,null,154525866267729]
+      IF  tutorial#25([[10,0],[8,0],[7,[4]]])
+      IF  System#28([])
+      DO  tutorial#107([])
+    EVENT #138 [0,false,null,367414079887502]
+      IF  pause.Timer#76([[1,[148]]])
+      DO  pause.Timer#140([[1,[148]]])
+      DO  System#47([[11,"P2Control"],[7,[5]]])
+      DO  pause.Timer#51([[0,[149,[4,34]]],[3,0],[1,[150]]])
+    EVENT #139 [0,false,null,895848273891725]
+      IF  pause.Timer#76([[1,[150]]])
+      DO  System#47([[11,"P2Control"],[7,[4]]])
+    EVENT #140 [0,false,null,326362097079423]
+      IF  pause.Timer#76([[1,[151]]])
+      DO  pause.Timer#51([[0,[152]],[3,0],[1,[27]]])
+      DO  System#47([[11,"P2Control"],[7,[4]]])
+  EVENT #141 [0,false,null,207272745776170]
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    IF  System#26([[11,"CPU"],[8,0],[7,[5]]])
+    IF  System#26([[11,"P2Control"],[8,0],[7,[4]]])
+    IF  System#26([[11,"pause"],[8,0],[7,[4]]])
+    IF  balls#25([[10,4],[8,2],[7,[43]]])
+    IF  cpu#27([[4,8]])
+    EVENT #142 [0,false,null,264325632962497]
+      IF  pause.Timer#55([[1,[150]]])
+      IF  System#28([])
+      DO  pause.Timer#51([[0,[16]],[3,0],[1,[148]]])
+    EVENT #143 [0,false,null,347904729817310]
+      IF  cpu#141([[3,0],[0,[18,[1,104,53,false]]],[0,[18,[1,104,54,false]]]])
+      EVENT #144 [0,false,null,716854368222074]
+        IF  cpu#31([[8,3],[0,[18,[1,104,53,false]]]])
+        EVENT #145 [0,false,null,426456459692535]
+          IF  cpu#39([[0,[17]],[0,[153]]])
+          IF  System#28([])
+          DO  System#47([[11,"P2Control"],[7,[5]]])
+          DO  pause.Timer#140([[1,[148]]])
+          DO  pause.Timer#51([[0,[149,[4,34]]],[3,0],[1,[150]]])
+      EVENT #146 [0,false,null,646781596647051]
+        IF  System#40([])
+        EVENT #147 [0,false,null,761243727335206]
+          IF  cpu#39([[0,[154]],[0,[155]]])
+          IF  System#28([])
+          DO  System#47([[11,"P2Control"],[7,[5]]])
+          DO  pause.Timer#140([[1,[148]]])
+          DO  pause.Timer#51([[0,[149,[4,34]]],[3,0],[1,[150]]])
+  EVENT #148 [0,false,null,480065350305972]
+    IF  System#26([[11,"goal"],[8,0],[7,[4]]])
+    IF  System#26([[11,"CPU"],[8,0],[7,[5]]])
+    IF  balls#25([[10,4],[8,5],[7,[43]]])
+    IF  cpu#27([[4,8]])
+    IF  pause.Timer#55([[1,[151]]])
+    IF  pause.Timer#55([[1,[27]]])
+    IF  System#28([])
+    DO  pause.Timer#140([[1,[150]]])
+    DO  pause.Timer#140([[1,[148]]])
+    DO  System#47([[11,"P2Control"],[7,[5]]])
+    DO  pause.Timer#51([[0,[156]],[3,0],[1,[151]]])
+  EVENT #149 [0,false,null,315262562975878]
+    IF  System#26([[11,"CPU"],[8,0],[7,[5]]])
+    IF  System#28([])
+    EVENT #150 [0,false,null,234440580382484]
+      IF  potaP2#25([[10,3],[8,0],[7,[5]]])
+      DO  potaP2#116([[0,[5]]])
+    EVENT #151 [0,false,null,565870197847310]
+      IF  potaP2#25([[10,3],[8,0],[7,[16]]])
+      DO  potaP2#116([[0,[16]]])
+      DO  potaP2#56([[0,[157,[1,73,53,false]]]])
+    EVENT #152 [0,false,null,374465267481306]
+      IF  potaP2#25([[10,3],[8,0],[7,[43]]])
+      DO  potaP2#46([[0,[158]]])
