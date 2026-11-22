@@ -2,13 +2,17 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 796,
+  "count": 800,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5dea89d","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: test Getaway Shootout visual post-load and click-through, not just Unity ready flag"},
+  {"sha":"7893f32","date":"2026-11-21","author":"Daniel Lowe","subject":"test: click Getaway Shootout Play and check scene after menu transition"},
+  {"sha":"6d4706f","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed Getaway Shootout blue-screen repair workflow"},
+  {"sha":"8864b0c","date":"2026-11-21","author":"Daniel Lowe","subject":"docs: document required Getaway Shootout splash object and blue-screen fix"},
   {"sha":"0335be0","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: restore Getaway Shootout startup scene and keep in-game branding hidden"},
   {"sha":"991a94c","date":"2026-11-21","author":"Daniel Lowe","subject":"test: fix literal newline in Getaway visual assertion"},
   {"sha":"7696e70","date":"2026-11-21","author":"Daniel Lowe","subject":"test: ignore legacy Unity analytics attempts in original Getaway comparison"},
