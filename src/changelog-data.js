@@ -2,13 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 800,
-  "newest": "2026-11-21",
+  "count": 803,
+  "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"cffad83","date":"2026-11-22","author":"Codebuff","subject":"Recover Rocket Chicken's Flash source and port it into the arcade"},
+  {"sha":"240b1f7","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: inspect Getaway Shootout inside the exact Bored #getaway-shootout route"},
+  {"sha":"2152b3a","date":"2026-11-21","author":"Daniel Lowe","subject":"test: diagnose actual Getaway Shootout deep-link in Bored embedded player"},
   {"sha":"5dea89d","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: test Getaway Shootout visual post-load and click-through, not just Unity ready flag"},
   {"sha":"7893f32","date":"2026-11-21","author":"Daniel Lowe","subject":"test: click Getaway Shootout Play and check scene after menu transition"},
   {"sha":"6d4706f","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed Getaway Shootout blue-screen repair workflow"},
