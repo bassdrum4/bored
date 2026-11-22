@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 767,
+  "count": 768,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"78ebad8","date":"2026-11-21","author":"Daniel Lowe","subject":"Recover Basket Random source; skip intro and remove promotional links"},
   {"sha":"0d0c1c4","date":"2026-11-21","author":"Daniel Lowe","subject":"fix(scrabble): finish after two consecutive passes without breaking saves"},
   {"sha":"6e17206","date":"2026-11-21","author":"Claude","subject":"Shotgun Roulette: first-person table redesign, and open it to everyone"},
   {"sha":"9cf8377","date":"2026-11-21","author":"Daniel Lowe","subject":"Remove Rooftop Snipers title-screen promotional controls","pr":281},
