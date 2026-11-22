@@ -19,7 +19,7 @@ import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js'
 import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
-import { createRouletteBridge } from './hub/roulette.js';
+import { createRouletteBridge, rouletteWonOn, ROULETTE } from './hub/roulette.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -764,7 +764,12 @@ function activateProfile() {
 // is the only copy: every pull, hatch and spend is written here and synced.
 window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); renderBuddy(); } }),
   // Tower defense: battles, rewards and missions (src/hub/td.js).
-  td: tdBridge({ onChange: () => requestCloudPush() }) };
+  td: tdBridge({ onChange: () => requestCloudPush() }),
+  // The Collector's way to chips: today's net at Shotgun Roulette against its cap, and a door to it.
+  casino: {
+    today: () => ({ net: rouletteWonOn(readWallet(), defaultDailyDate()), cap: ROULETTE.dailyCap }),
+    open: () => openGame('shotgun-roulette')
+  } };
 // Pokédoku asks this for the look a player's line wears (normal, shiny or an SP skin).
 window.__boredLooks = storedLooks();
 // Shotgun Roulette asks over postMessage (see the bored:roulette case below); the wallet stays here.
@@ -1126,6 +1131,10 @@ addEventListener('message', event => {
           type: 'bored:admin-preview-wallet', chips: walletBalance(readWallet()).chips || 0, coins: walletBalance(readWallet()).chips || 0
         }, '*');
       }
+      break;
+    case 'bored:open-game':
+      // Shotgun Roulette's "back to Poké Gacha". Only that frame, and only that one door.
+      if (event.source === gameFrame.contentWindow && activeSlug === 'shotgun-roulette' && event.data.slug === 'poke-gacha') openGame('poke-gacha');
       break;
     case 'bored:roulette':
       // Shotgun Roulette's bets, payouts and board. The sandboxed frame only asks;
