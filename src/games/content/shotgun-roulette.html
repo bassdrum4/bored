@@ -54,21 +54,23 @@
   .felt-lines { position: absolute; inset: 0; pointer-events: none }
   .slots, #shell-layer { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none }
   .slots .item { pointer-events: auto }
-  .slot { position: absolute; width: 128px; height: 132px; border: 3px solid #cfc6a8e6; transform-style: preserve-3d;
-          display: flex; align-items: flex-end; justify-content: center; gap: 4px; padding-bottom: 14px }
-  .item { position: relative; width: 64px; height: 64px; border: 0; background: none; cursor: default; transform-origin: 50% 100%;
-          transform: rotateX(calc(-1 * var(--tilt))); transition: transform .18s ease-out, filter .18s }
-  .item img { width: 64px; height: 64px; display: block; filter: drop-shadow(0 6px 3px #0009) }
+  /* 8 boxes a side, one item each. Items lie flat in the table's own plane,
+     centered in their box, so they line up with the chalk lines. */
+  .slot { position: absolute; width: 150px; height: 100px; border: 3px solid #cfc6a8e6; transform-style: preserve-3d;
+          display: flex; align-items: center; justify-content: center }
+  .item { position: relative; width: 84px; height: 84px; padding: 0; border: 0; background: none; cursor: default;
+          transform: translateZ(1px); transition: transform .18s ease-out, filter .18s }
+  .item img { width: 84px; height: 84px; display: block; filter: drop-shadow(4px 8px 3px #000a) }
   .mine .item:not(:disabled) { cursor: pointer }
-  .mine .item:not(:disabled):hover, .mine .item:not(:disabled):focus-visible { transform: rotateX(calc(-1 * var(--tilt))) translateY(-16px) }
+  .mine .item:not(:disabled):hover, .mine .item:not(:disabled):focus-visible { transform: translateZ(22px) }
   .mine .item:disabled { filter: brightness(.55) }
   .item.using { animation: use-item .7s ease-in forwards }
   .item.glow img { filter: drop-shadow(0 0 10px var(--gold)) brightness(1.4) }
-  @keyframes use-item { 40% { transform: rotateX(calc(-1 * var(--tilt))) translateY(-34px) scale(1.15); filter: brightness(1.8) }
-                        100% { transform: rotateX(calc(-1 * var(--tilt))) translateY(-60px) scale(.6); opacity: 0 } }
+  @keyframes use-item { 40% { transform: translateZ(60px) scale(1.12); filter: brightness(1.8) }
+                        100% { transform: translateZ(110px) scale(.6); opacity: 0 } }
 
   /* The shotgun lies flat, barrel toward Giratina. */
-  .gun { position: absolute; left: 448px; top: 250px; width: 84px; height: 360px; border: 0; background: none; transform-origin: 50% 55%;
+  .gun { position: absolute; left: 426px; top: 250px; width: 84px; height: 360px; border: 0; background: none; transform-origin: 50% 55%;
          transform-style: preserve-3d; transition: transform .65s cubic-bezier(.3,.7,.3,1), filter .3s; cursor: default }
   .gun svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 10px 6px #000a) }
   .gun.ready { cursor: pointer; animation: ready 2.4s ease-in-out infinite }
@@ -82,21 +84,22 @@
   .flash.on { animation: flash .22s ease-out }
   @keyframes flash { 0% { opacity: 1; transform: scale(.4) } 100% { opacity: 0; transform: scale(1.4) } }
 
-  /* Shells: a row of slots, and the ones that pop out of the gun. */
-  .shell-row { position: absolute; left: 610px; top: 372px; width: 300px; height: 86px; border: 3px solid var(--chalk); display: flex;
-               transform-style: preserve-3d; opacity: .9 }
+  /* Shells: a row of 8 cells, the shells lying on their side in it, and the
+     ones that pop out of the gun. Pixel art, side view, brass base toward you. */
+  .shell-row { position: absolute; left: 550px; top: 250px; width: 314px; height: 96px; border: 3px solid var(--chalk); display: flex; opacity: .9 }
   .shell-row span { flex: 1; border-right: 2px solid var(--chalk) }
   .shell-row span:last-child { border-right: 0 }
-  .shell { position: absolute; width: 22px; height: 54px; transform-style: preserve-3d; transition: transform .5s ease-in, opacity .5s }
-  .shell i { position: absolute; inset: 0; border-radius: 4px 4px 2px 2px; backface-visibility: hidden }
-  .shell i::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: #b8923e; border-radius: 0 0 2px 2px }
-  .shell .face { background: var(--blank) }
-  .shell.live .face { background: var(--live) }
-  .shell .back { background: #2b2622; transform: rotateY(180deg) }
+  .shell { position: absolute; width: 24px; height: 76px; transform-style: preserve-3d; transition: transform .22s ease-out, opacity .22s }
+  .shell svg, .spent svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated;
+                           shape-rendering: crispEdges; backface-visibility: hidden; filter: drop-shadow(3px 5px 2px #0009) }
+  .shell svg.back { transform: rotateY(180deg) }
+  .shell.drop { animation: drop .34s cubic-bezier(.3,.6,.4,1) both }
+  @keyframes drop { 0% { transform: translateZ(150px); opacity: 0 } 55% { transform: translateZ(0); opacity: 1 }
+                    75% { transform: translateZ(14px) } 100% { transform: translateZ(0) } }
   .shell.down { transform: rotateY(180deg) }
-  .spent { position: absolute; width: 16px; height: 40px; border-radius: 3px 3px 1px 1px; background: var(--blank); transform-origin: 50% 50%;
-           box-shadow: inset 0 -10px 0 #b8923e; animation: eject 1.9s ease-out forwards }
-  .spent.live { background: var(--live) }
+  .spent { position: absolute; width: 18px; height: 58px; transform-origin: 50% 50%; animation: eject 1.9s ease-out forwards }
+  #pump { transition: transform .13s ease-in-out }
+  #pump.back { transform: translateY(22px) }
   @keyframes eject { 0% { transform: translate(0, 0) rotate(0) translateZ(60px); opacity: 1 }
                      35% { transform: translate(var(--dx), -70px) rotate(220deg) translateZ(110px) }
                      60% { transform: translate(calc(var(--dx) * 1.3), var(--dy)) rotate(380deg) translateZ(0); opacity: 1 }
@@ -248,10 +251,10 @@
       <div class="table" id="felt">
         <svg class="felt-lines" viewBox="0 0 936 698" preserveAspectRatio="none" aria-hidden="true">
           <g fill="none" stroke="#cfc6a8" stroke-width="3" opacity=".75">
-            <rect x="372" y="20" width="192" height="90"/>
-            <line x1="468" y1="110" x2="468" y2="220"/>
-            <line x1="40" y1="330" x2="896" y2="330"/>
-            <line x1="40" y1="510" x2="896" y2="510"/>
+            <rect x="410" y="20" width="116" height="78"/>
+            <line x1="468" y1="98" x2="468" y2="228"/>
+            <line x1="40" y1="238" x2="896" y2="238"/>
+            <line x1="40" y1="380" x2="896" y2="380"/>
           </g>
         </svg>
         <div class="slots foe" id="foe-slots"></div>
@@ -263,8 +266,12 @@
           <svg viewBox="0 0 84 360" aria-hidden="true">
             <rect x="34" y="0" width="16" height="190" rx="3" fill="#3b3531"/>
             <rect x="37" y="0" width="5" height="190" fill="#57504a"/>
-            <rect x="28" y="120" width="28" height="58" rx="5" fill="#5a3826"/>
-            <rect x="28" y="126" width="28" height="4" fill="#3d2418"/><rect x="28" y="138" width="28" height="4" fill="#3d2418"/><rect x="28" y="150" width="28" height="4" fill="#3d2418"/>
+            <g id="pump">
+              <rect x="28" y="120" width="28" height="58" rx="5" fill="#5a3826"/>
+              <rect x="28" y="126" width="28" height="4" fill="#3d2418"/><rect x="28" y="138" width="28" height="4" fill="#3d2418"/><rect x="28" y="150" width="28" height="4" fill="#3d2418"/>
+            </g>
+            <!-- The loading port, under the receiver. -->
+            <rect x="34" y="226" width="16" height="22" rx="2" fill="#191614"/>
             <rect x="26" y="186" width="32" height="70" rx="4" fill="#2e2a27"/>
             <path d="M42 252 q -4 26 8 30" stroke="#1b1816" stroke-width="5" fill="none"/>
             <path d="M28 254 L 56 254 L 66 352 Q 42 364 18 352 Z" fill="#5f3b28"/>
@@ -377,7 +384,6 @@ const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 const wait = ms => new Promise(done => setTimeout(done, ms));
 const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-const pick = list => list[Math.floor(Math.random() * list.length)];
 const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
 
 /* ── Sprites (the same path rule as Pokédoku, Poké Idle and Poké Gacha) ── */
@@ -401,6 +407,10 @@ const ITEMS = {
   orb: { name: "Griseous Orb", art: "griseous-orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
 };
 const POOL = ["potion", "scope", "eject", "band", "wave", "trick"];
+// Thunder Wave turns up half as often as the other items.
+const POOL_WEIGHT = { potion: 1, scope: 1, eject: 1, band: 1, wave: 0.5, trick: 1 };
+// A paralyzed side has this chance to lose its turn (Pokémon-style paralysis).
+const PARALYSIS = 0.5;
 const YOU = 0, FOE = 1;
 
 /* ── Fit the 1280x720 stage to the frame ─────────────────────────────── */
@@ -460,47 +470,117 @@ addEventListener("focus", () => { refreshCoins(); refreshStatus(); });
 /* ── Game state ───────────────────────────────────────────────────────── */
 let g = null, run = 0, lastStart = null;
 const alive = id => g && g.id === id && !g.over;
-const fighter = name => ({ name, hp: 0, max: 0, items: [], band: false, para: false, waveLock: false, knows: null, hidden: false });
+// Items are 8 fixed boxes (null = empty), so using one never moves the others.
+const emptyBoxes = () => Array(8).fill(null);
+const fighter = name => ({ name, hp: 0, max: 0, items: emptyBoxes(), band: false, para: false, waveLock: false, knows: null, hidden: false });
 const N = i => i === YOU ? "You" : "Giratina";
 
 // Every line goes to the log; the latest one is also said over the table.
 function log(text, kind = "") {
+  if (g && g.sim) return;
   const box = $("#log"), line = el("p", kind, text);
   box.appendChild(line);
   box.scrollTop = box.scrollHeight;
   $("#say").textContent = text;
 }
-function hint(text) { if (text) $("#say").textContent = text; }
+function hint(text) { if (text && !(g && g.sim)) $("#say").textContent = text; }
+
+/* ── Shell art: side view, pixel style, brass base toward the near end ── */
+// 11x28 grid: hull 21 rows, brass 5 rows plus a 2-row rim (about a quarter).
+function shellArt(kind) {
+  const hull = { live: ["#b3302a", "#7d1e1a", "#e0675c"], blank: ["#6f7c8c", "#4d5866", "#a9b7c6"], back: ["#2b2622", "#1c1916", "#3a332e"] }[kind];
+  const brass = kind === "back" ? ["#3a332e", "#2b2622", "#4a423b"] : ["#c9a24a", "#9a7a32", "#f0d27a"];
+  return '<svg class="' + (kind === "back" ? "back" : "face") + '" viewBox="0 0 11 28" aria-hidden="true">' +
+    '<rect x="1" y="0" width="9" height="21" fill="' + hull[0] + '"/>' +
+    '<rect x="1" y="0" width="9" height="2" fill="' + hull[1] + '"/>' +
+    '<rect x="8" y="2" width="2" height="19" fill="' + hull[1] + '"/>' +
+    '<rect x="3" y="3" width="1" height="15" fill="' + hull[2] + '"/>' +
+    '<rect x="1" y="21" width="9" height="5" fill="' + brass[0] + '"/>' +
+    '<rect x="8" y="21" width="2" height="5" fill="' + brass[1] + '"/>' +
+    '<rect x="3" y="22" width="1" height="3" fill="' + brass[2] + '"/>' +
+    '<rect x="0" y="26" width="11" height="2" fill="' + brass[1] + '"/></svg>';
+}
+
+/* ── Two tiny synthesized sounds for loading: a click per shell and the rack ── */
+const sfx = {
+  ctx: null,
+  burst(freq, length, volume) {
+    try {
+      this.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this.ctx, frames = Math.floor(ctx.sampleRate * length);
+      const buffer = ctx.createBuffer(1, frames, ctx.sampleRate), data = buffer.getChannelData(0);
+      for (let k = 0; k < frames; k++) data[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / frames, 4);
+      const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+      filter.type = "bandpass"; filter.frequency.value = freq; filter.Q.value = 2;
+      gain.gain.value = volume;
+      source.buffer = buffer;
+      source.connect(filter).connect(gain).connect(ctx.destination);
+      source.start();
+    } catch {}
+  },
+  click() { this.burst(3200, 0.03, 0.25); },
+  chk() { this.burst(1400, 0.06, 0.35); }
+};
 
 /* ── Effects: animate what the engine decides ─────────────────────────── */
+// Shell-row cell k, in table coordinates (the row is 314px wide, 8 cells).
+const cellAt = k => ({ x: 550 + 3 + k * 38.75 + 7, y: 250 + 3 + 7 });
+const PORT = { x: 468 - 11, y: 470 };
 const fx = {
   restart(node, cls) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); },
-  // Load: the shells stand in a row face up, turn face down, then go into the gun one by one.
+  skip: false,
+  // A wait the player can cut short with a click while the gun loads.
+  pause(ms) {
+    return new Promise(done => {
+      if (fx.skip) return done();
+      const timer = setTimeout(done, ms);
+      fx.cutShort = () => { clearTimeout(timer); done(); };
+    });
+  },
+  // Load, about 2-3 s: the shells drop into the row one by one (so you see the
+  // count), turn face down, go into the port under the barrel in an order you
+  // cannot follow, and the gun racks. A click anywhere skips to the end.
   async load() {
-    const layer = $("#shell-layer"), row = $("#shell-row");
-    layer.replaceChildren();
+    const layer = $("#shell-layer");
+    fx.skip = false;
+    layer.querySelectorAll(".shell").forEach(node => node.remove());
     const shown = [...Array(g.loaded[0]).fill(true), ...Array(g.loaded[1]).fill(false)];
-    const rowBox = { left: 610 - 22 + 3, top: 372 - 22 + 3 };
+    const n = shown.length, step = Math.min(110, 760 / n), slide = Math.min(120, 820 / n);
     const shells = shown.map((live, k) => {
-      const shell = el("div", "shell" + (live ? " live" : ""));
-      shell.append(el("i", "face"), el("i", "back"));
-      shell.style.left = (rowBox.left + 37.5 * k + 30) + "px";
-      shell.style.top = (rowBox.top + 38) + "px";
-      shell.style.transform = "rotateX(calc(-1 * var(--tilt)))";
+      const shell = el("div", "shell");
+      shell.innerHTML = shellArt(live ? "live" : "blank") + shellArt("back");
+      const at = cellAt(k);
+      shell.style.left = at.x + "px";
+      shell.style.top = at.y + "px";
+      shell.style.opacity = "0";
       layer.appendChild(shell);
       return shell;
     });
-    row.style.opacity = ".9";
-    await wait(1300);
-    for (const shell of shells) shell.style.transform = "rotateX(calc(-1 * var(--tilt))) rotateY(180deg)";
-    await wait(650);
     for (const shell of shells) {
-      shell.style.transform = "translate(" + (490 - parseFloat(shell.style.left)) + "px, " + (420 - parseFloat(shell.style.top)) + "px) rotateZ(90deg) scale(.6)";
-      shell.style.opacity = "0";
-      await wait(150);
+      shell.style.opacity = "";
+      shell.classList.add("drop");
+      await fx.pause(step);
     }
-    await wait(400);
-    layer.replaceChildren();
+    await fx.pause(340 + 380);
+    for (const shell of shells) { shell.classList.remove("drop"); shell.classList.add("down"); }
+    await fx.pause(260);
+    for (const shell of shuffle([...shells])) {
+      if (fx.skip) break;
+      shell.style.transform = "translate(" + (PORT.x - parseFloat(shell.style.left)) + "px, " + (PORT.y - parseFloat(shell.style.top)) + "px) rotateY(180deg) scale(.55)";
+      shell.style.opacity = "0";
+      await fx.pause(slide);
+      sfx.click();
+    }
+    if (!fx.skip) {
+      await fx.pause(120);
+      $("#pump").classList.add("back"); sfx.chk();
+      await fx.pause(150);
+      $("#pump").classList.remove("back"); sfx.chk();
+      await fx.pause(160);
+    }
+    shells.forEach(node => node.remove());
+    $("#pump").classList.remove("back");
+    fx.skip = false;
   },
   // Pick up the gun and point it. Aiming at you tilts the camera down.
   async aim(atYou) {
@@ -526,17 +606,18 @@ const fx = {
   },
   // Every shot throws its shell onto the felt, where it fades.
   eject(live) {
-    const shell = el("div", "spent" + (live ? " live" : ""));
+    const shell = el("div", "spent");
+    shell.innerHTML = shellArt(live ? "live" : "blank");
     const right = Math.random() < 0.5 ? 1 : -1;
-    shell.style.left = "482px";
-    shell.style.top = "400px";
+    shell.style.left = "459px";
+    shell.style.top = "440px";
     shell.style.setProperty("--dx", right * rand(90, 150) + "px");
     shell.style.setProperty("--dy", rand(-30, 60) + "px");
     $("#shell-layer").appendChild(shell);
     setTimeout(() => shell.remove(), 2000);
   },
   async useItem(side, index) {
-    const node = document.querySelectorAll("#" + (side === YOU ? "you" : "foe") + "-slots .item")[index];
+    const node = document.querySelector("#" + (side === YOU ? "you" : "foe") + '-slots .item[data-index="' + index + '"]');
     if (!node) return;
     node.classList.add("glow");
     await wait(side === FOE ? 420 : 0);
@@ -573,47 +654,101 @@ function begin(mode, test, bet = 0, betId = null) {
   $("#dealer-img").src = SPRITE_DIR + MODES[mode].sprite + ".png";
   $("#dealer").classList.remove("away", "vanished");
   log(test ? "Test game against " + MODES[mode].name + ". No coins are on the table." : "You bet " + bet.toLocaleString("en-US") + " coins against " + MODES[mode].name + ".", "you");
-  if (g.hard) log("Origin Giratina is in its own world: Shadow Force, Pressure and the Griseous Orb are on.", "status");
+  if (g.hard) log("Origin Giratina is in its own world: Shadow Force and the Griseous Orb are on.", "status");
   startRound();
 }
 
-function startRound() {
+/* ── Shared rules: the live game and simShotgun both run these ─────────── */
+// A new round: HP for the round, both sides' items cleared (only here, not on
+// every reload), and the first turn: you in rounds 1 and 3, Giratina in round 2.
+function setupRound() {
   g.round++;
   const hp = RULES.hp[g.round - 1];
-  for (const s of g.s) Object.assign(s, { hp, max: hp, items: [], band: false, para: false, waveLock: false, knows: null, hidden: false });
-  if (g.hard && g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
+  for (const s of g.s) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveLock: false, knows: null, hidden: false });
+  // Balance (simShotgun): Giratina gets +1 max HP in round 3 in both modes.
+  if (g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
   g.prevHp = [g.s[YOU].hp, g.s[FOE].hp];
-  log("Round " + g.round + ". " + hp + " HP each" + (g.hard && g.round === 3 ? ", and Giratina draws 1 extra max HP from the Distortion World." : "."), "round");
-  g.turn = YOU;
+  g.turn = g.round === 2 ? FOE : YOU;
+  log("Round " + g.round + ". " + hp + " HP each" + (g.round === 3 ? ", and Giratina draws 1 extra max HP from the Distortion World." : ".") +
+    (g.turn === FOE ? " Giratina goes first." : " You go first."), "round");
   reload();
+}
+// 2 to 8 shells; live ones are between a third and two thirds of them (rounded
+// up), and there is always at least one of each.
+function rollLoad() {
+  const total = rand(2, 8);
+  const low = Math.max(1, Math.ceil(total / 3)), high = Math.min(total - 1, Math.ceil(total * 2 / 3));
+  return { total, live: rand(low, high) };
+}
+// A weighted draw from the pool. A second Choice Band in the same hand is redrawn.
+function pickItem(hand) {
+  const draw = exclude => {
+    const keys = POOL.filter(key => key !== exclude);
+    let roll = Math.random() * keys.reduce((sum, key) => sum + POOL_WEIGHT[key], 0);
+    for (const key of keys) { roll -= POOL_WEIGHT[key]; if (roll < 0) return key; }
+    return keys[keys.length - 1];
+  };
+  const key = draw(null);
+  return key === "band" && hand.includes("band") ? draw("band") : key;
+}
+// The chance the shell in the chamber is live, as side i sees it: certain if
+// it has looked (Scope Lens), otherwise the exact count of what is left.
+function liveChance(i) {
+  const s = g.s[i];
+  if (s.knows !== null) return s.knows ? 1 : 0;
+  return g.shells.filter(Boolean).length / g.shells.length;
+}
+const paralysisHolds = () => Math.random() < PARALYSIS;
+// Resolve a shot by side i: takes the shell, applies damage, clears what anyone knew.
+function shotResult(i, atSelf) {
+  const me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
+  const dmg = me.band ? 2 : 1, banded = me.band;
+  me.band = false;
+  // The other side's Thunder Wave lock lifts once this side takes a real turn.
+  other.waveLock = false;
+  const live = g.shells.shift();
+  g.spent.push(live);
+  for (const s of g.s) s.knows = null;
+  const missed = live && i === YOU && !atSelf && other.hidden;
+  if (live && !missed) target.hp = Math.max(0, target.hp - dmg);
+  return { live, dmg, banded, missed, target };
+}
+
+function startRound() {
+  setupRound();
   render();
   beginTurn();
 }
 
+// The first empty box takes the item. With all 8 full (RULES.maxItems), it isn't given.
 function give(i, key) {
-  if (g.s[i].items.length >= RULES.maxItems) return false;
-  g.s[i].items.push(key);
+  const box = g.s[i].items.indexOf(null);
+  if (box < 0 || box >= RULES.maxItems) return false;
+  g.s[i].items[box] = key;
   return true;
 }
 function deal(i, count) {
   const got = [];
-  for (let k = 0; k < count; k++) { const key = pick(POOL); if (give(i, key)) got.push(ITEMS[key].name); }
+  for (let k = 0; k < count; k++) {
+    const key = pickItem(g.s[i].items);
+    if (give(i, key)) got.push(ITEMS[key].name);
+    else log("No room for " + ITEMS[key].name + (i === YOU ? " on your side." : " on Giratina's side."));
+  }
   if (got.length) log((i === YOU ? "You get " : "Giratina gets ") + got.join(" and ") + ".");
-  else log((i === YOU ? "Your" : "Giratina's") + " hands are full: no new items.");
 }
 function reload() {
-  const total = rand(2, 8), live = rand(1, total - 1);
+  const { total, live } = rollLoad();
   g.shells = shuffle(Array.from({ length: total }, (_, k) => k < live));
   g.loaded = [live, total - live];
   g.spent = [];
   for (const s of g.s) s.knows = null;
   log("Loaded " + live + " live / " + (total - live) + " blank. The shells go in shuffled.", "status");
-  deal(YOU, g.hard ? 1 : 2);
-  if (g.hard) log("Pressure: you only get 1 item this load.");
+  // Both sides get 2 items a load in both modes (Pressure was dropped for balance).
+  deal(YOU, 2);
   deal(FOE, 2);
-  if (g.hard && give(FOE, "orb")) log("Giratina gets a Griseous Orb.");
+  if (g.hard) log(give(FOE, "orb") ? "Giratina gets a Griseous Orb." : "No room for Griseous Orb on Giratina's side.");
   const game = g;
-  game.loading = fx.load().then(() => { if (g === game) { game.loading = null; render(); } });
+  if (!game.sim) game.loading = fx.load().then(() => { if (g === game) { game.loading = null; render(); } });
 }
 
 /* ── Turns ────────────────────────────────────────────────────────────── */
@@ -631,13 +766,19 @@ async function beginTurn() {
   // Shadow Force lasts until Giratina's next turn, skipped or not.
   if (g.turn === FOE) me.hidden = false;
   if (me.para) {
+    // Paralysis lasts one turn and stops it only half the time.
     me.para = false;
-    log(g.turn === YOU ? "You're paralyzed! You can't move this turn." : "Giratina is paralyzed! It can't move this turn.", "status");
+    const stuck = paralysisHolds();
+    log(g.turn === YOU
+      ? (stuck ? "You're paralyzed! You can't move!" : "You're paralyzed... but you moved anyway!")
+      : (stuck ? "Giratina is paralyzed! It can't move!" : "Giratina is paralyzed... but it moved anyway!"), "status");
     render();
     await wait(1100);
     if (!alive(id)) return;
-    g.turn = 1 - g.turn;
-    return beginTurn();
+    if (stuck) {
+      g.turn = 1 - g.turn;
+      return beginTurn();
+    }
   }
   if (g.turn === FOE) {
     g.busy = true;
@@ -655,26 +796,19 @@ async function beginTurn() {
 }
 
 async function fire(i, atSelf) {
-  const id = g.id, me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
+  const id = g.id, me = g.s[i], other = g.s[1 - i];
   g.busy = true;
   g.holding = false;
-  const dmg = me.band ? 2 : 1, banded = me.band;
-  me.band = false;
-  // The other side's Thunder Wave lock lifts once this side takes a real turn.
-  other.waveLock = false;
   log(i === YOU ? (atSelf ? "You point the gun at yourself..." : "You aim at Giratina...") : (atSelf ? "Giratina points the gun at itself..." : "Giratina aims at you..."), i === YOU ? "you" : "");
   render();
   // The gun faces whoever is being shot: toward the camera when that is you.
-  await fx.aim(target === g.s[YOU]);
+  await fx.aim((atSelf ? me : other) === g.s[YOU]);
   await wait(800);
   if (!alive(id)) return;
-  const live = g.shells.shift();
-  g.spent.push(live);
-  for (const s of g.s) s.knows = null;
+  const { live, dmg, banded, missed, target } = shotResult(i, atSelf);
   if (!live) log("*click* Blank." + (banded ? " The Choice Band is wasted." : ""));
-  else if (i === YOU && !atSelf && other.hidden) { fx.bang(false); log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status"); }
+  else if (missed) { fx.bang(false); log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status"); }
   else {
-    target.hp = Math.max(0, target.hp - dmg);
     fx.bang(target === g.s[FOE]);
     log("*BANG* Live! " + (target === g.s[YOU] ? "You lose " : "Giratina loses ") + dmg + " HP" + (banded ? " (Choice Band)." : "."), "live");
   }
@@ -707,7 +841,7 @@ function useItem(i, index) {
       const shell = g.shells.shift();
       g.spent.push(shell);
       for (const s of g.s) s.knows = null;
-      fx.eject(shell);
+      if (!g.sim) fx.eject(shell);
       log(N(i) + " used an Eject Button. Out pops a " + (shell ? "live" : "blank") + " shell.", mine ? "you" : "");
       break;
     }
@@ -721,7 +855,7 @@ function useItem(i, index) {
       if (me.waveLock) return refuse("You can't use Thunder Wave two turns in a row.");
       other.para = true;
       me.waveLock = true;
-      log(N(i) + " used Thunder Wave! " + (mine ? "Giratina skips" : "You skip") + " the next turn.", mine ? "you" : "status");
+      log(N(i) + " used Thunder Wave! " + (mine ? "Giratina is" : "You're") + " paralyzed: half the time, that means losing the next turn.", mine ? "you" : "status");
       break;
     case "trick":
     case "orb":
@@ -731,7 +865,7 @@ function useItem(i, index) {
       break;
     default: return false;
   }
-  me.items.splice(index, 1);
+  me.items[index] = null;
   if (!g.shells.length) { log("The gun is empty."); reload(); }
   render();
   return true;
@@ -754,37 +888,110 @@ async function playerItem(index) {
 }
 
 /* ── Giratina ─────────────────────────────────────────────────────────── */
-// Tracks the live and blank shells left. Plays a known shell correctly;
-// otherwise shoots you above 50% live, itself below, and flips a coin at 50%.
+// One decision at a time, re-asked after every item, in this order:
+//   1. Potion when below max HP.
+//   2. Scope Lens when the shell in the chamber is not known.
+//   3. Known live: Choice Band, then Thunder Wave, then shoot you.
+//   4. Known blank: Trick Room or Griseous Orb and shoot you (now live); without one, shoot itself.
+//   5. Unknown with an Eject Button: eject when live is 50% or more.
+//   6. Unknown: 50% or more live, shoot you; less, shoot itself.
+// It never holds an item it could still use: before an unknown shot it also
+// paralyzes you when it may, and puts on a Choice Band when it is shooting you.
+// Returns { use: box } or { shoot: atSelf }.
+function sidePlan(i) {
+  const me = g.s[i], other = g.s[1 - i];
+  const box = key => me.items.indexOf(key);
+  const has = key => box(key) >= 0;
+  const p = liveChance(i);
+  const canWave = has("wave") && !other.para && !me.waveLock;
+  // Only Giratina can vanish, so this only ever stops your shots.
+  const foeAway = i === YOU && other.hidden;
+  if (has("potion") && me.hp < me.max) return { use: box("potion") };
+  if (has("scope") && me.knows === null && p > 0 && p < 1) return { use: box("scope") };
+  if (p === 1) {
+    if (has("band") && !me.band && !foeAway) return { use: box("band") };
+    if (canWave) return { use: box("wave") };
+    return { shoot: false };
+  }
+  if (p === 0) {
+    const flip = has("orb") ? box("orb") : box("trick");
+    if (flip >= 0 && !foeAway) return { use: flip };
+    return { shoot: true };
+  }
+  if (has("eject") && p >= 0.5) return { use: box("eject") };
+  if (canWave) return { use: box("wave") };
+  if (p >= 0.5 && has("band") && !me.band && !foeAway) return { use: box("band") };
+  return { shoot: p < 0.5 };
+}
+const foePlan = () => sidePlan(FOE);
+
 async function foeTurn(id) {
-  const me = g.s[FOE], you = g.s[YOU];
-  const chance = () => me.knows !== null ? (me.knows ? 1 : 0) : g.shells.filter(Boolean).length / g.shells.length;
   await wait(900);
-  for (let step = 0; step < 10; step++) {
+  let plan = null;
+  for (let step = 0; step < 12; step++) {
     if (!alive(id)) return;
     if (g.loading) await g.loading;
-    const p = chance(), has = key => me.items.includes(key);
-    const flip = has("orb") ? "orb" : has("trick") ? "trick" : null;
-    let key = null;
-    if (has("potion") && me.hp < me.max) key = "potion";
-    else if (has("scope") && p > 0 && p < 1) key = "scope";
-    else if (p === 1 && has("band") && !me.band) key = "band";
-    else if (p === 0 && flip && Math.random() < 0.6) key = flip;
-    else if (p >= 0.4 && p <= 0.6 && has("eject") && Math.random() < 0.3) key = "eject";
-    else if (p > 0 && p < 0.5 && flip && Math.random() < 0.35) key = flip;
-    else if (has("wave") && !you.para && !me.waveLock && Math.random() < 0.4) key = "wave";
-    if (!key) break;
-    const index = me.items.indexOf(key);
-    await fx.useItem(FOE, index);
+    plan = foePlan();
+    if (plan.use === undefined) break;
+    // Its items glow and slide before they take effect; useItem logs each one.
+    await fx.useItem(FOE, plan.use);
     if (!alive(id)) return;
-    useItem(FOE, index);
+    useItem(FOE, plan.use);
     await wait(700);
   }
   if (!alive(id)) return;
   if (g.loading) await g.loading;
-  const p = chance();
-  return fire(FOE, p === 0.5 ? Math.random() < 0.5 : p < 0.5);
+  if (!plan || plan.use !== undefined) plan = { shoot: liveChance(FOE) < 0.5 };
+  return fire(FOE, plan.shoot);
 }
+
+/* ── simShotgun: the same rules, no animation ─────────────────────────── */
+// A decent player bot (exact shell counts, the same item sense as Giratina,
+// and it never wastes a shot on a vanished Giratina when it can help it)
+// plays full best-of-3 games against Giratina. In the console:
+//   simShotgun(10000, "normal")   simShotgun(10000, "hard")
+function simGame(mode) {
+  g = { id: ++run, mode, test: true, sim: true, hard: mode === "hard", round: 0, wins: [0, 0],
+        s: [fighter("You"), fighter("Giratina")], shells: [], loaded: [0, 0], spent: [], turn: YOU, busy: true, over: false, loading: null, holding: false };
+  while (g.wins[YOU] < 2 && g.wins[FOE] < 2) {
+    setupRound();
+    for (let turns = 0; turns < 1000 && g.s[YOU].hp > 0 && g.s[FOE].hp > 0; turns++) {
+      if (!g.shells.length) reload();
+      const i = g.turn, me = g.s[i];
+      if (i === FOE) me.hidden = false;
+      if (me.para) {
+        me.para = false;
+        if (paralysisHolds()) { g.turn = 1 - i; continue; }
+      }
+      if (i === FOE && g.hard && Math.random() < RULES.shadowForce) me.hidden = true;
+      let plan = null;
+      for (let step = 0; step < 12; step++) {
+        plan = sidePlan(i);
+        if (plan.use === undefined) break;
+        useItem(i, plan.use);
+      }
+      if (plan.use !== undefined) plan = { shoot: liveChance(i) < 0.5 };
+      const { live } = shotResult(i, plan.shoot);
+      if (!(plan.shoot && !live)) g.turn = 1 - i;
+    }
+    g.wins[g.s[YOU].hp <= 0 ? FOE : YOU]++;
+  }
+  return g.wins[YOU] === 2;
+}
+window.simShotgun = (games = 10000, mode = "normal") => {
+  if (!Object.hasOwn(MODES, mode)) throw new Error('mode is "normal" or "hard"');
+  if (g && !g.over) throw new Error("Finish or leave the game at the table first.");
+  const saved = g;
+  let won = 0;
+  try {
+    for (let k = 0; k < games; k++) if (simGame(mode)) won++;
+  } finally {
+    g = saved;
+  }
+  const rate = Math.round(won / games * 1000) / 10;
+  console.log("Shotgun Roulette, " + MODES[mode].name + ": the bot won " + won + " of " + games + " games (" + rate + "%).");
+  return { mode, games, won, rate };
+};
 
 /* ── Rounds and the end ───────────────────────────────────────────────── */
 async function endRound(winner) {
@@ -847,8 +1054,10 @@ function drawBolts(side, s, index) {
   });
   g.prevHp[index] = s.hp;
 }
-// 4 slots a side, 2 items to a slot: 8 items, the most anyone can hold.
-const SLOT_X = [40, 186, 664, 810], SLOT_Y = { foe: 160, you: 540 };
+// 8 boxes a side, one item each: a 2x2 block left of the gun, then one right of it.
+const SLOT_X = [72, 236, 72, 236, 550, 714, 550, 714];
+const SLOT_ROW = [0, 0, 1, 1, 0, 0, 1, 1];
+const SLOT_TOP = { foe: [20, 128], you: [392, 500] };
 function drawSlots(side, s, mine) {
   const box = $("#" + side + "-slots");
   // Rebuild only when the items or what you may do with them change, so sprites
@@ -859,32 +1068,31 @@ function drawSlots(side, s, mine) {
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   box.replaceChildren();
-  for (let k = 0; k < 4; k++) {
+  for (let index = 0; index < 8; index++) {
     const slot = el("div", "slot");
-    slot.style.left = SLOT_X[k] + "px";
-    slot.style.top = SLOT_Y[side] + "px";
-    for (const index of [k * 2, k * 2 + 1]) {
-      const key = s.items[index];
-      if (!key) continue;
-      const item = el("button", "item");
-      item.type = "button";
-      const art = el("img");
-      art.src = ITEM_DIR + ITEMS[key].art + ".png";
-      art.alt = ITEMS[key].name;
-      item.appendChild(art);
-      item.dataset.key = key;
-      item.setAttribute("aria-label", ITEMS[key].name + ". " + ITEMS[key].tip);
-      if (mine) {
-        item.disabled = !open ||
-          (key === "potion" && you.hp >= you.max) || (key === "band" && you.band) || (key === "wave" && (foe.para || you.waveLock));
-        item.onclick = () => playerItem(index);
-      } else item.tabIndex = -1;
-      item.onmouseenter = event => showTip(key, event);
-      item.onmousemove = event => moveTip(event);
-      item.onmouseleave = () => { $("#tip").hidden = true; };
-      slot.appendChild(item);
-    }
+    slot.style.left = SLOT_X[index] + "px";
+    slot.style.top = SLOT_TOP[side][SLOT_ROW[index]] + "px";
     box.appendChild(slot);
+    const key = s.items[index];
+    if (!key) continue;
+    const item = el("button", "item");
+    item.type = "button";
+    const art = el("img");
+    art.src = ITEM_DIR + ITEMS[key].art + ".png";
+    art.alt = ITEMS[key].name;
+    item.appendChild(art);
+    item.dataset.key = key;
+    item.dataset.index = index;
+    item.setAttribute("aria-label", ITEMS[key].name + ". " + ITEMS[key].tip);
+    if (mine) {
+      item.disabled = !open ||
+        (key === "potion" && you.hp >= you.max) || (key === "band" && you.band) || (key === "wave" && (foe.para || you.waveLock));
+      item.onclick = () => playerItem(index);
+    } else item.tabIndex = -1;
+    item.onmouseenter = event => showTip(key, event);
+    item.onmousemove = event => moveTip(event);
+    item.onmouseleave = () => { $("#tip").hidden = true; };
+    slot.appendChild(item);
   }
 }
 function showTip(key, event) {
@@ -902,7 +1110,7 @@ function flags(s) {
   return [s.para && "paralyzed", s.band && "Choice Band on", s.hidden && "vanished"].filter(Boolean).join(", ");
 }
 function render() {
-  if (!g) return;
+  if (!g || g.sim) return;
   const you = g.s[YOU], foe = g.s[FOE];
   const mine = g.turn === YOU && !g.busy && !g.over && !g.loading;
   $("#round-label").textContent = "Round " + g.round + " of 3. You " + g.wins[YOU] + ", Giratina " + g.wins[FOE] + ".";
@@ -924,6 +1132,11 @@ function render() {
   gun.classList.toggle("ready", mine && !g.holding);
   $("#choices").hidden = !(mine && g.holding);
 }
+
+// A click anywhere while the gun loads skips the load animation.
+$("#stage").addEventListener("pointerdown", () => {
+  if (g && g.loading && !fx.skip) { fx.skip = true; if (fx.cutShort) fx.cutShort(); }
+}, true);
 
 /* ── Picking up the gun ───────────────────────────────────────────────── */
 $("#gun").onclick = async () => {
