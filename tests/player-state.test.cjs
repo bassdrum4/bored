@@ -148,6 +148,39 @@ test('unchanged cloud state avoids duplicate writes but real improvements still 
   assert.equal(row.data.bests.snake, 12);
 });
 
+test('no-op cloud saves periodically discover progress from another device', async () => {
+  let clock = Date.now();
+  class TestDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [clock])); }
+    static now() { return clock; }
+  }
+  const session = { user: { id: 'shared-account' } };
+  let row = null;
+  const methods = [];
+  const request = async (path, options = {}) => {
+    const method = options.method || 'GET';
+    methods.push(method);
+    if (method === 'GET') return row ? [structuredClone(row)] : [];
+    row = { data: structuredClone(options.body.data), updated_at: 'v1' };
+    return [structuredClone(row)];
+  };
+  const { pushPlayerState } = moduleUnderTest('src/hub/cloud.js', ['pushPlayerState'],
+    { request, getSession: () => session, freshSession: async () => session, Date: TestDate });
+  const local = { library: { favorites: ['snake'], recent: ['snake'] }, bests: { snake: 10 } };
+  await pushPlayerState(local);
+  await pushPlayerState(local);
+  assert.deepEqual(methods, ['GET', 'POST']);
+
+  // Another browser writes a better score; our next unchanged save should
+  // eventually read it without overwriting the other browser's data.
+  row.data.bests.snake = 42;
+  row.updated_at = 'v2';
+  clock += 120_001;
+  const merged = await pushPlayerState(local);
+  assert.equal(merged.bests.snake, 42);
+  assert.deepEqual(methods, ['GET', 'POST', 'GET']);
+});
+
 test('browser score and library keys follow their account, not the next person', () => {
   const localStorage = new MemoryStorage();
   const { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } =
