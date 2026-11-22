@@ -736,7 +736,8 @@ export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {
    is not a dupe, it adds the shiny. Dust buys any missing species (priced by tier) or shards
    (COLLECTOR.shards, a weekly limit of its own beside the coin shop's).
 
-   Pacing (scripts in the PR): about 140 days to 1025 at 600 chips a day, 85 at 1000, 280 on
+   Pacing, simulated with 10-pulls and dust spent on the cheapest missing species, sets paying
+   chips as they complete: about 140 days to 1025 at 600 chips a day, 85 at 1000, 280 on
    login chips alone. 15 dust a shard makes the 50-a-week cap 750 dust, about a dedicated
    player's weekly dust over the first three months, so a 300-shard skin is six weeks either way.
 
