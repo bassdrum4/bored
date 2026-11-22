@@ -66,6 +66,59 @@ const playerPanel = $('#player');
 const gameFrame = $('#frame');
 const menuButton = $('#menu-toggle');
 const menuPanel = $('#player-actions');
+const getawayLoader = $('#getaway-loading');
+const getawayLoaderText = $('#getaway-loading-message');
+const getawayLoaderTrack = $('#getaway-loading-track');
+const getawayLoaderFill = $('#getaway-loading-fill');
+const getawayLoaderPercent = $('#getaway-loading-percent');
+let getawayLoaderTimer = 0;
+
+function resetGetawayLoader() {
+  clearTimeout(getawayLoaderTimer);
+  getawayLoaderTimer = 0;
+  getawayLoader.hidden = true;
+}
+
+function beginGetawayLoader() {
+  resetGetawayLoader();
+  getawayLoaderText.textContent = 'Preparing the getaway…';
+  getawayLoaderTrack.setAttribute('aria-valuenow', '0');
+  getawayLoaderFill.style.width = '0%';
+  getawayLoaderPercent.textContent = '0%';
+  getawayLoader.hidden = false;
+}
+
+function onGetawayLoading(data) {
+  if (activeSlug !== 'getaway-shootout' || getawayLoader.hidden) return;
+  if (data.phase === 'error') {
+    clearTimeout(getawayLoaderTimer);
+    getawayLoaderText.textContent = 'Could not start the game. Use the menu to restart or go back.';
+    getawayLoaderTrack.removeAttribute('aria-valuenow');
+    getawayLoaderPercent.textContent = 'LOAD FAILED';
+    return;
+  }
+  const progress = Number(data.progress);
+  if (Number.isFinite(progress)) {
+    const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
+    getawayLoaderFill.style.width = pct + '%';
+    getawayLoaderTrack.setAttribute('aria-valuenow', String(pct));
+    getawayLoaderPercent.textContent = pct + '%';
+    getawayLoaderText.textContent = pct >= 100 ? 'Putting the finishing touches on…'
+      : pct >= 75 ? 'Starting the engine…'
+      : pct >= 25 ? 'Unpacking the game…' : 'Preparing the getaway…';
+  }
+  if (data.phase === 'ready') {
+    clearTimeout(getawayLoaderTimer);
+    // Unity can report 100% before its first title-scene frames appear.
+    // Cover that short transition rather than exposing an empty-blue canvas.
+    getawayLoaderTimer = setTimeout(() => {
+      if (activeSlug === 'getaway-shootout' && !getawayLoader.hidden) {
+        getawayLoader.hidden = true;
+        $('#hint').hidden = false;
+      }
+    }, 2500);
+  }
+}
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -304,6 +357,11 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (challenge) $('#challenge-progress').textContent = challenge.goal;
   hubRoot.inert = true;
 
+  if (slug === 'getaway-shootout') {
+    beginGetawayLoader();
+    $('#hint').hidden = true;
+  } else resetGetawayLoader();
+
   if (external || slug === 'getaway-shootout') {
     // Unity WebGL's loader uses its document URL and scene lifecycle. In a
     // srcdoc frame the compiled Getaway Shootout build can finish loading but
@@ -437,6 +495,7 @@ function closeGame({ force = false } = {}) {
   loadToken++;
   clearTimeout(hintTimer);
   clearTimeout(focusTimer);
+  resetGetawayLoader();
   if (fullscreenElement()) leaveFullscreen();
   playerPanel.hidden = true;
   hubRoot.inert = false;
@@ -1040,6 +1099,9 @@ addEventListener('message', event => {
   if (activeTracks) activeTracks.message(event);
   if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
+    case 'bored:getaway-loading':
+      if (activeSlug === 'getaway-shootout' && event.origin === location.origin) onGetawayLoading(event.data);
+      break;
     case 'bored:admin-preview-wallet-request':
       // The untrusted sandbox has only this read-only, narrowly scoped bridge:
       // admin previews for an admin, and public sandboxed games for anyone.
