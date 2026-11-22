@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 786,
+  "count": 788,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3a9860c","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: run actual Getaway Shootout Unity browser smoke test"},
+  {"sha":"7deb158","date":"2026-11-21","author":"Daniel Lowe","subject":"test: verify Getaway Shootout recovered source and original Unity browser boot"},
   {"sha":"b712cb1","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: remove embedded Getaway Shootout branding from Unity scene"},
   {"sha":"051f5e8","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: retry Unity menu patch on verified patch-script changes"},
   {"sha":"37b7c6f","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: correct Unity menu patch inactive-button assertion"},
