@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 842,
+  "count": 843,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"34f4ea4","date":"2026-11-22","author":"Daniel Lowe","subject":"Add Trackbound career pace tiebreaker"},
   {"sha":"7c5d04a","date":"2026-11-22","author":"Daniel Lowe","subject":"chore: remove completed Getaway Shootout one-time branding workflow"},
   {"sha":"4fc3767","date":"2026-11-22","author":"Daniel Lowe","subject":"chore: remove completed Getaway Shootout one-time branding workflow"},
   {"sha":"b99229d","date":"2026-11-22","author":"Daniel Lowe","subject":"ci: guard Getaway Shootout against branding regression and splash transition failure"},
