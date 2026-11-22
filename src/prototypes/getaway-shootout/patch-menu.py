@@ -20,10 +20,13 @@ MAGIC = b"UnityWebData1.0\0"
 COMMENT = b"UnityWeb Compressed Content (gzip)\0"
 
 # Named objects confirmed from the recovered serialized scenes.
-DISABLE = {"Branding_TwoPlayerGamesOrg", "NewEichGames"}
+DISABLE = {"Branding_TwoPlayerGamesOrg", "NewEichGames", "Mobile"}
 # This object belongs to a separate splash scene controlled by LoadSplash.
 # Turning it off leaves the game rendering its background with no transition.
 SPLASH_REQUIRED = "two_logo"
+# 'Mobile' is the standalone title screen's App Store promotion. The touch
+# controls for actual gameplay live in separate PlayerCanvas scene objects.
+APP_STORE_OBJECT = "Mobile"
 KEEP = {"Play", "OnePlayer", "Two Player", "Settings", "ExitButton"}
 ALREADY_INACTIVE = {"TwitterButton", "Branding_Silvergames", "Branding_CrazyGames", "BuyButton"}
 
@@ -85,6 +88,7 @@ for obj in env.objects:
 assert DISABLE <= set(seen), "Unexpected original game scene; missing branding objects: " + str(DISABLE - set(seen))
 assert KEEP <= set(seen), "Missing gameplay navigation components"
 assert before.get(SPLASH_REQUIRED) == [True], "Startup splash must remain active"
+assert before.get(APP_STORE_OBJECT) in ([True], [False]), "Unexpected App Store scene object"
 assert all(any(before[name]) for name in ("Play", "OnePlayer", "Two Player", "Settings")), "Play/settings scene was already disabled"
 assert all(not any(before[name]) for name in ALREADY_INACTIVE if name in before), "Previously inactive third-party buttons unexpectedly enabled"
 
