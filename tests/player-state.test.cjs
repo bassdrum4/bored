@@ -114,6 +114,40 @@ test('simultaneous devices retry stale writes rather than overwriting one anothe
   assert.deepEqual(Object.keys(row.data.daily).sort(), ['one', 'two']);
 });
 
+test('unchanged cloud state avoids duplicate writes but real improvements still save', async () => {
+  const session = { user: { id: 'account-noop' } };
+  let row = null;
+  const operations = [];
+  const request = async (path, options = {}) => {
+    const method = options.method || 'GET';
+    operations.push(method);
+    if (method === 'GET') return row ? [structuredClone(row)] : [];
+    if (method === 'POST' || method === 'PATCH') {
+      if (method === 'PATCH') {
+        const version = new URL(path, 'https://example.invalid').searchParams.get('updated_at');
+        assert.equal(version, 'eq.' + row.updated_at, 'cloud writes remain version-conditional');
+      }
+      row = { data: structuredClone(options.body.data), updated_at: 'v' + operations.length };
+      return [structuredClone(row)];
+    }
+    throw Error('unexpected request: ' + method);
+  };
+  const { pushPlayerState } = moduleUnderTest('src/hub/cloud.js', ['pushPlayerState'],
+    { request, getSession: () => session, freshSession: async () => session });
+
+  const initial = { library: { favorites: ['snake'], recent: ['snake'] }, bests: { snake: 8 } };
+  await pushPlayerState(initial);
+  await pushPlayerState(initial);
+  await pushPlayerState(initial);
+  assert.deepEqual(operations, ['GET', 'POST'], 'no-op saves should not PATCH or preflight');
+
+  const improved = { ...initial, bests: { snake: 12 } };
+  await pushPlayerState(improved);
+  await pushPlayerState(improved);
+  assert.deepEqual(operations, ['GET', 'POST', 'PATCH']);
+  assert.equal(row.data.bests.snake, 12);
+});
+
 test('browser score and library keys follow their account, not the next person', () => {
   const localStorage = new MemoryStorage();
   const { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } =
