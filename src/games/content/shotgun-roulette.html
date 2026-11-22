@@ -384,7 +384,6 @@ const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 const wait = ms => new Promise(done => setTimeout(done, ms));
 const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-const pick = list => list[Math.floor(Math.random() * list.length)];
 const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
 
 /* ── Sprites (the same path rule as Pokédoku, Poké Idle and Poké Gacha) ── */
@@ -408,6 +407,10 @@ const ITEMS = {
   orb: { name: "Griseous Orb", art: "griseous-orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
 };
 const POOL = ["potion", "scope", "eject", "band", "wave", "trick"];
+// Thunder Wave turns up half as often as the other items.
+const POOL_WEIGHT = { potion: 1, scope: 1, eject: 1, band: 1, wave: 0.5, trick: 1 };
+// A paralyzed side has this chance to lose its turn (Pokémon-style paralysis).
+const PARALYSIS = 0.5;
 const YOU = 0, FOE = 1;
 
 /* ── Fit the 1280x720 stage to the frame ─────────────────────────────── */
@@ -474,12 +477,13 @@ const N = i => i === YOU ? "You" : "Giratina";
 
 // Every line goes to the log; the latest one is also said over the table.
 function log(text, kind = "") {
+  if (g && g.sim) return;
   const box = $("#log"), line = el("p", kind, text);
   box.appendChild(line);
   box.scrollTop = box.scrollHeight;
   $("#say").textContent = text;
 }
-function hint(text) { if (text) $("#say").textContent = text; }
+function hint(text) { if (text && !(g && g.sim)) $("#say").textContent = text; }
 
 /* ── Shell art: side view, pixel style, brass base toward the near end ── */
 // 11x28 grid: hull 21 rows, brass 5 rows plus a 2-row rim (about a quarter).
@@ -650,19 +654,68 @@ function begin(mode, test, bet = 0, betId = null) {
   $("#dealer-img").src = SPRITE_DIR + MODES[mode].sprite + ".png";
   $("#dealer").classList.remove("away", "vanished");
   log(test ? "Test game against " + MODES[mode].name + ". No coins are on the table." : "You bet " + bet.toLocaleString("en-US") + " coins against " + MODES[mode].name + ".", "you");
-  if (g.hard) log("Origin Giratina is in its own world: Shadow Force, Pressure and the Griseous Orb are on.", "status");
+  if (g.hard) log("Origin Giratina is in its own world: Shadow Force and the Griseous Orb are on.", "status");
   startRound();
 }
 
-function startRound() {
+/* ── Shared rules: the live game and simShotgun both run these ─────────── */
+// A new round: HP for the round, both sides' items cleared (only here, not on
+// every reload), and the first turn: you in rounds 1 and 3, Giratina in round 2.
+function setupRound() {
   g.round++;
   const hp = RULES.hp[g.round - 1];
   for (const s of g.s) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveLock: false, knows: null, hidden: false });
-  if (g.hard && g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
+  // Balance (simShotgun): Giratina gets +1 max HP in round 3 in both modes.
+  if (g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
   g.prevHp = [g.s[YOU].hp, g.s[FOE].hp];
-  log("Round " + g.round + ". " + hp + " HP each" + (g.hard && g.round === 3 ? ", and Giratina draws 1 extra max HP from the Distortion World." : "."), "round");
-  g.turn = YOU;
+  g.turn = g.round === 2 ? FOE : YOU;
+  log("Round " + g.round + ". " + hp + " HP each" + (g.round === 3 ? ", and Giratina draws 1 extra max HP from the Distortion World." : ".") +
+    (g.turn === FOE ? " Giratina goes first." : " You go first."), "round");
   reload();
+}
+// 2 to 8 shells; live ones are between a third and two thirds of them (rounded
+// up), and there is always at least one of each.
+function rollLoad() {
+  const total = rand(2, 8);
+  const low = Math.max(1, Math.ceil(total / 3)), high = Math.min(total - 1, Math.ceil(total * 2 / 3));
+  return { total, live: rand(low, high) };
+}
+// A weighted draw from the pool. A second Choice Band in the same hand is redrawn.
+function pickItem(hand) {
+  const draw = exclude => {
+    const keys = POOL.filter(key => key !== exclude);
+    let roll = Math.random() * keys.reduce((sum, key) => sum + POOL_WEIGHT[key], 0);
+    for (const key of keys) { roll -= POOL_WEIGHT[key]; if (roll < 0) return key; }
+    return keys[keys.length - 1];
+  };
+  const key = draw(null);
+  return key === "band" && hand.includes("band") ? draw("band") : key;
+}
+// The chance the shell in the chamber is live, as side i sees it: certain if
+// it has looked (Scope Lens), otherwise the exact count of what is left.
+function liveChance(i) {
+  const s = g.s[i];
+  if (s.knows !== null) return s.knows ? 1 : 0;
+  return g.shells.filter(Boolean).length / g.shells.length;
+}
+const paralysisHolds = () => Math.random() < PARALYSIS;
+// Resolve a shot by side i: takes the shell, applies damage, clears what anyone knew.
+function shotResult(i, atSelf) {
+  const me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
+  const dmg = me.band ? 2 : 1, banded = me.band;
+  me.band = false;
+  // The other side's Thunder Wave lock lifts once this side takes a real turn.
+  other.waveLock = false;
+  const live = g.shells.shift();
+  g.spent.push(live);
+  for (const s of g.s) s.knows = null;
+  const missed = live && i === YOU && !atSelf && other.hidden;
+  if (live && !missed) target.hp = Math.max(0, target.hp - dmg);
+  return { live, dmg, banded, missed, target };
+}
+
+function startRound() {
+  setupRound();
   render();
   beginTurn();
 }
@@ -677,25 +730,25 @@ function give(i, key) {
 function deal(i, count) {
   const got = [];
   for (let k = 0; k < count; k++) {
-    const key = pick(POOL);
+    const key = pickItem(g.s[i].items);
     if (give(i, key)) got.push(ITEMS[key].name);
     else log("No room for " + ITEMS[key].name + (i === YOU ? " on your side." : " on Giratina's side."));
   }
   if (got.length) log((i === YOU ? "You get " : "Giratina gets ") + got.join(" and ") + ".");
 }
 function reload() {
-  const total = rand(2, 8), live = rand(1, total - 1);
+  const { total, live } = rollLoad();
   g.shells = shuffle(Array.from({ length: total }, (_, k) => k < live));
   g.loaded = [live, total - live];
   g.spent = [];
   for (const s of g.s) s.knows = null;
   log("Loaded " + live + " live / " + (total - live) + " blank. The shells go in shuffled.", "status");
-  deal(YOU, g.hard ? 1 : 2);
-  if (g.hard) log("Pressure: you only get 1 item this load.");
+  // Both sides get 2 items a load in both modes (Pressure was dropped for balance).
+  deal(YOU, 2);
   deal(FOE, 2);
   if (g.hard) log(give(FOE, "orb") ? "Giratina gets a Griseous Orb." : "No room for Griseous Orb on Giratina's side.");
   const game = g;
-  game.loading = fx.load().then(() => { if (g === game) { game.loading = null; render(); } });
+  if (!game.sim) game.loading = fx.load().then(() => { if (g === game) { game.loading = null; render(); } });
 }
 
 /* ── Turns ────────────────────────────────────────────────────────────── */
@@ -713,13 +766,19 @@ async function beginTurn() {
   // Shadow Force lasts until Giratina's next turn, skipped or not.
   if (g.turn === FOE) me.hidden = false;
   if (me.para) {
+    // Paralysis lasts one turn and stops it only half the time.
     me.para = false;
-    log(g.turn === YOU ? "You're paralyzed! You can't move this turn." : "Giratina is paralyzed! It can't move this turn.", "status");
+    const stuck = paralysisHolds();
+    log(g.turn === YOU
+      ? (stuck ? "You're paralyzed! You can't move!" : "You're paralyzed... but you moved anyway!")
+      : (stuck ? "Giratina is paralyzed! It can't move!" : "Giratina is paralyzed... but it moved anyway!"), "status");
     render();
     await wait(1100);
     if (!alive(id)) return;
-    g.turn = 1 - g.turn;
-    return beginTurn();
+    if (stuck) {
+      g.turn = 1 - g.turn;
+      return beginTurn();
+    }
   }
   if (g.turn === FOE) {
     g.busy = true;
@@ -737,26 +796,19 @@ async function beginTurn() {
 }
 
 async function fire(i, atSelf) {
-  const id = g.id, me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
+  const id = g.id, me = g.s[i], other = g.s[1 - i];
   g.busy = true;
   g.holding = false;
-  const dmg = me.band ? 2 : 1, banded = me.band;
-  me.band = false;
-  // The other side's Thunder Wave lock lifts once this side takes a real turn.
-  other.waveLock = false;
   log(i === YOU ? (atSelf ? "You point the gun at yourself..." : "You aim at Giratina...") : (atSelf ? "Giratina points the gun at itself..." : "Giratina aims at you..."), i === YOU ? "you" : "");
   render();
   // The gun faces whoever is being shot: toward the camera when that is you.
-  await fx.aim(target === g.s[YOU]);
+  await fx.aim((atSelf ? me : other) === g.s[YOU]);
   await wait(800);
   if (!alive(id)) return;
-  const live = g.shells.shift();
-  g.spent.push(live);
-  for (const s of g.s) s.knows = null;
+  const { live, dmg, banded, missed, target } = shotResult(i, atSelf);
   if (!live) log("*click* Blank." + (banded ? " The Choice Band is wasted." : ""));
-  else if (i === YOU && !atSelf && other.hidden) { fx.bang(false); log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status"); }
+  else if (missed) { fx.bang(false); log("*BANG* Live, but the shot hits empty air. Giratina is in the Distortion World.", "status"); }
   else {
-    target.hp = Math.max(0, target.hp - dmg);
     fx.bang(target === g.s[FOE]);
     log("*BANG* Live! " + (target === g.s[YOU] ? "You lose " : "Giratina loses ") + dmg + " HP" + (banded ? " (Choice Band)." : "."), "live");
   }
@@ -789,7 +841,7 @@ function useItem(i, index) {
       const shell = g.shells.shift();
       g.spent.push(shell);
       for (const s of g.s) s.knows = null;
-      fx.eject(shell);
+      if (!g.sim) fx.eject(shell);
       log(N(i) + " used an Eject Button. Out pops a " + (shell ? "live" : "blank") + " shell.", mine ? "you" : "");
       break;
     }
@@ -803,7 +855,7 @@ function useItem(i, index) {
       if (me.waveLock) return refuse("You can't use Thunder Wave two turns in a row.");
       other.para = true;
       me.waveLock = true;
-      log(N(i) + " used Thunder Wave! " + (mine ? "Giratina skips" : "You skip") + " the next turn.", mine ? "you" : "status");
+      log(N(i) + " used Thunder Wave! " + (mine ? "Giratina is" : "You're") + " paralyzed: half the time, that means losing the next turn.", mine ? "you" : "status");
       break;
     case "trick":
     case "orb":
@@ -836,37 +888,110 @@ async function playerItem(index) {
 }
 
 /* ── Giratina ─────────────────────────────────────────────────────────── */
-// Tracks the live and blank shells left. Plays a known shell correctly;
-// otherwise shoots you above 50% live, itself below, and flips a coin at 50%.
+// One decision at a time, re-asked after every item, in this order:
+//   1. Potion when below max HP.
+//   2. Scope Lens when the shell in the chamber is not known.
+//   3. Known live: Choice Band, then Thunder Wave, then shoot you.
+//   4. Known blank: Trick Room or Griseous Orb and shoot you (now live); without one, shoot itself.
+//   5. Unknown with an Eject Button: eject when live is 50% or more.
+//   6. Unknown: 50% or more live, shoot you; less, shoot itself.
+// It never holds an item it could still use: before an unknown shot it also
+// paralyzes you when it may, and puts on a Choice Band when it is shooting you.
+// Returns { use: box } or { shoot: atSelf }.
+function sidePlan(i) {
+  const me = g.s[i], other = g.s[1 - i];
+  const box = key => me.items.indexOf(key);
+  const has = key => box(key) >= 0;
+  const p = liveChance(i);
+  const canWave = has("wave") && !other.para && !me.waveLock;
+  // Only Giratina can vanish, so this only ever stops your shots.
+  const foeAway = i === YOU && other.hidden;
+  if (has("potion") && me.hp < me.max) return { use: box("potion") };
+  if (has("scope") && me.knows === null && p > 0 && p < 1) return { use: box("scope") };
+  if (p === 1) {
+    if (has("band") && !me.band && !foeAway) return { use: box("band") };
+    if (canWave) return { use: box("wave") };
+    return { shoot: false };
+  }
+  if (p === 0) {
+    const flip = has("orb") ? box("orb") : box("trick");
+    if (flip >= 0 && !foeAway) return { use: flip };
+    return { shoot: true };
+  }
+  if (has("eject") && p >= 0.5) return { use: box("eject") };
+  if (canWave) return { use: box("wave") };
+  if (p >= 0.5 && has("band") && !me.band && !foeAway) return { use: box("band") };
+  return { shoot: p < 0.5 };
+}
+const foePlan = () => sidePlan(FOE);
+
 async function foeTurn(id) {
-  const me = g.s[FOE], you = g.s[YOU];
-  const chance = () => me.knows !== null ? (me.knows ? 1 : 0) : g.shells.filter(Boolean).length / g.shells.length;
   await wait(900);
-  for (let step = 0; step < 10; step++) {
+  let plan = null;
+  for (let step = 0; step < 12; step++) {
     if (!alive(id)) return;
     if (g.loading) await g.loading;
-    const p = chance(), has = key => me.items.includes(key);
-    const flip = has("orb") ? "orb" : has("trick") ? "trick" : null;
-    let key = null;
-    if (has("potion") && me.hp < me.max) key = "potion";
-    else if (has("scope") && p > 0 && p < 1) key = "scope";
-    else if (p === 1 && has("band") && !me.band) key = "band";
-    else if (p === 0 && flip && Math.random() < 0.6) key = flip;
-    else if (p >= 0.4 && p <= 0.6 && has("eject") && Math.random() < 0.3) key = "eject";
-    else if (p > 0 && p < 0.5 && flip && Math.random() < 0.35) key = flip;
-    else if (has("wave") && !you.para && !me.waveLock && Math.random() < 0.4) key = "wave";
-    if (!key) break;
-    const index = me.items.indexOf(key);
-    await fx.useItem(FOE, index);
+    plan = foePlan();
+    if (plan.use === undefined) break;
+    // Its items glow and slide before they take effect; useItem logs each one.
+    await fx.useItem(FOE, plan.use);
     if (!alive(id)) return;
-    useItem(FOE, index);
+    useItem(FOE, plan.use);
     await wait(700);
   }
   if (!alive(id)) return;
   if (g.loading) await g.loading;
-  const p = chance();
-  return fire(FOE, p === 0.5 ? Math.random() < 0.5 : p < 0.5);
+  if (!plan || plan.use !== undefined) plan = { shoot: liveChance(FOE) < 0.5 };
+  return fire(FOE, plan.shoot);
 }
+
+/* ── simShotgun: the same rules, no animation ─────────────────────────── */
+// A decent player bot (exact shell counts, the same item sense as Giratina,
+// and it never wastes a shot on a vanished Giratina when it can help it)
+// plays full best-of-3 games against Giratina. In the console:
+//   simShotgun(10000, "normal")   simShotgun(10000, "hard")
+function simGame(mode) {
+  g = { id: ++run, mode, test: true, sim: true, hard: mode === "hard", round: 0, wins: [0, 0],
+        s: [fighter("You"), fighter("Giratina")], shells: [], loaded: [0, 0], spent: [], turn: YOU, busy: true, over: false, loading: null, holding: false };
+  while (g.wins[YOU] < 2 && g.wins[FOE] < 2) {
+    setupRound();
+    for (let turns = 0; turns < 1000 && g.s[YOU].hp > 0 && g.s[FOE].hp > 0; turns++) {
+      if (!g.shells.length) reload();
+      const i = g.turn, me = g.s[i];
+      if (i === FOE) me.hidden = false;
+      if (me.para) {
+        me.para = false;
+        if (paralysisHolds()) { g.turn = 1 - i; continue; }
+      }
+      if (i === FOE && g.hard && Math.random() < RULES.shadowForce) me.hidden = true;
+      let plan = null;
+      for (let step = 0; step < 12; step++) {
+        plan = sidePlan(i);
+        if (plan.use === undefined) break;
+        useItem(i, plan.use);
+      }
+      if (plan.use !== undefined) plan = { shoot: liveChance(i) < 0.5 };
+      const { live } = shotResult(i, plan.shoot);
+      if (!(plan.shoot && !live)) g.turn = 1 - i;
+    }
+    g.wins[g.s[YOU].hp <= 0 ? FOE : YOU]++;
+  }
+  return g.wins[YOU] === 2;
+}
+window.simShotgun = (games = 10000, mode = "normal") => {
+  if (!Object.hasOwn(MODES, mode)) throw new Error('mode is "normal" or "hard"');
+  if (g && !g.over) throw new Error("Finish or leave the game at the table first.");
+  const saved = g;
+  let won = 0;
+  try {
+    for (let k = 0; k < games; k++) if (simGame(mode)) won++;
+  } finally {
+    g = saved;
+  }
+  const rate = Math.round(won / games * 1000) / 10;
+  console.log("Shotgun Roulette, " + MODES[mode].name + ": the bot won " + won + " of " + games + " games (" + rate + "%).");
+  return { mode, games, won, rate };
+};
 
 /* ── Rounds and the end ───────────────────────────────────────────────── */
 async function endRound(winner) {
@@ -985,7 +1110,7 @@ function flags(s) {
   return [s.para && "paralyzed", s.band && "Choice Band on", s.hidden && "vanished"].filter(Boolean).join(", ");
 }
 function render() {
-  if (!g) return;
+  if (!g || g.sim) return;
   const you = g.s[YOU], foe = g.s[FOE];
   const mine = g.turn === YOU && !g.busy && !g.over && !g.loading;
   $("#round-label").textContent = "Round " + g.round + " of 3. You " + g.wins[YOU] + ", Giratina " + g.wins[FOE] + ".";
