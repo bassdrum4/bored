@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 827,
+  "count": 829,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b496d74","date":"2026-11-22","author":"Daniel Lowe","subject":"docs: explain App Store title object removal without affecting touch controls"},
+  {"sha":"fd71ab6","date":"2026-11-22","author":"Daniel Lowe","subject":"chore: remove completed one-time App Store binary repair workflow"},
   {"sha":"06ab1ca","date":"2026-11-22","author":"Codebuff","subject":"Add Ballistic Chickens, ported from its Scratch project"},
   {"sha":"1b80182","date":"2026-11-22","author":"Codebuff","subject":"Remove Rocket Chicken"},
   {"sha":"11b122d","date":"2026-11-22","author":"Daniel Lowe","subject":"test: reject Getaway Shootout App Store tile in actual rendered Unity menu"},
