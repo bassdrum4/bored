@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/patch-getaway-menu.yml
+      - src/prototypes/getaway-shootout/patch-menu.py
   workflow_dispatch:
 
 permissions:
