@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rocket Chicken</title>
+<!-- Rocket Chicken — Dugh (code) and Skrupsakken (art), the 2013 Flash game.
+     This document is a JavaScript port of the recovered ActionScript in
+     src/prototypes/rocket-chicken/source/as3/ (main.as is the whole game: the
+     kick, the glide, the rocket, the pickups, the obstacles, the shop ladder
+     and the distance thresholds that unlock each item). The numbers injected
+     in the JSON block below are parsed from that source by
+     src/prototypes/rocket-chicken/extract.mjs, not retyped.
+     Art is redrawn in canvas — the original is a vector SWF, and this port
+     keeps its flat two-colour look instead of shipping extracted frames. -->
+<meta name="theme-color" content="#f1e8d2">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --paper: #f1e8d2;
+    --board: #fbf6e9;
+    --ink: #2b2620;
+    --dim: #7d715c;
+    --hair: #cdbf9f;
+    --accent: #bf5b3d;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  html, body { height: 100%; overflow: hidden }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #shell { position: fixed; inset: 0; display: grid; place-items: center; padding: 8px }
+  #stage { position: relative; line-height: 0 }
+  canvas { display: block; position: relative; z-index: 0; background: var(--paper); border: 1px solid var(--hair); border-radius: 2px }
+  /* One line of small caps, like the rest of the arcade. */
+  #hudLine {
+    position: absolute; left: 10px; right: 10px; top: 6px; display: flex; gap: 12px;
+    justify-content: space-between; pointer-events: none; z-index: 2;
+    font: 600 10px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink);
+  }
+  #hudLine span:last-child { margin-left: auto }
+  #panel {
+    position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+    background: rgba(43, 38, 32, .22); line-height: 1.5; z-index: 4;
+  }
+  #panel[hidden] { display: none }
+  #card {
+    background: var(--board); border: 1px solid var(--hair); border-radius: 3px;
+    padding: 14px 16px 12px; width: min(560px, 100%); max-height: 100%; overflow: auto;
+    text-align: center;
+  }
+  #card h2 { font: 600 10px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 3px }
+  #card p { color: var(--dim); margin-bottom: 10px }
+  #card p strong { color: var(--ink); font-weight: 600 }
+  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap }
+  button {
+    font: 12px/1 var(--mono); padding: 8px 12px; border: 1px solid var(--hair); border-radius: 2px;
+    background: transparent; color: var(--ink); cursor: pointer;
+  }
+  button.primary { background: var(--ink); border-color: var(--ink); color: var(--board) }
+  button:disabled { opacity: .4; cursor: default }
+  #store { text-align: left }
+  #store h3 { font: 600 10px/1.6 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-top: 10px }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px }
+  .item {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+    border: 1px solid var(--hair); border-radius: 2px; padding: 5px 7px; font-size: 11px;
+    text-align: left; background: transparent; color: inherit; width: 100%; cursor: pointer;
+  }
+  .item small { color: var(--dim); font-size: 10px; white-space: nowrap }
+  .item[data-owned="no"] { opacity: .45; cursor: default }
+  .item[data-worn="yes"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink) }
+  .toast {
+    position: absolute; left: 50%; top: 34px; transform: translateX(-50%);
+    background: var(--board); border: 1px solid var(--hair); border-radius: 2px;
+    padding: 4px 8px; font: 600 10px/1.5 var(--mono); letter-spacing: .08em;
+    text-transform: uppercase; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 3;
+  }
+  .toast.show { opacity: 1 }
+</style>
+</head>
+<body>
+<div id="shell">
+  <div id="stage">
+    <canvas id="board" width="800" height="480" aria-label="Rocket Chicken"></canvas>
+    <div id="hudLine"><span id="hudScore">0 FT</span><span id="hudCash">$0</span></div>
+    <div class="toast" id="toast"></div>
+    <div id="panel" hidden><div id="card"></div></div>
+  </div>
+</div>
+<!-- BEGIN GENERATED DATA -->
+<script type="application/json" id="rocket-chicken-data">
+{"helmets":[["rheadband",130,35,14500],["bheadband",35,20,5000],["gheadband",130,35,14500],["prophat",35,20,5000],["blheadband",130,35,14500],["wheadband",35,20,5000],["smileyface",130,35,14500],["rnycap",35,20,5000],["gnycap",130,35,14500],["gmban",90,30,9000],["bmban",90,30,9000],["wmban",90,30,9000],["blmban",90,30,9000],["rmban",120,50,18000],["whue",110,30,10000],["ghue",25,25,4500],["blhuea",25,25,4500],["bhue",85,25,8000],["rhue",85,25,8000],["rcap",85,25,8000],["blcap",85,25,8000],["bcap",85,25,8000],["gcap",50,30,6000],["wcap",50,30,6000],["wglass",50,30,6000],["bglass",50,30,6000],["wjew",50,30,6000],["bjew",150,30,20000],["wban",150,30,20000],["rban",45,10,5250],["gban",45,10,5250],["blban",20,15,3000],["bban",20,15,3000],["rbackcap",20,15,3000],["bbackcap",20,15,3000],["gbackcap",20,15,3000],["wbackcap",70,20,7250],["blbackcap",70,20,7250],["glhue",70,20,7250],["blhue",70,20,7250],["wlhue",70,20,7250],["bllhue",160,40,25000],["rlhue",60,20,6500],["jason",60,20,6500],["awesomeface",200,20,30000],["rbancomb",200,20,30000],["blbancomb",200,20,30000],["bbancomb",250,120,50000],["gbancomb",300,100,55000],["wbancomb",300,100,55000],["ohelm",300,100,55000],["bsunglass",90,30,9000],["rsunglass",220,100,40000],["abu",220,100,40000],["mine",220,100,40000],["rheadset",35,20,5000],["bheadset",10,5,1500],["wheadset",270,10,48000],["næb",40,25,5500],["goldrace",40,25,5500],["brace",40,25,5500],["rrace",40,25,5500],["faic",40,25,5500],["halsting",220,10,35000],["mili",200,200,80000],["bkong",200,250,100000],["madness",80,150,28000],["rkong",250,120,42000],["wkong",30,20,4750],["illuface",130,40,12000],["mand",150,200,60000],["pac",200,200,65000]],"belts":[["furrybelt",90,10,15000],["nbelt",25,10,6500],["smileybelt",95,30,15000],["paperbelt",95,30,15000],["nbeltblack",85,25,12000],["wbelt",85,25,12000],["sbelt",30,5,100],["sbeltblack",30,5,100],["pilbeltblack",65,15,200],["pilbelt",65,15,200],["smileybelt2",10,15,500],["altbelt",10,15,1000],["altbeltblack",75,20,10000],["accbeltblack",75,20,10000],["accbelt",40,10,700],["toolbeltblack",40,10,700],["toolbelt",20,15,300],["bbeltblack",145,30,5250],["bbelt",145,30,5250],["rbelt",160,30,6500],["smileybelt3",180,35,7600],["seedbelt",85,70,7600],["smallironbelt",200,50,12000],["smallironbeltblack",130,25,5000],["ironbeltblack",55,50,5000],["ironbelt",155,10,1000],["facebelt",15,5,2000],["ironbelt2black",15,0,3000],["blackbelt",190,40,10000],["ironbelt3black",120,20,10000],["ironbelt3",25,10,5000],["armorbelt",50,10,350],["bigironbelt",100,10,350]],"rockets":[["minirakket",15,10,15,5000],["minirakket2",25,15,30,7000],["crakket",55,20,15,8000],["crakket2",55,20,30,10000],["swings",1,15,30000,15000],["swings2",60,15,35,18000],["tnt",100,25,35,21000],["longrakket2",15,10,500,25000],["rakket",25,15,500,30000],["bwings",60,20,200,35000],["bwings2",80,10,200,45000],["brakket",100,20,200,50000],["3rakket",100,25,270,60000],["3rakket2",100,30,350,65000],["illurakket",120,30,350,70000],["illurakket2",100,20,450,80000],["hrakket",120,30,450,90000],["longrakket",180,45,1000,100000]],"unlocks":[[250,["wbelt","smileyface"]],[350,["swings"]],[370,["gnycap","rnycap"]],[400,["swings2"]],[500,["sbelt","sbeltblack"]],[620,["gmban","wmban","bmban","blmban","rmban"]],[650,["tnt"]],[700,["longrakket"]],[850,["pilbelt","pilbeltblack"]],[900,["bhue","rhue","whue","ghue","blhuea"]],[1000,["longrakket2"]],[1200,["gcap","bcap","wcap","blcap","rcap"]],[1300,["rakket"]],[1500,["smileybelt2"]],[1550,["wglass","bglass"]],[1600,["bwings"]],[1750,["altbelt","altbeltblack"]],[1800,["bwings2"]],[1850,["bjew","wjew"]],[1950,["wban","bban","rban","gban","blban"]],[2000,["brakket"]],[2050,["accbeltblack","accbelt"]],[2150,["rbackcap","bbackcap","blbackcap","gbackcap","wbackcap"]],[2200,["3rakket"]],[2400,["toolbelt","toolbeltblack"]],[2500,["wlhue","rlhue","glhue","bllhue","blhue"]],[2600,["3rakket2"]],[2700,["jason"]],[2750,["bbeltblack","bbelt"]],[2800,["rbelt","awesomeface"]],[2900,["rbancomb","gbancomb","wbancomb","bbancomb","blbancomb"]],[3000,["illurakket"]],[3100,["smileybelt3"]],[3250,["ohelm"]],[3400,["seedbelt"]],[3500,["illurakket2"]],[3600,["bsunglass","rsunglass"]],[3700,["smallironbeltblack","smallironbelt"]],[3850,["abu"]],[4000,["ironbelt","ironbeltblack","mine"]],[4250,["bheadset","wheadset","rheadset"]],[4400,["facebelt"]],[4500,["hrakket"]],[4550,["næb"]],[4600,["ironbelt2black"]],[4700,["rrace","brace","goldrace"]],[4800,["blackbelt","faic"]],[5000,["halsting"]],[5200,["ironbelt3black","ironbelt3"]],[5400,["mili"]],[5600,["armorbelt"]],[5800,["rkong","bkong","wkong","madness"]],[6000,["bigironbelt"]],[6150,["illuface"]],[6300,["mand"]]]}
+</script>
+<!-- END GENERATED DATA -->
+<script>
+'use strict';
+(function () {
+
+/* ── the recovered game data ─────────────────────────────────────────────── */
+
+const DATA = JSON.parse(document.getElementById('rocket-chicken-data').textContent);
+// [name, mood, protect, price] — mood raises the energy bar, protect softens hits.
+const HELMETS = DATA.helmets;
+// [name, protect, weight, price]
+const BELTS = DATA.belts;
+// [name, fuel, weight, power, price] — fuel raises the tank, power the thrust.
+const ROCKETS = DATA.rockets;
+// [feet, [item, …]] in the order main.as unlocks them.
+const UNLOCKS = DATA.unlocks;
+
+const find = (list, name) => list.find((entry) => entry[0] === name) || list[0];
+
+/* ── persistence ─────────────────────────────────────────────────────────── */
+
+// One save, like every other Bored game: what you own, what you wear and the
+// cash you have taken out of the air. The run itself lives in the hub's resume
+// helper (bored.resume.rocket-chicken) so it survives a closed tab.
+const KEY = 'bored.rocket-chicken.progress';
+const DEFAULT_PROGRESS = () => ({
+  v: 1,
+  cash: 0,
+  runs: 0,
+  owned: { helmets: ['none'], belts: ['nbeltblack'], rockets: ['none'] },
+  bought: { helmets: ['none'], belts: ['nbeltblack'], rockets: ['none'] },
+  worn: { helmet: 'none', belt: 'nbeltblack', rocket: 'none' },
+});
+function loadProgress() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (!saved || saved.v !== 1 || !saved.owned || !saved.worn) return DEFAULT_PROGRESS();
+    // A save from before the shop tracked purchases: everything found is free.
+    if (!saved.bought) saved.bought = { helmets: saved.owned.helmets.slice(), belts: saved.owned.belts.slice(), rockets: saved.owned.rockets.slice() };
+    return saved;
+  } catch (error) { return DEFAULT_PROGRESS(); }
+}
+let progress = loadProgress();
+function saveProgress() {
+  try { localStorage.setItem(KEY, JSON.stringify(progress)); } catch (error) { /* embedded contexts throw */ }
+}
+
+/* ── the bird you built ──────────────────────────────────────────────────── */
+
+// Everything here comes from createBird() in main.as.
+function build() {
+  const helmet = find(HELMETS, progress.worn.helmet);
+  const belt = find(BELTS, progress.worn.belt);
+  const rocket = find(ROCKETS, progress.worn.rocket);
+  const hasRocket = progress.worn.rocket !== 'none';
+  return {
+    helmet, belt, rocket, hasRocket,
+    maxEnergy: 50 + helmet[1] * 2.8,
+    maxFuel: hasRocket ? rocket[1] * 1.3 : 0,
+    protect: 1 + (helmet[2] + belt[1]) * 0.065,
+    weight: (belt[2] + (hasRocket ? rocket[2] : 0)) * 0.8,
+    thrust: hasRocket ? rocket[3] * 0.0148 : 0,
+  };
+}
+
+// Boots raise the kick. main.as hands them out for finishing runs, not distance.
+const BOOT_POWER = [3, 3.8, 4.5, 5.6];
+function bootTier() {
+  if (progress.runs >= 26) return 3;
+  if (progress.runs >= 13) return 2;
+  if (progress.runs >= 5) return 1;
+  return 0;
+}
+
+/* ── board and layout ────────────────────────────────────────────────────── */
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const W = 800, H = 480;
+const panel = document.getElementById('panel');
+const card = document.getElementById('card');
+const hudScore = document.getElementById('hudScore');
+const hudCash = document.getElementById('hudCash');
+const toast = document.getElementById('toast');
+
+// Letterbox the 800×480 board into whatever the card gives us.
+function fit() {
+  const box = document.getElementById('shell').getBoundingClientRect();
+  const scale = Math.max(.2, Math.min((box.width - 16) / W, (box.height - 16) / H));
+  canvas.style.width = Math.round(W * scale) + 'px';
+  canvas.style.height = Math.round(H * scale) + 'px';
+}
+new ResizeObserver(fit).observe(document.getElementById('shell'));
+fit();
+
+/* ── run state ───────────────────────────────────────────────────────────── */
+
+// Phase numbers, lifted from updateBird(): gravity, the speed cap and the
+// angle clamp are the originals.
+const GRAVITY = 0.45;
+const FORCE = 1.5;
+const SPEED_CAP = 150;
+const STEP = 1 / 30;
+
+const bird = { vx: 0, vy: 0, alt: 0, rot: 0, power: 0, paralyzed: 0, hurt: 0, still: 0, inAir: true };
+let phase = 'aim';        // aim | fly | over
+let finished = false;
+let time = 0;             // frames since the kick
+let distance = 0;         // feet, exactly as main.as counts them
+let peak = 0;             // highest altitude reached, in board pixels
+let fuel = 0;
+let energy = 0;
+let bonus = 0;
+let chain = 0;            // consecutive pickups, the cash multiplier
+let chainTimer = 0;
+let scroll = 0;           // world x under the bird
+let aimAngle = 0.5;       // radians above the horizontal, up and to the right
+let rocketOn = false;
+let run = build();
+let pickups = [];
+let obstacles = [];
+let particles = [];
+let feathers = [];
+let unlockedThisRun = [];
+let spawnTimer = 0;
+let obstacleTimer = 40;
+
+const keys = { up: false, down: false, kick: false };
+
+function resetRun() {
+  run = build();
+  bird.vx = 0; bird.vy = 0; bird.alt = 0; bird.rot = 0; bird.paralyzed = 0;
+  bird.hurt = 0; bird.still = 0; bird.inAir = true;
+  phase = 'aim'; finished = false; time = 0; distance = 0; peak = 0;
+  fuel = run.maxFuel; energy = run.maxEnergy; bonus = 0; chain = 0; chainTimer = 0;
+  scroll = 0; rocketOn = false; pickups = []; obstacles = []; particles = [];
+  feathers = []; unlockedThisRun = []; spawnTimer = 30; obstacleTimer = 40;
+  aimAngle = 0.5;
+  updateHud();
+}
+
+/* ── the kick ────────────────────────────────────────────────────────────── */
+
+// downed() in main.as: the boot's stored power sets both components, and the
+// bird flies paralysed for 20 frames while the launch plays out.
+function kick() {
+  if (phase !== 'aim') return;
+  const power = BOOT_POWER[bootTier()];
+  // (leg power bar + 100) * 0.07 * boot: the bar's own height is not in the
+  // recovered code, so 120 stands in for it.
+  const magnitude = (120 + 100) * 0.07 * power;
+  bird.vx = Math.cos(aimAngle) * magnitude;
+  bird.vy = -Math.sin(aimAngle) * magnitude;
+  bird.paralyzed = 20;
+  bird.inAir = true;
+  phase = 'fly';
+  time = 0;
+  burst(250, groundScreenY() - bird.alt, 10, 2.2);
+  sound('kick');
+}
+
+/* ── flight ──────────────────────────────────────────────────────────────── */
+
+// The camera holds the bird at y=200 while she climbs and lets the ground come
+// up to her near the bottom — goPlayer in main.as.
+function groundScreenY() {
+  return bird.alt > 100 ? 200 + bird.alt : 300;
+}
+const birdY = () => groundScreenY() - bird.alt;
+const birdX = () => 250;
+
+function step() {
+  if (phase !== 'fly') return;
+  time += 1;
+  if (chainTimer > 0 && --chainTimer === 0) chain = 0;
+  if (bird.hurt > 0) bird.hurt -= 1;
+  if (bird.paralyzed > 0) bird.paralyzed -= 1;
+
+  // Space holds the rocket down. createBird() gives fuel = rocket.fuel * 1.3.
+  if (run.hasRocket && rocketOn && fuel > 0) {
+    fuel = Math.max(0, fuel - 0.5);
+    bird.power = run.thrust;
+    if (Math.random() < 0.4) flame();
+  } else {
+    bird.power = 0;
+  }
+
+  if (bird.paralyzed === 0) {
+    if (keys.up && energy > 0) {
+      energy -= 1;
+      if (bird.vy > 2) bird.vy -= bird.vy * 0.1 / Math.abs(bird.vy * 0.1);
+      bird.vy -= 1;
+      bird.vx += 0.2;
+    } else if (keys.down) {
+      if (Math.abs(bird.vy) > 2) {
+        bird.vx += 0.6;
+        if (bird.vy < -2) bird.vy -= bird.vy * 0.3 / Math.abs(bird.vy * 0.1);
+        bird.vy += 1;
+      }
+    }
+  }
+
+  energy = Math.max(0, Math.min(run.maxEnergy, energy));
+  fuel = Math.max(0, Math.min(run.maxFuel, fuel));
+
+  // Gravity, lighter at speed and halved while the rocket burns.
+  const drag = bird.vx * 0.015 + 1;
+  bird.vy += (run.weight * 0.004 / drag + GRAVITY / drag) / (bird.power + 1);
+
+  const heading = Math.atan2(bird.vy, bird.vx);
+  bird.vx -= bird.vx * 0.00394;
+  bird.vx += Math.cos(heading) * bird.power * 0.587;
+  bird.vx = Math.max(-SPEED_CAP, Math.min(SPEED_CAP, bird.vx));
+  bird.vy += Math.sin(heading) * bird.power * FORCE;
+  if (bird.vx < 0.3 && Math.abs(bird.vy) < 0.5) { bird.vx = 0; bird.vy = 0; }
+
+  bird.alt -= bird.vy;
+  scroll += bird.vx;
+  distance += bird.vx * 0.0035;
+  if (bird.alt > peak) peak = bird.alt;
+
+  if (bird.inAir) {
+    const target = -Math.atan2(bird.vy, bird.vx) * 180 / Math.PI;
+    if (target > 80) bird.rot = 80;
+    else bird.rot += (target - bird.rot) * 0.3;
+  }
+
+  // The ground: a bounce while there is speed in her, then a countdown to the
+  // scoreboard once she has stopped (stillTime > 30 in updateBird()).
+  if (bird.alt <= 0) {
+    bird.alt = 0;
+    const speed = Math.hypot(bird.vx, bird.vy);
+    if (speed > 5) {
+      const angle = Math.atan2(-bird.vy, bird.vx);
+      burst(birdX(), 300, 6, 1.4);
+      bird.vx -= bird.vx * Math.cos(angle) * 0.24;
+      bird.vy = -bird.vy * 0.325;
+      bird.inAir = true;
+      bird.still = 0;
+      if (Math.abs(bird.vy) > 6) sound('bounce');
+    } else {
+      bird.still += 1;
+      bird.vy = 0; bird.vx = 0; bird.rot = 0;
+      bird.inAir = false;
+      if (bird.still > 30) endRun();
+    }
+  } else {
+    bird.inAir = true;
+    bird.still = 0;
+  }
+
+  scenery();
+  updateParticles();
+  collisions();
+  checkUnlocks();
+  updateHud();
+}
+
+/* ── scenery, pickups and obstacles ──────────────────────────────────────── */
+
+const POWER_TABLE = {
+  boost:    { cash: 150,  vy: -10, vx: 20, energy: 0.33, fuel: 0,    label: 'BOOST' },
+  boost2:   { cash: 250,  vy: -20, vx: 35, energy: 0.55, fuel: 0,    label: 'BOOST' },
+  benzin:   { cash: 100,  vy: -10, vx: 20, energy: 10,   fuel: 0.33, label: 'FUEL' },
+  benzin2:  { cash: 200,  vy: -15, vx: 30, energy: 20,   fuel: 0.55, label: 'FUEL' },
+  diamond:  { cash: 1000, vy: -15, vx: 30, energy: 20,   fuel: 0,    label: 'GEM' },
+  diamond2: { cash: 800,  vy: -15, vx: 30, energy: 20,   fuel: 0.55, label: 'GEM' },
+  diamond3: { cash: 1000, vy: -15, vx: 30, energy: 20,   fuel: 0.55, label: 'GEM' },
+  diamond4: { cash: 1100, vy: -15, vx: 30, energy: 20,   fuel: 0.55, label: 'GEM' },
+};
+
+function scenery() {
+  if (--spawnTimer <= 0) {
+    spawnTimer = 14 + Math.random() * 26;
+    // createPower() rolls a small pickup 2 times in 3, a diamond otherwise.
+    const roll = Math.random();
+    const type = roll < 0.2 ? 'boost' : roll < 0.4 ? 'benzin' : roll < 0.45 ? 'boost2'
+      : roll < 0.5 ? 'benzin2' : roll < 0.68 ? 'diamond' : roll < 0.78 ? 'diamond2'
+      : roll < 0.88 ? 'diamond3' : 'diamond4';
+    pickups.push({
+      x: scroll + W + 120 + Math.random() * 180,
+      alt: bird.alt + Math.random() * 340 - 140,
+      type, spin: Math.random() * Math.PI,
+    });
+  }
+  if (--obstacleTimer <= 0) {
+    obstacleTimer = 70 + Math.random() * 90;
+    obstacles.push({
+      x: scroll + W + 140 + Math.random() * 220,
+      alt: bird.alt + Math.random() * 320 - 150,
+      wide: Math.random() < 0.5,
+    });
+  }
+  pickups = pickups.filter((pickup) => pickup.x - scroll > -80);
+  obstacles = obstacles.filter((rock) => rock.x - scroll > -90);
+  for (const pickup of pickups) pickup.spin += 0.04;
+}
+
+function collisions() {
+  const px = birdX(), py = birdY();
+  for (let index = pickups.length - 1; index >= 0; index--) {
+    const pickup = pickups[index];
+    const sx = pickup.x - scroll, sy = groundScreenY() - pickup.alt;
+    if (Math.abs(sx - px) < 26 && Math.abs(sy - py) < 24) {
+      collect(pickup);
+      pickups.splice(index, 1);
+    }
+  }
+  if (bird.hurt > 0) return;
+  for (let index = obstacles.length - 1; index >= 0; index--) {
+    const rock = obstacles[index];
+    const sx = rock.x - scroll, sy = groundScreenY() - rock.alt;
+    if (Math.abs(sx - px) < 26 && Math.abs(sy - py) < 26) {
+      hit();
+      obstacles.splice(index, 1);
+      break;
+    }
+  }
+}
+
+// updateSceneary()'s power switch, with its chain multiplier from addCash().
+function collect(pickup) {
+  const power = POWER_TABLE[pickup.type];
+  chain = Math.min(chain + 1, 8);
+  chainTimer = 50;
+  bird.vy += power.vy;
+  bird.vx += power.vx;
+  energy = Math.min(run.maxEnergy, energy + (power.energy <= 1 ? run.maxEnergy * power.energy : power.energy));
+  if (power.fuel) fuel = Math.min(run.maxFuel, fuel + run.maxFuel * power.fuel);
+  const cash = Math.round(power.cash * (1 + (chain - 1) * 0.75));
+  progress.cash += cash;
+  bonus += power.cash;
+  saveProgress();
+  burst(birdX(), birdY(), 8, 1.8);
+  showToast('+' + power.label + '  $' + cash);
+  updateHud();
+  sound('pickup');
+}
+
+// An obstacle's damage, straight out of updateSceneary(): protect softens the
+// paralysed frames and the energy the hit costs.
+function hit() {
+  const ease = run.protect + 1;
+  bird.vy += 40 / (run.protect * 1.3);
+  const slow = Math.min(1.6, run.protect * 0.42 + 0.13);
+  bird.vx *= 0.6 * slow;
+  bird.paralyzed += Math.round(20 / ease);
+  bird.hurt += Math.round(90 / ease);
+  energy = Math.max(0, energy - run.maxEnergy * 0.6 / ease);
+  fuel = Math.max(0, fuel - run.maxFuel * 0.6 / ease);
+  chain = 0;
+  burst(birdX(), birdY(), 12, 2.4);
+  showToast('OUCH');
+  sound('hit');
+}
+
+/* ── the ladder ──────────────────────────────────────────────────────────── */
+
+// main.as watches this.distance against a list of thresholds and pushes the
+// item into the right owned list as you pass it.
+function checkUnlocks() {
+  for (const [feet, items] of UNLOCKS) {
+    if (distance < feet) continue;
+    for (const item of items) {
+      const kind = HELMETS.some((entry) => entry[0] === item) ? 'helmets'
+        : BELTS.some((entry) => entry[0] === item) ? 'belts'
+        : ROCKETS.some((entry) => entry[0] === item) ? 'rockets' : null;
+      if (!kind || progress.owned[kind].includes(item)) continue;
+      progress.owned[kind].push(item);
+      unlockedThisRun.push(item);
+      showToast('FOUND: ' + item);
+    }
+    saveProgress();
+  }
+}
+
+/* ── particles ───────────────────────────────────────────────────────────── */
+
+function burst(x, y, count, scale) {
+  for (let index = 0; index < count; index++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 2.4 * scale,
+      vy: (Math.random() - 0.5) * 2.4 * scale,
+      life: 18 + Math.random() * 10,
+    });
+  }
+}
+function flame() {
+  particles.push({
+    x: birdX() + 10 + Math.random() * 4,
+    y: birdY() + 16,
+    vx: -2 - Math.random() * 2, vy: (Math.random() - 0.5) * 1.4,
+    life: 10, hot: true,
+  });
+}
+function feather() {
+  if (bird.vx < 30 || feathers.length > 20) return;
+  feathers.push({ x: birdX(), y: birdY(), vx: -2 - Math.random(), vy: (Math.random() - 0.5), life: 40 });
+}
+function updateParticles() {
+  if (bird.vx > 30) feather();
+  for (const list of [particles, feathers]) {
+    for (let index = list.length - 1; index >= 0; index--) {
+      const spark = list[index];
+      spark.x += spark.vx;
+      spark.y += spark.vy;
+      spark.vy += 0.04;
+      spark.life -= 1;
+      if (spark.life <= 0) list.splice(index, 1);
+    }
+  }
+}
+
+/* ── drawing ─────────────────────────────────────────────────────────────── */
+
+const INK = '#2b2620';
+const PAPER = '#f1e8d2';
+const ACCENT = '#bf5b3d';
+const DIM = '#7d715c';
+const HILL = '#e2d6b8';
+const GROUND = '#d6c8a5';
+const GROUND_DARK = '#c3b391';
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, W, H);
+
+  const groundY = groundScreenY();
+  // The county below sinks at a fifth of her climb, so a long flight still has
+  // something underneath it instead of an empty sky.
+  const farY = 200 + Math.max(100, bird.alt * 0.2);
+
+  // Clouds sit furthest back, then the distant county, then the near ground.
+  drawClouds();
+  drawHills(scroll * 0.08, farY, 0.5, HILL);
+  ctx.fillStyle = '#e8dcc0';
+  ctx.fillRect(0, farY, W, H - farY);
+  ctx.fillStyle = HILL;
+  ctx.fillRect(0, farY, W, 1);
+
+  drawHills(scroll * 0.26 + 120, groundY, 0.8, GROUND_DARK);
+  ctx.fillStyle = GROUND;
+  ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.fillStyle = INK;
+  ctx.fillRect(0, groundY, W, 1);
+
+  drawTree(groundY);
+
+  for (const pickup of pickups) {
+    const sx = pickup.x - scroll;
+    const sy = groundScreenY() - pickup.alt;
+    if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+    drawPickup(sx, sy, pickup);
+  }
+  for (const rock of obstacles) {
+    const sx = rock.x - scroll;
+    const sy = groundScreenY() - rock.alt;
+    if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+    drawObstacle(sx, sy, rock);
+  }
+
+  for (const spark of particles) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, spark.life / 20));
+    ctx.fillStyle = spark.hot ? ACCENT : INK;
+    ctx.fillRect(spark.x - 1, spark.y - 1, 2, 2);
+  }
+  for (const fluff of feathers) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, fluff.life / 40));
+    ctx.fillStyle = '#fffdf4';
+    ctx.fillRect(fluff.x, fluff.y, 3, 2);
+  }
+  ctx.globalAlpha = 1;
+
+  drawBird(groundY);
+
+  if (phase === 'aim') drawAim(groundY);
+  if (phase === 'fly' && run.hasRocket) drawFuel(groundY);
+  drawEnergy(groundY);
+}
+
+function drawHills(offset, groundY, height, colour) {
+  ctx.fillStyle = colour;
+  const span = 320;
+  const start = -((offset % span) + span);
+  for (let x = start; x < W + span; x += span) {
+    ctx.beginPath();
+    ctx.moveTo(x, groundY);
+    ctx.quadraticCurveTo(x + span * 0.25, groundY - 130 * height, x + span * 0.5, groundY - 60 * height);
+    ctx.quadraticCurveTo(x + span * 0.75, groundY - 10 * height, x + span, groundY);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawClouds() {
+  ctx.fillStyle = '#fbf6e9';
+  for (let index = 0; index < 11; index++) {
+    const seed = index * 137;
+    const drift = index * 53;
+    const x = ((seed * 3 + drift - scroll * 0.4) % (W + 300) + W + 300) % (W + 300) - 150;
+    const y = 24 + ((seed * 7) % 300);
+    const wide = 28 + (seed % 4) * 8;
+    ctx.beginPath();
+    ctx.ellipse(x, y, wide + 18, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + wide, y + 5, wide * 0.7, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// The tree she is kicked out of: a trunk behind her and a flat canopy above.
+function drawTree(groundY) {
+  const x = 250 - scroll;
+  if (x < -200 || x > W + 80) return;
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = GROUND_DARK;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 4, groundY);
+  ctx.lineTo(x - 2, groundY - 96);
+  ctx.lineTo(x + 3, groundY - 96);
+  ctx.lineTo(x + 5, groundY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // A flat silhouette canopy, so the three leaves read as one tree.
+  ctx.beginPath();
+  ctx.ellipse(x - 26, groundY - 104, 34, 21, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 26, groundY - 110, 32, 20, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 2, groundY - 130, 40, 26, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBird() {
+  const x = birdX();
+  const y = phase === 'aim' ? groundScreenY() - 26 : birdY();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(bird.rot * Math.PI / 180);
+  if (bird.hurt > 0 && Math.floor(bird.hurt / 4) % 2 === 0) ctx.globalAlpha = 0.45;
+
+  const r = 17;
+  // Body.
+  ctx.fillStyle = '#fffdf4';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Tail and wing.
+  ctx.fillStyle = '#fffdf4';
+  ctx.beginPath();
+  ctx.moveTo(-r + 2, -4);
+  ctx.lineTo(-r - 12, -13);
+  ctx.lineTo(-r - 11, -1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(-2, 3, 10, 6, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Comb, beak, eye.
+  ctx.fillStyle = ACCENT;
+  ctx.beginPath();
+  ctx.arc(4, -r + 1, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#e2a23c';
+  ctx.beginPath();
+  ctx.moveTo(r - 3, -2);
+  ctx.lineTo(r + 9, 2);
+  ctx.lineTo(r - 3, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(8, -5, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Boots and the rocket you bought (drawBird only knows shapes, not art).
+  ctx.fillStyle = INK;
+  ctx.fillRect(-6, r - 2, 7, 4);
+  ctx.fillRect(3, r - 2, 7, 4);
+  if (run.hasRocket) {
+    ctx.fillStyle = '#8d9a8f';
+    ctx.beginPath();
+    ctx.rect(-16, 10, 30, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(-20, 12, 5, 6);
+    if (rocketOn && fuel > 0) {
+      ctx.fillStyle = ACCENT;
+      ctx.beginPath();
+      ctx.moveTo(-20, 13);
+      ctx.lineTo(-30 - Math.random() * 6, 15);
+      ctx.lineTo(-20, 17);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // Helmet or hat: a band for the headgear you are wearing.
+  if (progress.worn.helmet !== 'none') {
+    ctx.fillStyle = ACCENT;
+    ctx.beginPath();
+    ctx.arc(1, -8, r - 3, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function drawPickup(x, y, pickup) {
+  const power = POWER_TABLE[pickup.type];
+  const gem = power.label === 'GEM';
+  ctx.save();
+  ctx.translate(x, y);
+  if (!gem) ctx.rotate(Math.sin(pickup.spin) * 0.2);
+  ctx.fillStyle = '#fffdf4';
+  ctx.strokeStyle = gem ? ACCENT : INK;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (gem) {
+    ctx.moveTo(0, -15); ctx.lineTo(14, 0); ctx.lineTo(0, 15); ctx.lineTo(-14, 0);
+  } else {
+    ctx.rect(-16, -10, 32, 20);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = gem ? ACCENT : INK;
+  ctx.font = '600 9px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(power.label, 0, 0.5);
+  ctx.restore();
+}
+
+function drawObstacle(x, y, rock) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = HILL;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (rock.wide) {
+    ctx.ellipse(0, 0, 18, 11, 0, 0, Math.PI * 2);
+  } else {
+    ctx.moveTo(-12, 12);
+    ctx.lineTo(-15, -3);
+    ctx.lineTo(-4, -13);
+    ctx.lineTo(10, -9);
+    ctx.lineTo(15, 4);
+    ctx.lineTo(6, 12);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// The aiming leg from the tree: a line from the bird to the pointer.
+function drawAim() {
+  const x = birdX(), y = groundScreenY() - 26;
+  const length = 96;
+  const tx = x + Math.cos(aimAngle) * length;
+  const ty = y - Math.sin(aimAngle) * length;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(tx, ty);
+  ctx.stroke();
+  ctx.fillStyle = ACCENT;
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx - Math.cos(aimAngle - 0.4) * 10, ty + Math.sin(aimAngle - 0.4) * 10);
+  ctx.lineTo(tx - Math.cos(aimAngle + 0.4) * 10, ty + Math.sin(aimAngle + 0.4) * 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = INK;
+  ctx.font = '600 10px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('SPACE TO KICK', x, y + 46);
+  ctx.fillStyle = DIM;
+  ctx.fillText('UP AND DOWN STEER IN THE AIR', x, y + 60);
+}
+
+function drawEnergy(groundY) {
+  const width = 120;
+  const x = 16, y = 20;
+  ctx.fillStyle = 'rgba(43,38,32,.18)';
+  ctx.fillRect(x, y, width, 3);
+  ctx.fillStyle = INK;
+  ctx.fillRect(x, y, width * Math.max(0, energy / run.maxEnergy), 3);
+}
+
+function drawFuel(groundY) {
+  const width = 120;
+  const x = 16, y = 27;
+  ctx.fillStyle = 'rgba(43,38,32,.18)';
+  ctx.fillRect(x, y, width, 3);
+  ctx.fillStyle = ACCENT;
+  ctx.fillRect(x, y, width * Math.max(0, fuel / run.maxFuel), 3);
+}
+
+function updateHud() {
+  const feet = phase === 'aim' ? 0 : Math.max(0, Math.floor(distance));
+  hudScore.textContent = feet + ' FT';
+  hudCash.textContent = '$' + progress.cash;
+}
+
+let toastTimer = 0;
+function showToast(text) {
+  toast.textContent = text;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1100);
+}
+
+/* ── sound ───────────────────────────────────────────────────────────────── */
+
+// The SWF's own effects were never extracted into the document (they are Flash
+// event sounds); these are two short tones so a hit and a pickup feel different
+// without shipping audio files. Browsers only allow this after a gesture.
+let audio = null;
+function sound(kind) {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = kind === 'hit' ? 'square' : 'triangle';
+    osc.frequency.value = kind === 'hit' ? 90 : kind === 'kick' ? 220 : kind === 'bounce' ? 160 : 520;
+    gain.gain.value = 0.04;
+    gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.12);
+    osc.connect(gain).connect(audio.destination);
+    osc.start();
+    osc.stop(audio.currentTime + 0.13);
+  } catch (error) { /* audio is optional */ }
+}
+
+/* ── end of the run, and the shop ────────────────────────────────────────── */
+
+function endRun() {
+  phase = 'over';
+  finished = true;
+  progress.runs += 1;
+  saveProgress();
+  const feet = Math.max(0, Math.round(distance));
+  const height = Math.max(0, Math.round(peak / 2));
+  if (RESUME) RESUME.clear();
+  showCard('Run over',
+    '<strong>' + feet + ' ft</strong> &middot; peak ' + height + ' &middot; ' +
+      (time / 30).toFixed(1) + 's &middot; bonus $' + Math.round(bonus) +
+      (unlockedThisRun.length ? '<br>New gear: ' + unlockedThisRun.join(', ') : ''),
+    [
+      { text: 'Kick again', primary: true, run: () => { hideCard(); resetRun(); } },
+      { text: 'Your bird', run: openStore },
+    ]);
+  updateHud();
+}
+
+function showCard(title, body, buttons) {
+  card.innerHTML = '';
+  const heading = document.createElement('h2');
+  heading.textContent = title;
+  const line = document.createElement('p');
+  line.innerHTML = body;
+  const row = document.createElement('div');
+  row.className = 'row';
+  for (const spec of buttons) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = spec.text;
+    if (spec.primary) button.className = 'primary';
+    if (spec.disabled) button.disabled = true;
+    button.onclick = spec.run;
+    row.appendChild(button);
+  }
+  card.append(heading, line, row);
+  panel.hidden = false;
+}
+function hideCard() { panel.hidden = true; card.innerHTML = ''; }
+
+function openStore() {
+  const sections = [
+    ['rockets', 'Rockets', ROCKETS, (item) => item[0] === 'none' ? 'no rocket' : 'fuel ' + item[1] + ' \u00b7 power ' + item[3]],
+    ['helmets', 'Helmets', HELMETS, (item) => item[0] === 'none' ? 'bare head' : 'energy +' + Math.round(item[1] * 2.8) + ' \u00b7 guard ' + item[2]],
+    ['belts', 'Belts', BELTS, (item) => 'guard ' + item[1] + ' \u00b7 weight ' + item[2]],
+  ];
+  card.innerHTML = '<div id="store"></div>';
+  const store = card.querySelector('#store');
+  store.innerHTML = '<h2>Your bird</h2><p>Cash: <strong>$' + progress.cash + '</strong> \u00b7 ' +
+    'distance finds the gear, cash buys it. Runs finished: ' + progress.runs + ' (boot ' +
+    (bootTier() + 1) + '/4)</p>';
+  for (const [kind, title, list, detail] of sections) {
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    const grid = document.createElement('div');
+    grid.className = 'items';
+    const owned = progress.owned[kind];
+    const bought = progress.bought[kind];
+    const worn = kind === 'rockets' ? progress.worn.rocket : kind === 'helmets' ? progress.worn.helmet : progress.worn.belt;
+    // Only what the run has found is on the shelf; the rest is still ahead.
+    let shown = 0;
+    for (const item of list) {
+      const name = item[0];
+      if (!owned.includes(name)) continue;
+      shown += 1;
+      const price = item[item.length - 1];
+      const free = bought.includes(name);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'item';
+      button.dataset.owned = 'yes';
+      button.dataset.worn = worn === name ? 'yes' : 'no';
+      button.disabled = !free && progress.cash < price;
+      button.innerHTML = '<span>' + name + (worn === name ? ' &middot; worn' : '') + '</span>' +
+        '<small>' + (free ? 'owned' : '$' + price) + '</small>';
+      button.title = detail(item);
+      button.onclick = () => {
+        if (worn === name) return;
+        if (!free) {
+          if (progress.cash < price) return;
+          progress.cash -= price;
+          bought.push(name);
+        }
+        if (kind === 'rockets') progress.worn.rocket = name;
+        if (kind === 'helmets') progress.worn.helmet = name;
+        if (kind === 'belts') progress.worn.belt = name;
+        saveProgress();
+        run = build();
+        fuel = run.maxFuel;
+        energy = run.maxEnergy;
+        updateHud();
+        openStore();
+      };
+      grid.appendChild(button);
+    }
+    if (shown <= 1) {
+      const note = document.createElement('p');
+      note.textContent = 'Nothing found yet — fly further to unlock gear.';
+      note.style.margin = '0';
+      grid.appendChild(note);
+    }
+    store.append(heading, grid);
+  }
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.style.marginTop = '12px';
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'primary';
+  back.textContent = 'Kick again';
+  back.onclick = () => { hideCard(); resetRun(); };
+  row.appendChild(back);
+  store.appendChild(row);
+  panel.hidden = false;
+}
+
+/* ── input ───────────────────────────────────────────────────────────────── */
+
+function boardPoint(clientX, clientY) {
+  const box = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - box.left) * (W / box.width),
+    y: (clientY - box.top) * (H / box.height),
+  };
+}
+
+function aimAt(clientX, clientY) {
+  const point = boardPoint(clientX, clientY);
+  const originX = birdX(), originY = groundScreenY() - 26;
+  const angle = Math.atan2(originY - point.y, point.x - originX);
+  // Only up and to the right: down the slope is never a launch.
+  aimAngle = Math.max(0.08, Math.min(1.31, angle));
+}
+
+canvas.addEventListener('pointermove', (event) => {
+  if (phase === 'aim' && panel.hidden) aimAt(event.clientX, event.clientY);
+});
+canvas.addEventListener('pointerdown', (event) => {
+  if (phase === 'aim' && panel.hidden) {
+    aimAt(event.clientX, event.clientY);
+    kick();
+    return;
+  }
+  if (phase !== 'fly') return;
+  // Touch: the half you press is the way you steer, and the rocket burns while
+  // you hold. A mouse player presses the same canvas but mainly uses the keys.
+  const point = boardPoint(event.clientX, event.clientY);
+  if (point.y < birdY()) keys.up = true;
+  else keys.down = true;
+  if (run.hasRocket) rocketOn = true;
+});
+
+addEventListener('keydown', (event) => {
+  if ([' ', 'ArrowUp', 'ArrowDown'].includes(event.key)) event.preventDefault();
+  if (event.key === 'ArrowUp') keys.up = true;
+  if (event.key === 'ArrowDown') keys.down = true;
+  if (event.key === ' ') {
+    if (phase === 'aim' && panel.hidden) kick();
+    else if (phase === 'fly') rocketOn = true;
+  }
+  if (event.key === 'r' || event.key === 'R') {
+    if (panel.hidden) { resetRun(); }
+  }
+});
+addEventListener('keyup', (event) => {
+  if (event.key === 'ArrowUp') keys.up = false;
+  if (event.key === 'ArrowDown') keys.down = false;
+  if (event.key === ' ') rocketOn = false;
+});
+addEventListener('pointerup', () => { keys.up = false; keys.down = false; rocketOn = false; });
+addEventListener('pointercancel', () => { keys.up = false; keys.down = false; rocketOn = false; });
+addEventListener('blur', () => { keys.up = false; keys.down = false; rocketOn = false; });
+
+/* ── the hub's two hooks ─────────────────────────────────────────────────── */
+
+// Hook 1: the current run, integer metrics, never null.
+window.__boredSnapshot = function () {
+  return {
+    slug: 'rocket-chicken',
+    feet: phase === 'aim' ? 0 : Math.max(0, Math.floor(distance)),
+    height: Math.max(0, Math.round(peak / 2)),
+    cash: Math.round(bonus),
+    finished: finished === true,
+  };
+};
+
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+const RESUME = window.__boredResume || null;
+
+// A run is worth resuming while she is in the air: the exact altitude, speed,
+// fuel and distance come back, so a long flight is not lost to a closed tab.
+function savedRun() {
+  if (phase !== 'fly' || time < 30) return null;
+  return {
+    label: Math.floor(distance) + ' ft \u00b7 ' + Math.ceil(fuel) + ' fuel \u00b7 ' +
+      (run.hasRocket ? 'rocket' : 'no rocket'),
+    state: {
+      alt: bird.alt, vx: bird.vx, vy: bird.vy, rot: bird.rot,
+      distance, peak, fuel, energy, bonus, scroll, time,
+      worn: { ...progress.worn },
+    },
+  };
+}
+
+function restoreRun(saved) {
+  const state = saved && saved.state;
+  if (!state || !Number.isFinite(state.alt) || !Number.isFinite(state.vx)) return false;
+  run = build();
+  bird.alt = state.alt;
+  bird.vx = state.vx;
+  bird.vy = state.vy;
+  bird.rot = state.rot || 0;
+  bird.paralyzed = 0;
+  bird.still = 0;
+  bird.inAir = true;
+  distance = state.distance || 0;
+  peak = state.peak || state.alt || 0;
+  fuel = Number.isFinite(state.fuel) ? state.fuel : run.maxFuel;
+  energy = Number.isFinite(state.energy) ? state.energy : run.maxEnergy;
+  bonus = state.bonus || 0;
+  scroll = state.scroll || 0;
+  time = state.time || 0;
+  pickups = [];
+  obstacles = [];
+  particles = [];
+  feathers = [];
+  phase = 'fly';
+  finished = false;
+  hideCard();
+  updateHud();
+  return true;
+}
+
+if (RESUME) {
+  RESUME.arm(savedRun);
+  const saved = RESUME.read();
+  if (saved) {
+    RESUME.ask(saved.label, () => { restoreRun(saved); },
+      () => { RESUME.clear(); resetRun(); });
+  }
+}
+
+/* ── loop ────────────────────────────────────────────────────────────────── */
+
+let accumulator = 0;
+let previous = performance.now();
+function loop(now) {
+  const elapsed = Math.min(0.25, (now - previous) / 1000);
+  previous = now;
+  accumulator += elapsed;
+  let steps = 0;
+  while (accumulator >= STEP && steps < 4) {
+    step();
+    accumulator -= STEP;
+    steps += 1;
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+resetRun();
+requestAnimationFrame(loop);
+}());
+</script>
+</body>
+</html>

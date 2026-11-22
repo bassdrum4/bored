@@ -194,6 +194,11 @@
     "min_value": 3,
     "max_value": 999
   },
+  "rocket-chicken": {
+    "label": "Feet flown in a finished run",
+    "better": "high",
+    "max_value": 20000
+  },
   "scrabble": {
     "label": "Points in a finished game against the computer",
     "better": "high",
