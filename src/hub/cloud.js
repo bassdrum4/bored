@@ -82,7 +82,7 @@ let known = null;
 function remember(id, row) {
   // A missing row is worth remembering too: the next save can POST directly and
   // fall back to a read only when another device created the row first.
-  known = id ? { id, updatedAt: row?.updated_at || null, data: object(row?.data) } : null;
+  known = id ? { id, updatedAt: row?.updated_at || null, data: object(row?.data), checkedAt: Date.now() } : null;
 }
 
 async function currentRow(id) {
@@ -106,16 +106,22 @@ export async function pushPlayerState(incoming) {
   for (let attempt = 0; attempt < 8; attempt++) {
     if (!sameSession(id)) return null;
     const cached = known?.id === id ? known : null;
-    const row = cached
+    let row = cached
       ? (cached.updatedAt ? { updated_at: cached.updatedAt, data: cached.data } : null)
       : await currentRow(id);
     if (!sameSession(id)) return null;
-    const data = mergeCloudState(row?.data, incoming);
-    // Cloud pushes are triggered by several overlapping UI events. Do not
-    // rewrite an unchanged row (and cause another CORS preflight/DB trigger).
-    // A new state still uses the same optimistic version check below.
-    if (row && JSON.stringify(data) === JSON.stringify(row.data))
-      return sameSession(id) ? data : null;
+    let data = mergeCloudState(row?.data, incoming);
+    // Repeated UI events can request the same save. Skip redundant PATCHes,
+    // but periodically re-read so another device's progress is still merged.
+    if (row && JSON.stringify(data) === JSON.stringify(row.data)) {
+      if (Date.now() - (known?.id === id ? known.checkedAt : 0) >= 120_000) {
+        row = await currentRow(id);
+        if (!sameSession(id)) return null;
+        data = mergeCloudState(row?.data, incoming);
+      }
+      if (row && JSON.stringify(data) === JSON.stringify(row.data))
+        return sameSession(id) ? data : null;
+    }
     const body = { data, updated_at: new Date().toISOString() };
     try {
       let result;
