@@ -1,0 +1,86 @@
+name: Verify Getaway Shootout App Store removal
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/patch-getaway-appstore.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: python -m pip install --quiet UnityPy==1.25.4 Pillow
+      - name: Deactivate just the App Store promotion in Unity assets
+        run: |
+          cp src/games/content/getaway-shootout/unity/GetawayShootout.data.unityweb /tmp/getaway-before-appstore.unityweb
+          python src/prototypes/getaway-shootout/patch-menu.py
+          python src/prototypes/getaway-shootout/inspect-game.py
+          python - <<'PY'
+          from pathlib import Path
+          d={}
+          for line in Path('src/prototypes/getaway-shootout/scene-gameobjects.tsv').read_text().splitlines()[1:]:
+              fields=line.split('\t')
+              if len(fields)==4:d.setdefault(fields[2],[]).append(fields[3])
+          assert d['Mobile']==['0'], 'App Store banner remains active'
+          assert d['two_logo']==['1'], 'startup transition accidentally disabled'
+          for name in ('Play','OnePlayer','Two Player','Settings'):
+              assert d[name]==['1'], f'Game menu {name} disabled'
+          for name in ('Branding_TwoPlayerGamesOrg','NewEichGames'):
+              assert d[name]==['0'], f'Existing portal cleanup reverted: {name}'
+          print('Game navigation and startup preserved; App Store promotion disabled.')
+          PY
+      - name: Compare actual Unity title menus in Chromium
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          GETAWAY_ORIGINAL_DATA: /tmp/getaway-before-appstore.unityweb
+        run: |
+          node tests/getaway-scene-boot.cjs
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          folder=Path('_build/getaway-shootout')
+          before=Image.open(folder/'original-22s.png').convert('RGB')
+          after=Image.open(folder/'patched-22s.png').convert('RGB')
+          assert before.size==after.size, 'Misaligned title scene screenshots'
+          # The App Store tile sits in the bottom-left of the original 960 x 650 scene.
+          region=(28,525,302,630)
+          a=before.crop(region)
+          b=after.crop(region)
+          def dark_fraction(im):
+              pixels=list(im.getdata())
+              return sum(max(p)<75 for p in pixels)/len(pixels)
+          before_dark=dark_fraction(a)
+          after_dark=dark_fraction(b)
+          print(f'App Store tile region: dark fraction {before_dark:.3f} -> {after_dark:.3f}')
+          assert before_dark>0.35, 'Baseline title screenshot did not contain the expected dark App Store banner'
+          assert after_dark<0.17, 'App Store banner still visible after scene patch'
+          PY
+      - name: Save the visual comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: getaway-appstore-before-after
+          path: _build/getaway-shootout/*.png
+          if-no-files-found: ignore
+          retention-days: 2
+      - name: Propose verified binary asset through a PR
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/games/content/getaway-shootout/unity/GetawayShootout.data.unityweb src/prototypes/getaway-shootout/scene-gameobjects.tsv
+          git commit -m "fix: remove App Store button from actual Getaway Shootout Unity scene"
+          git push origin HEAD:refs/heads/agent/getaway-hide-appstore
