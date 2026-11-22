@@ -83,6 +83,9 @@ test('construct starts on the main menu and has no More or TwoPlayerGames links'
   for (const [name, events] of project[6]) {
     function visit(item) {
       if (![0, 3, 4].includes(item[0])) return;
+      for (const condition of item[6] || []) {
+        assert.ok(!/\[4,(?:20|54)\]/.test(JSON.stringify(condition)), name + ' still touches the removed promo links');
+      }
       for (const action of item[7] || []) assert.ok(!(action[0] === 49 && action[1] === 176), name + ' has a leftover external browser navigation');
       for (const child of item[8] || []) visit(child);
     }

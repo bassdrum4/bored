@@ -27,9 +27,6 @@ GROUP [true,"Menu"]
     DO  System#74([[0,[23]]])
     DO  startButton2.Tween#171([[1,[263]],[3,1],[0,[129]],[0,[129]],[0,[28]],[18,9],[3,0]])
     DO  System#74([[0,[23]]])
-  EVENT #7 [0,false,null,472965571049301]
-    IF  Touch#175([[4,54]])
-    DO  Audio#73([[2,["buttonx",false]],[3,0],[0,[69]],[1,[132]]])
   EVENT #8 [0,false,null,220509110097831]
     IF  Touch#175([[4,105]])
     IF  startButton.Tween#185([])
