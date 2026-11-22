@@ -30,6 +30,15 @@ test('diagnose the actual Getaway Shootout Bored hash route and iframe startup',
  const url=srv.origin+'/index.html?utm_source=chatgpt.com#getaway-shootout';
  await page.goto(url,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.current==='getaway-shootout',{timeout:20000});
+ const hostLoader=await page.evaluate(()=>{
+   const overlay=document.querySelector('#getaway-loading');
+   return {shown:!overlay.hidden, inPlayer:overlay.parentElement?.id==='player',
+     title:overlay.querySelector('h2')?.textContent,
+     progress:overlay.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')};
+ });
+ console.log('BORED HOST LOADER INITIAL '+JSON.stringify(hostLoader));
+ assert.ok(hostLoader.shown && hostLoader.inPlayer && hostLoader.title==='Getaway Shootout',
+   'Bored must show an obvious external loading screen before the game is ready');
  let frame=await (await page.$('#frame')).contentFrame();
  const screenshots=path.join(ROOT,'_build/getaway-hub-route');fs.mkdirSync(screenshots,{recursive:true});
  for(const [name, delay] of [['start',3000],['later',9000],['settled',14000]]){
@@ -66,13 +75,20 @@ test('diagnose the actual Getaway Shootout Bored hash route and iframe startup',
    'Getaway Shootout still displays a mostly uniform blue screen: '+JSON.stringify(stats));
  const state=await page.evaluate(()=>{
    const f=document.querySelector('#frame');
+   const loading=document.querySelector('#getaway-loading');
    return {source:f.getAttribute('src'),srcdoc:f.getAttribute('srcdoc'),
-     loaded:f.contentWindow.__boredSnapshot?.().loaded===true};
+     loaded:f.contentWindow.__boredSnapshot?.().loaded===true,
+     loaderHidden:loading.hidden,
+     loaderPercent:loading.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow'),
+     loaderOnlyInHost:!f.contentDocument?.querySelector('#getaway-loading')};
  });
  assert.ok(state.source?.includes('/games/content/getaway-shootout.html'),
    'Unity game must load as its own iframe document');
  assert.equal(state.srcdoc,null,'Unity game must not run in srcdoc');
  assert.ok(state.loaded,'Unity runtime must load in the hub');
+ assert.equal(state.loaderHidden,true,'host loading overlay must disappear once Unity is ready');
+ assert.equal(state.loaderPercent,'100','host progress indicator must reach 100%');
+ assert.equal(state.loaderOnlyInHost,true,'loading UI must be in Bored, not the Unity game');
  console.log('BROWSER LOGS '+JSON.stringify(messages.slice(-25)));
  console.log('FAILED REQUESTS '+JSON.stringify(badRequests.slice(-25)));
  assert.ok(await page.evaluate(()=>!document.querySelector('#player').hidden),'player should be visible');
