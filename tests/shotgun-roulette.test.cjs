@@ -26,31 +26,32 @@ const { placeRouletteBet, settleRouletteWin, rouletteWonOn, rouletteStreak, roul
 const { walletBalance, grantOnce } = rewards;
 
 const DAY = '2026-11-21';
-const funded = coins => grantOnce({ v: 1, entries: {} }, 'gift:test', { coins }).wallet;
+const funded = chips => grantOnce({ v: 1, entries: {} }, 'gift:test', { chips }).wallet;
 let tokens = 0;
 const bet = (wallet, mode, amount) => placeRouletteBet(wallet, mode, amount, { today: DAY, now: 1e12 + tokens * 1000, token: 'token-' + (++tokens) });
 
-test('a bet takes coins once and refuses what the rules do not allow', () => {
+test('a bet takes chips once and refuses what the rules do not allow', () => {
   const wallet = funded(1000);
   const placed = bet(wallet, 'normal', 100);
   assert.equal(placed.ok, true);
-  assert.equal(walletBalance(placed.wallet).coins, 900);
+  assert.equal(walletBalance(placed.wallet).chips, 900);
+  assert.equal(walletBalance(placed.wallet).coins, 0, 'coins are never touched');
   assert.equal(bet(wallet, 'normal', 5).reason, 'range');
   assert.equal(bet(wallet, 'normal', 501).reason, 'range');
   assert.equal(bet(wallet, 'normal', 12.5).reason, 'range');
   assert.equal(bet(wallet, 'expert', 100).reason, 'mode');
-  assert.equal(bet(funded(50), 'hard', 100).reason, 'coins');
+  assert.equal(bet(funded(50), 'hard', 100).reason, 'chips');
 });
 
 test('a win pays the multiplier once; a loss pays nothing', () => {
   const normal = bet(funded(1000), 'normal', 100);
   const paid = settleRouletteWin(normal.wallet, normal.betId);
   assert.deepEqual([paid.ok, paid.payout, paid.profit, paid.capped], [true, 180, 80, false]);
-  assert.equal(walletBalance(paid.wallet).coins, 1080);
+  assert.equal(walletBalance(paid.wallet).chips, 1080);
   assert.equal(settleRouletteWin(paid.wallet, normal.betId).reason, 'settled');
 
   const hard = bet(funded(1000), 'hard', 500);
-  assert.equal(walletBalance(settleRouletteWin(hard.wallet, hard.betId).wallet).coins, 2000);
+  assert.equal(walletBalance(settleRouletteWin(hard.wallet, hard.betId).wallet).chips, 2000);
 
   assert.equal(settleRouletteWin(funded(1000), 'spend:sr:' + DAY + ':normal:made-up-id').reason, 'bet');
 });
@@ -72,6 +73,35 @@ test('the daily cap trims the last win and then refuses new bets', () => {
   assert.equal(rouletteWonOn(trimmed.wallet, DAY), 3000);
   assert.equal(bet(trimmed.wallet, 'normal', 10).reason, 'cap');
   assert.equal(placeRouletteBet(trimmed.wallet, 'normal', 10, { today: '2026-11-22', token: 'next-day-1' }).ok, true);
+});
+
+test('the cap counts net profit: losses come off the day, so wins in between cannot pass it', () => {
+  let wallet = funded(20000);
+  const play = (mode, amount, won) => {
+    const placed = bet(wallet, mode, amount);
+    wallet = won ? settleRouletteWin(placed.wallet, placed.betId).wallet : placed.wallet;
+  };
+  // Three Hard wins (+3000 gross) with a 500 loss between them nets +2500.
+  play('hard', 500, true); play('hard', 500, false); play('hard', 500, true); play('hard', 500, true);
+  assert.equal(rouletteWonOn(wallet, DAY), 2500, 'net, not the 3000 won gross');
+  assert.equal(walletBalance(wallet).chips, 22500);
+  // The next win fills the day to exactly +3000.
+  const placed = bet(wallet, 'hard', 500);
+  const paid = settleRouletteWin(placed.wallet, placed.betId);
+  assert.deepEqual([paid.payout, paid.profit, paid.capped], [1000, 500, true]);
+  assert.equal(rouletteWonOn(paid.wallet, DAY), 3000);
+  assert.equal(walletBalance(paid.wallet).chips - 20000, 3000, 'the wallet gained exactly the cap');
+  assert.equal(bet(paid.wallet, 'normal', 10).reason, 'cap');
+  assert.deepEqual(rouletteGames(paid.wallet).map(g => g.profit), [1000, -500, 1000, 1000, 500]);
+});
+
+test('games from before chips still read back in coins and count toward their day', () => {
+  const old = grantOnce({ v: 1, entries: {} }, 'gift:test', { coins: 1000, chips: 1000 }).wallet;
+  old.entries['spend:sr:' + DAY + ':normal:old-coin-game'] = { at: 1, g: { coins: -100 }, x: { m: 'normal', b: 100 } };
+  const paid = settleRouletteWin(old, 'spend:sr:' + DAY + ':normal:old-coin-game');
+  assert.equal(paid.ok, true);
+  assert.deepEqual([walletBalance(paid.wallet).coins, walletBalance(paid.wallet).chips], [1080, 1000]);
+  assert.equal(rouletteWonOn(paid.wallet, DAY), 80);
 });
 
 test('streaks count wins in a row per mode', () => {
@@ -117,6 +147,11 @@ test('the SQL creates the board and refuses impossible scores', async () => {
   await submit('hard', 1000, 2);
   await assert.rejects(submit('hard', 1000, 3), /daily win cap/);
   await submit('hard', 600, 3);
+  // A loss posts as -bet and makes room under the net cap.
+  await assert.rejects(submit('normal', -501, 1), /out of range/);
+  await submit('hard', -500, 3);
+  await submit('hard', 500, 3);
+  await assert.rejects(submit('hard', 1, 3), /daily win cap/);
 
   await as('00000000-0000-0000-0000-000000000002');
   await submit('normal', 120, 1);
@@ -124,6 +159,6 @@ test('the SQL creates the board and refuses impossible scores', async () => {
   const top = (await db.query('select * from public.shotgun_roulette_top($1)', ['normal'])).rows;
   assert.deepEqual(top.map(row => [row.handle, Number(row.coins_won), row.best_streak]), [['gira_fan', 400, 1], ['unnamed', 120, 1]]);
   const hard = (await db.query('select * from public.shotgun_roulette_top($1)', ['hard'])).rows;
-  assert.deepEqual(hard.map(row => Number(row.coins_won)), [2600]);
+  assert.deepEqual(hard.map(row => Number(row.coins_won)), [2600], 'net: 1000 + 1000 + 600 - 500 + 500');
   await db.close();
 });
