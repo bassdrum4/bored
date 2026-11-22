@@ -1,5 +1,5 @@
 import { backendReady, request, getHandle, hasIdentity, authErrorMessage, ANON_TOKEN } from './backend.js';
-import { LB_GAMES, accountStandings, rankPoints, bestValue, formatScore } from './scores.js';
+import { LB_GAMES, TRACKBOUND_PACE_ID, accountStandings, rankPoints, bestValue, formatScore } from './scores.js';
 import { dailyDate, dailyStreak } from '../daily.js';
 export function createLeaderboardView({ state, openGame, onBoard = () => {} }) {
 const $ = selector => document.querySelector(selector);
@@ -171,6 +171,31 @@ function renderLeaderboard() {
           versus.append('them ', element('b', '', formatScore(value, spec)), verdict);
           line.append(versus);
         }
+        if (spec.id === 'trackbound') {
+          const pace = all.find(row => row.game === TRACKBOUND_PACE_ID &&
+            String(row.handle || '').toLowerCase() === key);
+          const completed = Array.isArray(pace?.records) ? pace.records.length : 0;
+          const basisPoints = Number(pace?.value);
+          const ready = completed === 15 && Number.isInteger(basisPoints) && basisPoints > 0;
+          line.appendChild(element('span', 'lb-career-pace',
+            ready ? 'Career pace ' + (basisPoints / 100).toFixed(2) + '% of author · 15/15 tracks'
+              : 'Career pace pending · ' + completed + '/15 tracks synced'));
+          if (completed) {
+            const details = element('details', 'lb-pace-details');
+            details.appendChild(element('summary', '', 'Best campaign times (' + completed + '/15)'));
+            const times = element('ul', 'lb-pace-list');
+            for (const best of pace.records) {
+              const ms = Number(best.ms);
+              const author = Number(best.author_ms);
+              if (!Number.isInteger(ms) || ms <= 0 || typeof best.name !== 'string') continue;
+              times.appendChild(element('li', '', best.name + ' · ' + (ms / 1000).toFixed(3) +
+                's' + (Number.isInteger(author) && author > 0
+                  ? ' / ' + (author / 1000).toFixed(3) + 's author' : '')));
+            }
+            details.appendChild(times);
+            line.appendChild(details);
+          }
+        }
         const play = element('button', 'lb-play', 'Play');
         play.type = 'button';
         play.setAttribute('aria-label', 'Play ' + spec.name);
@@ -285,6 +310,20 @@ async function loadLeaderboard(force = false) {
       if (page.length < pageSize) break;
       if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
     }
+    // Supplemental, public per-track times. The legacy points board remains
+    // available even if the optional pace RPC is offline or not deployed.
+    try {
+      const career = await request('/rest/v1/rpc/trackbound_campaign_board', {
+        method: 'POST', body: {}, token: ANON_TOKEN
+      });
+      if (Array.isArray(career)) for (const record of career) {
+        if (!record || typeof record.handle !== 'string' ||
+            !Array.isArray(record.records)) continue;
+        rows.push({ game: TRACKBOUND_PACE_ID, handle: record.handle,
+          value: Number.isInteger(record.pace_bp) ? record.pace_bp : 0,
+          records: record.records });
+      }
+    } catch { /* A missing pace service must not hide ordinary scores. */ }
     state.lbCache.set(key, { rows, at: Date.now() });
   } catch (err) {
     state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
