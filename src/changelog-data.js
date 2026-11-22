@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 812,
+  "count": 814,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"28f1bbe","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: send Unity loading progress to Bored host, suppress in-game loading label"},
+  {"sha":"78019a9","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: drive Bored's Getaway loading overlay from verified Unity progress events"},
   {"sha":"fbca733","date":"2026-11-22","author":"Daniel Lowe","subject":"style: large high-contrast Bored player loading screen and progress bar"},
   {"sha":"742e56d","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: add host-owned Getaway Shootout loading overlay to Bored player"},
   {"sha":"0fd926c","date":"2026-11-22","author":"Codebuff","subject":"Rocket Chicken: open the shop from the start screen and steer on touch"},
