@@ -81,7 +81,7 @@ for obj in env.objects:
 assert DISABLE <= set(seen), "Unexpected original game scene; missing branding objects: " + str(DISABLE - set(seen))
 assert KEEP <= set(seen), "Missing gameplay navigation components"
 assert all(any(before[name]) for name in ("Play", "OnePlayer", "Two Player", "Settings")), "Play/settings scene was already disabled"
-assert not any(before[name]) for name in ALREADY_INACTIVE if name in before, "Previously inactive third-party buttons unexpectedly enabled"
+assert all(not any(before[name]) for name in ALREADY_INACTIVE if name in before), "Previously inactive third-party buttons unexpectedly enabled"
 
 if not modified:
     print("Getaway branding objects already inactive; no changes", flush=True)
