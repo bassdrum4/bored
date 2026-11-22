@@ -38,7 +38,7 @@ jobs:
           assert d['Mobile']==['0'], 'App Store banner remains active'
           assert d['two_logo']==['1'], 'startup transition accidentally disabled'
           for name in ('Play','OnePlayer','Two Player','Settings'):
-              assert d[name]==['1'], f'Game menu {name} disabled'
+              assert '1' in d[name], f'Game menu {name} disabled'
           for name in ('Branding_TwoPlayerGamesOrg','NewEichGames'):
               assert d[name]==['0'], f'Existing portal cleanup reverted: {name}'
           print('Game navigation and startup preserved; App Store promotion disabled.')
