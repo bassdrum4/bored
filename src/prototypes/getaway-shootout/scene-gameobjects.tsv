@@ -175,9 +175,9 @@ data.unity3d	133	Text	1
 data.unity3d	134	MapObj_PaperStack1	1
 data.unity3d	135	CharacterHolder	1
 data.unity3d	136	Roof	1
-data.unity3d	137	Branding_TwoPlayerGamesOrg	1
+data.unity3d	137	Branding_TwoPlayerGamesOrg	0
 data.unity3d	138	Back	1
-data.unity3d	139	NewEichGames	1
+data.unity3d	139	NewEichGames	0
 data.unity3d	140	Summary	1
 data.unity3d	141	Target	1
 data.unity3d	142	Roof	1
@@ -1026,7 +1026,7 @@ data.unity3d	47	Front	1
 data.unity3d	48	Category	1
 data.unity3d	49	Force	1
 data.unity3d	1	Main Camera	1
-data.unity3d	2	two_logo	1
+data.unity3d	2	two_logo	0
 data.unity3d	95	Bomb_Rig	1
 data.unity3d	96	Sprite	1
 data.unity3d	97	ShotPos	1
