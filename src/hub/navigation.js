@@ -15,7 +15,7 @@ export function createHubNavigation({ togetherUI, onLeaderboard }) {
     } else {
       togetherUI.close();
     }
-    for (const id of ['daily', 'recent', 'library']) $(id).hidden = !isHome;
+    for (const id of ['daily', 'recent', 'game-finder', 'library']) $(id).hidden = !isHome;
     $('leaderboard').hidden = next !== 'leaderboard';
     $('settings').hidden = next !== 'settings';
     if (!isTogether) $('together').hidden = true;

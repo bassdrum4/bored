@@ -23,6 +23,7 @@ import { createRouletteBridge } from './hub/roulette.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
+import { createGameFinder } from './hub/game-finder.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
@@ -212,6 +213,7 @@ function closeMenu(options) {
 const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, score: reportedValue, isLower: slug => !!LB_GAMES.find(g => g.id === slug)?.lower, paused: () => !menuPanel.hidden });
 window.addEventListener('bored:together-telemetry', event => analytics.track(event.detail?.kind, event.detail));
 const enjoyment = createEnjoymentUI({ analytics });
+createGameFinder({ openGame, track: (kind, details) => analytics.track(kind, details) });
 gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXTERNS[activeSlug]); });
 
 function restartGame() {
