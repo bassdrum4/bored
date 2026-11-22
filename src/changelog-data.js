@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 831,
+  "count": 832,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2d6b6ba","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: remove all outside Unity splash and portal textures without disabling startup scene objects"},
   {"sha":"d478735","date":"2026-11-22","author":"Daniel Lowe","subject":"ci: inspect splash logo renderer while keeping the startup controller"},
   {"sha":"6ee0d2b","date":"2026-11-22","author":"Daniel Lowe","subject":"tools: inspect renderer components for original Unity splash and portal graphics"},
   {"sha":"b496d74","date":"2026-11-22","author":"Daniel Lowe","subject":"docs: explain App Store title object removal without affecting touch controls"},
