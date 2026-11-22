@@ -51,6 +51,14 @@
   // Version the assets as well as the launcher so the corrected scene is used.
   const assetVersion = '?bored-build=20261122-startup-restored-v2';
   let started = false, loaded = false;
+  const embeddedInBored = window.parent !== window;
+  // Bored's outer player owns the visible loading UI. Keep the Unity page
+  // itself free of any additional loading labels when opened in that player.
+  if (embeddedInBored) status.hidden = true;
+  function notifyBored(phase, progress) {
+    if (!embeddedInBored) return;
+    parent.postMessage({type:'bored:getaway-loading', phase, progress}, location.origin);
+  }
 
   // The mirrored portal's script is NOT loaded. Prevent in-game calls to
   // external promotional URLs from opening new tabs.
@@ -72,7 +80,7 @@
     backgroundColor: '#202e35'
   };
 
-  function fail() { status.hidden = true; error.classList.add('visible'); }
+  function fail() { status.hidden = true; error.classList.add('visible'); notifyBored('error'); }
   function loadRuntime(url) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -107,8 +115,14 @@
         width: Math.max(320, innerWidth),
         height: Math.max(240, innerHeight),
         onProgress: function (game, progress) {
-          if (progress >= 1) { loaded = true; status.hidden = true; }
-          else status.textContent = 'Starting game… ' + Math.round(progress * 100) + '%';
+          if (progress >= 1) {
+            loaded = true;
+            status.hidden = true;
+            notifyBored('ready', 1);
+          } else {
+            status.textContent = 'Starting game… ' + Math.round(progress * 100) + '%';
+            notifyBored('progress', progress);
+          }
         }
       });
     } catch (err) {
