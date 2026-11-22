@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 791,
+  "count": 793,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"7f078f2","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: compare original and patched Getaway Shootout through actual post-load visuals"},
+  {"sha":"df92ff3","date":"2026-11-21","author":"Daniel Lowe","subject":"test: detect Getaway Shootout blue-screen stall with 22-second visual comparison"},
   {"sha":"a56bfd4","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: preserve Getaway Shootout splash object required for startup"},
   {"sha":"999d720","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed one-time Getaway Shootout asset job"},
   {"sha":"29d96a1","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed one-time Getaway Shootout asset job"},
