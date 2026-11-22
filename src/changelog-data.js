@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 814,
+  "count": 815,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"23421e1","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: disable App Store title promotion in original Getaway Shootout Unity scene"},
   {"sha":"28f1bbe","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: send Unity loading progress to Bored host, suppress in-game loading label"},
   {"sha":"78019a9","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: drive Bored's Getaway loading overlay from verified Unity progress events"},
   {"sha":"fbca733","date":"2026-11-22","author":"Daniel Lowe","subject":"style: large high-contrast Bored player loading screen and progress bar"},
