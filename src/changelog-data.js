@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 771,
+  "count": 772,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1316d13","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: prefer self-hosted Getaway Shootout runtime with pinned fallback"},
   {"sha":"531d978","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: route vendored Getaway Shootout assets through a PR"},
   {"sha":"7e48cd7","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: import pinned Getaway Shootout runtime into Bored"},
   {"sha":"c34670d","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: add Getaway Shootout with clean Unity game shell"},
