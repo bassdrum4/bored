@@ -20,7 +20,6 @@ GROUP [true,"Menu"]
       DO  titleBG#97([])
       DO  startButton#107([])
       DO  startButton2#107([])
-      DO  moreButton#107([])
       DO  tutorial#71([[3,1]])
   EVENT #6 [0,false,null,518625068017289]
     IF  title.Tween#131([[1,[142]]])
@@ -28,17 +27,14 @@ GROUP [true,"Menu"]
     DO  System#74([[0,[23]]])
     DO  startButton2.Tween#171([[1,[263]],[3,1],[0,[129]],[0,[129]],[0,[28]],[18,9],[3,0]])
     DO  System#74([[0,[23]]])
-    DO  moreButton.Tween#171([[1,[263]],[3,1],[0,[129]],[0,[129]],[0,[28]],[18,9],[3,0]])
   EVENT #7 [0,false,null,472965571049301]
     IF  Touch#175([[4,54]])
     DO  Audio#73([[2,["buttonx",false]],[3,0],[0,[69]],[1,[132]]])
-    DO  Browser#176([[1,[257]],[1,[258]]])
   EVENT #8 [0,false,null,220509110097831]
     IF  Touch#175([[4,105]])
     IF  startButton.Tween#185([])
     DO  GameDistributionSDK#181([])
     DO  startButton#33([[10,2],[7,[4]]])
-    DO  moreButton#33([[10,0],[7,[4]]])
     DO  startButton2#33([[10,2],[7,[4]]])
     DO  Audio#132([[1,[130]]])
     DO  Audio#73([[2,["music",false]],[3,1],[0,[264]],[1,[131]]])
@@ -46,7 +42,6 @@ GROUP [true,"Menu"]
     DO  Audio#73([[2,["buttonx",false]],[3,0],[0,[69]],[1,[132]]])
     DO  startButton.Tween#171([[1,[251]],[3,1],[0,[4]],[0,[4]],[0,[28]],[18,8],[3,1]])
     DO  startButton2.Tween#171([[1,[251]],[3,1],[0,[4]],[0,[4]],[0,[28]],[18,8],[3,1]])
-    DO  moreButton.Tween#171([[1,[251]],[3,1],[0,[4]],[0,[4]],[0,[28]],[18,8],[3,1]])
     DO  title.Tween#139([[1,[266]],[3,0],[0,[140]],[0,[28]],[18,8],[3,1]])
     DO  titleBG.Fade#187([])
     DO  System#47([[11,"menu"],[7,[5]]])
@@ -100,17 +95,6 @@ GROUP [true,"Menu"]
     EVENT #20 [0,false,null,515422872420718]
       IF  System#40([])
       DO  startButton2#57([[0,[5]]])
-  EVENT #21 [0,false,null,474393175838554]
-    IF  moreButton.Tween#188([])
-    DO  moreButton#33([[10,0],[7,[5]]])
-  EVENT #22 [0,false,null,486345870663350]
-    IF  moreButton#25([[10,0],[8,0],[7,[5]]])
-    EVENT #23 [0,false,null,477463783581383]
-      IF  Mouse#189([[4,54]])
-      DO  moreButton#57([[0,[270]]])
-    EVENT #24 [0,false,null,754677656171732]
-      IF  System#40([])
-      DO  moreButton#57([[0,[5]]])
   EVENT #25 [0,false,null,322874037935790]
     DO  titleChars#56([[0,[271,[1,52,53,false],[2,65,false,0]]]])
   EVENT #26 [0,false,null,322760807047531]

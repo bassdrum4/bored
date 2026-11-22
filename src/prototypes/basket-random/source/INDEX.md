@@ -15,8 +15,8 @@ expression trees. Numeric opcode IDs are **not** invented event names.
 | gameEvent | 126 | 28 |
 | tailEvent | 13 | 1 |
 | bonusEvent | 59 | 2 |
-| pauseEvent | 8 | 4 |
-| menuEvent | 25 | 2 |
+| pauseEvent | 6 | 3 |
+| menuEvent | 21 | 2 |
 | introEvent | 4 | 5 |
 | gdEvent | 4 | 3 |
 

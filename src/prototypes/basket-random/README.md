@@ -91,6 +91,16 @@ its Bored wrapper, and its catalog entry are untouched.
 - The full generic runtime is preserved, not falsely presented as handwritten
   Basket Random game code.
 
-No mechanics were intentionally changed during extraction. The published game
-continues using its original vendor assets until a rebuild is explicitly
-installed.
+No mechanics were intentionally changed during extraction. The published game uses the cleaned-up game and menu data described below.
+
+## Bored menu cleanup (November 2026)
+
+This recovery now tracks the intentionally modified Bored export. The wrapper starts
+loading the game immediately, and the Construct project starts in the `game`
+layout (its own main menu) instead of the interactive `intro` layout. The
+`moreButton` and `TPG` branded-logo instances are removed from the main menu;
+corresponding click/hover and external-browser actions are removed from the
+original event sheets, including the pause screen. The objects and the unused
+intro layout remain present in the recovered object catalog for historical
+reference. The gameplay physics, match scoring, controls and randomization are
+unchanged. The source, rebuild target, and tests are updated together.

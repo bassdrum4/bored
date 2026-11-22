@@ -42,7 +42,7 @@ test('basket random is a catalogued, local, unscored two-player game', async () 
 function bootWrapper(href, baseURI) {
   const elements = new Map();
   const element = id => ({
-    id, hidden: false, disabled: false, textContent: '', src: '', onclick: null, listeners: {},
+    id, hidden: false, disabled: false, textContent: '', src: '', listeners: {},
     addEventListener(type, fn) { this.listeners[type] = fn; }
   });
   const document = {
@@ -52,38 +52,42 @@ function bootWrapper(href, baseURI) {
       return elements.get(id);
     }
   };
-  // The iframe carries the hidden attribute in the markup; the stub starts bare.
-  document.getElementById('game').hidden = /<iframe[^>]*\shidden[\s>]/.test(wrapper);
-  const sandbox = { document, location: { href }, URL, console, setTimeout: () => 0 };
+  const sandbox = { document, location: { href }, URL, console };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
   vm.runInContext(wrapper.match(/<script>([\s\S]*?)<\/script>/)[1], context, { filename: 'basket-random.html' });
   return { run: code => vm.runInContext(code, context), node: id => elements.get(id) };
 }
 
-test('the wrapper starts the local build from the hub and from its own address', () => {
-  // Inside the hub the document is a srcdoc frame, so its base is the hub page.
+test('basket random starts its original main menu immediately, from hub or standalone URL', () => {
+  assert.doesNotMatch(wrapper, /Start match|Still loading|id="cover"/i);
   const hub = bootWrapper('about:srcdoc', 'https://example.test/bored/index.html');
-  // The no-src iframe loads a blank placeholder whose load event can arrive after
-  // this script does; it must not lift the cover over an empty stage.
-  hub.node('game').listeners.load();
-  assert.equal(hub.node('cover').hidden, false, 'the placeholder load is not the game');
-  assert.deepEqual({ ...hub.run('__boredSnapshot()') }, { slug: 'basket-random', started: false, loaded: false, finished: false });
-  assert.equal(hub.node('game').hidden, true, 'the build is not fetched until the player starts');
-  hub.node('start').onclick();
   assert.equal(hub.node('game').src, 'https://example.test/bored/games/content/basket-random/index.html');
   assert.equal(hub.node('game').hidden, false);
+  assert.deepEqual({ ...hub.run('__boredSnapshot()') }, { slug: 'basket-random', started: true, loaded: false, finished: false });
   hub.node('game').listeners.load();
-  assert.equal(hub.node('cover').hidden, true);
   assert.equal(hub.run('__boredSnapshot()').loaded, true);
 
-  // Opened on its own, the game folder sits beside the wrapper document.
   const standalone = bootWrapper(
     'https://example.test/bored/games/content/basket-random.html',
     'https://example.test/bored/games/content/basket-random.html'
   );
-  standalone.node('start').onclick();
   assert.equal(standalone.node('game').src, 'https://example.test/bored/games/content/basket-random/index.html');
+});
+
+test('construct starts on the main menu and has no More or TwoPlayerGames links', () => {
+  const project = JSON.parse(fs.readFileSync(path.join(vendor, 'data.json'), 'utf8')).project;
+  assert.equal(project[1], 'game');
+  const menuItems = project[5].find(layout => layout[0] === 'game')[6].flatMap(layer => layer[14] || []);
+  assert.ok(!menuItems.some(instance => [20, 54].includes(instance[1])), 'More button and TPG logo must not be placed');
+  for (const [name, events] of project[6]) {
+    function visit(item) {
+      if (![0, 3, 4].includes(item[0])) return;
+      for (const action of item[7] || []) assert.ok(!(action[0] === 49 && action[1] === 176), name + ' has a leftover external browser navigation');
+      for (const child of item[8] || []) visit(child);
+    }
+    for (const item of events) visit(item);
+  }
 });
 
 test('the vendored Construct 3 build is complete and stays offline', () => {
@@ -95,7 +99,7 @@ test('the vendored Construct 3 build is complete and stays offline', () => {
     assert.ok(fs.existsSync(path.join(vendor, file)), 'missing ' + file);
   }
   assert.equal(JSON.parse(fs.readFileSync(path.join(vendor, 'data.json'), 'utf8')).project[0], 'Basket Random');
-  assert.equal(sha('data.json'), 'c206e99105049fcce5f49eb363e217a6421f77e7f4f7ffd58d73ff8a3198ef36');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(vendor, 'data.json'), 'utf8')).project[1], 'game');
   assert.equal(sha('scripts/c3runtime.js'), '6189b6125c52212f24c3f2a0fbb3f531f8e234cae854c8121453e5f38029391f');
 
   const inner = fs.readFileSync(path.join(vendor, 'index.html'), 'utf8');

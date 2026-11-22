@@ -299,7 +299,6 @@ GROUP [true,"Control"]
     IF  System#26([[11,"pause"],[8,0],[7,[4]]])
     IF  System#26([[11,"goal"],[8,0],[7,[4]]])
     IF  Touch#105([[4,16]])
-    IF  Touch#105([[4,20]])
     IF  Touch#105([[4,48]])
     EVENT #86 [0,true,null,470532884080689]
       IF  Keyboard#106([[9,38]])
