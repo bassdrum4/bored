@@ -6,6 +6,7 @@ not HTML or an overlay. Existing play/settings, scripts, physics and scene
 transitions remain untouched. Requires UnityPy 1.25.4.
 """
 import gzip
+import os
 import hashlib
 import struct
 from pathlib import Path
@@ -19,7 +20,10 @@ MAGIC = b"UnityWebData1.0\0"
 COMMENT = b"UnityWeb Compressed Content (gzip)\0"
 
 # Named objects confirmed from the recovered serialized scenes.
-DISABLE = {"Branding_TwoPlayerGamesOrg", "NewEichGames", "two_logo"}
+DISABLE = {"Branding_TwoPlayerGamesOrg", "NewEichGames"}
+# This object belongs to a separate splash scene controlled by LoadSplash.
+# Turning it off leaves the game rendering its background with no transition.
+SPLASH_REQUIRED = "two_logo"
 KEEP = {"Play", "OnePlayer", "Two Player", "Settings", "ExitButton"}
 ALREADY_INACTIVE = {"TwitterButton", "Branding_Silvergames", "Branding_CrazyGames", "BuyButton"}
 
@@ -58,7 +62,7 @@ def unity_gzip(buf):
     compressed[3] = 0x10
     return bytes(compressed[:10]) + COMMENT + bytes(compressed[10:])
 
-original = DATA.read_bytes()
+original = Path(os.environ.get("GETAWAY_ORIGINAL_DATA", str(DATA))).read_bytes()
 parts = unpack_web(gzip.decompress(original))
 scenes = [(name, content) for name, content in parts if name == "data.unity3d"]
 if len(scenes) != 1:
@@ -80,6 +84,7 @@ for obj in env.objects:
         modified.append((name, obj.path_id))
 assert DISABLE <= set(seen), "Unexpected original game scene; missing branding objects: " + str(DISABLE - set(seen))
 assert KEEP <= set(seen), "Missing gameplay navigation components"
+assert before.get(SPLASH_REQUIRED) == [True], "Startup splash must remain active"
 assert all(any(before[name]) for name in ("Play", "OnePlayer", "Two Player", "Settings")), "Play/settings scene was already disabled"
 assert all(not any(before[name]) for name in ALREADY_INACTIVE if name in before), "Previously inactive third-party buttons unexpectedly enabled"
 
@@ -98,7 +103,7 @@ for obj in again.objects:
         after.setdefault(go.m_Name, []).append(bool(go.m_IsActive))
 for name in DISABLE:
     assert name in after and not any(after[name]), f"{name} still visible"
-for name in ("Play", "OnePlayer", "Two Player", "Settings"):
+for name in ("Play", "OnePlayer", "Two Player", "Settings", SPLASH_REQUIRED):
     assert after.get(name) == before.get(name), f"Gameplay menu changed: {name}"
 
 edited = unity_gzip(pack_web([
