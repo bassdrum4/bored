@@ -47,6 +47,9 @@
   const standalone = (() => { try { return new URL(document.baseURI).pathname.endsWith('/getaway-shootout.html'); } catch { return false; } })();
   const local = new URL(standalone ? 'getaway-shootout/' : 'games/content/getaway-shootout/', document.baseURI).href.replace(/\/$/, '');
   let base = mirror;
+  // Cached pre-fix Unity scenes can survive a newer GitHub Pages deployment.
+  // Version the assets as well as the launcher so the corrected scene is used.
+  const assetVersion = '?bored-build=20261122-startup-restored-v2';
   let started = false, loaded = false;
 
   // The mirrored portal's script is NOT loaded. Prevent in-game calls to
@@ -86,17 +89,17 @@
       const localCheck = await fetch(local + '/Build/UnityLoader.js', {method:'HEAD'});
       if (localCheck.ok) base = local;
     } catch (error) { /* local assets are optional in source checkouts */ }
-    try { await loadRuntime(base + '/Build/UnityLoader.js'); }
+    try { await loadRuntime(base + '/Build/UnityLoader.js' + assetVersion); }
     catch (error) {
       if (base === mirror) { fail(); return; }
       base = mirror;
-      try { await loadRuntime(base + '/Build/UnityLoader.js'); }
+      try { await loadRuntime(base + '/Build/UnityLoader.js' + assetVersion); }
       catch (fallbackError) { fail(); return; }
     }
-    config.dataUrl = base + '/unity/GetawayShootout.data.unityweb';
-    config.asmCodeUrl = base + '/unity/GetawayShootout.asm.code.unityweb';
-    config.asmMemoryUrl = base + '/unity/GetawayShootout.asm.memory.unityweb';
-    config.asmFrameworkUrl = base + '/unity/GetawayShootout.asm.framework.unityweb';
+    config.dataUrl = base + '/unity/GetawayShootout.data.unityweb' + assetVersion;
+    config.asmCodeUrl = base + '/unity/GetawayShootout.asm.code.unityweb' + assetVersion;
+    config.asmMemoryUrl = base + '/unity/GetawayShootout.asm.memory.unityweb' + assetVersion;
+    config.asmFrameworkUrl = base + '/unity/GetawayShootout.asm.framework.unityweb' + assetVersion;
     if (!window.UnityLoader || typeof UnityLoader.instantiate !== 'function') { fail(); return; }
     try {
       const url = URL.createObjectURL(new Blob([JSON.stringify(config)], {type:'application/json'}));
