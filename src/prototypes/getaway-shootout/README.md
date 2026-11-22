@@ -46,8 +46,9 @@ original digest as a baseline before changing the code.
 
 ## Menu cleanup (scene data, not CSS)
 
-The title scene contains GameObjects named `Branding_TwoPlayerGamesOrg`,
-`NewEichGames`, and the `two_logo` splash. These were originally active.
+The title scene contains GameObjects named `Branding_TwoPlayerGamesOrg` and
+`NewEichGames`, while the separate startup/splash scene contains `two_logo`.
+`two_logo` must stay active: disabling it caused the post-start blue screen.
 `TwitterButton`, `Branding_Silvergames`, `Branding_CrazyGames`, and
 `BuyButton` were already inactive in the particular vendored build.
 
