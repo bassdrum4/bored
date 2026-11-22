@@ -1738,7 +1738,10 @@ test('browser regressions', async t => {
   });
 
   await t.test('every local game boots with the shared daily seed', async () => {
-    const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
+    const slugs = await page.evaluate(() => // Getaway Shootout loads a compiled Unity URL, bypassing the HTML seed adapter.
+    // Its loading/launch path is covered separately; it cannot expose __boredSeed.
+    ORDER.filter(([slug]) => !EXTERNS[slug] && slug !== 'getaway-shootout' &&
+      !NEW_GAMES.includes(slug)).map(([slug]) => slug));
     const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
