@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 790,
+  "count": 791,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a56bfd4","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: preserve Getaway Shootout splash object required for startup"},
   {"sha":"999d720","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed one-time Getaway Shootout asset job"},
   {"sha":"29d96a1","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed one-time Getaway Shootout asset job"},
   {"sha":"3a9860c","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: run actual Getaway Shootout Unity browser smoke test"},
