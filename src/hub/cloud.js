@@ -111,6 +111,11 @@ export async function pushPlayerState(incoming) {
       : await currentRow(id);
     if (!sameSession(id)) return null;
     const data = mergeCloudState(row?.data, incoming);
+    // Cloud pushes are triggered by several overlapping UI events. Do not
+    // rewrite an unchanged row (and cause another CORS preflight/DB trigger).
+    // A new state still uses the same optimistic version check below.
+    if (row && JSON.stringify(data) === JSON.stringify(row.data))
+      return sameSession(id) ? data : null;
     const body = { data, updated_at: new Date().toISOString() };
     try {
       let result;
