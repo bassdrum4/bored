@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
 <link rel="stylesheet" href="./styles.css?bored-build=20261122-getaway-host-loading-v3">
 <link rel="stylesheet" href="./hub/paper-layout.css">
+<link rel="stylesheet" href="./hub/game-finder.css">
 <script>
 // Set a saved dark theme before first paint, so it never flashes paper.
 try {
@@ -92,6 +93,13 @@ try {
     </div>
     <div class="daily-visual" aria-hidden="true"><div id="daily-preview"></div><span class="preview-caption"></span></div>
   </section>
+  <aside id="game-finder" aria-label="Find your next game">
+    <div>
+      <p class="eyebrow">Can't decide?</p>
+      <p class="game-finder-copy"><strong>Find your game.</strong> Six quick questions, three games worth trying. No account needed.</p>
+    </div>
+    <button id="game-finder-open" class="action" type="button" aria-haspopup="dialog" aria-controls="game-finder-dialog">Find my game &#8594;</button>
+  </aside>
   <section id="library" aria-labelledby="library-heading" tabindex="-1">
     <div class="section-heading"><div><p class="eyebrow">03 / The whole collection</p><h2 id="library-heading">All Games<span class="wordmark-dot">.</span></h2></div><span id="library-count" class="section-aside"></span></div>
   <div class="tools">
@@ -219,6 +227,15 @@ try {
     <button id="claim-signup" type="button">Create an account</button>
     <button id="claim-cancel" type="button">Not now</button>
   </div>
+</dialog>
+
+<dialog id="game-finder-dialog" aria-labelledby="game-finder-title">
+  <div class="finder-head">
+    <div><p class="eyebrow">Bored / Game finder</p><h2 id="game-finder-title">Find my game</h2></div>
+    <button id="game-finder-close" type="button">Close</button>
+  </div>
+  <p id="game-finder-progress" aria-live="polite"></p>
+  <div id="game-finder-body"></div>
 </dialog>
 
 <dialog id="feedback-dialog" aria-labelledby="feedback-title">
