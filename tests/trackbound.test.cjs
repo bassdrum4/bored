@@ -12,7 +12,7 @@ function load(options) {
   const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
   const noop = () => {};
   const nodes = new Map();
-  const storage = new Map();
+  const storage = new Map((options && options.storage) || []);
   const glCalls = [];
   const previewCalls = [];
   const previewContext = new Proxy({}, {
@@ -367,6 +367,27 @@ test('Trackbound shares only current official campaign records, never ghosts', a
     'snapshots do not disclose ghosts or custom tracks');
   assert.equal('careerRecords' in page.sandbox.__boredSnapshot(), false,
     'ordinary analytics and daily snapshots stay small');
+});
+
+test('Trackbound never attributes an IndexedDB best to a different signed-in player', async () => {
+  const probe = load(), entry = probe.sandbox.__test.CAMPAIGN[0];
+  const layout = probe.sandbox.__test.layoutOf(entry.blocks);
+  const oldBests = { [entry.id]: { ms: 10300, layout } };
+  const idb = new Map([['best', { key: 'best', value: oldBests }]]);
+  const other = load({ idb, storage: new Map([['bored.player.active', 'user:other']]) });
+  await other.flush(); await other.flush();
+  assert.equal(other.sandbox.__boredCareerRecords().length, 0,
+    'another account does not inherit the previous browser user\'s time');
+  const mine = load({ idb, storage: new Map([
+    ['bored.player.active', 'user:mine'],
+    ['bored.trackbound.best', JSON.stringify({ [entry.id]: { ms: 14400, layout } })]
+  ]) });
+  await mine.flush(); await mine.flush();
+  assert.equal(mine.sandbox.__boredCareerRecords()[0].ms, 14400,
+    'the account-specific local mirror overrides the global IndexedDB record');
+  mine.storage.set('bored.player.active', 'user:someone-else');
+  assert.equal(mine.sandbox.__boredCareerRecords().length, 0,
+    'switching identity while a race is open disables its old records');
 });
 
 test('Trackbound career pace breaks verified ties without penalizing old scores', async () => {
