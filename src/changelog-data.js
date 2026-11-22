@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 774,
+  "count": 775,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"763f140","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: adapt Rooftop Snipers Unity decompiler to Getaway Shootout"},
   {"sha":"efe1b9f","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: remove completed Getaway Shootout import workflow"},
   {"sha":"df8434e","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: self-host verified Getaway Shootout Unity build"},
   {"sha":"1316d13","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: prefer self-hosted Getaway Shootout runtime with pinned fallback"},
