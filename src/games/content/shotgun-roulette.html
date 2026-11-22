@@ -61,6 +61,11 @@
   .item { position: relative; width: 84px; height: 84px; padding: 0; border: 0; background: none; cursor: default;
           transform: translateZ(1px); transition: transform .18s ease-out, filter .18s }
   .item img { width: 84px; height: 84px; display: block; filter: drop-shadow(4px 8px 3px #000a) }
+  .orb-spot { position: absolute; left: 410px; top: 20px; width: 116px; height: 78px; display: flex; align-items: center;
+              justify-content: center; gap: 2px; transform-style: preserve-3d; pointer-events: none }
+  .orb-spot .item { width: 64px; height: 64px; pointer-events: auto }
+  .orb-spot .item img { width: 64px; height: 64px }
+  .orb-count { font: 600 18px var(--mono); color: var(--chalk); transform: translateZ(1px) }
   .mine .item:not(:disabled) { cursor: pointer }
   .mine .item:not(:disabled):hover, .mine .item:not(:disabled):focus-visible { transform: translateZ(22px) }
   .mine .item:disabled { filter: brightness(.55) }
@@ -258,6 +263,8 @@
           </g>
         </svg>
         <div class="slots foe" id="foe-slots"></div>
+        <!-- Giratina's Griseous Orbs, in the chalk box at the far center: not an item box. -->
+        <div class="orb-spot" id="foe-orb"></div>
         <div class="slots mine" id="you-slots"></div>
         <div class="shell-row" id="shell-row" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div id="shell-layer"></div>
@@ -472,7 +479,7 @@ let g = null, run = 0, lastStart = null;
 const alive = id => g && g.id === id && !g.over;
 // Items are 8 fixed boxes (null = empty), so using one never moves the others.
 const emptyBoxes = () => Array(8).fill(null);
-const fighter = name => ({ name, hp: 0, max: 0, items: emptyBoxes(), band: false, para: false, waveLock: false, knows: null, hidden: false });
+const fighter = name => ({ name, hp: 0, max: 0, items: emptyBoxes(), orbs: 0, band: false, para: false, waveLock: false, knows: null, hidden: false });
 const N = i => i === YOU ? "You" : "Giratina";
 
 // Every line goes to the log; the latest one is also said over the table.
@@ -617,7 +624,8 @@ const fx = {
     setTimeout(() => shell.remove(), 2000);
   },
   async useItem(side, index) {
-    const node = document.querySelector("#" + (side === YOU ? "you" : "foe") + '-slots .item[data-index="' + index + '"]');
+    const node = index === "orb" ? document.querySelector("#foe-orb .item")
+      : document.querySelector("#" + (side === YOU ? "you" : "foe") + '-slots .item[data-index="' + index + '"]');
     if (!node) return;
     node.classList.add("glow");
     await wait(side === FOE ? 420 : 0);
@@ -647,7 +655,7 @@ function begin(mode, test, bet = 0, betId = null) {
   $("#hud").hidden = false;
   $("#result").hidden = true;
   $("#log").replaceChildren();
-  for (const box of [$("#you-slots"), $("#foe-slots")]) { box.dataset.sig = ""; box.replaceChildren(); }
+  for (const box of [$("#you-slots"), $("#foe-slots"), $("#foe-orb")]) { box.dataset.sig = ""; box.replaceChildren(); }
   $("#leave").textContent = "Leave table";
   $("#leave").dataset.confirm = "";
   $("#mode-label").textContent = MODES[mode].name + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " coins");
@@ -664,7 +672,7 @@ function begin(mode, test, bet = 0, betId = null) {
 function setupRound() {
   g.round++;
   const hp = RULES.hp[g.round - 1];
-  for (const s of g.s) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveLock: false, knows: null, hidden: false });
+  for (const s of g.s) Object.assign(s, { hp, max: hp, items: emptyBoxes(), orbs: 0, band: false, para: false, waveLock: false, knows: null, hidden: false });
   // Balance (simShotgun): Giratina gets +1 max HP in round 3 in both modes.
   if (g.round === 3) { g.s[FOE].max++; g.s[FOE].hp++; }
   g.prevHp = [g.s[YOU].hp, g.s[FOE].hp];
@@ -673,10 +681,10 @@ function setupRound() {
     (g.turn === FOE ? " Giratina goes first." : " You go first."), "round");
   reload();
 }
-// 2 to 8 shells; live ones are between a third and two thirds of them (rounded
+// 3 to 8 shells; live ones are between a third and two thirds of them (rounded
 // up), and there is always at least one of each.
 function rollLoad() {
-  const total = rand(2, 8);
+  const total = rand(3, 8);
   const low = Math.max(1, Math.ceil(total / 3)), high = Math.min(total - 1, Math.ceil(total * 2 / 3));
   return { total, live: rand(low, high) };
 }
@@ -699,6 +707,13 @@ function liveChance(i) {
   return g.shells.filter(Boolean).length / g.shells.length;
 }
 const paralysisHolds = () => Math.random() < PARALYSIS;
+// Who goes next after side i fires. A blank at yourself keeps the turn, except
+// when it was the last shell: whoever did not fire the last shell goes first
+// on the new load. (Paralysis is untouched by a reload; it carries over.)
+function nextTurn(i, atSelf, live) {
+  if (!g.shells.length) return 1 - i;
+  return atSelf && !live ? i : 1 - i;
+}
 // Resolve a shot by side i: takes the shell, applies damage, clears what anyone knew.
 function shotResult(i, atSelf) {
   const me = g.s[i], other = g.s[1 - i], target = atSelf ? me : other;
@@ -727,14 +742,16 @@ function give(i, key) {
   g.s[i].items[box] = key;
   return true;
 }
+// Each draw is either given or lost, never both, and a full side is reported
+// once: "Giratina's side is full, Potion is lost."
 function deal(i, count) {
-  const got = [];
+  const got = [], lost = [];
   for (let k = 0; k < count; k++) {
     const key = pickItem(g.s[i].items);
-    if (give(i, key)) got.push(ITEMS[key].name);
-    else log("No room for " + ITEMS[key].name + (i === YOU ? " on your side." : " on Giratina's side."));
+    (give(i, key) ? got : lost).push(ITEMS[key].name);
   }
   if (got.length) log((i === YOU ? "You get " : "Giratina gets ") + got.join(" and ") + ".");
+  if (lost.length) log((i === YOU ? "Your" : "Giratina's") + " side is full, " + lost.join(" and ") + (lost.length > 1 ? " are" : " is") + " lost.");
 }
 function reload() {
   const { total, live } = rollLoad();
@@ -746,7 +763,8 @@ function reload() {
   // Both sides get 2 items a load in both modes (Pressure was dropped for balance).
   deal(YOU, 2);
   deal(FOE, 2);
-  if (g.hard) log(give(FOE, "orb") ? "Giratina gets a Griseous Orb." : "No room for Griseous Orb on Giratina's side.");
+  // The Griseous Orb sits apart from the 8 item boxes, so it never takes one.
+  if (g.hard) { g.s[FOE].orbs++; log("Giratina gets a Griseous Orb."); }
   const game = g;
   if (!game.sim) game.loading = fx.load().then(() => { if (g === game) { game.loading = null; render(); } });
 }
@@ -819,13 +837,17 @@ async function fire(i, atSelf) {
   await wait(live ? 500 : 300);
   if (!alive(id)) return;
   if (g.s[YOU].hp <= 0 || g.s[FOE].hp <= 0) return endRound(g.s[YOU].hp <= 0 ? FOE : YOU);
-  if (atSelf && !live) log(i === YOU ? "You keep the turn." : "Giratina keeps the turn.");
-  else g.turn = 1 - i;
+  const next = nextTurn(i, atSelf, live);
+  if (!g.shells.length) log("That was the last shell. " + (next === YOU ? "You go" : "Giratina goes") + " first on the new load.");
+  else if (next === i) log(i === YOU ? "You keep the turn." : "Giratina keeps the turn.");
+  g.turn = next;
   return beginTurn();
 }
 
 function useItem(i, index) {
-  const me = g.s[i], other = g.s[1 - i], key = me.items[index], mine = i === YOU;
+  // `index` is an item box, or "orb" for Giratina's Griseous Orb, which has no box.
+  const me = g.s[i], other = g.s[1 - i], mine = i === YOU;
+  const key = index === "orb" ? (me.orbs > 0 ? "orb" : null) : me.items[index];
   const refuse = text => { if (mine) log(text); render(); return false; };
   switch (key) {
     case "potion":
@@ -865,7 +887,8 @@ function useItem(i, index) {
       break;
     default: return false;
   }
-  me.items[index] = null;
+  if (index === "orb") me.orbs--;
+  else me.items[index] = null;
   if (!g.shells.length) { log("The gun is empty."); reload(); }
   render();
   return true;
@@ -892,8 +915,10 @@ async function playerItem(index) {
 //   1. Potion when below max HP.
 //   2. Scope Lens when the shell in the chamber is not known.
 //   3. Known live: Choice Band, then Thunder Wave, then shoot you.
-//   4. Known blank: Trick Room or Griseous Orb and shoot you (now live); without one, shoot itself.
-//   5. Unknown with an Eject Button: eject when live is 50% or more.
+//   4. Known blank: Trick Room first, saving the Griseous Orb, then shoot you
+//      (the shell is now live); with neither, shoot itself.
+//   5. Unknown with an Eject Button: eject when live is 50% or more, or 40% or
+//      more when all 8 boxes are full, so it isn't stuck holding junk.
 //   6. Unknown: 50% or more live, shoot you; less, shoot itself.
 // It never holds an item it could still use: before an unknown shot it also
 // paralyzes you when it may, and puts on a Choice Band when it is shooting you.
@@ -913,12 +938,13 @@ function sidePlan(i) {
     if (canWave) return { use: box("wave") };
     return { shoot: false };
   }
-  if (p === 0) {
-    const flip = has("orb") ? box("orb") : box("trick");
-    if (flip >= 0 && !foeAway) return { use: flip };
-    return { shoot: true };
+  if (p === 0 && !foeAway) {
+    if (has("trick")) return { use: box("trick") };
+    if (me.orbs > 0) return { use: "orb" };
   }
-  if (has("eject") && p >= 0.5) return { use: box("eject") };
+  if (p === 0) return { shoot: true };
+  const full = i === FOE && me.items.every(Boolean);
+  if (has("eject") && p >= (full ? 0.4 : 0.5)) return { use: box("eject") };
   if (canWave) return { use: box("wave") };
   if (p >= 0.5 && has("band") && !me.band && !foeAway) return { use: box("band") };
   return { shoot: p < 0.5 };
@@ -972,7 +998,7 @@ function simGame(mode) {
       }
       if (plan.use !== undefined) plan = { shoot: liveChance(i) < 0.5 };
       const { live } = shotResult(i, plan.shoot);
-      if (!(plan.shoot && !live)) g.turn = 1 - i;
+      g.turn = nextTurn(i, plan.shoot, live);
     }
     g.wins[g.s[YOU].hp <= 0 ? FOE : YOU]++;
   }
@@ -1095,6 +1121,28 @@ function drawSlots(side, s, mine) {
     slot.appendChild(item);
   }
 }
+// Giratina's Griseous Orbs, shown apart from its 8 item boxes.
+function drawOrbs(foe) {
+  const spot = $("#foe-orb");
+  const sig = String(foe.orbs);
+  if (spot.dataset.sig === sig) return;
+  spot.dataset.sig = sig;
+  spot.replaceChildren();
+  if (!foe.orbs) return;
+  const orb = el("button", "item");
+  orb.type = "button";
+  orb.tabIndex = -1;
+  const art = el("img");
+  art.src = ITEM_DIR + ITEMS.orb.art + ".png";
+  art.alt = ITEMS.orb.name;
+  orb.appendChild(art);
+  orb.setAttribute("aria-label", "Griseous Orb" + (foe.orbs > 1 ? ", " + foe.orbs : "") + ". " + ITEMS.orb.tip);
+  orb.onmouseenter = event => showTip("orb", event);
+  orb.onmousemove = event => moveTip(event);
+  orb.onmouseleave = () => { $("#tip").hidden = true; };
+  spot.appendChild(orb);
+  if (foe.orbs > 1) spot.appendChild(el("span", "orb-count", "×" + foe.orbs));
+}
 function showTip(key, event) {
   const tip = $("#tip");
   tip.replaceChildren(el("b", "", ITEMS[key].name), el("span", "", ITEMS[key].tip));
@@ -1118,6 +1166,7 @@ function render() {
   drawBolts("foe", foe, FOE);
   drawSlots("you", you, true);
   drawSlots("foe", foe, false);
+  drawOrbs(foe);
   $("#dealer").classList.toggle("vanished", foe.hidden);
 
   const info = $("#info");
