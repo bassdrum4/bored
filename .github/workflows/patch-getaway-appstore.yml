@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/patch-getaway-appstore.yml
+      - tests/getaway-scene-boot.cjs
   workflow_dispatch:
 
 permissions:
