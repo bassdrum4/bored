@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - .github/workflows/recover-getaway-source.yml
+      - src/prototypes/getaway-shootout/decompile.mjs
+      - src/prototypes/getaway-shootout/inspect-game.py
   workflow_dispatch:
 
 permissions:
