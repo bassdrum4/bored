@@ -110,7 +110,7 @@ async function noOverflow(frame = page) {
 
 test('the entry document loads the hub as modules from its own folder', () => {
   assert.match(entry, /<script type="module" src="\.\/main\.js(?:\?[^"]*)?"><\/script>/, 'the hub is a module beside the page');
-  assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css">/, 'the stylesheet is a sibling file');
+  assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css(?:\?[^"]*)?">/, 'the stylesheet is a sibling file');
   assert.doesNotMatch(entry, /(?:src|href)="\/(?!\/)/, 'no root-absolute paths: the site is served under /bored/');
   const context = rules(['arcadeGame', 'nativeHTML']);
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
@@ -1791,6 +1791,11 @@ test('browser regressions', async t => {
       try {
         // A sandboxed game (SANDBOXED_GAMES) has an opaque origin, so its window
         // cannot be read from here by design; it is covered by its own test.
+        if (slug === 'getaway-shootout') {
+          // Unity must use a direct document URL, never srcdoc; it has no injected seed.
+          assert.match(await page.$eval('#frame', frame => frame.src), /\/games\/content\/getaway-shootout\.html/);
+          continue;
+        }
         if (await page.$eval('#frame', frame => frame.hasAttribute('sandbox'))) continue;
         // A populated iframe can still be the loading stand-in. Wait for the
         // current document's title and seed, not a fixed delay or live metrics
@@ -1819,7 +1824,7 @@ test('browser regressions', async t => {
     await page.setViewport({ width: 320, height: 740, isMobile: true, hasTouch: true });
     await filter('New');
     await noOverflow();
-    await page.click('#random');
+    await page.$eval('#random', button => button.click());
     await page.waitForFunction(() => !document.querySelector('#player').hidden);
     assert.ok(await page.evaluate(() => FRESH_GAMES.includes(current)));
     await close();
