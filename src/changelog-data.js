@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 783,
+  "count": 785,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"051f5e8","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: retry Unity menu patch on verified patch-script changes"},
+  {"sha":"37b7c6f","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: correct Unity menu patch inactive-button assertion"},
   {"sha":"1089d14","date":"2026-11-21","author":"Daniel Lowe","subject":"docs: explain Getaway Shootout source recovery and actual Unity menu edits"},
   {"sha":"7392fe5","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: verify direct Unity scene branding patch before proposing it"},
   {"sha":"2968e02","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: edit Getaway Shootout Unity scene to hide embedded host branding"},
