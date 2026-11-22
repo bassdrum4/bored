@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
-<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./styles.css?bored-build=20261122-getaway-host-loading-v3">
 <link rel="stylesheet" href="./hub/paper-layout.css">
 <script>
 // Set a saved dark theme before first paint, so it never flashes paper.
@@ -288,9 +288,22 @@ try {
     <p id="duel-finish-text">Finish and send this run? It becomes their turn.</p>
     <div><button id="duel-send" type="button" class="action">Send run</button><button id="duel-cancel" type="button" class="action">Keep playing</button></div>
   </div>
+  <!-- Bored owns this loading view; Getaway Shootout's Unity document does not render it. -->
+  <div id="getaway-loading" class="game-loading" role="status" aria-live="polite" hidden>
+    <div class="game-loading-content">
+      <span class="game-loading-kicker">BORED / LOADING</span>
+      <h2>Getaway Shootout</h2>
+      <p id="getaway-loading-message">Preparing the getaway…</p>
+      <div id="getaway-loading-track" class="game-loading-track" role="progressbar" aria-label="Game loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span id="getaway-loading-fill" class="game-loading-fill"></span>
+      </div>
+      <p id="getaway-loading-percent" class="game-loading-percent">0%</p>
+      <small>Hang on to your hat. Press Esc to leave.</small>
+    </div>
+  </div>
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; pointer-lock; clipboard-write; encrypted-media; picture-in-picture"></iframe>
 </div>
 <script type="module" src="./hub/watchdog.js"></script>
-<script type="module" src="./main.js?bored-build=20261122-getaway-loader-v2"></script>
+<script type="module" src="./main.js?bored-build=20261122-getaway-host-loading-v3"></script>
 </body>
 </html>
