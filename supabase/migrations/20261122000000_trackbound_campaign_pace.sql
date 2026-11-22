@@ -2,30 +2,32 @@
 -- The existing career-point board remains untouched; only equal points are tiebroken.
 create table if not exists public.trackbound_campaign_tracks (
   id text primary key,
+  name text not null,
   author_ms integer not null check (author_ms > 0),
   ordinal smallint not null unique check (ordinal between 1 and 15),
   layout text not null
 );
 
-insert into public.trackbound_campaign_tracks (id, author_ms, ordinal, layout)
+insert into public.trackbound_campaign_tracks (id, name, author_ms, ordinal, layout)
 values
-  ('paddock', 12198, 1, 'start|sprint|curveR|straight|curveR|straight|checkpoint|curveL|sprint|curveL|straight|curveR|checkpoint|curveL|sprint|straight|finish'),
-  ('slipstream', 11518, 2, 'start|sprint|sprint|boost|curveL|sprint|straight|checkpoint|curveR|sprint|curveR|boost|straight|checkpoint|curveL|sprint|straight|finish'),
-  ('switchback', 14025, 3, 'start|straight|curveL|straight|hairpinR|straight|checkpoint|curveR|sprint|wallL|hairpinR|straight|curveL|checkpoint|straight|curveR|sprint|finish'),
-  ('overpass', 13728, 4, 'start|sprint|up|straight|curveR|straight|down|checkpoint|straight|curveL|up|sprint|curveR|down|checkpoint|straight|curveL|sprint|finish'),
-  ('vertigo', 12665, 5, 'start|sprint|boost|straight|wallR|straight|checkpoint|curveR|sprint|boost|straight|wallR|straight|curveL|checkpoint|wallL|sprint|curveL|straight|finish'),
-  ('dustbowl', 9138, 6, 'start|straight|dirt|straight|curveR|narrow|checkpoint|straight|curveL|dirt|narrow|checkpoint|curveL|dirt|straight|finish'),
-  ('kicker', 17596, 7, 'start|sprint|kicker|curveR|sprint|down|checkpoint|straight|curveL|sprint|kicker2|boost|straight|checkpoint|curveL|sprint|straight|finish'),
-  ('grandloop', 16065, 8, 'start|sprint|straight|curveR|up|straight|down|checkpoint|curveL|sprint|boost|straight|wallL|straight|wallL|straight|checkpoint|curveR|dirt|straight|curveL|sprint|curveR|straight|finish'),
-  ('serpentine', 21753, 9, 'start|sprint|curveR|tunnel|curveL|hairpinR|straight|checkpoint|sprint|boost|wallL|straight|curveL|curveR|whoops|hairpinL|checkpoint|sprint|curveR|straight|curveL|narrow|curveR|checkpoint|sprint|boost|straight|finish'),
-  ('highline', 22032, 10, 'start|sprint|up|curveL|up|whoops|down|boost|straight|checkpoint|straight|curveR|boost|up|sprint|straight|curveL|straight|checkpoint|curveR|boost|straight|tunnel|down|curveL|sprint|finish'),
-  ('foundry', 17028, 11, 'start|tunnel|boost|narrow|curveR|straight|narrow|checkpoint|ice|boost|hairpinL|straight|curveR|narrow|boost|checkpoint|curveL|straight|curveR|sprint|boost|narrow|checkpoint|tunnel|curveL|sprint|finish'),
-  ('horizon', 18488, 12, 'start|sprint|straight|curveR|ice|curveL|checkpoint|boost|straight|curveR|up|tunnel|straight|curveL|checkpoint|straight|straight|curveL|sprint|wallR|straight|checkpoint|curveR|hairpinL|straight|curveR|boost|sprint|checkpoint|straight|curveL|finish'),
-  ('longway', 26224, 13, 'start|sprint|straight|curveR|sprint|curveL|checkpoint|tunnel|straight|curveR|hairpinL|sprint|checkpoint|boost|straight|curveL|up|straight|down|curveR|checkpoint|wallL|straight|wallR|curveL|checkpoint|ice|straight|boost|loop|straight|curveR|sprint|finish'),
-  ('coldstore', 17000, 14, 'start|sprint|curveL|ice|straight|sprint|curveR|checkpoint|sprint|boost|ice|curveL|straight|sprint|curveR|checkpoint|ice|straight|finish'),
-  ('downdraft', 11900, 15, 'start|sprint|down|curveR|boost|loop|checkpoint|straight|down|wallR|curveL|checkpoint|kicker|straight|sprint|finish')
+  ('paddock', 'Paddock', 12198, 1, 'start|sprint|curveR|straight|curveR|straight|checkpoint|curveL|sprint|curveL|straight|curveR|checkpoint|curveL|sprint|straight|finish'),
+  ('slipstream', 'Slipstream', 11518, 2, 'start|sprint|sprint|boost|curveL|sprint|straight|checkpoint|curveR|sprint|curveR|boost|straight|checkpoint|curveL|sprint|straight|finish'),
+  ('switchback', 'Switchback', 14025, 3, 'start|straight|curveL|straight|hairpinR|straight|checkpoint|curveR|sprint|wallL|hairpinR|straight|curveL|checkpoint|straight|curveR|sprint|finish'),
+  ('overpass', 'Overpass', 13728, 4, 'start|sprint|up|straight|curveR|straight|down|checkpoint|straight|curveL|up|sprint|curveR|down|checkpoint|straight|curveL|sprint|finish'),
+  ('vertigo', 'Vertigo', 12665, 5, 'start|sprint|boost|straight|wallR|straight|checkpoint|curveR|sprint|boost|straight|wallR|straight|curveL|checkpoint|wallL|sprint|curveL|straight|finish'),
+  ('dustbowl', 'Dust Bowl', 9138, 6, 'start|straight|dirt|straight|curveR|narrow|checkpoint|straight|curveL|dirt|narrow|checkpoint|curveL|dirt|straight|finish'),
+  ('kicker', 'Kicker', 17596, 7, 'start|sprint|kicker|curveR|sprint|down|checkpoint|straight|curveL|sprint|kicker2|boost|straight|checkpoint|curveL|sprint|straight|finish'),
+  ('grandloop', 'Grand Loop', 16065, 8, 'start|sprint|straight|curveR|up|straight|down|checkpoint|curveL|sprint|boost|straight|wallL|straight|wallL|straight|checkpoint|curveR|dirt|straight|curveL|sprint|curveR|straight|finish'),
+  ('serpentine', 'Serpentine', 21753, 9, 'start|sprint|curveR|tunnel|curveL|hairpinR|straight|checkpoint|sprint|boost|wallL|straight|curveL|curveR|whoops|hairpinL|checkpoint|sprint|curveR|straight|curveL|narrow|curveR|checkpoint|sprint|boost|straight|finish'),
+  ('highline', 'Highline', 22032, 10, 'start|sprint|up|curveL|up|whoops|down|boost|straight|checkpoint|straight|curveR|boost|up|sprint|straight|curveL|straight|checkpoint|curveR|boost|straight|tunnel|down|curveL|sprint|finish'),
+  ('foundry', 'Foundry', 17028, 11, 'start|tunnel|boost|narrow|curveR|straight|narrow|checkpoint|ice|boost|hairpinL|straight|curveR|narrow|boost|checkpoint|curveL|straight|curveR|sprint|boost|narrow|checkpoint|tunnel|curveL|sprint|finish'),
+  ('horizon', 'Horizon', 18488, 12, 'start|sprint|straight|curveR|ice|curveL|checkpoint|boost|straight|curveR|up|tunnel|straight|curveL|checkpoint|straight|straight|curveL|sprint|wallR|straight|checkpoint|curveR|hairpinL|straight|curveR|boost|sprint|checkpoint|straight|curveL|finish'),
+  ('longway', 'The Long Way', 26224, 13, 'start|sprint|straight|curveR|sprint|curveL|checkpoint|tunnel|straight|curveR|hairpinL|sprint|checkpoint|boost|straight|curveL|up|straight|down|curveR|checkpoint|wallL|straight|wallR|curveL|checkpoint|ice|straight|boost|loop|straight|curveR|sprint|finish'),
+  ('coldstore', 'Cold Store', 17000, 14, 'start|sprint|curveL|ice|straight|sprint|curveR|checkpoint|sprint|boost|ice|curveL|straight|sprint|curveR|checkpoint|ice|straight|finish'),
+  ('downdraft', 'Downdraft', 11900, 15, 'start|sprint|down|curveR|boost|loop|checkpoint|straight|down|wallR|curveL|checkpoint|kicker|straight|sprint|finish')
 on conflict (id) do update set
-  author_ms = excluded.author_ms, ordinal = excluded.ordinal, layout = excluded.layout;
+  name = excluded.name, author_ms = excluded.author_ms,
+  ordinal = excluded.ordinal, layout = excluded.layout;
 
 create table if not exists public.trackbound_campaign_bests (
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -108,7 +110,7 @@ as $$
     select b.user_id,
       count(*)::integer as n,
       round(avg(b.ms::numeric / t.author_ms::numeric) * 10000)::integer as pace,
-      jsonb_agg(jsonb_build_object('track', t.id, 'ms', b.ms)
+      jsonb_agg(jsonb_build_object('track', t.id, 'name', t.name, 'ms', b.ms, 'author_ms', t.author_ms)
         order by t.ordinal) as track_records
     from public.trackbound_campaign_bests b
     join public.trackbound_campaign_tracks t
