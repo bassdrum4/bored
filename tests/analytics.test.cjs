@@ -69,6 +69,39 @@ test('scoped game analytics readers are omitted only from the games they can rea
   assert.deepEqual(filterGameReaderTelemetry(rows,null,games), rows);
 });
 
+test('analytics role requests are shared, cached briefly, and isolated by account and token', async () => {
+  const source = fs.readFileSync(path.join(root, 'src/hub/analytics-access.js'), 'utf8')
+    .replace(/^import .*;\s*$/gm, '')
+    .replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|class))/g, '');
+  let session = { access_token: 'token-a', user: { id: 'account-a' } };
+  const calls = [];
+  const request = async (url) => {
+    calls.push(url);
+    if (url.includes('/analytics_admins')) return [{ user_id: 'account-a' }];
+    return [{ game: 'ashcrown' }];
+  };
+  const { getAnalyticsAccess } = new Function('request', 'getSession', 'freshSession',
+    source + '\nreturn { getAnalyticsAccess };')
+    (request, () => session, async () => session);
+
+  const both = await Promise.all([getAnalyticsAccess(), getAnalyticsAccess()]);
+  assert.equal(both[0].kind, 'admin');
+  assert.deepEqual(both[1], both[0]);
+  assert.equal(calls.length, 2, 'concurrent role consumers share one query pair');
+  await getAnalyticsAccess();
+  assert.equal(calls.length, 2, 'recent access uses in-memory cache');
+
+  session = { access_token: 'token-b', user: { id: 'account-b' } };
+  const next = await getAnalyticsAccess();
+  assert.equal(next.userId, 'account-b');
+  assert.equal(next.kind, 'game-reader');
+  assert.equal(calls.length, 4, 'new accounts always query their own roles');
+
+  session = { access_token: 'token-b2', user: { id: 'account-b' } };
+  await getAnalyticsAccess();
+  assert.equal(calls.length, 6, 'new session tokens cannot inherit stale permissions');
+});
+
 test('analytics footer routes only authorized accounts to their dashboard', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
   assert.ok(executablePath, 'Set CHROME_PATH or install Chrome');

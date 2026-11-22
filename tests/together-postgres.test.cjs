@@ -96,6 +96,13 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
   assert.equal(untouched.state.board.filter(Boolean).length,0);
   await rpc(b,'delete',{match_id:parallel[0].id});
   assert.ok(!(await rpc(a,'dashboard')).matches.some(m=>m.id===parallel[0].id));
-  const f=await admin.query("select prosrc from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='bored_together' and proname='api'");
-  assert.match(f.rows[0].prosrc,/pg_advisory_xact_lock/);
+  // A fresh database must replay the scoped-lock migration rather than
+  // retaining the old global lock that caused production timeouts.
+  const f=await admin.query("select proname,prosrc from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='bored_together' and proname in ('api','lock_scope','lock_accounts','pool_commit')");
+  const functions=Object.fromEntries(f.rows.map(row=>[row.proname,row.prosrc]));
+  assert.match(functions.api,/bored_together\.lock_scope\(u,action,args\)/);
+  assert.doesNotMatch(functions.api,/pg_advisory_xact_lock\(210425\s*,\s*1\)/);
+  assert.match(functions.lock_scope,/pg_advisory_xact_lock/);
+  assert.match(functions.lock_accounts,/pg_advisory_xact_lock/);
+  assert.match(functions.pool_commit,/hashtext\(actor::text\)/);
 });
