@@ -5,6 +5,7 @@ on:
     paths:
       - tests/getaway-shootout.test.cjs
       - tests/getaway-scene-boot.cjs
+      - tests/getaway-hub-route.test.cjs
       - src/games/content/getaway-shootout.html
       - src/prototypes/getaway-shootout/patch-menu.py
       - .github/workflows/test-getaway-shootout.yml
@@ -34,10 +35,16 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: node tests/getaway-scene-boot.cjs
+      - name: Diagnose the Bored hash route with the real iframe
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node --test tests/getaway-hub-route.test.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: getaway-playthrough-screenshots
-          path: _build/getaway-shootout/*.png
+          path: |
+            _build/getaway-shootout/*.png
+            _build/getaway-hub-route/*.png
           if-no-files-found: ignore
           retention-days: 2
