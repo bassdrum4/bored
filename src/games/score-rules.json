@@ -24,6 +24,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "ballistic-chickens": {
+    "label": "Metres flown in a finished run",
+    "better": "high",
+    "max_value": 5000
+  },
   "block-blast": {
     "label": "Score",
     "better": "high",
@@ -142,16 +147,6 @@
     "min_value": 8,
     "max_value": 3600
   },
-  "poke-idle": {
-    "label": "Pok\u00e9dex entries plus shinies",
-    "better": "high",
-    "max_value": 2050
-  },
-  "poke-idle-tower": {
-    "label": "Highest Battle Tower floor cleared",
-    "better": "high",
-    "max_value": 100000
-  },
   "poke-gacha": {
     "label": "Species caught plus stage stars",
     "better": "high",
@@ -162,8 +157,18 @@
     "better": "high",
     "max_value": 13
   },
+  "poke-idle": {
+    "label": "Pokédex entries plus shinies",
+    "better": "high",
+    "max_value": 2050
+  },
+  "poke-idle-tower": {
+    "label": "Highest Battle Tower floor cleared",
+    "better": "high",
+    "max_value": 100000
+  },
   "pokedoku": {
-    "label": "Today's three Pok\u00e9mon dailies added up",
+    "label": "Today's three Pokémon dailies added up",
     "better": "high",
     "max_value": 2650
   },

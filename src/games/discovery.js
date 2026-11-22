@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  "ballistic-chickens": info('1–3 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   "getaway-shootout": info('3–8 min', 'Competitive', ['Keyboard'], {quick:true, players:'2 local'}),
   "shotgun-roulette": info('5–10 min', 'Competitive', ['Mouse']),
   "crossword": info('5–20 min', 'Focused', ['Keyboard', 'Mouse', 'Touch']),
@@ -98,7 +99,7 @@ export function inCollection(slug, collection) {
 // A newly scaffolded game starts with an SVG placeholder and is listed here
 // until a real capture replaces it. F-14 and Klang use self-hosted illustrated
 // SVG previews; Risk keeps its existing SVG preview.
-export const PREVIEW_FALLBACKS = {"getaway-shootout": '.svg', "shotgun-roulette": '.svg', "crossword": '.svg', "imposter": '.svg', "sudoku": '.svg', "photo-puzzle": '.svg', "poke-gacha": '.svg', "poke-idle": '.svg', "air-hockey": '.svg', "pokedoku": '.svg', "quickdraw": ".svg","clicker": '.svg',"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
+export const PREVIEW_FALLBACKS = {"ballistic-chickens": '.svg', "getaway-shootout": '.svg', "shotgun-roulette": '.svg', "crossword": '.svg', "imposter": '.svg', "sudoku": '.svg', "photo-puzzle": '.svg', "poke-gacha": '.svg', "poke-idle": '.svg', "air-hockey": '.svg', "pokedoku": '.svg', "quickdraw": ".svg","clicker": '.svg',"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug] || PREVIEW_FALLBACKS[slug]).map(([slug]) => [slug, previewUrl(slug)]));

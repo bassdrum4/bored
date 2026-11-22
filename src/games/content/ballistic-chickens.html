@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ballistic Chickens</title>
+<style>
+  :root {
+    --paper: #f4efe3;
+    --ink: #1b1a17;
+    --mute: #6f6857;
+    --hair: #cfc7b4;
+    --accent: #b4622f;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  html, body { height: 100% }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 13px/1.45 var(--mono);
+    display: grid; place-items: center; overflow: hidden;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  }
+  #frame {
+    position: relative; width: min(100vw, 132vh); max-width: 900px;
+    aspect-ratio: 4 / 3; background: var(--paper);
+    border: 1px solid var(--hair);
+  }
+  #frame.bleed { width: 100vw; max-width: none; height: 100vh; aspect-ratio: auto; border: 0 }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair }
+
+  .card {
+    position: absolute; inset: 0; z-index: 3; display: grid; place-items: center;
+    background: rgba(244, 239, 227, .86); padding: 16px;
+  }
+  .card[hidden] { display: none }
+  .card > div { width: min(320px, 100%); border: 1px solid var(--hair); background: var(--paper); padding: 16px 18px 14px }
+  .kicker { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--mute); margin-bottom: 6px }
+  h1 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 10px }
+  h2 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 10px }
+  .rows { display: grid; gap: 3px; margin: 0 0 12px; font-size: 12px }
+  .rows div { display: flex; justify-content: space-between; gap: 12px }
+  .rows b { font-weight: 600 }
+  .act { display: flex; gap: 8px; margin-top: 4px }
+  button {
+    font: 600 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    padding: 9px 12px; border: 1px solid var(--ink); border-radius: 2px;
+    background: none; color: inherit; cursor: pointer;
+  }
+  button.primary { background: var(--ink); color: var(--paper) }
+  button:disabled { border-color: var(--hair); color: var(--mute); cursor: default }
+  .buy { padding: 6px 9px; font-size: 9px }
+  .shop-list { display: grid; gap: 0; border-top: 1px solid var(--hair) }
+  .item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair) }
+  .item .n { font-size: 11px; letter-spacing: .05em; text-transform: uppercase }
+  .item .d { font-size: 10px; color: var(--mute); line-height: 1.35; margin-top: 2px }
+  .item .lv { color: var(--accent) }
+  .price { font-size: 10px; color: var(--mute); margin-right: 8px }
+  #shopBody { width: min(420px, 100%); max-height: 100%; overflow: auto }
+  .tip { font-size: 10px; color: var(--mute); margin-top: 10px }
+</style>
+</head>
+<body>
+<div id="frame">
+  <canvas id="board" width="960" height="720" aria-label="Ballistic Chickens"></canvas>
+
+  <div class="card" id="home">
+    <div>
+      <p class="kicker">Bored arcade</p>
+      <h1>Ballistic Chickens</h1>
+      <div class="rows">
+        <div><span>Best distance</span><b id="homeBest">0 m</b></div>
+        <div><span>Cash</span><b id="homeMoney">$0</b></div>
+      </div>
+      <div class="act">
+        <button class="primary" id="homePlay" type="button">Play</button>
+        <button id="homeShop" type="button">Shop</button>
+      </div>
+      <p class="tip">Aim with the mouse, click to fire, hold to burn the rocket. Smash what you can afford to hit.</p>
+    </div>
+  </div>
+
+  <div class="card" id="over" hidden>
+    <div>
+      <p class="kicker">Run finished</p>
+      <h2 id="overTitle">Splatted</h2>
+      <div class="rows">
+        <div><span>Distance</span><b id="overDist">0 m</b></div>
+        <div><span>Height</span><b id="overAlt">0 m</b></div>
+        <div><span>Earned</span><b id="overCash">$0</b></div>
+        <div><span>Cash</span><b id="overMoney">$0</b></div>
+      </div>
+      <div class="act">
+        <button class="primary" id="overAgain" type="button">Fire again</button>
+        <button id="overShop" type="button">Shop</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="shop" hidden>
+    <div id="shopBody">
+      <p class="kicker">The cannon shed</p>
+      <h2>Upgrades — <span id="shopMoney">$0</span></h2>
+      <div class="shop-list" id="shopList"></div>
+      <div class="act"><button class="primary" id="shopDone" type="button">Back to the cannon</button></div>
+      <p class="tip">Cash comes from distance, height and whatever you flatten. Prices multiply every time.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Ballistic Chickens — ported from -ezbreez-'s Scratch project 780035707
+   (the original idea is mrVoo's). The numbers below are the project's own:
+   stage gravity 500, launch power 100, rocket 600, fuel 10 burning at 25/s,
+   drag 1, bounciness 0.5, and the obstacle table at 100 px per metre. The
+   shop ladders, their cost multipliers and their per-level deltas come from
+   the same `upgrades` list; extract.mjs regenerates that table. */
+(() => {
+'use strict';
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const frameEl = document.getElementById('frame');
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------- constants
+const VIEW_W = 480, VIEW_H = 360;          // Scratch stage
+const GROUND_Y = -120;                      // world ground line
+const GRAVITY = 500;                        // px/s², downward
+const START = { launchPower: 100, drag: 1, fuel: 10, burn: 25, bounciness: 0.5,
+                moneyGain: 1, rocketPower: 600 };
+const CANNON = { x: -172, y: -140 };
+const METRE = 100;                          // px per metre on the score line
+
+/* BEGIN GENERATED DATA (extract.mjs rewrites this from project.json) */
+// [name, blurb, costMultiplier, firstCost, delta, level]
+const UPGRADES = [
+  ['Launch Velocity', 'Shove some more gunpowderinto the cannon.', 2, 1.2, 25, 0],
+  ['Aerodynamics', 'Slice through the air as fast as... a chicken... through air...', 5, 1.8, -.1, 0],
+  ['Fuel Surplus', 'Make more  room in  your fuel tank that doesn\'t really  exist anyway.', 6, 1.4, 5, 0],
+  ['Shock Absorber', 'Lose  less  speed when you smack into the ground.', 8, 3, 0.05, 0],
+  ['Chick-y Bank', 'Gain more money when you crush stuff.  Who is paying  you? (And who cares?)', 5, 1.9, 0.25, 0],
+  ['Rocket Science', 'Get a better firework rocket  that speeds you up more.', 7.5, 1.3, 30, 0],
+];
+// [name, hardness in px/s, distance in px, cash]
+const OBSTACLES = [
+  ['Fence', 950, 480, 25],
+  ['House', 2000, 10000, 75],
+  ['SkyScraper', 3000, 20000, 300],
+  ['Stadium', 4000, 40000, 1000],
+  ['Mountain', 7500, 100000, 10000],
+];
+/* END GENERATED DATA */
+
+const PROGRESS_KEY = 'bored.ballistic-chickens.progress';
+
+const store = {
+  read() {
+    try {
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (!saved || typeof saved !== 'object') return null;
+      return saved;
+    } catch (error) { return null; }
+  },
+  write(value) {
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(value)); } catch (error) {}
+  }
+};
+
+function freshProgress() {
+  return { v: 1, money: 0, best: 0, levels: UPGRADES.map(() => 0) };
+}
+let progress = (() => {
+  const saved = store.read();
+  if (!saved) return freshProgress();
+  const levels = Array.isArray(saved.levels) ? saved.levels.slice(0, UPGRADES.length) : [];
+  while (levels.length < UPGRADES.length) levels.push(0);
+  return {
+    v: 1,
+    money: Math.max(0, Number(saved.money) || 0),
+    best: Math.max(0, Number(saved.best) || 0),
+    levels: levels.map((n) => Math.max(0, Math.floor(Number(n) || 0)))
+  };
+})();
+
+// ---------------------------------------------------------------- stats
+function stats() {
+  const level = (i) => progress.levels[i] || 0;
+  const value = (i) => UPGRADES[i][4] * level(i);
+  return {
+    launchPower: Math.round(START.launchPower + value(0)),
+    drag: Math.max(0, START.drag + value(1)),
+    fuel: START.fuel + value(2),
+    bounciness: Math.min(0.95, START.bounciness + value(3)),
+    moneyGain: Math.round((START.moneyGain + value(4)) * 100) / 100,
+    rocketPower: START.rocketPower + value(5)
+  };
+}
+function costOf(i) {
+  return Math.round(UPGRADES[i][3] * Math.pow(UPGRADES[i][2], progress.levels[i] || 0) * 100) / 100;
+}
+function moneyText(n) {
+  return '$' + (Math.round(n * 100) / 100).toLocaleString('en-US');
+}
+
+// ---------------------------------------------------------------- state
+const scene = { name: 'home' };
+const run = {
+  phase: 'idle',            // idle | aim | fly | over
+  bird: { x: 0, y: 0, vx: 0, vy: 0, dir: 90, fuel: 0, maxAlt: 0 },
+  cam: { x: 0, y: 300 },
+  camOffset: 300,
+  aim: 0, aimTarget: 0,
+  cash: 0,
+  smashed: OBSTACLES.map(() => false),
+  landed: 0,
+  touched: false,
+  finished: false,
+  started: false,
+  shake: 0,
+  flying: false,
+  spark: 0,
+  meters: 0
+};
+
+function resetRun() {
+  run.phase = 'aim';
+  run.bird = { x: 0, y: 0, vx: 0, vy: 0, dir: 90, fuel: 0, maxAlt: 0 };
+  run.cam = { x: 0, y: run.camOffset };
+  run.cash = 0;
+  run.smashed = OBSTACLES.map(() => false);
+  run.landed = 0;
+  run.touched = false;
+  run.finished = false;
+  run.started = false;
+  run.flying = false;
+  run.spark = 0;
+  run.meters = 0;
+  run.shake = 0;
+  run.aim = 0;
+  run.aimTarget = 0;
+}
+
+function enterPlay() {
+  scene.name = 'play';
+  $('home').hidden = true;
+  $('over').hidden = true;
+  $('shop').hidden = true;
+  run.phase = 'aim';
+  run.started = false;
+  run.bird.x = CANNON.x;
+  run.bird.y = CANNON.y;
+  run.cam = { x: 0, y: 220 };
+  run.camOffset = 220;
+}
+
+// ---------------------------------------------------------------- input
+const keys = { held: false };
+let pointerWorld = { x: 0, y: 0, inside: false };
+
+function toStage(event) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = (event.clientX - rect.left) / rect.width;
+  const sy = (event.clientY - rect.top) / rect.height;
+  return { x: sx * VIEW_W - VIEW_W / 2, y: VIEW_H / 2 - sy * VIEW_H, sx, sy };
+}
+
+canvas.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  canvas.setPointerCapture?.(event.pointerId);
+  const point = toStage(event);
+  pointerWorld = { x: point.x, y: point.y, inside: true };
+  if (scene.name !== 'play') return;
+  keys.held = true;
+  if (run.phase === 'aim') aimAt(point);
+  else if (run.phase === 'aim' || run.phase === 'fly') { /* hold = rocket */ }
+});
+canvas.addEventListener('pointermove', (event) => {
+  const point = toStage(event);
+  pointerWorld = { x: point.x, y: point.y, inside: true };
+  if (scene.name === 'play' && run.phase === 'aim') aimAt(point);
+});
+window.addEventListener('pointerup', () => { keys.held = false; });
+window.addEventListener('pointercancel', () => { keys.held = false; });
+canvas.addEventListener('pointerleave', () => { pointerWorld.inside = false; });
+
+function aimAt(point) {
+  const cannonScreenX = CANNON.x - run.cam.x;
+  const cannonScreenY = CANNON.y - run.cam.y;
+  const dx = point.x - cannonScreenX;
+  const dy = point.y - cannonScreenY;
+  let dir = Math.atan(dx / (dy || 0.0001)) * 180 / Math.PI;
+  if (cannonScreenY > point.y) dir += 180;
+  if (!Number.isFinite(dir)) dir = 45;
+  run.aimTarget = Math.max(0, Math.min(80, dir));
+}
+
+window.addEventListener('keydown', (event) => {
+  if (event.key === ' ' || event.key === 'Spacebar') {
+    keys.held = true;
+    if (scene.name === 'play' && run.phase === 'aim') run.aimTarget = 45;
+    event.preventDefault();
+  }
+  if (event.key === 'r' || event.key === 'R') {
+    if (scene.name === 'play') { hideCards(); resetRun(); }
+  }
+});
+window.addEventListener('keyup', (event) => { if (event.key === ' ' || event.key === 'Spacebar') keys.held = false; });
+
+// ---------------------------------------------------------------- physics
+function launch() {
+  const s = stats();
+  const rad = run.aim * Math.PI / 180;
+  const dx = Math.sin(rad), dy = Math.cos(rad);
+  const screenX = CANNON.x - run.cam.x;
+  const screenY = CANNON.y - run.cam.y;
+  run.bird.x = screenX + dx * 75 + -dy * 13 + run.cam.x;
+  run.bird.y = screenY + dy * 75 + dx * 13 + run.cam.y;
+  run.bird.vx = dx * s.launchPower;
+  run.bird.vy = dy * s.launchPower;
+  run.bird.dir = run.aim;
+  run.bird.fuel = s.fuel;
+  run.bird.maxAlt = run.bird.y;
+  run.phase = 'fly';
+  run.started = true;
+  run.flying = true;
+  run.landed = 0;
+  run.touched = false;
+  run.spark = 0;
+  RESUME?.flush?.();
+}
+
+function boost(dt, s) {
+  const bird = run.bird;
+  const rad = bird.dir * Math.PI / 180;
+  const lift = bird.dir > 90 ? (bird.dir - 30) * Math.PI / 180 : rad;
+  bird.vx += Math.sin(rad) * s.rocketPower * dt;
+  bird.vy += Math.cos(lift) * s.rocketPower * dt;
+  bird.fuel = Math.max(0, bird.fuel - START.burn * dt);
+  run.spark = Math.min(1, run.spark + dt * 6);
+}
+
+function obstacleAt(index) {
+  return OBSTACLES[index];
+}
+
+function touchingObstacle() {
+  const bird = run.bird;
+  for (let i = 0; i < OBSTACLES.length; i += 1) {
+    if (run.smashed[i]) continue;
+    const [name, , at] = OBSTACLES[i];
+    const left = at - 34, right = at + 34;
+    if (bird.x < left || bird.x > right) continue;
+    const height = obstacleHeight(name);
+    if (bird.y > GROUND_Y - 4 && bird.y < GROUND_Y + height) return i;
+  }
+  return -1;
+}
+
+function obstacleHeight(name) {
+  switch (name) {
+    case 'Fence': return 46;
+    case 'House': return 96;
+    case 'Skyscraper': return 168;
+    case 'Stadium': return 74;
+    case 'Mountain': return 150;
+    default: return 60;
+  }
+}
+
+function step(dt) {
+  const s = stats();
+  const bird = run.bird;
+
+  if (run.phase === 'aim') {
+    // The cannon swings toward the pointer instead of snapping to it, like the
+    // project's 150°/s slew, and cannot fire until it has settled.
+    const slew = 150 * dt;
+    const diff = run.aimTarget - run.aim;
+    run.aim += Math.abs(diff) <= slew ? diff : Math.sign(diff) * slew;
+    run.aim = Math.max(0, Math.min(80, run.aim));
+    run.camOffset = Math.max(0, run.camOffset - 900 * dt);
+    const targetY = run.camOffset;
+    run.cam.y += (targetY - run.cam.y) * Math.min(1, dt * 10);
+    if (keys.held && run.camOffset < 20 && Math.abs(run.aimTarget - run.aim) < 5) launch();
+    return;
+  }
+
+  if (run.phase !== 'fly') return;
+
+  if (run.landed !== 2) {
+    if (keys.held && bird.fuel > 0) boost(dt, s);
+    else run.spark = Math.max(0, run.spark - dt * 4);
+
+    if (bird.vx > 0) {
+      bird.vx -= bird.vx * s.drag * dt;
+      if (bird.vx < 0) bird.vx = 0;
+    }
+    bird.vy -= GRAVITY * dt;
+
+    bird.x += bird.vx * dt;
+    bird.y += bird.vy * dt;
+    bird.maxAlt = Math.max(bird.maxAlt, bird.y);
+
+    // Ground: small speeds stop her, bigger ones bounce.
+    if (bird.y < GROUND_Y) {
+      bird.fuel = 0;
+      if (run.landed === 0) run.landed = 1;
+      if (Math.abs(bird.vx) < 5) {
+        bird.y = GROUND_Y;
+        bird.vx = 0;
+        bird.vy = 0;
+        run.landed = 2;
+      } else {
+        bird.vx *= s.bounciness;
+        bird.vy = Math.abs(bird.vy) * s.bounciness;
+        bird.y = GROUND_Y + 1;
+        run.shake = Math.max(run.shake, Math.min(6, Math.abs(bird.vy) * 0.02));
+      }
+    }
+
+    // Obstacles: fast enough breaks them, slow enough bounces her back.
+    if (!run.touched) {
+      const index = touchingObstacle();
+      if (index >= 0) {
+        const [name, hardness, , cash] = obstacleAt(index);
+        const speed = Math.abs(bird.vx) + Math.abs(bird.vy);
+        if (speed > hardness) {
+          run.smashed[index] = true;
+          run.cash += cash;
+          bird.vx *= 0.8;
+          bird.vy *= 0.8;
+          run.shake = Math.max(run.shake, 8);
+        } else {
+          run.touched = true;
+          bird.vx *= -0.1;
+          bird.vy *= -0.1;
+          bird.fuel = 0;
+          run.landed = 1;
+          run.shake = Math.max(run.shake, 6);
+        }
+      }
+    }
+
+    if (bird.vx !== 0 || bird.vy !== 0) bird.dir = Math.atan2(bird.vx, bird.vy) * 180 / Math.PI;
+    const speed = Math.abs(bird.vx) + Math.abs(bird.vy);
+    if (speed > 200) run.shake = Math.max(run.shake, Math.min(5, speed * 0.0015));
+  } else {
+    // Settled on the ground: face forward and finish the run.
+    bird.dir += (90 - bird.dir) * Math.min(1, dt * 10);
+    if (!run.finished) finishRun();
+  }
+
+  // Camera: lead the bird, follow her climb, never dip below the horizon.
+  const lead = 150 + bird.vx / 10;
+  const targetX = bird.x + lead;
+  const targetY = Math.max(-20, bird.y + bird.vy / 10);
+  const follow = Math.min(1, dt * 10);
+  run.cam.x += (targetX - run.cam.x) * follow;
+  run.cam.y += (targetY - run.cam.y) * follow;
+  run.shake = Math.max(0, run.shake - dt * 14);
+  run.meters = Math.max(0, Math.floor((bird.x + 172) / METRE));
+}
+
+function finishRun() {
+  const s = stats();
+  run.finished = true;
+  run.phase = 'over';
+  run.flying = false;
+  const bird = run.bird;
+  const distance = Math.max(0, Math.floor((bird.x + 172) / METRE));
+  const height = Math.max(0, Math.floor((bird.maxAlt + 120) / METRE));
+  const earned = Math.round((distance + height + run.cash) * s.moneyGain * 100) / 100;
+  run.meters = distance;
+  progress.money = Math.round((progress.money + earned) * 100) / 100;
+  progress.best = Math.max(progress.best, distance);
+  store.write(progress);
+  RESUME?.flush?.();
+
+  $('overTitle').textContent = distance > 0 ? 'Run finished' : 'Splatted';
+  $('overDist').textContent = distance + ' m';
+  $('overAlt').textContent = height + ' m';
+  $('overCash').textContent = moneyText(earned);
+  $('overMoney').textContent = moneyText(progress.money);
+  $('over').hidden = false;
+}
+
+// ---------------------------------------------------------------- drawing
+const px = (value) => value * 2;  // 960×720 canvas, 480×360 stage
+
+function screenX(worldX) { return px(worldX - run.cam.x + VIEW_W / 2); }
+function screenY(worldY) { return px(VIEW_H / 2 - (worldY - run.cam.y)); }
+
+function line(x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.moveTo(screenX(x1), screenY(y1));
+  ctx.lineTo(screenX(x2), screenY(y2));
+  ctx.stroke();
+}
+
+function groundScreenY() { return screenY(GROUND_Y); }
+
+function drawSky() {
+  ctx.fillStyle = '#f4efe3';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawGround() {
+  const gy = groundScreenY();
+  ctx.fillStyle = '#dcd3c0';
+  ctx.fillRect(0, gy, canvas.width, canvas.height - gy);
+  ctx.strokeStyle = '#1b1a17';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, gy);
+  ctx.lineTo(canvas.width, gy);
+  ctx.stroke();
+
+  // Grass tufts and flowers every few metres, placed from their world x so the
+  // pattern stays put while the camera moves.
+  const startX = run.cam.x - VIEW_W / 2 - 40;
+  const endX = run.cam.x + VIEW_W / 2 + 40;
+  const stepX = 42;
+  const first = Math.floor(startX / stepX);
+  const last = Math.ceil(endX / stepX);
+  ctx.strokeStyle = '#8e8672';
+  ctx.lineWidth = 1.5;
+  for (let i = first; i <= last; i += 1) {
+    const worldX = i * stepX;
+    const kind = ((i * 7919) % 11 + 11) % 11;
+    const x = screenX(worldX);
+    if (kind === 0) {
+      // flower
+      ctx.strokeStyle = '#8e8672';
+      line(worldX, GROUND_Y, worldX, GROUND_Y + 9);
+      ctx.fillStyle = kind % 2 ? '#b4622f' : '#1b1a17';
+      ctx.beginPath();
+      ctx.arc(x, screenY(GROUND_Y + 11), 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#8e8672';
+      line(worldX, GROUND_Y, worldX - 3, GROUND_Y + 7);
+      line(worldX, GROUND_Y, worldX + 3, GROUND_Y + 7);
+    }
+  }
+}
+
+function drawObstacle(index) {
+  const [name, , at] = OBSTACLES[index];
+  const h = obstacleHeight(name);
+  const x = screenX(at);
+  const base = screenY(GROUND_Y);
+  const w = px(68);
+  const hh = px(h);
+  const smashed = run.smashed[index];
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#1b1a17';
+  ctx.fillStyle = smashed ? 'rgba(27,26,23,.06)' : '#e8e0cd';
+
+  if (smashed) {
+    // rubble: a low broken outline where the thing used to be
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2, base);
+    ctx.lineTo(x - w * 0.18, base - hh * 0.16);
+    ctx.lineTo(x, base);
+    ctx.lineTo(x + w * 0.22, base - hh * 0.11);
+    ctx.lineTo(x + w / 2, base);
+    ctx.fill();
+    ctx.stroke();
+    return;
+  }
+
+  ctx.beginPath();
+  switch (name) {
+    case 'Fence':
+      // three pickets and two rails
+      for (let i = 0; i < 3; i += 1) {
+        const picketX = x - w / 2 + (w / 2) * i;
+        ctx.beginPath();
+        ctx.rect(picketX - px(5), base - hh, px(10), hh);
+        ctx.fill();
+        ctx.stroke();
+      }
+      for (let i = 0; i < 2; i += 1) {
+        ctx.beginPath();
+        ctx.rect(x - w / 2 - px(3), base - hh * (0.75 - i * 0.4), w + px(6), px(5));
+        ctx.fill();
+        ctx.stroke();
+      }
+      break;
+    case 'House':
+      ctx.rect(x - w / 2, base - hh * 0.72, w, hh * 0.72);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.58, base - hh * 0.72);
+      ctx.lineTo(x, base - hh);
+      ctx.lineTo(x + w * 0.58, base - hh * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1b1a17';
+      ctx.fillRect(x - px(8), base - hh * 0.34, px(16), hh * 0.34);
+      break;
+    case 'Skyscraper':
+      ctx.rect(x - w / 2, base - hh, w, hh);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1b1a17';
+      for (let row = 0; row < 7; row += 1) {
+        for (let col = 0; col < 3; col += 1) {
+          if ((row * 3 + col) % 4 === 0) continue;
+          ctx.fillRect(x - w / 2 + px(6) + col * px(19), base - hh + px(10) + row * px(22), px(9), px(11));
+        }
+      }
+      break;
+    case 'Stadium':
+      ctx.ellipse(x, base, w * 0.62, hh, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#1b1a17';
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.62, base - hh * 0.35);
+      ctx.lineTo(x + w * 0.62, base - hh * 0.35);
+      ctx.stroke();
+      break;
+    default: // Mountain
+      ctx.moveTo(x - w * 0.7, base);
+      ctx.lineTo(x - w * 0.1, base - hh);
+      ctx.lineTo(x + w * 0.2, base - hh * 0.62);
+      ctx.lineTo(x + w * 0.45, base - hh * 0.82);
+      ctx.lineTo(x + w * 0.8, base);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+  }
+}
+
+function drawCannon() {
+  const x = screenX(CANNON.x);
+  const base = screenY(CANNON.y);
+  const rad = run.aim * Math.PI / 180;
+  const len = px(run.phase === 'aim' ? 46 : 42);
+  const thickness = px(12);
+
+  // stand
+  ctx.strokeStyle = '#1b1a17';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x - px(20), base + px(12));
+  ctx.lineTo(x, base - px(6));
+  ctx.lineTo(x + px(20), base + px(12));
+  ctx.stroke();
+  ctx.fillStyle = '#dcd3c0';
+  ctx.beginPath();
+  ctx.ellipse(x, base + px(14), px(26), px(9), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // barrel
+  ctx.save();
+  ctx.translate(x, base);
+  ctx.rotate(-rad);
+  ctx.fillStyle = '#1b1a17';
+  ctx.fillRect(0, -thickness / 2, len, thickness);
+  ctx.fillStyle = '#f4efe3';
+  ctx.fillRect(len - px(5), -thickness / 2, px(5), thickness);
+  ctx.strokeStyle = '#f4efe3';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px(6), -thickness / 2);
+  ctx.lineTo(px(6), thickness / 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // the chicken's head peeking out of the muzzle while aiming
+  if (run.phase === 'aim') {
+    const mx = x + Math.sin(rad) * (len - px(3));
+    const my = base - Math.cos(rad) * (len - px(3));
+    ctx.fillStyle = '#f4efe3';
+    ctx.strokeStyle = '#1b1a17';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(mx, my, px(9), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#b4622f';
+    ctx.beginPath();
+    ctx.moveTo(mx + px(7), my - px(3));
+    ctx.lineTo(mx + px(16), my);
+    ctx.lineTo(mx + px(7), my + px(3));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // aim guide
+  if (run.phase === 'aim' && !keys.held) {
+    ctx.strokeStyle = 'rgba(27, 26, 23, .22)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([px(4), px(6)]);
+    line(CANNON.x + Math.sin(rad) * 80, CANNON.y + Math.cos(rad) * 80,
+         CANNON.x + Math.sin(rad) * 190, CANNON.y + Math.cos(rad) * 190);
+    ctx.setLineDash([]);
+  }
+}
+
+function drawBird() {
+  if (run.phase === 'aim' || run.phase === 'idle') return;
+  const bird = run.bird;
+  const x = screenX(bird.x);
+  const y = screenY(bird.y);
+  const rad = bird.dir * Math.PI / 180;
+  const s = 2.6;
+  const burning = keys.held && run.phase === 'fly' && bird.fuel > 0;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-rad + Math.PI / 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#1b1a17';
+
+  // rocket, under her and sticking out past the tail
+  ctx.save();
+  ctx.fillStyle = '#dcd3c0';
+  ctx.beginPath();
+  ctx.moveTo(-7 * s, 10 * s);
+  ctx.lineTo(5 * s, 10 * s);
+  ctx.lineTo(9 * s, 16 * s);
+  ctx.lineTo(5 * s, 23 * s);
+  ctx.lineTo(-7 * s, 23 * s);
+  ctx.lineTo(-11 * s, 16 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#1b1a17';
+  ctx.fillRect(-6 * s, 14 * s, 4 * s, 5 * s);
+  if (burning) {
+    ctx.fillStyle = '#b4622f';
+    const flick = (10 + Math.random() * 9) * s * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(-11 * s, 13 * s);
+    ctx.lineTo(-11 * s - flick, 16.5 * s);
+    ctx.lineTo(-11 * s, 20 * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // tail
+  ctx.fillStyle = '#dcd3c0';
+  ctx.beginPath();
+  ctx.moveTo(-7 * s, 9 * s);
+  ctx.lineTo(0, 17 * s);
+  ctx.lineTo(7 * s, 9 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // body
+  ctx.fillStyle = '#f4efe3';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 12 * s, 14 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // wing
+  ctx.fillStyle = '#dcd3c0';
+  ctx.beginPath();
+  ctx.ellipse(7 * s, 2 * s, 5 * s, 8 * s, 0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // head
+  ctx.fillStyle = '#f4efe3';
+  ctx.beginPath();
+  ctx.arc(2 * s, -15 * s, 8 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // comb
+  ctx.fillStyle = '#b4622f';
+  ctx.beginPath();
+  ctx.moveTo(-3 * s, -22 * s);
+  ctx.lineTo(-1.5 * s, -27 * s);
+  ctx.lineTo(1.5 * s, -22.5 * s);
+  ctx.lineTo(4 * s, -26 * s);
+  ctx.lineTo(5 * s, -21.5 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  // beak and eye
+  ctx.beginPath();
+  ctx.moveTo(9 * s, -16 * s);
+  ctx.lineTo(16 * s, -13.5 * s);
+  ctx.lineTo(9 * s, -11 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1b1a17';
+  ctx.beginPath();
+  ctx.arc(5 * s, -17 * s, 1.6 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawHud() {
+  const s = stats();
+  const padding = px(12);
+  ctx.fillStyle = '#1b1a17';
+  ctx.font = '600 ' + px(9) + 'px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+
+  const metres = run.phase === 'aim' ? 0 : run.meters;
+  ctx.fillText(metres + ' M', padding, padding);
+  ctx.textAlign = 'center';
+  const alt = run.phase === 'aim' ? 0 : Math.max(0, Math.floor((run.bird.y + 120) / METRE));
+  ctx.fillText(alt + ' M UP', canvas.width / 2, padding);
+  ctx.textAlign = 'right';
+  ctx.fillText(moneyText(progress.money), canvas.width - padding, padding);
+
+  // fuel bar, top left under the distance
+  if (run.phase === 'fly') {
+    const barW = px(90), barH = px(4);
+    const ratio = Math.max(0, Math.min(1, run.bird.fuel / Math.max(1, s.fuel)));
+    ctx.strokeStyle = '#1b1a17';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(padding, padding + px(17), barW, barH);
+    ctx.fillStyle = '#b4622f';
+    ctx.fillRect(padding, padding + px(17), barW * ratio, barH);
+  }
+
+  if (run.phase === 'aim') {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6f6857';
+    ctx.font = '600 ' + px(8) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText(run.camOffset > 20 ? 'LOADING THE CANNON' : 'CLICK TO FIRE', canvas.width / 2, canvas.height - px(26));
+    ctx.fillText('HOLD TO USE THE ROCKET', canvas.width / 2, canvas.height - px(14));
+  }
+}
+
+function draw() {
+  const shake = run.shake;
+  ctx.save();
+  if (shake > 0.2) {
+    ctx.translate(px((Math.random() - 0.5) * shake), px((Math.random() - 0.5) * shake));
+  }
+  drawSky();
+  drawGround();
+  for (let i = OBSTACLES.length - 1; i >= 0; i -= 1) {
+    const at = OBSTACLES[i][2];
+    if (Math.abs(at - run.cam.x) < VIEW_W) drawObstacle(i);
+  }
+  if (scene.name === 'play') drawCannon();
+  drawBird();
+  ctx.restore();
+  drawHud();
+}
+
+// ---------------------------------------------------------------- loop
+let last = 0;
+function tick(now) {
+  const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+  last = now;
+  if (scene.name === 'play') step(dt);
+  draw();
+  requestAnimationFrame(tick);
+}
+
+// ---------------------------------------------------------------- shop
+function renderShop() {
+  $('shopMoney').textContent = moneyText(progress.money);
+  const list = $('shopList');
+  list.textContent = '';
+  UPGRADES.forEach((entry, index) => {
+    const cost = costOf(index);
+    const level = progress.levels[index];
+    const row = document.createElement('div');
+    row.className = 'item';
+
+    const left = document.createElement('div');
+    const name = document.createElement('p');
+    name.className = 'n';
+    name.innerHTML = '';
+    name.textContent = entry[0] + ' ';
+    const lv = document.createElement('span');
+    lv.className = 'lv';
+    lv.textContent = 'lv ' + level;
+    name.appendChild(lv);
+    const detail = document.createElement('p');
+    detail.className = 'd';
+    detail.textContent = entry[1].replace(/\s+/g, ' ') + ' ' + effectText(index);
+    left.appendChild(name);
+    left.appendChild(detail);
+
+    const right = document.createElement('div');
+    right.style.cssText = 'display:flex;align-items:center';
+    const price = document.createElement('span');
+    price.className = 'price';
+    price.textContent = moneyText(cost);
+    const buy = document.createElement('button');
+    buy.type = 'button';
+    buy.className = 'buy';
+    buy.textContent = 'Buy';
+    buy.disabled = progress.money < cost;
+    buy.onclick = () => {
+      if (progress.money < cost) return;
+      progress.money = Math.round((progress.money - cost) * 100) / 100;
+      progress.levels[index] += 1;
+      store.write(progress);
+      renderShop();
+    };
+    right.appendChild(price);
+    right.appendChild(buy);
+
+    row.appendChild(left);
+    row.appendChild(right);
+    list.appendChild(row);
+  });
+}
+
+function effectText(index) {
+  const s = stats();
+  switch (index) {
+    case 0: return 'Launch ' + s.launchPower + ' px/s.';
+    case 1: return 'Drag ' + (Math.round(s.drag * 100) / 100).toFixed(2) + '.';
+    case 2: return 'Tank ' + s.fuel + ' fuel.';
+    case 3: return 'Bounce ' + (Math.round(s.bounciness * 100) / 100) + '.';
+    case 4: return 'Payout x' + s.moneyGain + '.';
+    default: return 'Rocket ' + s.rocketPower + ' px/s².';
+  }
+}
+
+function hideCards() {
+  $('home').hidden = true;
+  $('over').hidden = true;
+  $('shop').hidden = true;
+}
+
+$('homePlay').onclick = () => enterPlay();
+$('homeShop').onclick = () => { renderShop(); $('shop').hidden = false; };
+$('shopDone').onclick = () => {
+  $('shop').hidden = true;
+  if (scene.name === 'home') $('home').hidden = false;
+  else if (run.phase === 'over') $('over').hidden = false;
+};
+$('overAgain').onclick = () => { hideCards(); resetRun(); };
+$('overShop').onclick = () => { renderShop(); $('shop').hidden = false; };
+
+function paintHome() {
+  $('homeBest').textContent = progress.best + ' m';
+  $('homeMoney').textContent = moneyText(progress.money);
+}
+
+// ---------------------------------------------------------------- resume
+const RESUME = window.__boredResume || null;
+
+function resumeLabel(state) {
+  return state.meters + ' m flown · ' + moneyText(progress.money) + ' in the till';
+}
+
+function resumeState() {
+  if (run.phase !== 'fly' || run.finished) return null;
+  if (!run.bird.x) return null;
+  return {
+    x: run.bird.x, y: run.bird.y, vx: run.bird.vx, vy: run.bird.vy,
+    dir: run.bird.dir, fuel: run.bird.fuel, maxAlt: run.bird.maxAlt,
+    camX: run.cam.x, camY: run.cam.y, cash: run.cash, smashed: run.smashed,
+    landed: run.landed, touched: run.touched, meters: run.meters
+  };
+}
+
+function applyResume(state) {
+  scene.name = 'play';
+  hideCards();
+  run.phase = 'fly';
+  run.started = true;
+  run.flying = true;
+  run.bird = {
+    x: state.x, y: state.y, vx: state.vx, vy: state.vy,
+    dir: state.dir, fuel: state.fuel, maxAlt: state.maxAlt
+  };
+  run.cam.x = state.camX;
+  run.cam.y = state.camY;
+  run.camOffset = 0;
+  run.cash = state.cash;
+  run.smashed = Array.isArray(state.smashed) ? state.smashed.slice(0, OBSTACLES.length) : OBSTACLES.map(() => false);
+  while (run.smashed.length < OBSTACLES.length) run.smashed.push(false);
+  run.landed = state.landed || 0;
+  run.touched = !!state.touched;
+  run.meters = state.meters || 0;
+  run.finished = false;
+  last = 0;
+}
+
+window.__boredSnapshot = () => ({
+  slug: 'ballistic-chickens',
+  meters: Math.max(0, Math.round(run.phase === 'aim' ? 0 : run.meters)),
+  height: run.phase === 'aim' || run.phase === 'idle' ? 0 : Math.max(0, Math.floor((run.bird.y + 120) / METRE)),
+  money: Math.round(progress.money),
+  finished: run.finished === true
+});
+
+// ---------------------------------------------------------------- boot
+paintHome();
+resetRun();
+run.phase = 'idle';
+if (RESUME) {
+  RESUME.arm(() => {
+    const state = resumeState();
+    return state ? { state, label: resumeLabel(state) } : null;
+  });
+  const saved = RESUME.read();
+  if (saved && saved.state) {
+    RESUME.ask(saved.label, () => { applyResume(saved.state); paintHome(); }, () => { RESUME.clear(); paintHome(); });
+  }
+}
+
+// Keep the canvas as large as its frame allows without letterboxing the card.
+function fit() {
+  const wide = window.innerWidth / Math.max(1, window.innerHeight) > 4 / 3;
+  frameEl.classList.toggle('bleed', !wide && window.innerWidth < 520);
+}
+window.addEventListener('resize', fit);
+fit();
+
+requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

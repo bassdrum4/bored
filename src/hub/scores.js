@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore("ballistic-chickens", "Ballistic Chickens", "m", { metric: "meters", when: snapshot => snapshot.finished === true }),
   // Crossword ranks the clock on the day's grid. Two archive puzzles are not
   // the same test — a random Wednesday is nothing like a Sunday — so only a
   // solved daily posts, and anything under a minute is not a solve. The clock
