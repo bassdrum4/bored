@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 779,
+  "count": 780,
   "newest": "2026-11-21",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5222cc8","date":"2026-11-21","author":"Daniel Lowe","subject":"feat: recover editable Getaway Shootout Unity source"},
   {"sha":"2c4d51a","date":"2026-11-21","author":"Daniel Lowe","subject":"ci: retry source recovery when its extraction tools change"},
   {"sha":"94a0a66","date":"2026-11-21","author":"Daniel Lowe","subject":"fix: distinguish decimal ternaries from optional chaining during Unity asm.js recovery"},
   {"sha":"1388294","date":"2026-11-21","author":"Daniel Lowe","subject":"chore: execute Getaway Shootout source recovery on GitHub Actions"},
