@@ -122,3 +122,32 @@ test('the vendored Construct 3 build is complete and stays offline', () => {
     .reduce((total, file) => total + fs.statSync(path.join(vendor, file)).size, 0);
   assert.ok(bytes < 4 * 1024 * 1024, 'the payload stays small enough to fetch on demand');
 });
+
+
+test('the recovered Construct event source round-trips and rebuilds a playable package', () => {
+  const { execFileSync } = require('node:child_process');
+  const os = require('node:os');
+  const script = path.join(root, 'src/prototypes/basket-random/decompile.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bored-basket-rebuild-'));
+  const destination = path.join(dir, 'basket-random');
+  try {
+    execFileSync(process.execPath, [script, '--check'], { cwd: root, timeout: 30000 });
+    execFileSync(process.execPath, [script, '--rebuild', destination], { cwd: root, timeout: 30000 });
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(path.join(destination, 'data.json'), 'utf8')),
+      JSON.parse(fs.readFileSync(path.join(vendor, 'data.json'), 'utf8')),
+      'extraction and rebuild must preserve all original Construct event data'
+    );
+    for (const file of ['scripts/main.js', 'scripts/c3runtime.js']) {
+      assert.deepEqual(fs.readFileSync(path.join(destination, file)), fs.readFileSync(path.join(vendor, file)));
+    }
+    assert.ok(fs.existsSync(path.join(destination, 'index.html')));
+    assert.ok(fs.existsSync(path.join(destination, 'box2d.wasm')));
+    const index = fs.readFileSync(path.join(root, 'src/prototypes/basket-random/source/INDEX.md'), 'utf8');
+    for (const name of ['gameEvent', 'bonusEvent', 'player1Event', 'player2Event']) {
+      assert.match(index, new RegExp(name));
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
