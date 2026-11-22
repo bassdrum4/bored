@@ -109,7 +109,7 @@ async function noOverflow(frame = page) {
 }
 
 test('the entry document loads the hub as modules from its own folder', () => {
-  assert.match(entry, /<script type="module" src="\.\/main\.js"><\/script>/, 'the hub is a module beside the page');
+  assert.match(entry, /<script type="module" src="\.\/main\.js(?:\?[^"]*)?"><\/script>/, 'the hub is a module beside the page');
   assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css">/, 'the stylesheet is a sibling file');
   assert.doesNotMatch(entry, /(?:src|href)="\/(?!\/)/, 'no root-absolute paths: the site is served under /bored/');
   const context = rules(['arcadeGame', 'nativeHTML']);
@@ -1788,21 +1788,28 @@ test('browser regressions', async t => {
     const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
-      // A sandboxed game (SANDBOXED_GAMES) has an opaque origin, so its window
-      // cannot be read from here by design; it is covered by its own test.
-      if (await page.$eval('#frame', frame => frame.hasAttribute('sandbox'))) { await close(); continue; }
-      // A populated iframe can still be the loading stand-in. Wait for the
-      // current document's title and seed, not a fixed delay or live metrics
-      // (some snapshot metrics are initialized only when a run starts).
-      await page.waitForFunction(() => {
-        const frame = document.querySelector('#frame');
-        const expected = new DOMParser().parseFromString(frame.srcdoc, 'text/html').title;
-        return frame.contentDocument?.title === expected && Number.isFinite(frame.contentWindow.__boredSeed?.seed);
-      });
-      const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
-      assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
-      seeds.add(seed.date + ':' + seed.seed);
-      await close();
+      try {
+        // A sandboxed game (SANDBOXED_GAMES) has an opaque origin, so its window
+        // cannot be read from here by design; it is covered by its own test.
+        if (await page.$eval('#frame', frame => frame.hasAttribute('sandbox'))) continue;
+        // A populated iframe can still be the loading stand-in. Wait for the
+        // current document's title and seed, not a fixed delay or live metrics
+        // (some snapshot metrics are initialized only when a run starts).
+        try {
+          await page.waitForFunction(() => {
+            const frame = document.querySelector('#frame');
+            const expected = new DOMParser().parseFromString(frame.srcdoc, 'text/html').title;
+            return frame.contentDocument?.title === expected && Number.isFinite(frame.contentWindow.__boredSeed?.seed);
+          });
+        } catch (error) {
+          throw new Error(slug + ' did not reach a seeded game document: ' + error.message);
+        }
+        const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
+        assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
+        seeds.add(seed.date + ':' + seed.seed);
+      } finally {
+        await close();
+      }
     }
     assert.equal(seeds.size, 1, 'every game receives the same daily seed');
     assert.deepEqual(errors, [], 'no uncaught JavaScript errors');
