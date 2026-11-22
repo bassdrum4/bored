@@ -206,7 +206,12 @@ function scan(src, onToken) {
     }
     const candidates = PUNCT_BY_FIRST.get(src[i]);
     let matched = null;
-    if (candidates) for (const p of candidates) if (src.startsWith(p, i)) { matched = p; break; }
+    if (candidates) for (const p of candidates) {
+      // '?.' cannot start optional chaining when followed by a decimal digit:
+      // Unity's minified `a?.1:b` means `a ? .1 : b`, not `a?. 1`.
+      if (p === '?.' && /[0-9]/.test(src[i + 2] || '')) continue;
+      if (src.startsWith(p, i)) { matched = p; break; }
+    }
     if (matched) { const start = i; i += matched.length; emitToken('punct', start, i); continue; }
     if (SINGLE.has(src[i])) { const start = i; i++; emitToken('punct', start, i); continue; }
     throw new Error(`unexpected character ${JSON.stringify(src[i])} at ${i}`);
