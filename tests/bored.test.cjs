@@ -1828,8 +1828,15 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => !document.querySelector('#player').hidden);
     assert.ok(await page.evaluate(() => FRESH_GAMES.includes(current)));
     await close();
-    await page.evaluate(day => { window.originalDailyDate ||= dailyDate; dailyDate = () => day; renderDaily(); }, dateFor('memory'));
-    await page.click('#daily-play');
+    // Open the daily challenge directly: this test measures the narrow layout,
+    // while the Daily Play button is exercised by the dedicated interaction tests.
+    await page.evaluate(day => {
+      window.originalDailyDate ||= dailyDate;
+      dailyDate = () => day;
+      renderDaily();
+      const challenge = dailyChallenge(day);
+      openGame(challenge.slug, challenge);
+    }, dateFor('memory'));
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelectorAll('.memory-card').length === 16);
     await noOverflow();
     const progress = await (await page.$('#challenge-progress')).boundingBox();
