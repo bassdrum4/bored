@@ -1,5 +1,5 @@
 import { backendReady, request, getHandle, hasIdentity, authErrorMessage, ANON_TOKEN } from './backend.js';
-import { LB_GAMES, accountStandings, rankPoints, bestValue, formatScore } from './scores.js';
+import { LB_GAMES, TRACKBOUND_PACE_ID, accountStandings, rankPoints, bestValue, formatScore } from './scores.js';
 import { dailyDate, dailyStreak } from '../daily.js';
 export function createLeaderboardView({ state, openGame, onBoard = () => {} }) {
 const $ = selector => document.querySelector(selector);
@@ -140,7 +140,14 @@ function renderLeaderboard() {
     score.textContent = row.points + ' pts';
     const open = state.lbOpenPlayer === key;
     button.setAttribute('aria-expanded', String(open));
-    button.onclick = () => { state.lbOpenPlayer = open ? '' : key; renderLeaderboard(); };
+    button.onclick = () => {
+      state.lbOpenPlayer = open ? '' : key;
+      renderLeaderboard();
+      // Only fetch the detailed records when a player actually opens a
+      // Trackbound entry; homepage and multiplayer never make this request.
+      if (!open && all.some(entry => entry.game === 'trackbound' &&
+          String(entry.handle || '').toLowerCase() === key)) void loadCareerDetails();
+    };
     const detail = element('ul', 'lb-breakdown');
     detail.hidden = !open;
     if (open) {
@@ -170,6 +177,33 @@ function renderLeaderboard() {
           const versus = element('span', 'lb-line-versus');
           versus.append('them ', element('b', '', formatScore(value, spec)), verdict);
           line.append(versus);
+        }
+        if (spec.id === 'trackbound') {
+          const pace = all.find(row => row.game === TRACKBOUND_PACE_ID &&
+            String(row.handle || '').toLowerCase() === key);
+          const detailsRow = (state.lbCache.get('career')?.rows || []).find(row =>
+            String(row.handle || '').toLowerCase() === key);
+          const records = Array.isArray(detailsRow?.records) ? detailsRow.records : [];
+          const basisPoints = Number(pace?.value);
+          const ready = Number.isInteger(basisPoints) && basisPoints > 0;
+          line.appendChild(element('span', 'lb-career-pace',
+            ready ? 'Career pace ' + (basisPoints / 100).toFixed(2) + '% of author · 15/15 tracks'
+              : 'Career pace pending · ' + (detailsRow ? records.length + '/15 tracks synced' : 'open the game to sync tracks')));
+          if (records.length) {
+            const details = element('details', 'lb-pace-details');
+            details.appendChild(element('summary', '', 'Best campaign times (' + records.length + '/15)'));
+            const times = element('ul', 'lb-pace-list');
+            for (const best of records) {
+              const ms = Number(best.ms);
+              const author = Number(best.author_ms);
+              if (!Number.isInteger(ms) || ms <= 0 || typeof best.name !== 'string') continue;
+              times.appendChild(element('li', '', best.name + ' · ' + (ms / 1000).toFixed(3) +
+                's' + (Number.isInteger(author) && author > 0
+                  ? ' / ' + (author / 1000).toFixed(3) + 's author' : '')));
+            }
+            details.appendChild(times);
+            line.appendChild(details);
+          }
         }
         const play = element('button', 'lb-play', 'Play');
         play.type = 'button';
@@ -252,6 +286,28 @@ function buddyImage(key) {
   img.width = 24; img.height = 24;
   img.loading = 'lazy';
   return img;
+}
+
+// Detailed times are intentionally lazy. The ordinary leaderboard view already
+// includes the tiny computed pace score, so landing on the homepage makes no
+// new network requests and existing multiplayer tests remain isolated.
+let careerLoading = null;
+async function loadCareerDetails() {
+  const cached = state.lbCache.get('career');
+  if (cached && Date.now() - cached.at < 60000) return;
+  if (careerLoading) return careerLoading;
+  careerLoading = (async () => {
+    try {
+      const rows = await request('/rest/v1/rpc/trackbound_campaign_board', {
+        method: 'POST', body: {}, token: ANON_TOKEN
+      });
+      state.lbCache.set('career', { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
+    } catch {
+      state.lbCache.set('career', { rows: [], at: Date.now() });
+    }
+    renderLeaderboard();
+  })();
+  try { await careerLoading; } finally { careerLoading = null; }
 }
 
 async function loadLeaderboard(force = false) {

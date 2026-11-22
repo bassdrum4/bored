@@ -12,7 +12,7 @@ function load(options) {
   const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
   const noop = () => {};
   const nodes = new Map();
-  const storage = new Map();
+  const storage = new Map((options && options.storage) || []);
   const glCalls = [];
   const previewCalls = [];
   const previewContext = new Proxy({}, {
@@ -342,6 +342,95 @@ test('Trackbound wall rides bank the surface without rolling the exit', () => {
   assert.ok(Math.abs(exit.y[1] - 1) < 0.001, 'the exit connector is level again');
   assert.ok(Math.abs(exit.y[0]) < 1e-9 && Math.abs(exit.y[2]) < 1e-9);
   assert.equal(T.trackFolds(track), false);
+});
+
+test('Trackbound shares only current official campaign records, never ghosts', async () => {
+  const probe = load();
+  const entries = probe.sandbox.__test.CAMPAIGN;
+  assert.equal(entries.length, 15, 'pace compares the fixed fifteen-track career');
+  const bests = Object.fromEntries(entries.map((entry, i) => [entry.id, {
+    ms: 12000 + i * 100, layout: probe.sandbox.__test.layoutOf(entry.blocks),
+    ghost: [[0, 0, 0], [1, 1, 1]]
+  }]));
+  bests[entries[1].id].layout = 'old|road'; // Changes to a course invalidate its record.
+  bests['community-track'] = { ms: 1234, layout: 'start|finish' };
+  const storage = new Map([['best', { key: 'best', value: bests }]]);
+  const page = load({ idb: storage });
+  await page.flush(); await page.flush();
+  const records = page.sandbox.__boredCareerRecords();
+  assert.equal(records.length, 14, 'only current official layouts qualify');
+  assert.equal(records.some(record => record.track === entries[1].id), false);
+  assert.equal(records.some(record => record.track === 'community-track'), false);
+  assert.equal(records[0].ms, 12000);
+  assert.equal(records[0].layout, probe.sandbox.__test.layoutOf(entries[0].blocks));
+  assert.equal(Object.keys(records[0]).sort().join(','), 'layout,ms,track',
+    'snapshots do not disclose ghosts or custom tracks');
+  assert.equal('careerRecords' in page.sandbox.__boredSnapshot(), false,
+    'ordinary analytics and daily snapshots stay small');
+});
+
+test('Trackbound never attributes an IndexedDB best to a different signed-in player', async () => {
+  const probe = load(), entry = probe.sandbox.__test.CAMPAIGN[0];
+  const layout = probe.sandbox.__test.layoutOf(entry.blocks);
+  const oldBests = { [entry.id]: { ms: 10300, layout } };
+  const idb = new Map([['best', { key: 'best', value: oldBests }]]);
+  const other = load({ idb, storage: new Map([['bored.player.active', 'user:other']]) });
+  await other.flush(); await other.flush();
+  assert.equal(other.sandbox.__boredCareerRecords().length, 0,
+    'another account does not inherit the previous browser user\'s time');
+  const mine = load({ idb, storage: new Map([
+    ['bored.player.active', 'user:mine'],
+    ['bored.trackbound.best', JSON.stringify({ [entry.id]: { ms: 14400, layout } })]
+  ]) });
+  await mine.flush(); await mine.flush();
+  assert.equal(mine.sandbox.__boredCareerRecords()[0].ms, 14400,
+    'the account-specific local mirror overrides the global IndexedDB record');
+  mine.storage.set('bored.player.active', 'user:someone-else');
+  assert.equal(mine.sandbox.__boredCareerRecords().length, 0,
+    'switching identity while a race is open disables its old records');
+});
+
+test('Trackbound career pace breaks verified ties without penalizing old scores', async () => {
+  const { accountStandings, TRACKBOUND_PACE_ID, LB_GAMES } =
+    await import('../src/hub/scores.js');
+  assert.ok(!LB_GAMES.some(game => game.id === TRACKBOUND_PACE_ID),
+    'pace is not an extra scored game');
+  const points = [
+    { game: 'trackbound', handle: 'Siv', value: 65 },
+    { game: 'trackbound', handle: 'Yo-Yo', value: 65 },
+    { game: 'trackbound', handle: 'Dnaiel', value: 60 }
+  ];
+  const old = accountStandings(points);
+  assert.equal(old.find(r => r.handle === 'Siv').points, 5);
+  assert.equal(old.find(r => r.handle === 'Yo-Yo').points, 5);
+  const partial = accountStandings([...points,
+    { game: TRACKBOUND_PACE_ID, handle: 'Siv', value: 9800 }]);
+  assert.equal(partial.find(r => r.handle === 'Siv').points, 5);
+  assert.equal(partial.find(r => r.handle === 'Yo-Yo').points, 5,
+    'a player without synchronized records keeps the tie');
+  const verified = accountStandings([...points,
+    { game: TRACKBOUND_PACE_ID, handle: 'Siv', value: 9800 },
+    { game: TRACKBOUND_PACE_ID, handle: 'Yo-Yo', value: 9600 }]);
+  assert.equal(verified.find(r => r.handle === 'Yo-Yo').points, 5,
+    'lower normalized career pace wins');
+  assert.equal(verified.find(r => r.handle === 'Siv').points, 4);
+  assert.equal(verified.find(r => r.handle === 'Dnaiel').points, 3,
+    'the next career tier keeps its place');
+  assert.equal(verified.find(r => r.handle === 'Siv').gamesPlayed, 1,
+    'pace does not count as an additional played game');
+  const { boardLeaders, boardTop } = await import('../src/hub/scores.js');
+  const withPace = [...points,
+    { game: TRACKBOUND_PACE_ID, handle: 'Siv', value: 9800 },
+    { game: TRACKBOUND_PACE_ID, handle: 'Yo-Yo', value: 9600 }];
+  assert.equal(boardLeaders(withPace).get('trackbound').handle, 'Yo-Yo',
+    'the library card names the pace winner');
+  assert.equal(boardTop(withPace, 'trackbound', 2)[0].handle, 'Yo-Yo',
+    'the game top three sorts by pace at equal career points');
+  assert.equal(boardLeaders([...points,
+    { game: TRACKBOUND_PACE_ID, handle: 'Siv', value: 9800 }
+  ]).get('trackbound').handles.length, 2,
+  'an old unsynced leader remains a co-leader');
+
 });
 
 test('Trackbound keeps bests, ghosts and medals in IndexedDB', async () => {

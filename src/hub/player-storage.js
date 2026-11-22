@@ -14,7 +14,7 @@ const EXACT = new Set([
 // `bored.resume.` is a game in progress, so it belongs to the player who left it:
 // switching accounts must not hand the next player a half-finished board.
 const isPlayerKey = key => EXACT.has(key) ||
-  ['bored.daily.', 'bored.high.', 'bored.best.', 'bored.synced.', 'bored.resume.'].some(prefix => key.startsWith(prefix));
+  ['bored.daily.', 'bored.high.', 'bored.best.', 'bored.synced.', 'bored.resume.', 'bored.trackbound.'].some(prefix => key.startsWith(prefix));
 
 export function capturePlayerSnapshot() {
   const snapshot = {};

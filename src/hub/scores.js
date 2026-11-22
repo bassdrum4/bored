@@ -7,6 +7,40 @@ import {
   backendReady, request, getSession, freshSession, scoreRules, rulesLoaded, loadRules, ensureProfile
 } from './backend.js';
 
+/* Extra Trackbound records are public leaderboard metadata, not another
+   scored game. They only break ties when everyone in the tied group has a
+   complete, layout-matched set of fifteen campaign records. */
+export const TRACKBOUND_PACE_ID = 'trackbound-career-pace';
+
+export function careerPaces(rows) {
+  const result = new Map();
+  for (const row of rows || []) {
+    if (row.game !== TRACKBOUND_PACE_ID) continue;
+    const key = String(row.handle || '').trim().toLowerCase();
+    const pace = Number(row.value);
+    if (key && Number.isInteger(pace) && pace > 0) result.set(key, pace);
+  }
+  return result;
+}
+
+function sortGameScores(rows, game, paceByPlayer) {
+  rows.sort((a, b) => (game.lower ? a.value - b.value : b.value - a.value) || a.key.localeCompare(b.key));
+  if (game.id !== 'trackbound') return new Set();
+  const tiebroken = new Set();
+  for (let start = 0; start < rows.length;) {
+    let end = start + 1;
+    while (end < rows.length && rows[end].value === rows[start].value) end++;
+    const group = rows.slice(start, end);
+    if (group.length > 1 && group.every(entry => paceByPlayer.has(entry.key))) {
+      group.sort((a, b) => paceByPlayer.get(a.key) - paceByPlayer.get(b.key) || a.key.localeCompare(b.key));
+      rows.splice(start, group.length, ...group);
+      for (const entry of group) tiebroken.add(entry.key);
+    }
+    start = end;
+  }
+  return tiebroken;
+}
+
 /* ── Ranking ───────────────────────────────────────────────────────────────── */
 
 /**
@@ -19,6 +53,7 @@ export const rankPoints = rank => RANK_WINDOW + 1 - rank;
 
 export function accountStandings(scores) {
   const accounts = new Map();
+  const paceByPlayer = careerPaces(scores);
   const scoresByGame = new Map(LB_GAMES.map(game => [game.id, []]));
   for (const row of scores) {
     const gameScores = scoresByGame.get(row.game);
@@ -32,14 +67,19 @@ export function accountStandings(scores) {
   }
   for (const game of LB_GAMES) {
     const rows = scoresByGame.get(game.id);
-    rows.sort((a, b) => (game.lower ? a.value - b.value : b.value - a.value) || a.key.localeCompare(b.key));
+    const tiebroken = sortGameScores(rows, game, paceByPlayer);
     let rank = 0;
     let previous = null;
+    let previousPace = null;
     for (let i = 0; i < rows.length; i++) {
-      if (previous !== rows[i].value) rank = i + 1;
-      previous = rows[i].value;
+      const current = rows[i];
+      const pace = tiebroken.has(current.key) ? paceByPlayer.get(current.key) : null;
+      if (previous !== current.value ||
+          (pace !== null && previousPace !== null && pace !== previousPace)) rank = i + 1;
+      previous = current.value;
+      previousPace = pace;
       if (rank > RANK_WINDOW) break;
-      const account = accounts.get(rows[i].key);
+      const account = accounts.get(current.key);
       account.points += rankPoints(rank);
       account.gamesRanked++;
       if (rank === 1) account.wins++;
@@ -320,6 +360,21 @@ export function boardLeaders(rows) {
       held.handles.sort((a, b) => a.localeCompare(b));
     }
   }
+  // A leaderboard-card co-leader is only a co-leader until the whole
+  // first-place group has verified career pace data. The same safeguard used
+  // by the overall ranking prevents an unsynced older account losing first.
+  const track = leaders.get('trackbound');
+  if (track?.handles.length > 1) {
+    const pace = new Map((rows || [])
+      .filter(row => row.game === 'trackbound-career-pace' &&
+        Number.isInteger(Number(row.value)) && Number(row.value) > 0)
+      .map(row => [String(row.handle || '').toLowerCase(), Number(row.value)]));
+    if (track.handles.every(handle => pace.has(handle.toLowerCase()))) {
+      const fastest = Math.min(...track.handles.map(handle => pace.get(handle.toLowerCase())));
+      track.handles = track.handles.filter(handle => pace.get(handle.toLowerCase()) === fastest);
+      track.handle = track.handles[0];
+    }
+  }
   return leaders;
 }
 
@@ -341,9 +396,23 @@ export function boardTop(rows, id, limit = 3) {
     const held = best.get(key);
     if (!held || (spec.lower ? value < held.value : value > held.value)) best.set(key, { handle, value });
   }
-  return [...best.values()]
-    .sort((a, b) => (spec.lower ? a.value - b.value : b.value - a.value) || a.handle.localeCompare(b.handle))
-    .slice(0, limit);
+  const ranked = [...best.values()]
+    .sort((a, b) => (spec.lower ? a.value - b.value : b.value - a.value) || a.handle.localeCompare(b.handle));
+  if (id === 'trackbound') {
+    const pace = careerPaces(rows);
+    for (let start = 0; start < ranked.length;) {
+      let end = start + 1;
+      while (end < ranked.length && ranked[end].value === ranked[start].value) end++;
+      const tied = ranked.slice(start, end);
+      if (tied.length > 1 && tied.every(entry => pace.has(entry.handle.toLowerCase()))) {
+        tied.sort((a, b) => pace.get(a.handle.toLowerCase()) - pace.get(b.handle.toLowerCase()) ||
+          a.handle.localeCompare(b.handle));
+        ranked.splice(start, tied.length, ...tied);
+      }
+      start = end;
+    }
+  }
+  return ranked.slice(0, limit);
 }
 
 /* ── Which boards the shared table can hold ───────────────────────────────── */
@@ -441,6 +510,57 @@ export function reportedValue(slug, snapshot) {
 }
 
 /* ── Syncing to the shared board ───────────────────────────────────────────── */
+
+// The game keeps full campaign bests in IndexedDB. Sync only a changed set,
+// once per signed-in account. Failed uploads retry after a short backoff;
+// another device's slower times cannot overwrite better published records.
+let careerSentKey = '';
+let careerPending = null;
+let careerInFlight = false;
+let careerFailedKey = '';
+let careerRetryAfter = 0;
+export function queueTrackboundCareer(records) {
+  const user = getSession()?.user?.id;
+  if (!backendReady() || !user || !Array.isArray(records)) return;
+  // The hub's player storage must match this account before local campaign
+  // records can be attributed to it on the public leaderboard.
+  try { if (localStorage.getItem('bored.player.active') !== 'user:' + user) return; }
+  catch { return; }
+  const clean = records.filter(record => record && /^[a-z0-9-]{2,30}$/.test(record.track) &&
+    Number.isInteger(record.ms) && record.ms > 0 && record.ms <= 1200000 &&
+    typeof record.layout === 'string' && record.layout.length > 0 && record.layout.length <= 400);
+  if (!clean.length || clean.length > 15) return;
+  const key = user + ':' + JSON.stringify(clean);
+  if (key === careerSentKey || key === careerPending?.key ||
+      (key === careerFailedKey && Date.now() < careerRetryAfter)) return;
+  careerPending = { key, user, records: clean };
+  if (!careerInFlight) void flushTrackboundCareer();
+}
+
+async function flushTrackboundCareer() {
+  careerInFlight = true;
+  try {
+    while (careerPending) {
+      const job = careerPending;
+      careerPending = null;
+      if (job.key === careerSentKey || getSession()?.user?.id !== job.user ||
+          !(await freshSession()) || getSession()?.user?.id !== job.user) continue;
+      try {
+        await request('/rest/v1/rpc/submit_trackbound_campaign', {
+          method: 'POST', body: { p_records: job.records }
+        });
+        careerSentKey = job.key;
+        careerFailedKey = '';
+        if (job.records.length === 15 && getSession()?.user?.id === job.user)
+          postedListener({ rows: [] }); // Refresh the separate pace data, not game scores.
+      } catch {
+        careerFailedKey = job.key;
+        careerRetryAfter = Date.now() + 30000;
+        break;
+      }
+    }
+  } finally { careerInFlight = false; }
+}
 
 let postedListener = () => {};
 
