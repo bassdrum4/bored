@@ -397,6 +397,19 @@ test('Trackbound career pace breaks verified ties without penalizing old scores'
     'the next career tier keeps its place');
   assert.equal(verified.find(r => r.handle === 'Siv').gamesPlayed, 1,
     'pace does not count as an additional played game');
+  const { boardLeaders, boardTop } = await import('../src/hub/scores.js');
+  const withPace = [...points,
+    { game: TRACKBOUND_PACE_ID, handle: 'Siv', value: 9800 },
+    { game: TRACKBOUND_PACE_ID, handle: 'Yo-Yo', value: 9600 }];
+  assert.equal(boardLeaders(withPace).get('trackbound').handle, 'Yo-Yo',
+    'the library card names the pace winner');
+  assert.equal(boardTop(withPace, 'trackbound', 2)[0].handle, 'Yo-Yo',
+    'the game top three sorts by pace at equal career points');
+  assert.equal(boardLeaders([...points,
+    { game: TRACKBOUND_PACE_ID, handle: 'Siv', value: 9800 }
+  ]).get('trackbound').handles.length, 2,
+  'an old unsynced leader remains a co-leader');
+
 });
 
 test('Trackbound keeps bests, ghosts and medals in IndexedDB', async () => {
