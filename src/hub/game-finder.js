@@ -186,6 +186,7 @@ export function createGameFinder({ openGame, track = () => {} }) {
     if (step) controls.append(button('← Back', 'finder-back', () => { step--; drawQuestion(); }));
     controls.append(el('span', 'finder-footnote', 'Pick the first answer that feels right.'));
     body.append(controls);
+    if (dialog.open) list.querySelector('.finder-option')?.focus();
   }
   function drawResults() {
     const results = recommendGames(answers, { exclude: excluded });
@@ -232,6 +233,7 @@ export function createGameFinder({ openGame, track = () => {} }) {
       drawQuestion();
     }));
     body.append(controls);
+    if (dialog.open) list.querySelector('.finder-play')?.focus();
   }
 
   opener.addEventListener('click', () => {
@@ -240,6 +242,7 @@ export function createGameFinder({ openGame, track = () => {} }) {
     track('library_action', { surface: 'library', action: 'open' });
     if (dialog.showModal) dialog.showModal();
     else dialog.setAttribute('open', '');
+    body.querySelector('.finder-option')?.focus();
   });
   $('game-finder-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
