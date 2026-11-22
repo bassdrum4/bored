@@ -483,6 +483,10 @@ const toLocal = (parent, worldPoint) => {
    blocked the game plays without saved data and never complains. */
 const DATA = 'bored.trackbound';
 const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, parkSwept: false, daily: {}, custom: [] };
+// The hub rotates trackbound.* local mirrors when an account changes. IndexedDB
+// remains a fast cache, but must not reassign the previous player's trophies.
+const PROFILE_DATA = new Set(['best', 'medals', 'freeplay', 'parkSwept', 'daily', 'custom']);
+let playerScope = null;
 let db = null;
 
 function persist(name) {
@@ -494,8 +498,10 @@ function persist(name) {
 }
 
 function startSaved(onLoaded) {
-  // Lift data a previous build kept in localStorage, then prefer what the
-  // database holds. Old obsolete layouts are still ignored.
+  // An authenticated Bored account already has its own localStorage mirror.
+  // Never restore personal records from the browser-wide IndexedDB cache over
+  // that mirror: another signed-in player may have used this browser.
+  try { playerScope = localStorage.getItem('bored.player.active') || null; } catch {}
   try {
     for (const name of ['best', 'medals', 'ghost', 'freeplay', 'parkSwept', 'daily', 'custom']) {
       const raw = localStorage.getItem(DATA + '.' + name);
@@ -524,7 +530,8 @@ function startSaved(onLoaded) {
       all.onsuccess = () => {
         for (const record of all.result || []) {
           if (record && typeof record.key === 'string' && record.key in saved &&
-              record.value !== undefined && record.value !== null) {
+              record.value !== undefined && record.value !== null &&
+              !(playerScope && PROFILE_DATA.has(record.key))) {
             saved[record.key] = record.value;
           }
         }
@@ -5022,13 +5029,18 @@ function nearestCenterline(point, track) {
 
 /* Only official campaign bests feed the pace comparison. Do not put this large
    record set in __boredSnapshot: snapshots also feed daily and analytics. */
-window.__boredCareerRecords = () => CAMPAIGN.flatMap(entry => {
+window.__boredCareerRecords = () => {
+  try {
+    if (playerScope && localStorage.getItem('bored.player.active') !== playerScope) return [];
+  } catch { return []; }
+  return CAMPAIGN.flatMap(entry => {
   const best = saved.best[entry.id];
   return best && Number.isInteger(best.ms) && best.ms > 0 &&
     best.layout === layoutOf(entry.blocks)
     ? [{ track: entry.id, ms: best.ms, layout: best.layout }]
     : [];
-});
+  });
+};
 
 /* ── what the hub reads ───────────────────────────────────────────────────── */
 window.__boredSnapshot = () => ({
