@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 817,
+  "count": 818,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4fcb004","date":"2026-11-22","author":"Daniel Lowe","subject":"ci: account for multiple Settings GameObjects across Unity scenes"},
   {"sha":"17f3b8e","date":"2026-11-22","author":"Daniel Lowe","subject":"test: require prominent Bored-owned loader that clears on Unity readiness"},
   {"sha":"bb5bf4d","date":"2026-11-22","author":"Daniel Lowe","subject":"ci: remove embedded App Store banner and verify visually before merging"},
   {"sha":"23421e1","date":"2026-11-22","author":"Daniel Lowe","subject":"feat: disable App Store title promotion in original Getaway Shootout Unity scene"},
