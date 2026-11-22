@@ -399,7 +399,8 @@ const SPRITE_DIR = CONTENT_DIR + "pokedoku/sprites/";
 const ITEM_DIR = CONTENT_DIR + "shotgun-roulette/items/";
 
 /* ── Rules ────────────────────────────────────────────────────────────── */
-const RULES = { hp: [2, 3, 4], maxItems: 8, minBet: 10, maxBet: 500, dailyCap: 3000, shadowForce: 0.2 };
+// shadowForce: the chance, each of Giratina's turns on Hard, that it vanishes (15%, from simShotgun tuning).
+const RULES = { hp: [2, 3, 4], maxItems: 8, minBet: 10, maxBet: 500, dailyCap: 3000, shadowForce: 0.15 };
 const MODES = {
   normal: { name: "Altered Giratina", forme: "Altered Forme", level: "Normal", pays: 1.8, sprite: 487 },
   hard: { name: "Origin Giratina", forme: "Origin Forme", level: "Hard", pays: 3, sprite: 10007 }
