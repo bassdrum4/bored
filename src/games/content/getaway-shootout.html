@@ -119,7 +119,33 @@
   window.__boredSnapshot = function () {
     return {slug:'getaway-shootout', started:started, loaded:loaded, finished:false};
   };
-  // The hub already handles Escape/close. Give gameplay keys to the canvas.
+  // This game is served as a normal same-origin iframe document instead of
+  // srcdoc so Unity can find its own executable. Preserve the hub shortcuts
+  // that srcdoc games normally receive from the launcher.
+  window.addEventListener('keydown', function (e) {
+    if (window.parent === window) return;
+    const t = e.target || {};
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      parent.postMessage({type:'bored:close'}, '*');
+      return;
+    }
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey &&
+        !t.isContentEditable && !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')) {
+      if (e.key === 'R' || e.key === 'r') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        parent.postMessage({type:'bored:restart'}, '*');
+      } else if (e.key === 'F' || e.key === 'f') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        parent.postMessage({type:'bored:fullscreen'}, '*');
+      }
+    }
+  }, true);
+  document.addEventListener('pointerdown', function () {
+    if (window.parent !== window) parent.postMessage({type:'bored:menuclose'}, '*');
+  }, true);
+  // Give gameplay keys to the canvas after any click.
   stage.addEventListener('pointerdown', function () {
     const canvas = stage.querySelector('canvas');
     if (canvas && canvas.focus) canvas.focus();
