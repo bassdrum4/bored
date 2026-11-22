@@ -23,6 +23,29 @@ indexed and editable here, as with Rooftop Snipers.
 - `patch-menu.py` — narrowly deactivate only unwanted external title/splash
   branding in the serialized scene, preserving game menu functionality
 
+## External branding removal
+
+`strip-branding.py` clears the pixels from the separate Unity Texture2D
+artworks `two_logo`, `two-logo-big`, `silvergames_logo_with_shadow-500x70`,
+`CrazyGamesLogo`, and `NeweichgamesSplash`. This is intentional: simply
+deactivating the `two_logo` GameObject broke the game startup, because the
+splash scene needs that object to remain active even when its art is invisible.
+
+The script preserves every original GameObject state, verifies each selected
+texture's alpha channel is entirely transparent, and checks that unrelated
+UnityWebData archive members remain byte-identical. The earlier menu cleanup
+keeps unnecessary third-party link and promo objects inactive.
+
+To reapply against an original copy of the game assets:
+
+```bash
+python -m pip install UnityPy==1.25.4 Pillow
+python src/prototypes/getaway-shootout/strip-branding.py
+```
+
+Only the visible in-game branding is removed: original creator attribution
+remains in this repository and the binary's authorship does not change.
+
 ## Editing the game
 
 From the repository root:
