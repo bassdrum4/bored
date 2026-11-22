@@ -1004,7 +1004,9 @@ const { renderAccount, openAuthDialog, initAccount } = createAccountUI({
   syncSharedScores, restorePlayerState
 });
 
-const { initFeedback } = createFeedbackUI();
+const { initFeedback, openFeedbackDialog } = createFeedbackUI({
+  onSent: game => { if (game === activeSlug) showHint('Feedback sent. Thanks.'); }
+});
 const { initAnnouncements } = createAnnouncementsUI({
   track: (kind, details) => analytics.track(kind, details)
 });
@@ -1061,7 +1063,11 @@ $('#duel-send').onclick = async () => {
   finally { send.disabled = false; }
 };
 $('#duel-cancel').onclick = () => hideDuelFinish();
-$('#resume').onclick = () => { closeMenu(); gameFrame.focus(); };
+$('#game-feedback').onclick = () => {
+  closeMenu();
+  const title = ORDER.find(([slug]) => slug === activeSlug)?.[1] || gameFrame.title || activeSlug;
+  openFeedbackDialog({ slug: activeSlug, title });
+};
 $('#restart').onclick = restartGame;
 $('#daily-play').onclick = () => {
   const challenge = dailyChallenge(challengeDate());
