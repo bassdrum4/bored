@@ -481,6 +481,52 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#player').hidden);
   });
 
+
+  await t.test('in-game feedback opens a dialog, tags the game, and keeps the game running', async () => {
+    await open('2048');
+    assert.equal(await page.$('#resume'), null, 'the old Resume menu action is gone');
+    await page.click('#menu-toggle');
+    await page.click('#game-feedback');
+    assert.equal(await page.$eval('#player-actions', el => el.hidden), true, 'opening feedback closes the waffle menu');
+    assert.equal(await page.$eval('#feedback-dialog', el => el.open), true, 'a modal appears above the game');
+    assert.match(await text(page, '#feedback-blurb'), /Feedback about 2048/);
+    await page.click('#feedback-cancel');
+    assert.equal(await page.$eval('#feedback-dialog', el => el.open), false);
+    assert.equal(await page.$eval('#player', el => el.hidden), false, 'cancel leaves the game open');
+
+    // Stub only the feedback POST: this verifies the submitted row without sending real feedback.
+    await page.evaluate(() => {
+      const fetchBeforeFeedbackTest = window.fetch;
+      window.__feedbackPosts = [];
+      window.fetch = (input, options) => {
+        if (String(input).includes('/rest/v1/feedback_entries') && options?.method === 'POST') {
+          window.__feedbackPosts.push(JSON.parse(options.body));
+          return Promise.resolve(new Response('', { status: 201 }));
+        }
+        return fetchBeforeFeedbackTest(input, options);
+      };
+      window.__restoreFeedbackFetch = () => { window.fetch = fetchBeforeFeedbackTest; };
+    });
+    try {
+      await page.click('#menu-toggle');
+      await page.click('#game-feedback');
+      await page.type('#feedback-text', 'A tile gets stuck after I move.');
+      await page.click('#feedback-submit');
+      await page.waitForFunction(() => !document.querySelector('#feedback-dialog').open);
+      const payload = await page.evaluate(() => window.__feedbackPosts.at(-1));
+      assert.equal(payload.kind, 'note');
+      assert.equal(payload.game, '2048', 'the analytics feedback queue knows which game was open');
+      assert.equal(payload.body, 'A tile gets stuck after I move.');
+      assert.equal(await page.$eval('#player', el => el.hidden), false);
+    } finally {
+      await page.evaluate(() => window.__restoreFeedbackFetch());
+    }
+    await close();
+    await page.click('#feedback-open');
+    assert.match(await text(page, '#feedback-blurb'), /Something broken\?/, 'general hub feedback is still general');
+    await page.click('#feedback-cancel');
+  });
+
   await t.test('overall ranking groups scores by account, respects lower-is-better and ties', async () => {
     const rankings = await page.evaluate(() => accountStandings([
       { game: '2048', handle: 'Ada', value: 300 },
@@ -509,7 +555,7 @@ test('browser regressions', async t => {
     await openTitle('tetris', 'Tetris');
     await page.click('#menu-toggle');
     assert.equal(await page.$('#fullscreen'), null);
-    await page.click('#resume');
+    await page.keyboard.press('Escape');
     await page.keyboard.down('Shift');
     await page.keyboard.press('F');
     await page.keyboard.up('Shift');
