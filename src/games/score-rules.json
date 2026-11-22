@@ -27,7 +27,7 @@
   "ballistic-chickens": {
     "label": "Metres flown in a finished run",
     "better": "high",
-    "max_value": 5000
+    "max_value": 100000
   },
   "block-blast": {
     "label": "Score",
