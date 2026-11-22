@@ -109,8 +109,8 @@ async function noOverflow(frame = page) {
 }
 
 test('the entry document loads the hub as modules from its own folder', () => {
-  assert.match(entry, /<script type="module" src="\.\/main\.js"><\/script>/, 'the hub is a module beside the page');
-  assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css">/, 'the stylesheet is a sibling file');
+  assert.match(entry, /<script type="module" src="\\.\\/main\\.js(?:\\?[^"]*)?"><\\/script>/, 'the hub is a module beside the page');
+  assert.match(entry, /<link rel="stylesheet" href="\\.\\/styles\\.css(?:\\?[^"]*)?">/, 'the stylesheet is a sibling file');
   assert.doesNotMatch(entry, /(?:src|href)="\/(?!\/)/, 'no root-absolute paths: the site is served under /bored/');
   const context = rules(['arcadeGame', 'nativeHTML']);
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
