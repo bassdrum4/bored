@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<rect width="640" height="360" fill="#25b8e8"/>
+<g fill="#e6faff"><rect x="56" y="48" width="42" height="19"/><rect x="98" y="54" width="31" height="13"/><rect x="482" y="65" width="53" height="17"/><rect x="535" y="72" width="24" height="10"/></g>
+<g fill="#9ebdc7"><rect x="44" y="178" width="74" height="109"/><rect x="132" y="151" width="53" height="136"/><rect x="198" y="184" width="67" height="103"/><rect x="426" y="157" width="62" height="130"/><rect x="503" y="182" width="80" height="105"/></g>
+<rect y="287" width="640" height="73" fill="#8e9492"/><rect y="287" width="640" height="12" fill="#edf2ef"/>
+<g stroke="#161a1b" stroke-width="4"><path d="M0 286h640"/><path d="M0 312h640" stroke="#c1c4c0" stroke-width="2" stroke-dasharray="18 18"/></g>
+<g stroke="#171f20" stroke-width="4">
+<g transform="translate(192 235) rotate(-17)"><rect x="-17" y="-18" width="34" height="31" fill="#f2d0a0"/><rect x="-14" y="13" width="28" height="30" fill="#f7f8f0"/><rect x="-13" y="43" width="11" height="19" fill="#3556a2"/><rect x="3" y="43" width="11" height="19" fill="#3556a2"/><path d="M-18 20l-24 3M18 20l26 -7" fill="none"/><rect x="5" y="-5" width="4" height="4" stroke="none" fill="#171f20"/></g>
+<g transform="translate(380 233) rotate(15)"><rect x="-17" y="-18" width="34" height="31" fill="#edc79a"/><rect x="-14" y="13" width="28" height="30" fill="#373737"/><rect x="-13" y="43" width="11" height="19" fill="#242424"/><rect x="3" y="43" width="11" height="19" fill="#242424"/><path d="M-18 20l-24 3M18 20l20 -16" fill="none"/><rect x="-7" y="-5" width="4" height="4" stroke="none" fill="#171f20"/></g>
+</g>
+<g font-family="system-ui,sans-serif" font-size="36" font-weight="900" fill="#fff" stroke="#121e20" stroke-width="8" paint-order="stroke fill" text-anchor="middle"><text x="320" y="89">GETAWAY</text><text x="320" y="132">SHOOTOUT</text></g>
+</svg>

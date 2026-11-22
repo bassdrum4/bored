@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Getaway Shootout</title>
+<meta name="theme-color" content="#25b8e8">
+<link rel="icon" href="data:,">
+<!-- New Eich Games' Getaway Shootout. Bored's plain shell intentionally omits
+     the third-party portal's advertising, branding script and external links.
+     Game data is still the original Unity build, loaded from a pinned CDN mirror.
+     The Unity runtime must initialize before the actual game menu appears. -->
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#202e35}
+  body{font:12px/1.4 system-ui,sans-serif;touch-action:none}
+  #gameContainer{width:100%;height:100%;height:100dvh;overflow:hidden;position:relative}
+  #gameContainer canvas{width:100%!important;height:100%!important;display:block;outline:none}
+  /* No second start screen, Unity splash, progress bar, loader logo or
+     portal controls. Keep the stage visible throughout initialization. */
+  #gameContainer .logo,#gameContainer .progress,#gameContainer .spinner,
+  #gameContainer .fullscreen,#gameContainer .webgl-logo,
+  #gameContainer .footer,#gameContainer .unity-logo,
+  #gameContainer #unity-logo,#gameContainer #unity-progress-bar-empty,
+  #gameContainer #unity-loading-bar{display:none!important}
+  #status{position:absolute;top:10px;left:10px;z-index:10;
+    padding:4px 7px;background:#202e35d9;color:#f0f5f8;
+    font:11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+    pointer-events:none}
+  #status[hidden]{display:none}
+  #error{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    padding:18px;background:#202e35;color:#fff;text-align:center;font-size:14px}
+  #error.visible{display:flex}
+</style>
+<script src="https://cdn.jsdelivr.net/gh/mamayaya1/game@f3a882424a8f28d07bdf456b251d889725c4c1e4/projects/getaway-shootout/Build/UnityLoader.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="gameContainer" role="application" aria-label="Getaway Shootout game"></div>
+<div id="status" role="status" aria-live="polite">Starting game…</div>
+<div id="error" role="alert">This game needs WebGL and an internet connection to load its Unity assets.</div>
+<script>
+'use strict';
+(function () {
+  const stage = document.getElementById('gameContainer');
+  const status = document.getElementById('status');
+  const error = document.getElementById('error');
+  const base = 'https://cdn.jsdelivr.net/gh/mamayaya1/game@f3a882424a8f28d07bdf456b251d889725c4c1e4/projects/getaway-shootout';
+  let started = false, loaded = false;
+
+  // The mirrored portal's script is NOT loaded. Prevent in-game calls to
+  // external promotional URLs from opening new tabs.
+  window.open = function () { return null; };
+
+  // Use an in-memory Unity manifest so this complete document works unchanged
+  // when Bored loads it via srcdoc or when opened directly as a standalone page.
+  const config = {
+    companyName: 'Michael Eichler',
+    productName: 'Getaway Shootout',
+    dataUrl: base + '/unity/GetawayShootout.data.unityweb',
+    asmCodeUrl: base + '/unity/GetawayShootout.asm.code.unityweb',
+    asmMemoryUrl: base + '/unity/GetawayShootout.asm.memory.unityweb',
+    asmFrameworkUrl: base + '/unity/GetawayShootout.asm.framework.unityweb',
+    TOTAL_MEMORY: 268435456,
+    graphicsAPI: ['WebGL 2.0', 'WebGL 1.0'],
+    webglContextAttributes: { preserveDrawingBuffer: false },
+    splashScreenStyle: 'Dark',
+    backgroundColor: '#202e35'
+  };
+
+  function fail() { status.hidden = true; error.classList.add('visible'); }
+  function boot() {
+    if (started) return;
+    started = true;
+    if (!window.UnityLoader || typeof UnityLoader.instantiate !== 'function') {
+      fail(); return;
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(config)], {type:'application/json'}));
+      UnityLoader.instantiate('gameContainer', url, {
+        width: Math.max(320, innerWidth),
+        height: Math.max(240, innerHeight),
+        onProgress: function (game, progress) {
+          if (progress >= 1) { loaded = true; status.hidden = true; }
+          else status.textContent = 'Starting game… ' + Math.round(progress * 100) + '%';
+        }
+      });
+    } catch (err) {
+      console.error('Getaway Shootout failed to initialize', err);
+      fail();
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});
+  else boot();
+
+  window.__boredSnapshot = function () {
+    return {slug:'getaway-shootout', started:started, loaded:loaded, finished:false};
+  };
+  // The hub already handles Escape/close. Give gameplay keys to the canvas.
+  stage.addEventListener('pointerdown', function () {
+    const canvas = stage.querySelector('canvas');
+    if (canvas && canvas.focus) canvas.focus();
+  });
+}());
+</script>
+</body>
+</html>
