@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 847,
+  "count": 849,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"80972ea","date":"2026-11-22","author":"Daniel Lowe","subject":"Correct regex escaping in cache-busting test"},
+  {"sha":"2309fab","date":"2026-11-22","author":"Daniel Lowe","subject":"Let smoke test accept cache-busted CSS and JS URLs"},
   {"sha":"9b641da","date":"2026-11-22","author":"Daniel Lowe","subject":"Add optional Find My Game survey to homepage","pr":294},
   {"sha":"ca2b9c6","date":"2026-11-22","author":"Claude","subject":"Shotgun Roulette: Giratina balance pass, smarter AI, and simShotgun"},
   {"sha":"884b354","date":"2026-11-22","author":"Claude","subject":"Shotgun Roulette: card art, 8 item boxes a side, pixel shells, new load"},
