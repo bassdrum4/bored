@@ -36,7 +36,7 @@ async function run(name,original=false){
     page.on('console',m=>{if(m.type()==='error'||m.type()==='warning')msgs.push(m.text().slice(0,300))});
     await page.setRequestInterception(true);
     page.on('request',req=>{
-      if(original && req.url().endsWith('/GetawayShootout.data.unityweb')){
+      if(original && new URL(req.url()).pathname.endsWith('/GetawayShootout.data.unityweb')){
         return req.respond({status:200,contentType:'application/octet-stream',
           body:fs.readFileSync(baseline)});
       }
