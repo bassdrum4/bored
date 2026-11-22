@@ -354,6 +354,12 @@ test('browser regressions', async t => {
       // Public, but still an opaque origin: it cannot read the session or the wallet.
       assert.equal(await page.$eval('#frame', el => el.getAttribute('sandbox')), 'allow-scripts');
       assert.equal(await page.evaluate(() => window.current), 'shotgun-roulette');
+      // The Collector's casino door: today's net against the cap, and the way back to Poké Gacha.
+      assert.deepEqual(await page.evaluate(() => window.__boredGacha.casino.today()), { net: 0, cap: 3000 });
+      await page.evaluate(() => { const f = document.querySelector('#frame'); window.dispatchEvent(new MessageEvent('message', { data: { type: 'bored:open-game', slug: 'chess' }, source: f.contentWindow })); });
+      assert.equal(await page.evaluate(() => window.current), 'shotgun-roulette', 'only Poké Gacha is a door');
+      await page.evaluate(() => { const f = document.querySelector('#frame'); window.dispatchEvent(new MessageEvent('message', { data: { type: 'bored:open-game', slug: 'poke-gacha' }, source: f.contentWindow })); });
+      await page.waitForFunction(() => window.current === 'poke-gacha');
     } finally {
       await page.evaluate(() => closeGame({ force: true }));
     }
