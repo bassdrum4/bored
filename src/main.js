@@ -312,7 +312,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     // Keep this exception narrow: all other catalog games retain the normal
     // document injection, saving and analytics bridges.
     gameFrame.removeAttribute('srcdoc');
-    gameFrame.src = external || new URL('./games/content/getaway-shootout.html', document.baseURI).href;
+    gameFrame.src = external || new URL('./games/content/getaway-shootout.html?bored-build=20261122-startup-restored-v2', document.baseURI).href;
     showHint(external ? 'Internet required · use All games to return' :
       'Getaway Shootout · Esc leaves · Shift+R restarts');
   } else {
