@@ -13,7 +13,7 @@ import {
 import {
   LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
   isLocalOnly, bestValue, formatScore, recordBest, scoreValue, reportedValue, boardsOn,
-  syncScores, onScoresPosted, boardLeaders
+  syncScores, onScoresPosted, boardLeaders, queueTrackboundCareer
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
 import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
@@ -563,6 +563,12 @@ function captureBest({ leaving = false } = {}) {
   if (!activeSlug || playerPanel.hidden) return false;
   const snapshot = snapshotFor(activeSlug);
   if (!snapshot) return false;
+  // Campaign records are separate from the ordinary (small) snapshot; do not
+  // send ghosts, course layouts or fifteen records through analytics/dailies.
+  if (activeSlug === 'trackbound' && hasIdentity()) {
+    try { queueTrackboundCareer(gameFrame.contentWindow.__boredCareerRecords?.()); }
+    catch { /* The racer and the normal career score still work. */ }
+  }
   // A page can feed more than one board (Poké Idle's Battle Tower); its own comes first.
   let improved = false, claimed = false;
   for (const board of boardsOn(activeSlug)) {
