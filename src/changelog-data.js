@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 854,
+  "count": 855,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"80e36d6","date":"2026-11-22","author":"PenguinV360","subject":"Shotgun Roulette: Shadow Force 20% -> 15% on Hard","pr":297},
   {"sha":"a4cec4a","date":"2026-11-22","author":"PenguinV360","subject":"Shotgun Roulette: fixes from a Hard test log","pr":296},
   {"sha":"4f2e516","date":"2026-11-22","author":"Daniel Lowe","subject":"Replace in-game Resume menu action with feedback dialog","pr":293},
   {"sha":"a756350","date":"2026-11-22","author":"Daniel Lowe","subject":"Fix Supabase contention regression and redundant API writes"},
