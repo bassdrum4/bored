@@ -64,7 +64,8 @@ async function run(name,original=false){
     }
     console.log(JSON.stringify({name,steps,errors,msgs:msgs.slice(-10),remote},null,2));
     assert.deepEqual(errors,[],name+' page errors');
-    assert.ok(remote.every(url => /^https:\/\/(?:config\.uca\.cloud\.unity3d\.com|cdp\.cloud\.unity3d\.com)\//.test(url)),\n      name+' unexpected external requests: '+JSON.stringify(remote));
+    assert.ok(remote.every(url => /^https:\/\/(?:config\.uca\.cloud\.unity3d\.com|cdp\.cloud\.unity3d\.com)\//.test(url)),
+      name+' unexpected external requests: '+JSON.stringify(remote));
     return steps;
   }finally{try{await browser?.close()}finally{await site.close()}}
 }
