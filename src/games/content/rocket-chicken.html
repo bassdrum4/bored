@@ -48,6 +48,13 @@
     background: rgba(43, 38, 32, .22); line-height: 1.5; z-index: 4;
   }
   #panel[hidden] { display: none }
+  #shopBtn {
+    position: absolute; right: 10px; bottom: 10px; z-index: 2;
+    font: 600 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    padding: 6px 8px; background: var(--board); border: 1px solid var(--hair);
+    border-radius: 2px; color: var(--ink); cursor: pointer; opacity: .8;
+  }
+  #shopBtn:hover { opacity: 1 }
   #card {
     background: var(--board); border: 1px solid var(--hair); border-radius: 3px;
     padding: 14px 16px 12px; width: min(560px, 100%); max-height: 100%; overflow: auto;
@@ -88,6 +95,7 @@
   <div id="stage">
     <canvas id="board" width="800" height="480" aria-label="Rocket Chicken"></canvas>
     <div id="hudLine"><span id="hudScore">0 FT</span><span id="hudCash">$0</span></div>
+    <button id="shopBtn" type="button">Your bird</button>
     <div class="toast" id="toast"></div>
     <div id="panel" hidden><div id="card"></div></div>
   </div>
@@ -686,8 +694,16 @@ function drawBird() {
   ctx.fillRect(3, r - 2, 7, 4);
   if (run.hasRocket) {
     ctx.fillStyle = '#8d9a8f';
+    // A little rocket strapped under her: body, nose and a tail fin.
     ctx.beginPath();
-    ctx.rect(-16, 10, 30, 10);
+    ctx.moveTo(-16, 10);
+    ctx.lineTo(6, 10);
+    ctx.lineTo(14, 7);
+    ctx.lineTo(14, 22);
+    ctx.lineTo(6, 20);
+    ctx.lineTo(-16, 20);
+    ctx.lineTo(-23, 15);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = ACCENT;
@@ -887,9 +903,13 @@ function showCard(title, body, buttons) {
 function hideCard() { panel.hidden = true; card.innerHTML = ''; }
 
 function openStore() {
+  // "none" is a real choice for the head and the tail: it is what she flies
+  // with before anything is found, and it can always be put back on.
   const sections = [
-    ['rockets', 'Rockets', ROCKETS, (item) => item[0] === 'none' ? 'no rocket' : 'fuel ' + item[1] + ' \u00b7 power ' + item[3]],
-    ['helmets', 'Helmets', HELMETS, (item) => item[0] === 'none' ? 'bare head' : 'energy +' + Math.round(item[1] * 2.8) + ' \u00b7 guard ' + item[2]],
+    ['rockets', 'Rockets', [['none', 0, 0, 0, 0]].concat(ROCKETS),
+      (item) => item[0] === 'none' ? 'no rocket' : 'fuel ' + item[1] + ' \u00b7 power ' + item[3]],
+    ['helmets', 'Helmets', [['none', 0, 0, 0]].concat(HELMETS),
+      (item) => item[0] === 'none' ? 'bare head' : 'energy +' + Math.round(item[1] * 2.8) + ' \u00b7 guard ' + item[2]],
     ['belts', 'Belts', BELTS, (item) => 'guard ' + item[1] + ' \u00b7 weight ' + item[2]],
   ];
   card.innerHTML = '<div id="store"></div>';
@@ -955,8 +975,11 @@ function openStore() {
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'primary';
-  back.textContent = 'Kick again';
-  back.onclick = () => { hideCard(); resetRun(); };
+  back.textContent = phase === 'aim' ? 'Done' : 'Kick again';
+  back.onclick = () => {
+    hideCard();
+    if (phase === 'over') resetRun();
+  };
   row.appendChild(back);
   store.appendChild(row);
   panel.hidden = false;
@@ -1079,6 +1102,11 @@ function restoreRun(saved) {
   updateHud();
   return true;
 }
+
+document.getElementById('shopBtn').onclick = () => {
+  if (phase === 'fly') return;
+  openStore();
+};
 
 if (RESUME) {
   RESUME.arm(savedRun);
