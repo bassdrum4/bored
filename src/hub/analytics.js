@@ -115,7 +115,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   let checkedAccount = null, adminCheck = null, scopedReader = null;
   const scheduleFlush = () => {
     if (flushTimer) return;
-    flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 1200);
+    flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 3000);
   };
   const owner = () => getSession()?.user?.id || null;
   const suppressGame = game => scopedReader !== null && scopedReader.id === owner() &&
@@ -205,7 +205,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     });
     run.active = run.visible = 0;
     // Memory-only bounded retries; never leave private activity in shared-browser storage.
-    if (pending.length > 200) pending.splice(0, pending.length - 200);
+    // Keep all generated events until delivered; do not silently discard busy-session telemetry.
   }
   async function flush(keepalive = false) {
     if (busy || !pending.length || !canRecord()) return;
@@ -220,7 +220,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       if (user === undefined) return;
       const table = pending[0]._table === 'product_events' ? 'product_events' : 'play_events';
       const batch = pending.filter(event => event.user_id === user &&
-        (event._table === 'product_events' ? 'product_events' : 'play_events') === table).slice(0, 20);
+        (event._table === 'product_events' ? 'product_events' : 'play_events') === table).slice(0, 60);
       let token = ANON_TOKEN;
       if (user) {
         const fresh = await freshSession();
@@ -386,7 +386,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (Number.isInteger(payload?.step) && payload.step >= 0 && payload.step <= 100) details.step = payload.step;
     pending.push({ _table: 'product_events', id: uuid(), user_id: owner(),
       visitor_id: visitor, kind, game: safeGame, details });
-    if (pending.length > 200) pending.splice(0, pending.length - 200);
+    // Keep all generated events until delivered; do not silently discard busy-session telemetry.
     scheduleFlush();
   }
   track('visit');
