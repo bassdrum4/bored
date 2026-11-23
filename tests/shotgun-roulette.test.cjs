@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js',
   { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const roulette = moduleUnderTest('src/hub/roulette.js',
   ['ROULETTE', 'rouletteGames', 'rouletteWonOn', 'rouletteStreak', 'placeRouletteBet', 'settleRouletteWin'],
-  { ...daily, ...rewards, request: async () => [], freshSession: async () => null, hasIdentity: () => false, ANON_TOKEN: 'anon' });
+  { ...daily, ...rewards, request: async () => [], freshSession: async () => null, hasIdentity: () => false, ANON_TOKEN: 'anon', recordBest: () => false });
 const { placeRouletteBet, settleRouletteWin, rouletteWonOn, rouletteStreak, rouletteGames } = roulette;
 const { walletBalance, grantOnce } = rewards;
 

@@ -19,6 +19,7 @@
 import { readWallet, writeWallet, mergeWallet, walletBalance, spendFrom, grantOnce, claimDailyChips } from './rewards.js';
 import { dailyDate } from '../daily.js';
 import { request, freshSession, hasIdentity, ANON_TOKEN } from './backend.js';
+import { recordBest } from './scores.js';
 
 export const ROULETTE = Object.freeze({
   min: 10, max: 500, dailyCap: 3000,
@@ -176,6 +177,15 @@ export function createRouletteBridge({ onChange = () => {}, log = (...args) => c
               writeWallet(paid.wallet);
               try { onChange(); } catch {}
               ({ payout, profit, capped } = paid);
+              // The arcade's shared board, the same way every game posts a best:
+              // recordBest keeps it locally and syncs it to the scores table. The
+              // game frame is sandboxed, so its snapshot can't be read; the hub
+              // builds the snapshot from the profit it just paid, which only a
+              // real, won game produces. Test games never reach settle.
+              if (profit > 0) {
+                try { recordBest('shotgun-roulette', { slug: 'shotgun-roulette', profit, won: true, real: true, finished: true }); }
+                catch (error) { log('Shotgun Roulette: best not recorded.', error.message); }
+              }
             } else reason = paid.reason;
           }
         }
