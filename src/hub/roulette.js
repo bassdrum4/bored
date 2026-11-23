@@ -16,7 +16,7 @@
 //
 // The daily cap is on net profit: every payout that day less every bet that day,
 // so a loss makes room again and a run of wins cannot pass the cap by losing in between.
-import { readWallet, writeWallet, mergeWallet, walletBalance, spendFrom, grantOnce, claimDailyChips } from './rewards.js';
+import { readWallet, writeWallet, mergeWallet, walletBalance, spendFrom, grantOnce } from './rewards.js';
 import { dailyDate } from '../daily.js';
 import { request, freshSession, hasIdentity, ANON_TOKEN } from './backend.js';
 import { recordBest } from './scores.js';
@@ -132,7 +132,9 @@ export async function rouletteBoard(mode) {
  * Returns `handle(request) → Promise<reply>`. A win is only paid for a bet this
  * bridge placed in this page session, once, and no sooner than minGameMs after it.
  */
-export function createRouletteBridge({ onChange = () => {}, log = (...args) => console.log(...args) } = {}) {
+// `claims` (src/hub/claims.js) answers the table's claim buttons: the daily tokens,
+// the bailout and the Beginner's Package, the same claims the Collector shows.
+export function createRouletteBridge({ onChange = () => {}, claims = null, log = (...args) => console.log(...args) } = {}) {
   const open = new Map();
   const chips = () => walletBalance(readWallet()).chips || 0;
   // `coins` repeats the chip balance for a page from before chips; it is the same number.
@@ -141,19 +143,26 @@ export function createRouletteBridge({ onChange = () => {}, log = (...args) => c
     const won = rouletteWonOn(readWallet(), today);
     return { chips: chips(), coins: chips(), wonToday: won, capLeft: Math.max(0, ROULETTE.dailyCap - won) };
   };
-  // The day's login chips, for a player who comes straight to the table.
-  const login = () => {
-    const claimed = claimDailyChips(readWallet());
-    if (claimed.changed) { writeWallet(claimed.wallet); try { onChange(); } catch {} }
-  };
   const betSize = id => { const e = readWallet().entries[id]; const u = betUnit(e); return u ? -e.g[u] : 0; };
   const token = () => (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2)).toLowerCase();
 
   return async function handle(data = {}) {
     switch (data.op) {
       case 'status':
-        login();
         return { ok: true, ...status() };
+
+      // What the table can claim right now, and a claim. The daily tokens are a
+      // button now, never granted just for opening the table.
+      case 'rewards': {
+        if (!claims) return { ok: false, reason: 'op', ...status() };
+        const s = claims.state();
+        return { ok: true, signedIn: s.signedIn, daily: s.daily, bailout: s.bailout, beginner: { claimed: s.beginner.claimed }, ...status() };
+      }
+      case 'claim': {
+        if (!claims) return { ok: false, reason: 'op', ...status() };
+        const result = await claims.claim(data.kind, { species: data.species });
+        return { ...result, ...status() };
+      }
 
       case 'bet': {
         const placed = placeRouletteBet(readWallet(), data.mode, data.bet, { token: token() });

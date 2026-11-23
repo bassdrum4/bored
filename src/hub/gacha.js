@@ -710,16 +710,48 @@ export function lookFor(state, num) {
   return skinCovers(line.look, num) ? line.look : 'normal';
 }
 
-/** Three Regulars and the day's casino chips, once a day. */
+/** Three Regulars, once a day. The day's tokens are no longer granted here: the
+    player claims them with a button (src/hub/claims.js). */
 export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {}) {
   if (!mergeWallet(wallet).entries.on) return refuse(wallet, 'inactive');
-  const chips = claimDailyChips(wallet, { today, now });
-  const result = grantOnce(chips.wallet, 'gacha:login:' + today, LOGIN, { now });
+  const result = grantOnce(wallet, 'gacha:login:' + today, LOGIN, { now });
 
   // An account that picked its starter before the welcome pack existed gets it once, here.
   const welcome = result.wallet.entries['cfg:starter'] ? grantOnce(result.wallet, WELCOME_ID, WELCOME, { now }) : { wallet: result.wallet, changed: false };
-  return { wallet: welcome.wallet, ok: result.changed || chips.changed || welcome.changed, login: result.changed, chips: chips.changed ? CHIPS.login : 0,
+  return { wallet: welcome.wallet, ok: result.changed || welcome.changed, login: result.changed, chips: 0,
     welcome: welcome.changed ? { ...WELCOME } : null };
+}
+
+/* ── Beginner's Package and claims ───────────────────────────────────────
+   One time per account: CHIPS.beginner tokens and a starter of the player's
+   choice (any generation's grass, fire or water starter), straight into the
+   Full Dex, in one ledger entry so neither can land without the other. If the
+   player has no buddy yet, the starter becomes it. src/hub/claims.js records
+   the claim on the server first, so it can't be taken twice. */
+export const BEGINNER_ID = 'col:beginner';
+export function claimBeginner(wallet, species, { now = Date.now() } = {}) {
+  const next = mergeWallet(wallet);
+  if (next.entries[BEGINNER_ID]) return refuse(wallet, 'claimed');
+  if (!STARTERS.includes(species)) return refuse(wallet, 'unknown');
+  next.entries[BEGINNER_ID] = { at: seconds(now), g: { chips: CHIPS.beginner }, x: { s: species } };
+  let done = next;
+  if (!gachaState(next).buddy) {
+    const buddy = setBuddy(next, species, { now });
+    if (buddy.ok) done = buddy.wallet;
+  }
+  return { wallet: done, ok: true, species, tokens: CHIPS.beginner };
+}
+/** What can be claimed right now, from the wallet alone (the server has the final say). */
+export function rewardState(wallet, today = dailyDate()) {
+  const entries = mergeWallet(wallet).entries, tokens = walletBalance({ entries }).chips || 0;
+  const beginner = entries[BEGINNER_ID];
+  return {
+    tokens, rewards: CHIPS, starters: STARTERS.slice(),
+    beginner: beginner ? { claimed: true, species: object(beginner.x).s || null } : { claimed: false },
+    daily: { claimed: !!entries['chips:login:' + today], amount: CHIPS.login },
+    bailout: { claimed: !!entries['chips:bailout:' + today], amount: CHIPS.bailout, below: CHIPS.bailoutBelow,
+               open: tokens < CHIPS.bailoutBelow && !entries['chips:bailout:' + today] }
+  };
 }
 
 /* ── The Collector ───────────────────────────────────────────────────────
@@ -751,7 +783,8 @@ export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {
    Sets pay chips once (col:set:<id>) and show as badges on the Trainer card; 'all' is the
    Full Dex itself and has a badge of its own. */
 export const COLLECTOR = Object.freeze({
-  pull: 100, ten: 900, batch: 10,
+  // 60 tokens a pull, 600 for ten (was 100 and 900).
+  pull: 60, ten: 600, batch: 10,
   rates: [204, 44, 7, 1],
   pullDust: [5, 10, 25, 50],
   extra: [10, 25, 60, 150],
@@ -842,6 +875,8 @@ export function collectorCounts(entries) {
     if (buy) { const num = Number(buy[1]); if (validNum(num) && x.cb === num) at(num).n++; continue; }
     if (COL_DX.test(id) && Array.isArray(x.dx)) { for (const p of x.dx) if (Array.isArray(p) && validNum(p[0]) && Number.isInteger(p[1]) && p[1] > 0) at(p[0]).n -= p[1]; continue; }
     if (COL_TRADE.test(id)) { if (validNum(x.in)) { at(x.in).n++; if (x.sh === 1) at(x.in).shiny = true; } if (validNum(x.out)) at(x.out).n--; continue; }
+    // The Beginner's Package starter.
+    if (id === BEGINNER_ID) { if (validNum(x.s)) at(x.s).n++; continue; }
     const pull = COL_PULL.test(id) && readColPull(id, entry);
     if (pull) for (const m of pull.mons) { const c = at(m.species); c.n++; if (m.shiny) c.shiny = true; }
   }

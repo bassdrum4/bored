@@ -677,7 +677,7 @@ const name = num => G.dex[num - 1][0];
 const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (99). Hatch some first.", inactive: "Your wallet is not open yet.",
   candy: "Not enough candy.", shards: "Not enough shards.", owned: "Already done.", order: "Cut the cost by 1 first.", locked: "That look is not unlocked.",
   "not-owned": "You do not have that one yet.", coins: "Not enough coins.", limit: "That limit is used up for now.", cap: "At this form's level cap. Evolve it to raise the cap.",
-  chips: "Not enough chips. You get 300 a day, and Shotgun Roulette pays in chips.", dust: "Not enough dust. Duplicates from the Collector give it." };
+  chips: "Not enough tokens. Claim 300 every day, and Shotgun Roulette pays in tokens.", dust: "Not enough dust. Duplicates from the Collector give it." };
 
 /* ── The palette, and pixel art drawn at 2x from it ────────────────────── */
 const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", dim: "#807c9a", gold: "#e3ad2b", teal: "#3f9e8a", sky: "#8fd3e8" };
@@ -804,7 +804,7 @@ function lineCandy(line) {
 const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
 // Casino chips are the Item Drop sprite, Collector dust is Silver Powder (PokéRogue's items, cut
 // to their art), and the Collector itself is the owner's Pokédex in green. All at whole scales.
-const chipIcon = (scale = 1) => artImg("chip.png", [18, 16], scale, "chips");
+const chipIcon = (scale = 1) => artImg("chip.png", [18, 16], scale, "tokens");
 const dustIcon = (scale = 1) => artImg("dust.png", [22, 13], scale, "dust");
 const collectorArt = (scale = 6) => artImg("collector.png", [26, 24], scale, "The Collector");
 // Stage stars: the owner's 17x17 star at 1x, like the coin and the shard. Earned
@@ -1795,7 +1795,7 @@ function dexActions(line) {
   const who = skin ? (lineForms(line).filter(num => skinCovers(skin.id, num)).sort((a, b) => G.stageOf(b) - G.stageOf(a))[0] || skin.species) : tipOf(line);
   const can = S.owned.includes(who);
   const isBuddy = S.buddy && S.buddy.species === who && S.buddy.shiny === (l.look === "shiny") && (S.buddy.skin || null) === (skin ? skin.id : null);
-  list.push({ label: isBuddy ? "Your buddy" : "Make buddy", right: isBuddy ? [check(true)] : "", off: isBuddy || !can,
+  list.push({ label: isBuddy ? "Your buddy" : "Set as buddy", right: isBuddy ? [check(true)] : "", off: isBuddy || !can,
     about: can ? "Show " + name(who) + " next to your name on Bored and the leaderboard." : "Evolve into " + name(who) + " to show this skin as your buddy.",
     run: () => G.setBuddy({ species: who, shiny: l.look === "shiny", skin: skin ? skin.id : null }) });
   return list;
@@ -2194,8 +2194,8 @@ function cardUpdate() {
   $("#card-stats").replaceChildren(el("div", "title", "CARD"), ...rows);
   $("#card-stats").classList.toggle("col", !!CS);
   if (CS) $("#card-stats").append(badgeStrip());
-  say(b ? "Your buddy shows next to your name on Bored. Change it in the Dex: Enter on a line, then Make buddy."
-    : "Set a buddy in the Dex (Enter on a line, then Make buddy) to show it here and next to your name.");
+  say(b ? "Your buddy shows next to your name on Bored. Change it in the Dex: Enter on a line, then Set as buddy."
+    : "Set a buddy in the Dex (Enter on a line, then Set as buddy) to show it here and next to your name.");
 }
 // The Collector's set badges: the Full Dex first in gold, then the rest in the order they are listed.
 function badgeCode(set) {
@@ -2285,8 +2285,8 @@ function fullActions(num) {
     { label: CS.dust < price ? "Need " + price + " dust (you have " + CS.dust + ")" : "Buy for " + price + " dust", icon: dustIcon(), off: CS.dust < price,
       about: CS.dust < price ? "Every pull pays dust, and extras turn into dust in the Dust shop." : "Spend " + price + " dust on No. " + num + ".", run: () => G.collector.buy({ species: num }) },
     { label: CS.wish.includes(num) ? "Unstar (W)" : "Star for the wishlist (W)", about: "Starred: twice as likely in its tier, " + CS.wish.length + "/" + R.wish.max + " starred.", run: () => G.collector.wish({ species: num }) }];
-  const out = [{ label: "Make buddy", about: "Show " + name(num) + " on your card and next to your name.", run: () => G.setBuddy({ species: num }) }];
-  if (shiny) out.push({ label: "Make buddy (shiny)", about: "Show shiny " + name(num) + " as your buddy.", run: () => G.setBuddy({ species: num, shiny: true }) });
+  const out = [{ label: "Set as buddy", about: "Show " + name(num) + " on your card and next to your name.", run: () => G.setBuddy({ species: num }) }];
+  if (shiny) out.push({ label: "Set as buddy (shiny)", about: "Show shiny " + name(num) + " as your buddy.", run: () => G.setBuddy({ species: num, shiny: true }) });
   const extra = (CS.copies[num] || 1) - 1;
   if (extra) out.push({ label: "Dust " + extra + " extra (+" + extra * R.extra[G.collector.tierOf(num)] + ")", icon: dustIcon(), about: "Turn the extra copies into dust. One always stays.", run: () => G.collector.dustExtras({ species: num }) });
   return out;
@@ -2295,9 +2295,10 @@ function fullActions(num) {
 function colMenu() {
   const R = G.collector.rules;
   return [
-    { label: menuLine({ times: "x1", label: "1 Pull" }), icon: chipIcon(), right: [el("span", "num", R.pull)], off: CS.chips < R.pull, about: R.pull + " chips: 1 Pokémon for the Full Dex.", run: () => colPull(1) },
-    { label: menuLine({ times: "x10", label: "10 Pulls" }), icon: chipIcon(), right: [el("span", "num", R.ten)], off: CS.chips < R.ten, about: R.ten + " chips: 10 Pokémon, 1 Rare or better.", run: () => colPull(10) },
-    { label: "Get chips → Casino", off: !(G.casino && G.casino.open), about: "Shotgun Roulette pays chips, up to 3,000 a day net. Its ← Poké Gacha button comes back.", run: () => { G.casino.open(); return { ok: true, quiet: true }; } },
+    { label: menuLine({ times: "x1", label: "1 Pull" }), icon: chipIcon(), right: [el("span", "num", R.pull)], off: CS.chips < R.pull, about: R.pull + " tokens: 1 Pokémon for the Full Dex.", run: () => colPull(1) },
+    { label: menuLine({ times: "x10", label: "10 Pulls" }), icon: chipIcon(), right: [el("span", "num", R.ten)], off: CS.chips < R.ten, about: R.ten + " tokens: 10 Pokémon, 1 Rare or better.", run: () => colPull(10) },
+    ...claimRows(),
+    { label: "Get tokens → Casino", off: !(G.casino && G.casino.open), offSay: "The casino door needs the latest Bored.", about: "Shotgun Roulette pays tokens, up to 3,000 a day net. Its ← Poké Gacha button comes back.", run: () => { G.casino.open(); return { ok: true, quiet: true }; } },
     { label: "Rates · history (R, H)", about: "R: rates, pity and the dust each pull pays. H: your last pulls.", run: () => { colOver = "rates"; return { ok: true, quiet: true }; } },
     { label: "Trades (K)", off: !G.trades, about: "Trade Collector mons with other players: same rarity, a dust fee, 3 a day.", run: () => { openTrades(); return { ok: true, quiet: true }; } }
   ];
@@ -2361,6 +2362,30 @@ function fullDex(box) {
   box.replaceChildren(head, top, el("div", "sets", "Sets: " + (sets.join(" · ") || "—")), actBox);
   colSay(fullFocus === "acts" && acts[fullActAt] ? acts[fullActAt].about : "Arrows move · Enter: actions · W wishlist · / search");
 }
+// Claimable tokens (src/hub/claims.js, recorded per account): the day's tokens, and the
+// bailout while the balance is under its floor. They need an account.
+const CLAIM_REASONS = { signin: "Sign in to claim tokens.", claimed: "Already claimed. It comes back tomorrow.",
+  balance: "The bailout is only for a balance under 10.", server: "The claim didn't go through. Try again in a moment." };
+function claimRows() {
+  if (!G.claims) return [];
+  const st = G.claims.state(), d = st.daily, b = st.bailout;
+  if (!st.signedIn) return [{ label: "Claim " + d.amount + " daily tokens", icon: chipIcon(), off: true, offSay: CLAIM_REASONS.signin, about: CLAIM_REASONS.signin }];
+  const rows = [{ label: d.claimed ? "Daily tokens claimed" : "Claim " + d.amount + " daily tokens", icon: chipIcon(), off: d.claimed,
+    offSay: "Claimed today. " + d.amount + " more tomorrow.", about: d.claimed ? "Claimed today. " + d.amount + " more tomorrow." : "Free once a day: " + d.amount + " tokens.",
+    run: () => claimRow("daily") }];
+  if (b.open || b.claimed) rows.push({ label: b.claimed ? "Bailout claimed today" : "Bailout: " + b.amount + " tokens", icon: chipIcon(), off: !b.open,
+    offSay: "The bailout is once a day, under " + b.below + " tokens.", about: "Under " + b.below + " tokens? " + b.amount + " free, once a day.", run: () => claimRow("bailout") });
+  return rows;
+}
+function claimRow(kind) {
+  colSay("Claiming…");
+  G.claims.claim(kind).then(r => {
+    refreshTop();
+    colUpdate();
+    colSay(r.ok ? "+" + r.tokens + " tokens." : CLAIM_REASONS[r.reason] || "The claim didn't go through.");
+  });
+  return { ok: true, quiet: true };
+}
 function colMachine(box) {
   const menu = colMenu();
   if (colAt >= menu.length) colAt = menu.length - 1;
@@ -2370,7 +2395,7 @@ function colMachine(box) {
   const wrap = el("div"); wrap.id = "col-machine";
   const today = casinoToday();
   wrap.append(pic,
-    stat("Chips", el("span", "num", CS.chips), " ", chipIcon()),
+    stat("Tokens", el("span", "num", CS.chips), " ", chipIcon()),
     stat("Dust", el("span", "num", CS.dust), " ", dustIcon()),
     stat("Casino today", today ? el("span", "num", signed(today.net)) : el("span", "dim", "—"), el("span", "dim", " / " + (today ? today.cap : 3000).toLocaleString("en-US") + " net")));
   box.replaceChildren(wrap);
@@ -2378,7 +2403,7 @@ function colMachine(box) {
 }
 function runCol(item) {
   if (!item) return;
-  if (item.off) return colSay(item.label === "Get chips → Casino" ? "The casino door needs the latest Bored." : REASONS.chips);
+  if (item.off) return colSay(item.offSay || REASONS.chips);
   const r = item.run();
   if (r && r.quiet) return colUpdate();
 }
@@ -2455,7 +2480,7 @@ function runFull(action) {
   const r = action.run();
   refreshTop(); colUpdate();
   if (!r.ok) return colSay(REASONS[r.reason] || "Not now.");
-  const sets = (r.sets || []).map(st => st.name + " +" + st.chips + " chips").join(", ");
+  const sets = (r.sets || []).map(st => st.name + " +" + st.chips + " tokens").join(", ");
   colSay(r.dust && r.copies ? "+" + r.dust + " dust." : "Done." + (sets ? " Set complete: " + sets + "." : ""));
 }
 // Sets: the ones closest to done first, then the complete ones.
@@ -2468,9 +2493,9 @@ function fullSets(box) {
   const st = sets[setAt], def = G.collector.sets().find(x => x.id === st.id), have = new Set(CS.owned);
   const missing = def.nums.filter(n => !have.has(n)), minis = el("div", "minis");
   for (const n of missing.slice(0, 18)) minis.append(mini(n, "normal", true));
-  box.replaceChildren(el("div", "title", st.name.toUpperCase()), el("div", "", st.group + " · " + st.have + "/" + st.need + " · " + st.chips + " chips"),
+  box.replaceChildren(el("div", "title", st.name.toUpperCase()), el("div", "", st.group + " · " + st.have + "/" + st.need + " · " + st.chips + " tokens"),
     el("div", st.claimed ? "gold" : "dim", st.claimed ? "Complete: its badge is on your card." : missing.length + " to go" + (missing.length > 18 ? ", the first 18:" : ":")), minis, el("div", "gold", COL_NOTE));
-  colSay("Closest to done first. Each set pays chips once and gives a card badge.");
+  colSay("Closest to done first. Each set pays tokens once and gives a card badge.");
 }
 function shopRows() {
   const R = G.collector.rules, sh = R.shards, left = CS.shop.shardsLeft;
@@ -2608,7 +2633,8 @@ function colKey(e) {
     const menu = colMenu();
     if (k === "r" || k === "R") { e.preventDefault(); colOver = "rates"; return colUpdate(); }
     if (k === "h" || k === "H") { e.preventDefault(); colOver = "history"; return colUpdate(); }
-    if (k === "g" || k === "G") { e.preventDefault(); return runCol(menu[2]); }
+    // G is the casino door, found by its label: claim rows sit above it now.
+    if (k === "g" || k === "G") { e.preventDefault(); return runCol(menu.find(m => /Casino/.test(String(m.label)))); }
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); colAt = (colAt + (k === "ArrowUp" ? -1 : 1) + menu.length) % menu.length; return colUpdate(); }
     if (k === "Enter" || k === " ") { e.preventDefault(); return runCol(menu[colAt]); }
     return;
@@ -4480,11 +4506,11 @@ const TIPS = {
   // The first visit to the Collector: chips, pulls, the Full Dex against the TD Dex, dust, and sets.
   collector: () => [
     { at: () => tabBox("collector"), wiki: ["eggs", "collector"], text: "The Collector is its own game inside Poké Gacha: a dex of all 1025, apart from tower defense. Nothing here joins your squad, and the green tab is the reminder." },
-    { at: () => boxOf("#col-machine"), wiki: ["eggs", "collector"], text: "Chips pay for it: " + (G.collector ? G.collector.chipsPerDay : 300) + " every day you log in, plus whatever you win at the casino. Get chips → Casino opens Shotgun Roulette; winnings are capped at 3,000 a day, net of losses." },
-    { at: () => boxOf("#full-rows"), wiki: ["eggs", "collector"], text: "A pull is " + (G.collector ? G.collector.rules.pull : 100) + " chips (10 for " + (G.collector ? G.collector.rules.ten : 900) + ", with a Rare or better). Same rates and pity as eggs, and shinies 1 in 64." },
+    { at: () => boxOf("#col-machine"), wiki: ["eggs", "collector"], text: "Tokens pay for it: claim " + (G.collector ? G.collector.chipsPerDay : 300) + " every day, plus whatever you win at the casino. Get tokens → Casino opens Shotgun Roulette; winnings are capped at 3,000 a day, net of losses." },
+    { at: () => boxOf("#full-rows"), wiki: ["eggs", "collector"], text: "A pull is " + (G.collector ? G.collector.rules.pull : 60) + " tokens (10 for " + (G.collector ? G.collector.rules.ten : 600) + ", with a Rare or better). Same rates and pity as eggs, and shinies 1 in 64." },
     { at: () => boxOf("#full-keys"), wiki: ["eggs", "collector"], text: "Full Dex (D) is this collection, X/1025. Your Dex tab is your tower defense squad: hatched mons that fight. A Full Dex mon can still be your buddy." },
     { at: () => boxOf("#full-keys"), wiki: ["eggs", "collector"], text: "A duplicate pays dust. Dust buys any missing species (a Legendary costs " + (G.collector ? G.collector.rules.price[3] : 100) + ") or SP shards in the Dust shop (X), within its own weekly limit." },
-    { at: () => boxOf("#full-keys"), wiki: ["eggs", "collector"], text: "Sets (S): generations, types, starters, legends and families. Each pays chips once and puts a badge on your Trainer card; all 1025 is the gold one." }
+    { at: () => boxOf("#full-keys"), wiki: ["eggs", "collector"], text: "Sets (S): generations, types, starters, legends and families. Each pays tokens once and puts a badge on your Trainer card; all 1025 is the gold one." }
   ],
   eggs: () => [{ at: () => boxOf("#eggs-tray"), wiki: ["eggs", "hatch"], text: "Eggs hatch on waves: Poké Idle catches, Pokédoku boards and battle waves all count. Your first 10 eggs hatch at once." }],
   dex: () => [
@@ -4693,12 +4719,12 @@ function wikiEntries(page) {
       { id: "shiny", icon: null, label: "Shiny and SP", lines: ["Shiny: 1 in " + SHINY_IN.other + " per hatch, 1 in " + SHINY_IN.shiny + " on Shiny UP.", "SP skins: 1 in " + SP_IN + " on Shiny UP, or bought with shards."] },
       { id: "dupes", icon: shardIcon(), label: "Duplicates", lines: ["A hatch you already own still gives candy, plus shards: " + WIKI_HATCH.shards.slice(0, 4).join(" / ") + " by tier."] }
     ].concat(G && G.collector ? [{ id: "collector", icon: chipIcon(), label: "Collector", lines: [
-      "Its own tab: any of the 1025 for casino chips (" + G.collector.rules.pull + " a pull, " + G.collector.rules.ten + " for 10), straight into the Full Dex. It never unlocks tower defense.",
-      "Chips: " + G.collector.chipsPerDay + " a day for logging in, and Shotgun Roulette pays in chips. Same rates and pity as eggs, its own counters; shiny 1 in " + SHINY_IN.shiny + ".",
+      "Its own tab: any of the 1025 for tokens (" + G.collector.rules.pull + " a pull, " + G.collector.rules.ten + " for 10), straight into the Full Dex. It never unlocks tower defense.",
+      "Tokens: claim " + G.collector.chipsPerDay + " a day, and Shotgun Roulette pays in tokens. Same rates and pity as eggs, its own counters; shiny 1 in " + SHINY_IN.shiny + ".",
       "Every pull pays dust (" + G.collector.rules.pullDust.join(" / ") + " by tier) and dupes are kept; extras turn into dust (" + G.collector.rules.extra.join(" / ") + "), always keeping one.",
       "Dust buys a missing species (" + G.collector.rules.price.join(" / ") + ") or " + G.collector.rules.shards.shards + " shards for " + G.collector.rules.shards.dust + ", up to " + G.collector.rules.shards.perWeek + " a week. Star up to " + G.collector.rules.wish.max + " missing mons: each is " + G.collector.rules.wish.boost + "× as likely.",
-      "It is a collection only: nothing from the Collector joins your squad, and its chips and dust show only on its tab.",
-      "Sets (generations, types, starters, legends, families) pay chips once and give a badge on your card."] }] : []);
+      "It is a collection only: nothing from the Collector joins your squad, and its tokens and dust show only on its tab.",
+      "Sets (generations, types, starters, legends, families) pay tokens once and give a badge on your card."] }] : []);
   }
   return [];
 }
@@ -4796,7 +4822,7 @@ function refreshTop() {
     const canPull = id === "collector" && CS && CS.chips >= G.collector.rules.pull;
     if ((id === "eggs" && ready) || (id === "quests" && fresh) || canPull) {
       const d = mapCanvas("dot", { k: C.ink, 1: C.red }); d.classList.add("alert");
-      d.title = id === "eggs" ? "An egg is ready to hatch" : id === "collector" ? "You have chips for a pull" : "New rewards since you last looked";
+      d.title = id === "eggs" ? "An egg is ready to hatch" : id === "collector" ? "You have tokens for a pull" : "New rewards since you last looked";
       t.append(d);
     }
     t.dataset.tab = id;
@@ -4811,7 +4837,7 @@ function refreshTop() {
   const short = n => n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n);
   if (col) purse.append(el("span", "num", short(CS.chips)), chipIcon(), el("span", "num", short(CS.dust)), dustIcon());
   else purse.append(el("span", "num", S.balance.coins), coin(), el("span", "num", S.balance.shards), shardIcon());
-  purse.title = col ? "Casino chips and Collector dust" : "Coins and shards";
+  purse.title = col ? "Tokens and Collector dust" : "Coins and shards";
   $("#frame").classList.toggle("col", tab === "collector");
   // "?" and the gear share one small panel: tips for this screen, and Settings (sound, volume,
   // speed, effects, tutorials). M still turns the sound on and off anywhere.

@@ -178,6 +178,16 @@ dialog h2{font-family:var(--display);font-size:24px;font-weight:400;margin-botto
 .dialog-actions button{background:none;border:1px solid var(--rule);color:var(--ink);padding:8px 10px;font:11px var(--mono);cursor:pointer}
 .dialog-actions button[type="submit"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .dialog-actions button:disabled{opacity:.5;cursor:default}
+/* The Beginner's Package: 27 starters (every generation's grass, fire and water), pick one. */
+#beginner-dialog{max-width:min(520px,calc(100vw - 32px))}
+.starter-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px;margin:12px 0 8px}
+.starter-grid[hidden]{display:none}
+.starter-pick{display:grid;place-items:center;aspect-ratio:1;padding:0;border:1px solid var(--rule);background:none;cursor:pointer}
+.starter-pick img{width:100%;max-width:48px;aspect-ratio:1;height:auto;object-fit:contain;image-rendering:pixelated}
+.starter-pick:hover{border-color:var(--ink)}
+.starter-pick[aria-pressed="true"]{border-color:var(--ink);background:var(--chip)}
+.beginner-note{min-height:1.5em;color:var(--dim);font:12px var(--mono)}
+.dialog-actions button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .dialog-actions #auth-toggle{border:0;padding-left:0;color:var(--dim);text-decoration:underline}
 #feedback-blurb{font-size:13px;color:var(--dim);margin-bottom:14px}
 #feedback-form label{display:block;font:10.5px var(--mono);color:var(--dim);margin-bottom:12px}

@@ -265,10 +265,11 @@ test('the trophy list has every trophy with its progress, and an earned one show
   assert.equal(list.filter(t => t.done).length, walletTrophies(w).length, 'done matches the earned list');
 });
 
-test('casino chips: 300 a day once activated, once per day, and dust is its own balance', () => {
+test('daily tokens (the chips currency): 300 a day when claimed, once per day, and dust is its own balance', () => {
   const { claimDailyChips, CHIPS } = rewards;
   assert.equal(CHIPS.login, 300);
-  assert.equal(claimDailyChips({ v: 1, entries: {} }, { today: TODAY, now: NOW }).changed, false, 'nothing before activation');
+  // A claim button now, so a casino-only player can claim before Poké Gacha activates the wallet.
+  assert.equal(claimDailyChips({ v: 1, entries: {} }, { today: TODAY, now: NOW }).changed, true, 'claimable before activation');
   let w = activateWallet({ v: 1, entries: {} }, { today: TODAY, now: NOW }).wallet;
   const first = claimDailyChips(w, { today: TODAY, now: NOW });
   assert.equal(first.changed, true);

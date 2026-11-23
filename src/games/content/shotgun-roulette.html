@@ -168,6 +168,9 @@
   .corner.left { left: 76px }
   .corner.right { right: 22px }
   .corner .num { font: 600 15px var(--mono); color: var(--gold) }
+  .claims { display: flex; gap: 8px; align-items: center }
+  .claims .plain:disabled { opacity: .5; cursor: default }
+  .claims .plain.claim { border-color: var(--gold); color: var(--gold) }
   .plain { padding: 6px 12px; border: 1px solid #ffffff33; border-radius: 3px; background: #0008; cursor: pointer; font-size: 15px }
   .plain:hover { border-color: var(--ink) }
   .say { position: absolute; left: 50%; bottom: 16px; width: 440px; margin-left: -220px; text-align: center; font-style: italic; font-size: 18px;
@@ -352,7 +355,8 @@
     <main>
       <div class="corner left" style="position:static;margin:-48px 0 26px"><button class="plain" id="back" type="button">&#8249; Back to the arcade</button>
         <button class="plain" id="to-gacha" type="button">&#8592; Poké Gacha</button>
-        <span>Casino chips: <span class="num" id="coins">0</span></span></div>
+        <span>Tokens: <span class="num" id="coins">0</span></span>
+        <span class="claims" id="claims"></span></div>
       <h1 class="title">Shotgun Roulette</h1>
       <span class="reflection" aria-hidden="true">Shotgun Roulette</span>
       <p class="status">Take turns with Giratina pointing a shotgun at yourself or each other. Some shells are live, some are blank. Win two of three rounds.</p>
@@ -360,7 +364,7 @@
         <h2 id="opponents-title">Pick your opponent</h2>
         <div class="bet-row">
           <label for="bet">Your bet<input id="bet" type="number" min="10" max="500" step="10" value="50" inputmode="numeric"></label>
-          <span id="cap-line">Bets run from 10 to 500 chips. You can win up to 3,000 chips a day, net of losses.</span>
+          <span id="cap-line">Bets run from 10 to 500 tokens. You can win up to 3,000 tokens a day, net of losses.</span>
         </div>
         <div class="islands" role="group" aria-labelledby="opponents-title">
           <button class="island normal" type="button" data-mode="normal">
@@ -371,7 +375,7 @@
           </button>
           <div class="island test">
             <button class="island-test-start" id="test-start" type="button">
-              <span class="name">Test Game (no chips)</span>
+              <span class="name">Test Game (no tokens)</span>
               <span class="level">Plays the full game. No bet, no payout, no leaderboard.</span>
             </button>
             <div class="test-pick" role="radiogroup" aria-label="Test game difficulty">
@@ -520,12 +524,45 @@ function showCap(reply) {
   // The cap is on net profit, so a day can be below zero.
   const net = reply.wonToday, shown = (net < 0 ? "−" : "") + Math.abs(net).toLocaleString("en-US");
   $("#cap-line").textContent = reply.capLeft > 0
-    ? "Bets run from 10 to 500 chips. Today you're at " + shown + " net, of a 3,000-chip limit on winnings."
-    : "You're 3,000 chips up today, the daily limit. Test games are still open.";
+    ? "Bets run from 10 to 500 tokens. Today you're at " + shown + " net, of a 3,000-token limit on winnings."
+    : "You're 3,000 tokens up today, the daily limit. Test games are still open.";
+}
+// The claim buttons beside the balance: the day's tokens, and the bailout while under 10.
+// The hub records each claim on the account (src/hub/claims.js); they need an account.
+const CLAIM_SAY = { signin: "Sign in to claim tokens.", claimed: "Already claimed today.", balance: "The bailout is only for a balance under 10.",
+  server: "The claim didn't go through. Try again in a moment." };
+async function refreshRewards() {
+  const box = $("#claims"), reply = await ask("rewards");
+  if (!reply || !reply.ok) { box.replaceChildren(); return; }
+  setBalance(reply);
+  const button = (label, kind, off, title) => {
+    const b = el("button", "plain" + (off ? "" : " claim"), label);
+    b.type = "button";
+    b.disabled = off;
+    b.title = title;
+    if (!off) b.onclick = () => claimTokens(kind);
+    return b;
+  };
+  const d = reply.daily, bail = reply.bailout, rows = [];
+  if (!reply.signedIn) rows.push(button("Claim " + d.amount + " daily tokens", "daily", true, "Sign in to claim tokens."));
+  else {
+    rows.push(d.claimed ? button("Daily tokens claimed", "daily", true, d.amount + " more tomorrow.")
+      : button("Claim " + d.amount + " daily tokens", "daily", false, "Free once a day."));
+    if (bail.open) rows.push(button("Bailout: " + bail.amount + " tokens", "bailout", false, "Under " + bail.below + " tokens: " + bail.amount + " free, once a day."));
+  }
+  box.replaceChildren(...rows);
+}
+async function claimTokens(kind) {
+  for (const b of document.querySelectorAll("#claims button")) b.disabled = true;
+  const reply = await ask("claim", { kind }, 6000);
+  if (reply) setBalance(reply);
+  note(!reply ? "The arcade didn't answer. Try again." : reply.ok ? "+" + reply.tokens.toLocaleString("en-US") + " tokens." : CLAIM_SAY[reply.reason] || "The claim didn't go through.");
+  refreshRewards();
 }
 refreshCoins();
 refreshStatus();
-addEventListener("focus", () => { refreshCoins(); refreshStatus(); });
+refreshRewards();
+addEventListener("focus", () => { refreshCoins(); refreshStatus(); refreshRewards(); });
 
 /* ── Game state ───────────────────────────────────────────────────────── */
 let g = null, run = 0, lastStart = null;
@@ -713,10 +750,10 @@ function begin(mode, test, bet = 0, betId = null) {
   orbit.sync(0);
   $("#leave").textContent = "Leave table";
   $("#leave").dataset.confirm = "";
-  $("#mode-label").textContent = MODES[mode].name + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " chips");
+  $("#mode-label").textContent = MODES[mode].name + (test ? ", test game" : ", bet " + bet.toLocaleString("en-US") + " tokens");
   $("#dealer-img").src = SPRITE_DIR + MODES[mode].sprite + ".png";
   $("#dealer").classList.remove("away", "vanished");
-  log(test ? "Test game against " + MODES[mode].name + ". No chips are on the table." : "You bet " + bet.toLocaleString("en-US") + " chips against " + MODES[mode].name + ".", "you");
+  log(test ? "Test game against " + MODES[mode].name + ". No tokens are on the table." : "You bet " + bet.toLocaleString("en-US") + " tokens against " + MODES[mode].name + ".", "you");
   if (g.hard) log("Origin Giratina is in its own world: Shadow Force and the Griseous Orb are on.", "status");
   startRound();
 }
@@ -1096,21 +1133,21 @@ async function endGame(won, forfeit = false) {
   game.busy = true;
   render();
   let text;
-  if (game.test) text = "Test game. No chips moved and nothing went on the board.";
+  if (game.test) text = "Test game. No tokens moved and nothing went on the board.";
   else {
     const reply = await ask("settle", { betId: game.betId, mode: game.mode, won, forfeit });
     if (reply) showCap(reply);
     if (!reply || !reply.ok) {
       console.log("Shotgun Roulette: the arcade did not confirm this result.", reply && reply.reason);
-      text = !won ? "Your bet of " + game.bet.toLocaleString("en-US") + " chips is gone."
+      text = !won ? "Your bet of " + game.bet.toLocaleString("en-US") + " tokens is gone."
         : reply && reply.reason === "early" ? "That game finished too fast to pay out, so the bet is lost."
         : "The arcade didn't confirm the payout. Check your wallet in Poké Gacha.";
     } else {
       setBalance(reply);
       if (won && reply.profit > 0) game.profit = reply.profit;
       text = won
-        ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " chips" + (reply.capped ? ", trimmed to stay under the 3,000-chip daily limit." : ".")
-        : "Your bet of " + game.bet.toLocaleString("en-US") + " chips is gone.";
+        ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " tokens" + (reply.capped ? ", trimmed to stay under the 3,000-token daily limit." : ".")
+        : "Your bet of " + game.bet.toLocaleString("en-US") + " tokens is gone.";
       if (reply.streak != null) text += " " + MODES[game.mode].level + " win streak: " + reply.streak + ".";
     }
     loadBoard(game.mode);
@@ -1342,11 +1379,11 @@ $("#shoot-foe").onclick = () => { if (g && g.holding && !g.busy && !g.over) fire
 /* ── The lobby ────────────────────────────────────────────────────────── */
 const note = text => { $("#lobby-note").textContent = text; };
 const REFUSED = {
-  coins: "You don't have enough chips for that bet.",
-  chips: "You don't have enough chips for that bet. Poké Gacha gives 300 a day.",
-  cap: "You're 3,000 chips up today, the daily limit. Come back tomorrow, or play a test game.",
-  range: "Bets run from 10 to 500 chips.",
-  signin: "Sign in to bet chips."
+  coins: "You don't have enough tokens for that bet.",
+  chips: "You don't have enough tokens for that bet. Claim 300 a day up top.",
+  cap: "You're 3,000 tokens up today, the daily limit. Come back tomorrow, or play a test game.",
+  range: "Bets run from 10 to 500 tokens.",
+  signin: "Sign in to bet tokens."
 };
 async function startReal(mode, bet) {
   if (!(Number.isInteger(bet) && bet >= RULES.minBet && bet <= RULES.maxBet)) return note(REFUSED.range);
@@ -1355,9 +1392,9 @@ async function startReal(mode, bet) {
   for (const b of document.querySelectorAll(".islands button")) b.disabled = true;
   const reply = await ask("bet", { mode, bet });
   for (const b of document.querySelectorAll(".islands button")) b.disabled = false;
-  if (!reply) return note("Chip bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
+  if (!reply) return note("Token bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
   showCap(reply);
-  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your chips weren't touched.");
+  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your tokens weren't touched.");
   setBalance(reply);
   note("");
   begin(mode, false, bet, reply.betId);
@@ -1412,7 +1449,7 @@ let boardMode = "normal";
 function drawBoard(mode) {
   const panel = $("#board-" + mode), rows = boards[mode];
   const table = el("table", "board");
-  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net chips</th><th class="n">Best streak</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net tokens</th><th class="n">Best streak</th></tr></thead>';
   const body = document.createElement("tbody");
   for (let rank = 1; rank <= 10; rank++) {
     const row = body.insertRow(), entry = rows[rank - 1];
