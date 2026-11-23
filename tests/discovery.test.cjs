@@ -291,7 +291,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
     // backend has no recruits, so the board is empty and nobody has a code yet.
     if (url.pathname === '/rest/v1/recruiter_board') return reply([]);
     if (url.pathname === '/rest/v1/rpc/my_invite' || url.pathname === '/rest/v1/rpc/sync_invite') return reply(null);
-    if (url.pathname === '/rest/v1/announcements' || url.pathname === '/rest/v1/announcement_reads') return reply([]);
+    if (url.pathname === '/rest/v1/announcements' || url.pathname === '/rest/v1/announcement_reads'
+      || url.pathname === '/rest/v1/announcement_responses') return reply([]);
     // Role checks are expected on sign-in; this ordinary tester has no analytics access.
     if (url.pathname === '/rest/v1/analytics_admins' || url.pathname === '/rest/v1/game_analytics_readers') return reply([]);
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);

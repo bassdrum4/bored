@@ -10,7 +10,7 @@ function respondToAnalytics(request) {
   };
   // Game regression tests must not depend on real, possibly active announcements.
   // The dedicated announcement suite injects its own messages and tests the banner.
-  if (['/rest/v1/announcements', '/rest/v1/announcement_reads'].includes(url.pathname)) {
+  if (['/rest/v1/announcements', '/rest/v1/announcement_reads', '/rest/v1/announcement_responses'].includes(url.pathname)) {
     const preflight = request.method() === 'OPTIONS';
     void request.respond({ status: preflight ? 204 : 200, headers,
       contentType: 'application/json', body: preflight ? '' : '[]' });
