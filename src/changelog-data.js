@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 885,
+  "count": 886,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"930cd52","date":"2026-11-23","author":"Codebuff","subject":"Say what the invite code is for, and who is still pending"},
   {"sha":"3e98dc1","date":"2026-11-23","author":"Codebuff","subject":"Add the invite funnel to the analytics dashboard and a nudge toward the code"},
   {"sha":"407f16e","date":"2026-11-23","author":"Codebuff","subject":"Paint the result now and let the server catch up"},
   {"sha":"7530f4a","date":"2026-11-23","author":"Codebuff","subject":"Trackbound: accept TB2 codes when posting a public track"},
