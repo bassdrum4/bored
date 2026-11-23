@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 883,
+  "count": 884,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"407f16e","date":"2026-11-23","author":"Codebuff","subject":"Paint the result now and let the server catch up"},
   {"sha":"7530f4a","date":"2026-11-23","author":"Codebuff","subject":"Trackbound: accept TB2 codes when posting a public track"},
   {"sha":"78adb03","date":"2026-11-23","author":"Codebuff","subject":"test: answer the invite reads the hub now makes on load"},
   {"sha":"3d23965","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette main leaderboard: log the submit path"},
