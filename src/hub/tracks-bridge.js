@@ -1,4 +1,4 @@
-import { hasIdentity, getSession, request, freshSession, ANON_TOKEN } from './backend.js';
+import { hasIdentity, getSession, getHandle, request, freshSession, ANON_TOKEN } from './backend.js';
 import { loadMedals, medalFor } from './invites.js';
 
 // Trackbound's public tracks live on the Bored account, and only the hub has
@@ -64,6 +64,11 @@ async function listTracks() {
   const ask = token => request('/rest/v1/rpc/trackbound_tracks_list', {
     method: 'POST', body: { p_limit: LIST_LIMIT }, token
   });
+  // Public names carry the inviter's medal, so the medal list is read here
+  // rather than asking the game to decorate names later. It only decorates the
+  // rows, so it travels beside the tracks instead of holding the list back by
+  // a whole round trip; by the time the rows are mapped the map is in hand.
+  const medals = loadMedals();
   let rows;
   try { rows = await ask(); }
   catch (error) {
@@ -71,9 +76,7 @@ async function listTracks() {
     if (!getSession() || error.status !== 401) throw error;
     rows = await ask(ANON_TOKEN);
   }
-  // Public names carry the inviter's medal, so the medal list is read once here
-  // rather than asking the game to decorate names later.
-  await loadMedals();
+  await medals.catch(() => {});
   return {
     tracks: (Array.isArray(rows) ? rows : []).filter(row => row && typeof row.code === 'string' && row.name)
       .slice(0, LIST_LIMIT)
@@ -159,7 +162,9 @@ export function createTracksBridge({ frame, deps = {} }) {
   const send = message => { try { frame.contentWindow?.postMessage(Object.assign({ channel }, message), '*'); } catch (error) { /* the frame is gone */ } };
 
   async function call(op, payload) {
-    if (op === 'status') return { signedIn: signedIn() };
+    // The handle travels with the status check so a post can draw its own row
+    // before the write lands; it is read locally and never leaves the hub.
+    if (op === 'status') return { signedIn: signedIn(), handle: signedIn() ? getHandle() : '' };
     if (op === 'list') return list();
     if (op === 'post') return post(payload || {});
     if (op === 'run') return run(payload || {});

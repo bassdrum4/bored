@@ -499,6 +499,12 @@ export function recordBest(slug, snapshot, options) {
   const previous = bestValue(spec);
   if (previous && (spec.lower ? value >= previous : value <= previous)) return false;
   if (!writeRaw(spec.key, value)) return false;
+  // The board should move the moment the best does. Sync is debounced and the
+  // request still has to land; folding the local value into the cached board
+  // now is what keeps the leaderboard from arriving a second after the run.
+  // The sync reports again with the server's accepted value, and a later load
+  // replaces the whole board anyway, so a refused value cannot stick around.
+  if (getSession() && backendReady()) postedListener({ rows: [{ game: slug, value }], optimistic: true });
   requestScoreSync();
   return true;
 }

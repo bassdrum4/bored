@@ -4574,9 +4574,16 @@ function renderPublicList(rows) {
     }
     const drive = el('button', 'quiet', 'Drive');
     drive.type = 'button';
+    // A row still waiting on its post has no real id yet; its run could not be
+    // reported to the right course, so it becomes drivable when the id lands.
+    if (row.pending) {
+      drive.disabled = true;
+      drive.title = 'Waiting for the post to be confirmed.';
+      drive.setAttribute('aria-label', 'Drive ' + row.name + ' once the post is confirmed');
+    }
     drive.addEventListener('click', () => drivePublic(row));
     li.appendChild(drive);
-    if (row.mine) {
+    if (row.mine && !row.pending) {
       const remove = el('button', 'quiet', 'Delete');
       remove.type = 'button';
       remove.setAttribute('aria-label', 'Delete ' + row.name + ' from the public list');
@@ -4613,7 +4620,12 @@ async function refreshPublicList() {
   }
   if (publicBusy) return;
   publicBusy = true;
-  publicStatus('Loading public tracks…');
+  // Stale-while-revalidate: a list already on screen stays there while the
+  // fresh one is fetched, so coming back to the tab after a post or a run does
+  // not blank the shelf for a round trip.
+  const shown = Array.isArray(publicTracks);
+  if (shown) { renderPublicList(publicTracks); publicStatus('Updating…'); }
+  else publicStatus('Loading public tracks…');
   try {
     const result = await api.call('list');
     const rows = Array.isArray(result && result.tracks) ? result.tracks : [];
@@ -4621,9 +4633,9 @@ async function refreshPublicList() {
     publicStatus(publicTracks.length ? '' : 'Nothing shared yet. Post the first from the editor.');
     renderPublicList(publicTracks);
   } catch (error) {
-    // Left unset so opening the tab (or Reload) tries again rather than caching the failure.
-    publicTracks = null;
-    renderPublicList([]);
+    // With rows on screen the old list is better than nothing; left unset only
+    // when there is nothing to show, so the tab (or Reload) tries again.
+    if (!shown) { publicTracks = null; renderPublicList([]); }
     publicStatus(error.message || 'Public tracks are out of reach. Try again shortly.', true);
   } finally { publicBusy = false; }
 }
@@ -4635,30 +4647,57 @@ function drivePublic(row) {
   if (!validation.ok) { publicStatus(validation.error, true); return false; }
   return startCustomTrack({ name: row.name, blocks }, row.id);
 }
+// Everything that remembered a public identity, so an optimistic delete can be
+// undone if the server refuses it.
+function publishedPointers(id) {
+  const records = [];
+  if (Array.isArray(saved.custom)) {
+    for (const record of saved.custom) {
+      if (record && record.posted && record.posted.id === id) records.push({ record, posted: record.posted });
+    }
+  }
+  return { records, editorPosted: editor.posted && editor.posted.id === id ? editor.posted : null };
+}
+function forgetPublished(id) {
+  let touched = false;
+  if (Array.isArray(saved.custom)) {
+    saved.custom.forEach(record => {
+      if (record && record.posted && record.posted.id === id) { delete record.posted; touched = true; }
+    });
+    if (touched) persist('custom');
+  }
+  if (editor.posted && editor.posted.id === id) editor.posted = null;
+}
 // Only the author may delete, which the server enforces; this also lets a saved
 // copy of the course post again instead of believing it is still published.
 async function deletePublicTrack(row, button) {
   const api = tracksAPI();
   if (!api) { publicStatus('Removing a track needs Bored: open the game from the arcade.', true); return false; }
+  if (!row || !row.id) { publicStatus('That track is not shared.', true); return false; }
   if (button) button.disabled = true;
+  // The row leaves now. The function stays the authority, but the two-click
+  // delete should not then wait a round trip before the shelf agrees.
+  const before = Array.isArray(publicTracks) ? publicTracks.slice() : null;
+  const pointers = publishedPointers(row.id);
+  forgetPublished(row.id);
+  if (before) {
+    publicTracks = before.filter(entry => entry.id !== row.id);
+    renderPublicList(publicTracks);
+  }
+  publicStatus('Removed · ' + row.name + ' is no longer in the public list.');
+  paintPostButton();
   try {
     await api.call('remove', { id: row.id });
-    let touched = false;
-    if (Array.isArray(saved.custom)) {
-      saved.custom.forEach(record => {
-        if (record && record.posted && record.posted.id === row.id) { delete record.posted; touched = true; }
-      });
-      if (touched) persist('custom');
-    }
-    if (editor.posted && editor.posted.id === row.id) editor.posted = null;
-    publicTracks = (Array.isArray(publicTracks) ? publicTracks : []).filter(entry => entry.id !== row.id);
-    renderPublicList(publicTracks);
-    publicStatus('Removed · ' + row.name + ' is no longer in the public list.');
-    paintPostButton();
     return true;
   } catch (error) {
+    // Nothing was removed: put the row and its local pointers back exactly.
+    if (before) { publicTracks = before; renderPublicList(before); }
+    pointers.records.forEach(({ record, posted }) => { record.posted = posted; });
+    if (pointers.records.length) persist('custom');
+    if (pointers.editorPosted) editor.posted = pointers.editorPosted;
     if (button) button.disabled = false;
     publicStatus(error.message || 'That track could not be removed.', true);
+    paintPostButton();
     return false;
   }
 }
@@ -4736,31 +4775,35 @@ function nextTimesLabel(times) {
 }
 // A finished public course reports its time to that course's board. The board is
 // a bonus: a failure leaves the local best alone and says nothing over a result.
-async function postPublicRun(track, ms) {
-  const api = tracksAPI();
-  if (!api) return;
-  try { await api.call('run', { track, ms }); publicTracks = null; }
-  catch (error) { /* the run is still saved on this device */ }
-  await paintCourseBoard(track);
+const courseTimes = row => ((row && Array.isArray(row.best) ? row.best : [])
+  .filter(entry => entry && Number.isFinite(Number(entry.ms)))).slice(0, 4)
+  .map(entry => ({ handle: String(entry.handle || 'Bored player'),
+    tier: entry.tier, ms: Math.round(Number(entry.ms)) }));
+// The times this device already knows for a course, with the lap it just drove
+// slotted in. The server is asked in the background; the result screen is not
+// made to wait for a list read before it can show a time.
+function localCourseTimes(track, ms) {
+  const row = (Array.isArray(publicTracks) ? publicTracks : []).find(entry => entry.id === track);
+  const times = courseTimes(row);
+  times.push({ handle: 'You', tier: null, ms: Math.round(ms) });
+  times.sort((a, b) => a.ms - b.ms);
+  return times.slice(0, 4);
 }
-// The board for the course you just drove. It is read after the run is
-// reported, because that run may have just changed it; signed out, the public
-// times still arrive. A failure leaves the result screen as it was.
-async function paintCourseBoard(track) {
-  const api = tracksAPI();
-  if (!api) return;
-  let rows = [];
-  try {
-    const data = await api.call('list');
-    rows = Array.isArray(data && data.tracks) ? data.tracks : [];
-  } catch (error) { return; }
+function rememberRun(track, ms) {
+  if (!Array.isArray(publicTracks)) return;
+  publicTracks = publicTracks.map(row => {
+    if (!row || row.id !== track) return row;
+    const times = courseTimes(row);
+    times.push({ handle: 'You', tier: null, ms: Math.round(ms) });
+    times.sort((a, b) => a.ms - b.ms);
+    return { ...row, best: times.slice(0, 4) };
+  });
+}
+function paintRunTimes(track, times) {
   // The player may have left the result screen while the list was out.
   if (race.state !== 'finished' || !current || current.publicTrack !== track) return;
   const board = $('resBoard');
   if (!board || !isCustom()) return;
-  const row = rows.find(entry => entry && entry.id === track);
-  const times = ((row && Array.isArray(row.best) ? row.best : [])
-    .filter(entry => entry && Number.isFinite(Number(entry.ms)))).slice(0, 4);
   board.replaceChildren();
   board.hidden = !times.length;
   if (!times.length) return;
@@ -4775,6 +4818,36 @@ async function paintCourseBoard(track) {
       el('span', 'courseTime', clock(entry.ms)));
     board.appendChild(line);
   });
+}
+let courseBoardSeq = 0;
+async function postPublicRun(track, ms) {
+  const api = tracksAPI();
+  if (!api) return;
+  // Paint the lap just driven first: the course board belongs to the result
+  // screen, not to the network.
+  const times = localCourseTimes(track, ms);
+  rememberRun(track, ms);
+  paintRunTimes(track, times);
+  try { await api.call('run', { track, ms }); }
+  catch (error) { /* the run is still saved on this device */ }
+  await paintCourseBoard(track);
+}
+// The board for the course you just drove. It is read after the run is
+// reported, because that run may have just changed it; signed out, the public
+// times still arrive. A failure leaves the times already painted alone.
+async function paintCourseBoard(track) {
+  const api = tracksAPI();
+  if (!api) return;
+  const seq = ++courseBoardSeq;
+  let rows = [];
+  try {
+    const data = await api.call('list');
+    rows = Array.isArray(data && data.tracks) ? data.tracks : [];
+  } catch (error) { return; }
+  // A newer board owns the screen now.
+  if (seq !== courseBoardSeq) return;
+  const row = rows.find(entry => entry && entry.id === track);
+  paintRunTimes(track, courseTimes(row));
 }
 async function postPublicTrack() {
   const validation = refreshEditor();
@@ -4797,6 +4870,9 @@ async function postPublicTrack() {
   if (button) button.disabled = true;
   note.className = 'note';
   note.textContent = state.posted ? 'Reposting…' : 'Posting…';
+  const before = Array.isArray(publicTracks) ? publicTracks.slice() : null;
+  const previousSlot = Number.isInteger(editor.slot) && saved.custom[editor.slot]
+    ? saved.custom[editor.slot].posted || null : null;
   try {
     const who = await api.call('status');
     if (!who || !who.signedIn) {
@@ -4804,22 +4880,63 @@ async function postPublicTrack() {
       note.textContent = 'Sign in to Bored to post a track.';
       return false;
     }
-    const result = await api.call('post', { name: state.name, code: state.code,
-      id: state.posted ? state.posted.id : null });
+    // Draw the posted row from the code already in the editor, then let the
+    // write finish behind it. A refusal below puts the list and the button
+    // back and reports the server's reason, so the optimistic row can never
+    // outlive a rejected post.
+    const provisional = {
+      id: 'pending-' + Date.now().toString(36),
+      name: state.name,
+      handle: String(who.handle || 'You'),
+      tier: null,
+      code: state.code,
+      at: Math.floor(Date.now() / 1000),
+      best: [], mine: true, pending: true
+    };
+    if (before) {
+      const replacing = state.posted && state.posted.id
+        ? before.findIndex(entry => entry.id === state.posted.id) : -1;
+      publicTracks = replacing >= 0
+        ? before.map((entry, index) => index === replacing
+          ? { ...entry, name: state.name, code: state.code, pending: true } : entry)
+        : [...before, provisional];
+      renderPublicList(publicTracks);
+    }
     editor.name = state.name;
     $('editorName').value = state.name;
-    editor.posted = { id: result && result.id ? result.id : (state.posted && state.posted.id) || null, code: state.code };
-    // A saved copy remembers the published version, so reopening it offers a
-    // repost only once it has been changed again.
+    editor.posted = { id: provisional.id, code: state.code };
     if (Number.isInteger(editor.slot) && saved.custom[editor.slot]) {
-      saved.custom[editor.slot].posted = { id: editor.posted.id, code: editor.posted.code };
+      saved.custom[editor.slot].posted = { id: provisional.id, code: state.code };
       persist('custom');
     }
-    publicTracks = null;
+    note.className = 'note';
     note.textContent = (state.posted ? 'Reposted · ' : 'Posted · ') +
       'other players can drive ' + state.name + ' from the public list.';
+    paintPostButton();
+    const result = await api.call('post', { name: state.name, code: state.code,
+      id: state.posted ? state.posted.id : null });
+    const postedId = result && result.id ? String(result.id) : provisional.id;
+    // Swap the provisional identity for the one the server assigned, so Drive,
+    // Repost and Delete all point at the real row from here on.
+    editor.posted = { id: postedId, code: state.code };
+    if (Number.isInteger(editor.slot) && saved.custom[editor.slot]) {
+      saved.custom[editor.slot].posted = { id: postedId, code: state.code };
+      persist('custom');
+    }
+    if (Array.isArray(publicTracks)) {
+      publicTracks = publicTracks.map(entry => entry.pending
+        ? { ...entry, id: postedId, pending: false } : entry);
+      renderPublicList(publicTracks);
+    }
     return true;
   } catch (error) {
+    if (before) { publicTracks = before; renderPublicList(before); }
+    editor.posted = state.posted;
+    if (Number.isInteger(editor.slot) && saved.custom[editor.slot]) {
+      if (previousSlot) saved.custom[editor.slot].posted = previousSlot;
+      else delete saved.custom[editor.slot].posted;
+      persist('custom');
+    }
     note.className = 'note invalid';
     note.textContent = error.message || 'The track could not be posted.';
     return false;

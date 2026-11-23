@@ -94,15 +94,26 @@ async function submitAuth(event) {
     authBusy = true;
     $('#auth-submit').disabled = true;
     message.textContent = 'Saving…';
+    // The strip and the board are this browser's view of the account, so the
+    // new name goes on immediately; the server still decides whether it is
+    // taken, and a refusal puts the old name back and reopens the dialog.
+    const previous = getHandle();
+    setHandle(name);
+    closeAuthDialog();
+    renderAccount();
+    renderLeaderboard();
     try {
       await renameHandle(name);
       ui.lbCache.clear();
-      closeAuthDialog();
       renderAccount();
       renderLeaderboard();
       loadLeaderboard(true);
     } catch (err) {
-      message.textContent = authErrorMessage(err);
+      setHandle(previous);
+      renderAccount();
+      renderLeaderboard();
+      openAuthDialog('name');
+      $('#auth-message').textContent = authErrorMessage(err);
     } finally {
       authBusy = false;
       $('#auth-submit').disabled = false;

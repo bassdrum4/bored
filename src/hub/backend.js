@@ -288,10 +288,14 @@ export async function signUp(email, password, name, invite = '') {
 }
 
 export async function signOut() {
-  if (session) {
-    try { await request('/auth/v1/logout', { method: 'POST' }); } catch {}
-  }
+  // Signing out is about this browser, so the local session goes away first
+  // and the button repaints as a guest at once. Revoking the token is a
+  // best-effort courtesy to the server; it must not hold the interface.
+  const token = session?.access_token;
   forgetSession();
+  if (token) {
+    void request('/auth/v1/logout', { method: 'POST', token, keepalive: true }).catch(() => {});
+  }
 }
 
 export async function adoptToken(access, refresh, expiresIn) {

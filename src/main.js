@@ -876,9 +876,13 @@ onScoresPosted(result => {
   const cached = lbCache.get('overall');
   const handle = getHandle();
   const rows = result?.rows;
-  // The accepted values are already in hand, so fold them into the cached board
-  // instead of re-reading every score row the server just confirmed.
-  if (rows?.length && cached?.rows?.length && !cached.error && handle && hasIdentity()) {
+  // A best is folded into the cached board the moment it is set locally, then
+  // again with the value the server accepted. With no cached board there is
+  // nothing to fold into, and an optimistic value is not a reason to spend a
+  // whole leaderboard read; the ordinary load (or the confirmed sync) does it.
+  const foldable = cached && !cached.error && handle && hasIdentity() &&
+    (cached.rows.length > 0 || !result?.optimistic);
+  if (rows?.length && foldable) {
     const own = new Map(cached.rows.map(row =>
       [row.game + '|' + String(row.handle || '').toLowerCase(), row]));
     for (const { game, value } of rows) {
@@ -889,8 +893,11 @@ onScoresPosted(result => {
     cached.at = Date.now();
     renderAccount();
     renderLeaderboard();
+    // The library cards carry the same board's leader, so they move with it.
+    if (!document.activeElement?.closest?.('#grid, #recent')) renderLibrary();
     return;
   }
+  if (result?.optimistic) return;
   lbCache.clear();
   renderAccount();
   renderLeaderboard();
