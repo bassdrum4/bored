@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 872,
+  "count": 873,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2a9f715","date":"2026-11-23","author":"Daniel Lowe","subject":"Cache Puffer Party daily answer book and coalesce simultaneous loads"},
   {"sha":"a0d0cae","date":"2026-11-23","author":"Daniel Lowe","subject":"Deduplicate Krillion book loads and memoize multiple archive dates"},
   {"sha":"25bdd79","date":"2026-11-23","author":"Daniel Lowe","subject":"Batch up to 60 analytics rows without dropping queued events"},
   {"sha":"4d2a0a1","date":"2026-11-23","author":"Daniel Lowe","subject":"Cache public popularity once per day while preserving F-14 ranking"},
