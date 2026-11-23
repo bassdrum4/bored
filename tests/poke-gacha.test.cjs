@@ -395,7 +395,7 @@ test('Dex: uncaught lines are ??? with a silhouette, the egg they hatch from and
     const num = dexList()[i];
     return { caught: !!S.lines[num], title: r.title, name: name(formOf(num)), dark: !!r.querySelector('.unseen'), tip: r.querySelector('.mini').title };
   }));
-  assert.equal(rowsSeen.length, 54, 'a full page');
+  assert.equal(rowsSeen.length, 45, 'a full page');
   assert.ok(rowsSeen.some(r => r.caught) && rowsSeen.some(r => !r.caught), 'the first page holds both');
   for (const r of rowsSeen) {
     if (r.caught) { assert.ok(r.title.includes(r.name) && !r.dark, r.name + ' reads as caught'); }
@@ -2430,6 +2430,7 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   // The note on every view (in the list panel, or the details panel in the grid views), never in the message box.
   for (const m of ['machine', 'dex', 'sets', 'shop']) {
     await game.evaluate(m => { fullMode = m; colUpdate(); }, m);
+    if (m === 'dex') { assert.equal(await game.evaluate(() => document.querySelector('#full-detail').textContent.includes("Collection only")), false, 'not in the Full Dex details'); continue; }
     const seen = await game.evaluate(() => [...document.querySelectorAll('#scr-collector *')].some(n => n.offsetParent && n.children.length === 0 && n.textContent === "Collection only, doesn't join your squad."));
     assert.ok(seen, m + ' shows the note');
     assert.doesNotMatch(await game.$eval('#msg', n => n.textContent), /Collection only/, m + ': the message box keeps its room');
@@ -2468,8 +2469,30 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   // The Full Dex: a 9×7 icon grid a page, uncaught as ???; dust buys the three birds, which completes a set.
   await key(tab, 'd');
   await game.evaluate(() => { Object.assign(colF, { gen: 0, type: '', own: 'all', tier: -1, set: '', sort: 'num', q: '' }); colUpdate(); });
-  assert.equal(await game.$$eval('#full-rows > .cell', ns => ns.length), 63);
-  assert.match(await game.$eval('#full-filters', n => n.textContent), /Gen\s*Type\s*Caught\s*Rarity\s*Sets\s*No\.[\s\S]*1\/17/);
+  assert.equal(await game.$$eval('#full-rows > .cell', ns => ns.length), 54);
+  assert.match(await game.$eval('#full-filters', n => n.textContent), /Gen\s*Type\s*Caught\s*Rarity\s*In set\s*Sort: No\./);
+  assert.match(await game.$eval('#full-keys .page', n => n.textContent), /◀\uFE0E?\s*1\/19\s*▶/);
+  // Every cell holds a whole 40x30 sprite, rows evenly spaced, all inside the panel; the frame is the cell's edge.
+  const geo = await game.evaluate(() => {
+    const cells = [...document.querySelectorAll('#full-rows > .cell')], box = document.querySelector('#full-list').getBoundingClientRect();
+    const k = box.width / document.querySelector('#full-list').offsetWidth, tops = [...new Set(cells.map(c => Math.round(c.getBoundingClientRect().top / k)))];
+    const whole = cells.every(c => { const r = c.getBoundingClientRect(), m = c.querySelector('.mini').getBoundingClientRect(); return m.left >= r.left - 0.5 && m.right <= r.right + 0.5 && m.top >= r.top - 0.5 && m.bottom <= r.bottom + 0.5; });
+    const inside = cells.every(c => c.getBoundingClientRect().bottom <= box.bottom - 2 * k);
+    const at = document.querySelector('#full-rows > .cell.at'), ar = at.getBoundingClientRect(), mr = at.querySelector('.mini').getBoundingClientRect();
+    return { whole, inside, gaps: [...new Set(tops.slice(1).map((t, i) => t - tops[i]))], centred: Math.abs((ar.left + ar.right) - (mr.left + mr.right)) < 1 && Math.abs((ar.top + ar.bottom) - (mr.top + mr.bottom)) < 1, frame: getComputedStyle(at).boxShadow };
+  });
+  assert.deepEqual([geo.whole, geo.inside, geo.gaps, geo.centred], [true, true, [34], true], 'whole sprites, even 34px rows, inside the panel, the frame centred');
+  assert.match(geo.frame, /inset/);
+  // ◀ ▶ and the wheel turn pages.
+  await game.evaluate(() => document.querySelector('#full-keys .page .klabel:last-child').click());
+  assert.equal(await game.evaluate(() => fullAt), 54);
+  await game.$eval('#full-rows', n => n.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true })));
+  assert.equal(await game.evaluate(() => fullAt), 0);
+  // An uncaught mon: ??? for its type and no type sets; a buy it cannot afford says why.
+  const blind = await game.evaluate(() => { const n = 4; const d = CS.dust; fullAt = n - 1; colUpdate(); return { sets: document.querySelector('#full-detail .sets').textContent, buy: fullActions(n)[0].label, d, owned: CS.owned.includes(n) }; });
+  if (!blind.owned) { assert.doesNotMatch(blind.sets, /Fire/, 'no type set for an uncaught mon'); assert.match(blind.sets, /Gen 1/); }
+  const poor = await game.evaluate(() => { const n = [...Array(1025).keys()].map(i => i + 1).find(x => !CS.owned.includes(x) && G.collector.tierOf(x) === 0); const keep_ = CS.dust; CS.dust = 3; const a = fullActions(n)[0]; CS.dust = keep_; return [a.label, a.off]; });
+  assert.deepEqual(poor, ['Need 10 dust (you have 3)', true]);
   const unseen = await game.evaluate(() => { const n = CS.owned.includes(150) ? 151 : 150; fullAt = n - 1; colUpdate(); return document.querySelector('#full-detail .title').textContent; });
   assert.equal(unseen, '???');
   // Filters: Gen 1 only, Legendary only, then the wishlist; search finds owned names only.
@@ -2498,6 +2521,15 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   // Each mon shows the sets it counts toward.
   assert.match(await game.$eval('#full-detail .sets', n => n.textContent), /Gen 1: Kanto[\s\S]*Legendary birds 3\/3/);
   await shot('full-dex');
+  // The owner's Google Sites game area (about 1900x790, the frame at 2x).
+  if (process.env.SHOT_DIR) {
+    await game.evaluate(() => { fullAt = 5; fullFocus = 'list'; colUpdate(); });
+    await tab.setViewport({ width: 1900, height: 790 }); await pause(300);
+    await tab.screenshot({ path: path.join(process.env.SHOT_DIR, 'full-dex-sites.png') });
+    await game.evaluate(() => { fullAt = 143; colUpdate(); }); await pause(100);
+    await tab.screenshot({ path: path.join(process.env.SHOT_DIR, 'full-dex-sites-owned.png') });
+    await tab.setViewport({ width: 1280, height: 800 }); await pause(200);
+  }
   await key(tab, 's'); await game.evaluate(() => { setAt = CS.sets.findIndex(x => x.id === 'birds'); colUpdate(); });
   await shot('full-sets');
   // Sets: closest to done first.

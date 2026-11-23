@@ -195,10 +195,10 @@ canvas, img { image-rendering: pixelated; display: block }
 #hatch .grid .tag { height: 16px; line-height: 16px; text-align: center }
 
 /* Dex */
-/* PokeRogue's starter screen: the details on the left, the icon grid (9 × 6 a page) and its filter bar on the right. */
+/* PokeRogue's starter screen: the details on the left, the icon grid (9 × 5 a page) and its filter bar on the right. */
 #dex-list { left: 248px; top: 8px; width: 384px; height: 264px; display: flex; flex-direction: column; padding: 4px 3px }
 #dex-list .title { margin-bottom: 0 }
-#dex-rows { height: 174px; flex: none }
+#dex-rows { height: 168px; flex: none }
 /* Dex rows hold the 40x30 mini sprite at 1x, so they are 30px tall: 6 whole rows under the filter bar. */
 #dex-rows > div { height: 30px }
 #dex-detail { left: 8px; top: 8px; width: 232px; height: 264px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 96px 18px 120px; gap: 2px 12px }
@@ -275,15 +275,18 @@ canvas, img { image-rendering: pixelated; display: block }
 #full-filters .klabel { padding: 0 3px }
 #scr-collector.grid #full-detail { left: 8px; width: 232px; padding: 6px 8px }
 #scr-collector.grid #full-title, #scr-collector.grid #col-note { display: none }
-#scr-collector.grid #full-rows { height: 203px }
+/* Six whole rows of 32px cells, 2px apart: 6 × 32 + 5 × 2. */
+#scr-collector.grid #full-rows { height: 202px }
 #full-filters input { font: 400 var(--body)/18px var(--pixel); color: var(--paper); background: var(--ink); border: 1px solid var(--dim); padding: 0 4px; width: 58px; height: 20px; outline: none }
-.igrid { display: grid; grid-template-columns: repeat(var(--cols, 9), 40px); grid-auto-rows: 29px; column-gap: 1px; align-content: start; overflow: hidden }
-.igrid > .cell { position: relative; width: 40px; height: 29px; overflow: hidden; cursor: pointer }
-.igrid > .cell.at { outline: 2px solid var(--gold); outline-offset: -2px }
+.igrid { display: grid; grid-template-columns: repeat(var(--cols, 9), 40px); grid-auto-rows: 32px; column-gap: 1px; row-gap: 2px; align-content: start; overflow: hidden }
+/* A whole 40x30 mini sprite, centred in its 40x32 cell; the frame is the cell's own edge, so it sits
+   centred on the icon. */
+.igrid > .cell { position: relative; width: 40px; height: 32px; cursor: pointer; display: grid !important; place-items: center }
+.igrid > .cell.at { box-shadow: inset 0 0 0 2px var(--gold) }
 /* A grid inside a list container (#full-rows, #dex-rows) drops the list rows' height, padding and arrow. */
-#full-rows.igrid > .cell, #dex-rows.igrid > .cell { height: 29px; padding: 0; display: block; gap: 0 }
+#full-rows.igrid > .cell, #dex-rows.igrid > .cell { height: 32px; padding: 0; gap: 0 }
 #full-rows.igrid > .cell::before, #dex-rows.igrid > .cell::before { content: none }
-.igrid > .cell.wish { box-shadow: inset 0 0 0 1px var(--gold) }
+.igrid > .cell.wish:not(.at) { box-shadow: inset 0 0 0 1px var(--gold) }
 .igrid > .cell .b { position: absolute; font: 400 10px/10px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--paper); pointer-events: none }
 .igrid > .cell .tl { left: 1px; top: 1px } .igrid > .cell .tr { right: 1px; top: 1px; color: var(--gold) }
 .igrid > .cell .bl { left: 1px; bottom: 1px; color: var(--gold) } .igrid > .cell .br { right: 1px; bottom: 1px; color: var(--gold) }
@@ -296,8 +299,13 @@ canvas, img { image-rendering: pixelated; display: block }
 #full-detail #full-acts { height: auto } #full-detail #full-acts > div { height: 32px }
 #full-detail .small { font-size: 16px; line-height: 16px }
 #full-detail .hist { height: 150px } #full-detail .hist > div { display: flex; align-items: center; gap: 6px; height: 30px; padding-left: 0 }
-#scr-collector.grid #full-detail .info > div { font-size: 16px; line-height: 15px }
-#scr-collector.grid #full-detail .cell { width: 80px; height: 60px }
+/* The Full Dex details: the name, the sprite at 1x in a 96px cell on top, the facts under it. */
+#scr-collector.grid #full-detail .top { flex-direction: column; align-items: center; gap: 0 }
+#scr-collector.grid #full-detail .cell { width: 96px; height: 96px }
+#scr-collector.grid #full-detail .info { align-self: stretch; text-align: center }
+#scr-collector.grid #full-detail .info > div { font-size: 16px; line-height: 16px }
+#scr-collector.grid #full-detail #full-acts { height: auto; max-height: 56px; overflow-y: auto }
+#scr-collector.grid #full-detail #full-acts > div { height: 28px }
 #scr-collector.grid #full-acts > div { height: 24px }
 /* Settings: over the screen, from the gear by "?". */
 #settings { left: 140px; top: 16px; width: 360px; height: 248px; padding: 6px 12px; z-index: 70 }
@@ -1810,7 +1818,7 @@ function dexUpdate() {
   const pg = iconGrid($("#dex-rows"), list.map(num => { const l = S.lines[num];
     return { icon: l ? mini(formOf(num), l.look) : mini(num, "normal", true), tl: l && l.hatches > 1 ? l.hatches : "", tr: l && l.shiny ? "★" : "",
       title: l ? String(num).padStart(4, "0") + " " + name(formOf(num)) + (formOf(num) !== num ? " (" + name(num) + " line)" : "") : String(num).padStart(4, "0") + " ???", cls: l ? "caught" : "" }; }),
-    dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); }, { rows: 6 });
+    dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); }, { rows: 5 });
   $("#dex-keys").append(el("span", "page", pg.page + "/" + pg.pages));
   const line = list[dexAt], l = S.lines[line], tip = l ? formOf(line) : line;
   const shown = l && isSkin(l.look) && skinOf(l.look) ? skinForm(l.look, tip) : tip;
@@ -1920,7 +1928,7 @@ function dexKey(e) {
   const k = e.key;
   if (dexBuy) { e.preventDefault(); return answerCandy(k === "Enter" || k === " "); }
   if (dexFocus === "list") {
-    const list = dexList(), to = gridMove(k, dexAt, list.length, 9, 6);
+    const list = dexList(), to = gridMove(k, dexAt, list.length, 9, 5);
     if (FILTER_KEYS.dex.test(k)) { e.preventDefault(); return filtKey("dex", k.length === 1 ? k.toLowerCase() : k); }
     if (to !== null) { e.preventDefault(); dexAt = to; actAt = 0; return dexUpdate(); }
     if (k === "Enter" || k === " ") { e.preventDefault(); if (list[dexAt] && dexActions(list[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
@@ -2274,7 +2282,8 @@ function fullList() {
 function fullActions(num) {
   const R = G.collector.rules, have = CS.owned.includes(num), shiny = CS.shiny.includes(num), price = R.price[G.collector.tierOf(num)];
   if (!have) return [
-    { label: "Buy for " + price + " dust", icon: dustIcon(), off: CS.dust < price, about: "Spend " + price + " dust on No. " + num + ".", run: () => G.collector.buy({ species: num }) },
+    { label: CS.dust < price ? "Need " + price + " dust (you have " + CS.dust + ")" : "Buy for " + price + " dust", icon: dustIcon(), off: CS.dust < price,
+      about: CS.dust < price ? "Every pull pays dust, and extras turn into dust in the Dust shop." : "Spend " + price + " dust on No. " + num + ".", run: () => G.collector.buy({ species: num }) },
     { label: CS.wish.includes(num) ? "Unstar (W)" : "Star for the wishlist (W)", about: "Starred: twice as likely in its tier, " + CS.wish.length + "/" + R.wish.max + " starred.", run: () => G.collector.wish({ species: num }) }];
   const out = [{ label: "Make buddy", about: "Show " + name(num) + " on your card and next to your name.", run: () => G.setBuddy({ species: num }) }];
   if (shiny) out.push({ label: "Make buddy (shiny)", about: "Show shiny " + name(num) + " as your buddy.", run: () => G.setBuddy({ species: num, shiny: true }) });
@@ -2320,29 +2329,36 @@ function fullDex(box) {
   const pg = iconGrid($("#full-rows"), list.map(num => ({ icon: mini(num, shiny.has(num) ? "shiny" : "normal", !have.has(num)),
     tl: CS.copies[num] > 1 ? CS.copies[num] : "", tr: shiny.has(num) ? "★" : "", bl: colNew.has(num) ? "NEW" : "", br: wish.has(num) ? "♥" : "",
     cls: wish.has(num) ? "wish" : "", title: "No. " + num + " " + colName(num) })),
-    fullAt, i => { fullAt = i; fullFocus = "list"; fullActAt = 0; colUpdate(); });
+    fullAt, i => { fullAt = i; fullFocus = "list"; fullActAt = 0; colUpdate(); }, { rows: 6 });
   // The filter bar: Gen · Type · Caught · Rarity · Sets · Sort, the search box and the page.
-  const setName = colF.set === "wish" ? "Wishlist" : colF.set ? (CS.sets.find(x => x.id === colF.set) || {}).name || "Sets" : "Sets";
+  const setName = colF.set === "wish" ? "Wishlist" : colF.set ? (CS.sets.find(x => x.id === colF.set) || {}).name || "In set" : "In set";
   const search = el("input"); search.id = "col-search"; search.placeholder = "/ find"; search.value = colF.q; search.title = "Search by name (owned) or number";
   search.oninput = () => { colF.q = search.value; fullAt = 0; colUpdate(); $("#col-search").focus(); const v = $("#col-search").value; $("#col-search").setSelectionRange(v.length, v.length); };
   $("#full-filters").replaceChildren(keyLabel("g", colF.gen ? "Gen " + colF.gen : "Gen", !!colF.gen), keyLabel("t", colF.type || "Type", !!colF.type),
     keyLabel("c", colF.own === "all" ? "Caught" : colF.own === "have" ? "Have" : "Missing", colF.own !== "all"), keyLabel("r", colF.tier < 0 ? "Rarity" : tiers[colF.tier], colF.tier >= 0),
-    keyLabel("e", setName.length > 10 ? setName.slice(0, 9) + "…" : setName, !!colF.set), keyLabel("o", COL_SORT_NAME[colF.sort], colF.sort !== "num"), search, el("span", "page", pg.page + "/" + pg.pages));
+    keyLabel("e", colF.set ? (setName.length > 8 ? setName.slice(0, 7) + "…" : setName) : "In set", !!colF.set), keyLabel("o", "Sort: " + COL_SORT_NAME[colF.sort], colF.sort !== "num"), search);
+  // Pages: ◀ n/m ▶ (clickable), PageUp/PageDown, the mouse wheel, and the arrows run on across pages.
+  const pager = el("span", "page"), prev = keyLabel("PageUp", "◀\uFE0E"), next = keyLabel("PageDown", "▶\uFE0E");
+  pager.append(prev, " " + pg.page + "/" + pg.pages + " ", next);
+  $("#full-keys").append(pager);
+  $("#full-rows").onwheel = e => { e.preventDefault(); const to = gridMove(e.deltaY > 0 ? "PageDown" : "PageUp", fullAt, list.length, 9, 6); if (to !== null && to !== fullAt) { fullAt = to; colUpdate(); } };
   if (!list.length) { $("#full-rows").replaceChildren(el("p", "dim", "Nothing matches. Clear a filter.")); box.replaceChildren(el("div", "title", "FULL DEX"), el("div", "gold", COL_NOTE)); return colSay("Nothing matches these filters."); }
   const num = list[fullAt], owned = have.has(num), tier = tierOf(num), R = G.collector.rules;
   if (owned && colNew.delete(num)) keepNew();
-  // The mini sprite at 2x, so the note, the sets and three actions fit beside the grid.
-  const pic = el("div", "cell"); pic.append(miniStyle(el("span", "mini" + (owned ? "" : " unseen")), num, shiny.has(num) ? "shiny" : "normal", 2));
+  // The sprite on top at 1x (a 96px cell holds the biggest), the facts under it.
+  const pic = el("div", "cell"); pic.append(sprite(num, shiny.has(num) ? "shiny" : "normal", !owned));
   const info = el("div", "info");
-  info.append(el("div", "", "No. " + String(num).padStart(4, "0")), el("div", "gold", tiers[tier]),
-    el("div", "dim", owned ? G.dex[num - 1][1] : "???"), el("div", owned ? "" : "dim", owned ? "×" + (CS.copies[num] || 1) + (shiny.has(num) ? " · ★" : "") : R.price[tier] + " dust"));
+  const no = el("div"); no.append("No. " + String(num).padStart(4, "0") + " · ", el("span", "gold", tiers[tier]));
+  info.append(no,
+    el("div", "dim", (owned ? G.dex[num - 1][1] : "???") + " · " + (owned ? "×" + (CS.copies[num] || 1) + (shiny.has(num) ? " ★" : "") : R.price[tier] + " dust")));
   const top = el("div", "top"); top.append(pic, info);
-  const sets = (G.collector.setsOf(num) || []).map(id => { const st = CS.sets.find(x => x.id === id); return st ? st.name + " " + st.have + "/" + st.need : id; });
+  // An uncaught mon's type is ???, so its type sets are left out too (they would give it away).
+  const sets = (G.collector.setsOf(num) || []).filter(id => owned || !id.startsWith("type-")).map(id => { const st = CS.sets.find(x => x.id === id); return st ? st.name + " " + st.have + "/" + st.need : id; });
   const acts = fullActions(num), actBox = el("div", "rows"); actBox.id = "full-acts";
   if (fullActAt >= acts.length) fullActAt = acts.length - 1;
   rows(actBox, acts.map(a => ({ icon: a.icon || null, label: a.label, off: a.off })), fullFocus === "acts" ? fullActAt : -1, (i, click) => { fullActAt = i; fullFocus = "acts"; if (click) runFull(acts[i]); else colUpdate(); });
   const head = el("div", "title"); titled(head, colName(num).toUpperCase());
-  box.replaceChildren(head, el("div", "note", COL_NOTE), top, el("div", "sets", "Sets: " + (sets.join(" · ") || "—")), actBox);
+  box.replaceChildren(head, top, el("div", "sets", "Sets: " + (sets.join(" · ") || "—")), actBox);
   colSay(fullFocus === "acts" && acts[fullActAt] ? acts[fullActAt].about : "Arrows move · Enter: actions · W wishlist · / search");
 }
 function colMachine(box) {
@@ -2623,7 +2639,7 @@ function colKey(e) {
     if (k === "Enter" || k === " ") { e.preventDefault(); return runFull(acts[fullActAt]); }
     return;
   }
-  const to = gridMove(k, fullAt, list.length);
+  const to = gridMove(k, fullAt, list.length, 9, 6);
   if (to !== null) { e.preventDefault(); fullAt = to; return colUpdate(); }
   if (k === "Enter" || k === " ") { e.preventDefault(); fullFocus = "acts"; fullActAt = 0; return colUpdate(); }
 }
