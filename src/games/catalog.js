@@ -80,7 +80,7 @@ export const LAUNCHED = {
 export const META = {
   "ballistic-chickens": ["Arcade", "Load a chicken into a cannon and fire her as far as the gunpowder, the rocket and the obstacles allow."],
   "getaway-shootout": ["Arcade", "Hop left or right, grab weapons, and race your rivals to the escape. Play against computers or challenge a friend on one keyboard. Internet required for the Unity game files."],
-  "shotgun-roulette": ["Arcade", "Take turns with Giratina pointing a shotgun at yourself or each other in the Distortion World. Bet Poké Gacha coins, or play a free test game."],
+  "shotgun-roulette": ["Arcade", "Take turns with Giratina pointing a shotgun at yourself or each other in the Distortion World. Bet casino chips, or play a free test game."],
   "crossword": ["Puzzle", "The New York Times archive, one grid at a time. Everyone gets the same puzzle each morning; pull another whenever you like. Needs a connection to fetch a grid."],
   "imposter": ["Online", "Fill tasks or hunt the crew. A public room is always open; private rooms use a four-letter code."],
   "sudoku": ["Puzzle", "Nine by nine, three levels: fill every row, column and box without a repeat."],

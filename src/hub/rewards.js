@@ -28,7 +28,11 @@ import { readStored, writeStored, readStoredPrefix } from './store.js';
 import { dailyDate, dailyStreak } from '../daily.js';
 
 export const WALLET_KEY = 'bored.wallet';
-export const CURRENCIES = ['coins', 'waves', 'regular', 'plus', 'premium', 'gold', 'shards'];
+export const CURRENCIES = ['coins', 'waves', 'regular', 'plus', 'premium', 'gold', 'shards', 'chips', 'dust'];
+// Casino chips and Collector dust are their own economy (the Collector machine in Poké Gacha,
+// Shotgun Roulette): nothing converts coins or vouchers into chips, and chips never buy TD goods.
+// Every account gets CHIPS.login chips once a Detroit day (claimDailyChips), under chips:login:<day>.
+export const CHIPS = Object.freeze({ login: 300 });
 // Candy is one balance per species line: `candy:<line>`.
 const currencyOk = name => CURRENCIES.includes(name) || /^candy:[a-z0-9-]{1,40}$/.test(name);
 export const COINS_PER_REGULAR = 100;
@@ -391,6 +395,13 @@ export function spendFrom(wallet, cost, { id = null, now = Date.now(), gain = {}
   if (x && !entry.x) return { wallet: next, ok: false };
   next.entries[key] = entry;
   return { wallet: next, ok: true, id: key };
+}
+
+/** The day's login chips, once per Detroit day. A no-op before the wallet is activated. */
+export function claimDailyChips(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const next = mergeWallet(wallet);
+  if (!next.entries.on) return { wallet: next, changed: false };
+  return grantOnce(next, 'chips:login:' + today, { chips: CHIPS.login }, { now });
 }
 
 /** 100 coins buys one Regular voucher. */

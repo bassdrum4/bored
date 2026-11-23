@@ -16,7 +16,7 @@ function moduleUnderTest(file, names, injections = {}) {
 const { dailyDate, dailyStreak } = moduleUnderTest('src/daily.js', ['dailyDate', 'dailyStreak']);
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'observeSnapshot', 'grantOnce',
-  'spendFrom', 'buyRegular', 'walletTrophies', 'walletStats', 'walletTrophyList', 'bossStreak'
+  'spendFrom', 'buyRegular', 'walletTrophies', 'walletStats', 'walletTrophyList', 'bossStreak', 'claimDailyChips', 'CHIPS'
 ], { dailyDate, dailyStreak, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const { mergeWallet, walletBalance, activateWallet, observeSnapshot, grantOnce, spendFrom, buyRegular, walletTrophies } = rewards;
 
@@ -263,4 +263,19 @@ test('the trophy list has every trophy with its progress, and an earned one show
   assert.deepEqual(at('pi-caught-150'), [60, 150, false], 'in progress');
   assert.deepEqual(at('doku-10'), [0, 10, false]);
   assert.equal(list.filter(t => t.done).length, walletTrophies(w).length, 'done matches the earned list');
+});
+
+test('casino chips: 300 a day once activated, once per day, and dust is its own balance', () => {
+  const { claimDailyChips, CHIPS } = rewards;
+  assert.equal(CHIPS.login, 300);
+  assert.equal(claimDailyChips({ v: 1, entries: {} }, { today: TODAY, now: NOW }).changed, false, 'nothing before activation');
+  let w = activateWallet({ v: 1, entries: {} }, { today: TODAY, now: NOW }).wallet;
+  const first = claimDailyChips(w, { today: TODAY, now: NOW });
+  assert.equal(first.changed, true);
+  assert.equal(claimDailyChips(first.wallet, { today: TODAY, now: NOW }).changed, false, 'once a day');
+  w = claimDailyChips(first.wallet, { today: '2026-11-17', now: NOW + 864e5 }).wallet;
+  assert.equal(walletBalance(w).chips, 600);
+  assert.equal(walletBalance(w).coins, 0);
+  const spent = spendFrom(w, { chips: 100 }, { id: 'test-pull', now: NOW, gain: { dust: 20 } });
+  assert.deepEqual([spent.ok, walletBalance(spent.wallet).chips, walletBalance(spent.wallet).dust], [true, 500, 20]);
 });
