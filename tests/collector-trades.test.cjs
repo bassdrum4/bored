@@ -1,11 +1,11 @@
-// Collector trades: the server rules in supabase/migrations/*_collector_trades.sql, run in an
+// Collector trades: the server rules in sql/collector_trades.sql, run in an
 // in-memory Postgres (PGlite) with stand-ins for auth.users, profiles and player_state.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
-const file = fs.readdirSync(path.join(root, 'supabase/migrations')).find(f => f.endsWith('_collector_trades.sql'));
+const file = 'sql/collector_trades.sql';
 
 const A = '00000000-0000-0000-0000-00000000000a', B = '00000000-0000-0000-0000-00000000000b', C = '00000000-0000-0000-0000-00000000000c', NEW = '00000000-0000-0000-0000-00000000000d';
 // A wallet: Collector pulls of these species (one copy each) and some dust.
@@ -25,7 +25,7 @@ async function db() {
     insert into auth.users values ('${A}', now() - interval '30 days'), ('${B}', now() - interval '30 days'), ('${C}', now() - interval '30 days'), ('${NEW}', now() - interval '2 days');
     insert into public.profiles values ('${A}', 'ash'), ('${B}', 'misty'), ('${C}', 'brock'), ('${NEW}', 'newbie');
   `);
-  const sql = fs.readFileSync(path.join(root, 'supabase/migrations', file), 'utf8');
+  const sql = fs.readFileSync(path.join(root, file), 'utf8');
   await pg.exec(sql); await pg.exec(sql); // safe to run twice
   const state = (uid, data) => pg.query('insert into public.player_state (user_id, data) values ($1, $2) on conflict (user_id) do update set data = excluded.data', [uid, data]);
   const as = uid => pg.exec(`select set_config('test.uid', '${uid}', false)`);
