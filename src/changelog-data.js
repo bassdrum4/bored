@@ -2,13 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 878,
+  "count": 881,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3d23965","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette main leaderboard: log the submit path"},
+  {"sha":"1ae7da1","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette on the main page leaderboard"},
+  {"sha":"7031c3c","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette: Thunder Wave text without the odds"},
   {"sha":"152f352","date":"2026-11-23","author":"Codebuff","subject":"Give every account an invite code and tiered recruiter medals"},
   {"sha":"7ba436c","date":"2026-11-23","author":"PenguinV360","subject":"Shotgun Roulette: Griseous Orbs orbit around Giratina, not on its chest","pr":305},
   {"sha":"d832057","date":"2026-11-23","author":"PenguinV360","subject":"Shotgun Roulette: Griseous Orbs orbit Giratina","pr":304},
