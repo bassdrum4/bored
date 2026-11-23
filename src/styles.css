@@ -651,12 +651,19 @@ body.playing #announcement-banner{display:none!important}
 
 /* The nudge toward the invite code: a small pulsing dot beside Settings until
    this account has been led to the code. Slow enough to notice, not to nag. */
-.invite-dot{display:inline-block;width:7px;height:7px;margin-left:6px;vertical-align:middle;
-  border-radius:50%;background:var(--red);animation:invite-dot-pulse 1.8s ease-in-out infinite}
+.invite-dot{position:relative;display:inline-block;width:9px;height:9px;margin-left:7px;vertical-align:middle;
+  border-radius:50%;background:var(--red);animation:invite-dot-pulse 1.6s ease-in-out infinite}
+/* A halo that keeps expanding out of the dot, so it reads as a live nudge
+   beside a quiet mono nav instead of a stray speck of colour. */
+.invite-dot::after{content:"";position:absolute;inset:-4px;border:1px solid var(--red);
+  border-radius:50%;animation:invite-dot-ring 1.6s ease-out infinite}
 .invite-dot[hidden]{display:none}
-@keyframes invite-dot-pulse{0%,100%{opacity:1}50%{opacity:.12}}
-@media(prefers-reduced-motion:reduce){.invite-dot{animation:none}}
-html[data-reduce-motion="true"] .invite-dot{animation:none}
+@keyframes invite-dot-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.15)}}
+@keyframes invite-dot-ring{0%{transform:scale(.45);opacity:.9}70%,100%{transform:scale(1.5);opacity:0}}
+@media(prefers-reduced-motion:reduce){.invite-dot,.invite-dot::after{animation:none}.invite-dot::after{opacity:.6;transform:scale(1)}}
+html[data-reduce-motion="true"] .invite-dot,
+html[data-reduce-motion="true"] .invite-dot::after{animation:none}
+html[data-reduce-motion="true"] .invite-dot::after{opacity:.6;transform:scale(1)}
 
 /* Settings → Invites */
 #invite-blurb{font-size:13px;color:var(--dim);margin-top:3px}
