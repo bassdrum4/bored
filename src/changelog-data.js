@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 871,
+  "count": 872,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a0d0cae","date":"2026-11-23","author":"Daniel Lowe","subject":"Deduplicate Krillion book loads and memoize multiple archive dates"},
   {"sha":"25bdd79","date":"2026-11-23","author":"Daniel Lowe","subject":"Batch up to 60 analytics rows without dropping queued events"},
   {"sha":"4d2a0a1","date":"2026-11-23","author":"Daniel Lowe","subject":"Cache public popularity once per day while preserving F-14 ranking"},
   {"sha":"45062a0","date":"2026-11-23","author":"Daniel Lowe","subject":"test: align crossword spotlight ordering with expired new-game boost"},
@@ -282,7 +283,7 @@ export const CHANGELOG = [
   {"sha":"d0f379b","date":"2026-11-18","author":"Codebuff","subject":"Skip the score-bounds migration when score_rules is absent."},
   {"sha":"efaa1cd","date":"2026-11-18","author":"Codebuff","subject":"Bound every leaderboard board and record each submission."},
   {"sha":"880116e","date":"2026-11-18","author":"Codebuff","subject":"Drop the archived copies of the old feedback tables."},
-  {"sha":"80bc59c","date":"2026-11-18","author":"Codebuff","subject":"Keep the feedback migration safe for the minimal Together database."},
+  {"sha":"80bc59c5","date":"2026-11-18","author":"Codebuff","subject":"Keep the feedback migration safe for the minimal Together database."},
   {"sha":"656da92","date":"2026-11-18","author":"Codebuff","subject":"Unify feedback into one table and expire stale Together invites."},
   {"sha":"b5e8b81","date":"2026-11-18","author":"Codebuff","subject":"Auto-merge the Poké Gacha modules and stop a card-tooltip test racing the board refresh."},
   {"sha":"1c87739","date":"2026-11-18","author":"Codebuff","subject":"Docs: make README and AGENTS.md match the current catalog"},
