@@ -248,7 +248,112 @@
   .iv-medal-3 { --iv-medal: #e3b845; --iv-medal-rim: #9a6f14 }
   .empty { margin-top: 10px; color: var(--dim); font-size: 14px }
 
+  /* ── Multiplayer: the room panel, the room lobby, and the square table ── */
+  .islands:has(#mp-open:not([hidden])) { grid-template-columns: repeat(4, 1fr) }
+  .mp-open { margin-top: 72px }
+  .mp-panel { position: absolute; left: 76px; top: 250px; width: 720px; z-index: 5; padding: 18px 22px; border: 1px solid var(--gold); border-radius: 3px; background: #0b0709f7 }
+  .mp-panel[hidden], .mp[hidden], .mp-tablewrap[hidden], .mp-room[hidden] { display: none }
+  .mp-panel h2 { margin: 0 0 6px }
+  .mp-note { color: var(--dim); font-size: 15px; margin-bottom: 12px }
+  .mp-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+  .mp-btn { padding: 8px 14px; border: 1px solid var(--ink); border-radius: 3px; background: none; color: var(--ink); cursor: pointer; font-size: 15px }
+  .mp-btn.primary { background: var(--ink); color: #120c0c }
+  .mp-btn.quiet { border-color: #ffffff33; color: var(--dim) }
+  .mp-btn:disabled { opacity: .45; cursor: default }
+  .mp-join { color: var(--dim); font-size: 15px }
+  .mp-join input { width: 9ch; margin-left: 6px; padding: 6px 8px; border: 1px solid #3a2758; border-radius: 3px; background: #1d1230; color: var(--gold);
+                   font: 600 15px var(--mono); text-transform: uppercase; letter-spacing: .1em }
+  .mp-rooms { margin: 12px 0; display: grid; gap: 6px }
+  .mp-rooms button { text-align: left }
+  .mp { position: absolute; inset: 0 }
+  body.live .room, body.live .meter, body.live #hud, body.live .lobby { display: none }
+  .mp-room { position: absolute; inset: 0; display: grid; place-items: center; background: #060409cc }
+  .mp-lobby { width: 560px; padding: 22px 26px; border: 1px solid var(--gold); border-radius: 3px; background: #0b0709f2 }
+  .mp-lobby h2 { font: 400 30px/1.2 var(--display); margin-bottom: 4px }
+  .mp-code-line { color: var(--dim); margin-bottom: 14px }
+  .mp-code-line b { font: 600 22px var(--mono); color: var(--gold); letter-spacing: .14em; margin-left: 6px }
+  .mp-seats { list-style: none; display: grid; gap: 8px; margin-bottom: 12px }
+  .mp-seats li { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid #3a2758; border-radius: 3px; min-height: 64px }
+  .mp-seats li.empty { border-style: dashed; color: var(--dim) }
+  .mp-seats .state { font-size: 14px; color: var(--dim) }
+  .mp-seats .state.ready { color: #8dffa4 }
+  .mp-seats .state.host { color: var(--gold) }
+  .mp-buddy { width: 56px; height: 56px; display: grid; place-items: center }
+  .mp-buddy img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain }
+  .mp-buddy .none { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #3a2758; display: grid; place-items: center; color: var(--dim); font: 600 16px var(--mono) }
+
+  .mp-tablewrap { position: absolute; inset: 0 }
+  .mp-persp { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 6%; pointer-events: none }
+  .mp-table { position: absolute; left: 330px; top: 80px; width: 620px; height: 620px; transform-origin: 50% 100%; transform: rotateX(52deg);
+              transform-style: preserve-3d; background: #545a3e; border: 10px solid #3a2a24; outline: 14px solid #1b1715;
+              box-shadow: inset 0 0 70px #000c, 0 30px 0 #120e0d; pointer-events: auto }
+  .mp-felt { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+  .mp-zone { position: absolute; width: 300px; height: 96px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 6px;
+             transform-style: preserve-3d }
+  .mp-zone[data-pos="bottom"] { left: 150px; top: 500px }
+  .mp-zone[data-pos="top"] { left: 150px; top: 4px; transform: rotate(180deg) }
+  .mp-zone[data-pos="left"] { left: -98px; top: 252px; transform: rotate(90deg) }
+  .mp-zone[data-pos="right"] { left: 398px; top: 252px; transform: rotate(-90deg) }
+  .mp-zone.vacant { visibility: hidden }
+  .mp-ring { position: absolute; left: 157px; top: 157px; width: 276px; height: 276px; border-radius: 50%; background: #6a6a50;
+             border: 3px solid #2d2f27; box-shadow: 0 14px 0 #2a2b22, 0 18px 14px #000a; transform: translateZ(4px) }
+  .mp-ring::before { content: ""; position: absolute; inset: 46px; border-radius: 50%; background: #4e5039; border: 3px solid #2d2f27;
+                     box-shadow: inset 0 8px 0 #2a2b22 }
+  .mp-ring i { position: absolute; left: 50%; top: 50%; width: 7px; height: 4px; margin: -2px 0 0 -3px; background: #cfe8d0; box-shadow: 0 0 6px #8dffa4 }
+  .mp-hp { position: absolute; width: 132px; height: 40px; padding: 5px 8px; background: #101a12; border: 3px solid #2a2622;
+           box-shadow: inset 0 0 0 1px #22402a, 0 4px 0 #191513; display: flex; gap: 5px; align-items: center; justify-content: center; transform: translateZ(2px) }
+  .mp-hp .bolt { width: 15px; height: 25px }
+  .mp-hp[data-pos="bottom"] { left: 234px; top: 476px }
+  .mp-hp[data-pos="top"] { left: 234px; top: 84px; transform: translateZ(2px) rotate(180deg) }
+  .mp-hp[data-pos="left"] { left: 48px; top: 280px; transform: translateZ(2px) rotate(90deg) }
+  .mp-hp[data-pos="right"] { left: 420px; top: 280px; transform: translateZ(2px) rotate(-90deg) }
+  .mp-hp.vacant { visibility: hidden }
+  .mp-slot { border: 2px solid #cfc6a8cc; display: grid; place-items: center; transform-style: preserve-3d }
+  .mp-slot .item { width: 46px; height: 46px }
+  .mp-slot .item img { width: 46px; height: 46px }
+  .mp-gun { position: absolute; left: 273px; top: 184px; width: 54px; height: 232px; transform-origin: 50% 50%; transition: transform .55s cubic-bezier(.3,.7,.3,1);
+            transform-style: preserve-3d; z-index: 2 }
+  .mp-gun svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 8px 5px #000a) }
+  .mp-gun.lift svg { filter: drop-shadow(0 16px 10px #000c) brightness(1.15) }
+  .mp-gun .flash { top: -50px; width: 120px; height: 120px; margin-left: -60px }
+  .mp-shells { position: absolute; left: 140px; top: 272px; width: 320px; display: flex; justify-content: center; gap: 8px; pointer-events: none; transform: translateZ(2px) }
+  .mp-shells .shell { position: relative; width: 18px; height: 56px }
+  .mp-shells .shell.gone { opacity: 0; transform: translateY(80px) scale(.5); transition: transform .3s ease-in, opacity .3s }
+
+  .mp-plate { position: absolute; width: 250px; padding: 8px 10px; display: grid; grid-template-columns: 64px 1fr; gap: 2px 10px; align-items: center;
+              border: 1px solid #3a2758; border-radius: 3px; background: #0b0709e6; transition: border-color .2s, box-shadow .2s }
+  .mp-plate[data-pos="bottom"] { left: 60px; top: 596px }
+  .mp-plate[data-pos="top"] { left: 150px; top: 226px }
+  .mp-plate[data-pos="left"] { left: 24px; top: 400px }
+  .mp-plate[data-pos="right"] { left: 1006px; top: 400px }
+  .mp-plate.vacant { display: none }
+  .mp-plate .who { font: 400 18px/1.2 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .mp-plate .flags { grid-column: 2; font-size: 12px; color: var(--gold); min-height: 1.2em }
+  .mp-plate .bolts { grid-column: 2; padding: 3px 6px; background: #0c1a10; border: 1px solid #22402a; display: flex; gap: 3px; width: max-content }
+  .mp-plate .bolt { width: 11px; height: 18px }
+  .mp-plate .mp-buddy { grid-row: span 2; animation: bob 3.2s ease-in-out infinite }
+  .mp-plate.turn { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) }
+  .mp-plate.target { cursor: pointer; border-color: #e0564b; box-shadow: 0 0 0 2px #e0564b88 }
+  .mp-plate.target:hover { background: #2a0e10f2 }
+  .mp-plate.out { opacity: .55 }
+  .mp-plate.out .mp-buddy { animation: none; transform: rotate(90deg) translateY(10px); filter: grayscale(1) brightness(.6) }
+  .mp-plate.flinch .mp-buddy img { animation: flinch .5s ease-out }
+  @keyframes flinch { 0% { filter: brightness(5) saturate(0) } 30% { transform: translateX(-8px) rotate(-8deg) } 60% { transform: translateX(6px) rotate(5deg) } 100% { transform: none } }
+  .mp-hud { position: absolute; right: 22px; top: 18px; display: flex; gap: 14px; align-items: center; color: var(--dim); font-size: 15px }
+  .mp-timer { font: 600 18px var(--mono); color: var(--ink); min-width: 3ch; text-align: right }
+  .mp-timer.low { color: #e0564b }
+  .mp-say { bottom: 8px; width: 520px; margin-left: -260px; font-size: 16px }
+  .mp-choices { left: auto; right: 24px; bottom: 24px; transform: none; width: 250px; flex-direction: column; gap: 8px }
+  .mp-choices .choice { font-size: 17px; padding: 9px 14px }
+  .mp-log { top: 64px }
+  /* Giratina hosts from above the far edge and doesn't play. */
+  body.live .dealer { left: auto; right: 34px; top: 92px; width: 190px; height: 190px; margin: 0 }
+  body.live .haze, body.live .rig { opacity: .55 }
+  body.live .dark, body.live .redflash { z-index: 8 }
+  .mp-wins { color: var(--dim) }
+
   @media (prefers-reduced-motion: reduce) {
+    .mp-plate .mp-buddy { animation: none }
     .dealer, .dealer img, .cone, .gun.ready { animation: none }
     .scene.shaking { animation: none }
   }
@@ -383,6 +488,22 @@
               <label><input type="radio" name="test-mode" value="hard"> Hard</label>
             </div>
           </div>
+          <button class="island mp-open" type="button" id="mp-open" hidden>
+            <span class="name">Multiplayer</span><span class="level">2–4 players, live</span><span class="pays">No tokens. Just for fun.</span>
+          </button>
+        </div>
+        <!-- Multiplayer rooms, through Bored Together (the arcade's lobby bridge). -->
+        <div class="mp-panel" id="mp-panel" hidden>
+          <h2>Multiplayer</h2>
+          <p class="mp-note" id="mp-note">Play live with 2 to 4 people. Same rules as Normal, no Giratina buffs, no tokens.</p>
+          <div class="mp-actions" id="mp-actions">
+            <button class="island-test-start mp-btn" id="mp-create" type="button">Create a room</button>
+            <label class="mp-join">Room code <input id="mp-code" maxlength="8" autocomplete="off" spellcheck="false"></label>
+            <button class="mp-btn" id="mp-join" type="button">Join</button>
+            <button class="mp-btn quiet" id="mp-together" type="button" hidden>Open Bored Together</button>
+          </div>
+          <div class="mp-rooms" id="mp-rooms"></div>
+          <button class="mp-btn quiet" id="mp-close" type="button">Close</button>
         </div>
         <p class="lobby-note" id="lobby-note" role="status"></p>
       </section>
@@ -392,11 +513,83 @@
       <div class="tabs" role="tablist" aria-label="Leaderboard mode">
         <button class="tab" type="button" role="tab" id="tab-normal" aria-controls="board-normal" aria-selected="true">Normal</button>
         <button class="tab" type="button" role="tab" id="tab-hard" aria-controls="board-hard" aria-selected="false">Hard</button>
+        <button class="tab" type="button" role="tab" id="tab-multiplayer" aria-controls="board-multiplayer" aria-selected="false">Multiplayer</button>
       </div>
       <div id="board-normal" role="tabpanel" aria-labelledby="tab-normal"></div>
       <div id="board-hard" role="tabpanel" aria-labelledby="tab-hard" hidden></div>
+      <div id="board-multiplayer" role="tabpanel" aria-labelledby="tab-multiplayer" hidden></div>
       <p class="empty" id="board-empty">No runs yet. The first survivor goes here.</p>
     </section>
+  </div>
+
+  <!-- Multiplayer (live mode only): the room lobby, then the square table. -->
+  <div class="mp" id="mp" hidden>
+    <div class="mp-room" id="mp-room-wrap">
+      <div class="mp-lobby" id="mp-lobby">
+        <h2>Multiplayer room</h2>
+        <p class="mp-code-line" id="mp-code-line"></p>
+        <ol class="mp-seats" id="mp-seats-list"></ol>
+        <p class="mp-note" id="mp-lobby-note" role="status"></p>
+        <div class="mp-actions">
+          <button class="mp-btn primary" id="mp-ready" type="button">Ready</button>
+          <button class="mp-btn primary" id="mp-start" type="button" hidden>Start</button>
+          <button class="mp-btn quiet" id="mp-newcode" type="button" hidden>New code</button>
+          <button class="mp-btn quiet" id="mp-leave-lobby" type="button">Leave room</button>
+        </div>
+      </div>
+    </div>
+    <div class="mp-tablewrap" id="mp-tablewrap" hidden>
+      <div class="mp-persp">
+        <div class="mp-table" id="mp-table">
+          <svg class="mp-felt" viewBox="0 0 600 600" aria-hidden="true">
+            <g fill="none" stroke="#d9cfb0" stroke-width="2" opacity=".6">
+              <rect x="10" y="10" width="580" height="580"/>
+              <path d="M10 10 L 190 190 M590 10 L 410 190 M10 590 L 190 410 M590 590 L 410 410"/>
+              <path d="M140 10 V 140 H 10 M460 10 V 140 H 590 M140 590 V 460 H 10 M460 590 V 460 H 590"/>
+              <circle cx="300" cy="300" r="190" stroke-dasharray="4 9"/>
+            </g>
+          </svg>
+          <div class="mp-ring" aria-hidden="true"><i style="transform:rotate(0deg) translateY(-128px)"></i><i style="transform:rotate(45deg) translateY(-128px)"></i><i style="transform:rotate(90deg) translateY(-128px)"></i><i style="transform:rotate(135deg) translateY(-128px)"></i><i style="transform:rotate(180deg) translateY(-128px)"></i><i style="transform:rotate(225deg) translateY(-128px)"></i><i style="transform:rotate(270deg) translateY(-128px)"></i><i style="transform:rotate(315deg) translateY(-128px)"></i></div>
+          <div class="mp-hp" data-pos="bottom"></div>
+          <div class="mp-hp" data-pos="left"></div>
+          <div class="mp-hp" data-pos="top"></div>
+          <div class="mp-hp" data-pos="right"></div>
+          <div class="mp-zone" data-pos="bottom"></div>
+          <div class="mp-zone" data-pos="left"></div>
+          <div class="mp-zone" data-pos="top"></div>
+          <div class="mp-zone" data-pos="right"></div>
+          <div class="mp-shells" id="mp-shells"></div>
+          <div class="mp-gun" id="mp-gun">
+            <span class="flash" id="mp-flash"></span>
+            <svg viewBox="0 0 84 360" aria-hidden="true">
+              <rect x="34" y="0" width="16" height="190" rx="3" fill="#3b3531"/>
+              <rect x="37" y="0" width="5" height="190" fill="#57504a"/>
+              <rect x="28" y="120" width="28" height="58" rx="5" fill="#5a3826"/>
+              <rect x="26" y="186" width="32" height="70" rx="4" fill="#2e2a27"/>
+              <path d="M28 254 L 56 254 L 66 352 Q 42 364 18 352 Z" fill="#5f3b28"/>
+              <path d="M30 262 L 54 262 L 60 340 Q 42 348 24 340 Z" fill="#6e4630"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="mp-plate" data-pos="bottom"></div>
+      <div class="mp-plate" data-pos="left"></div>
+      <div class="mp-plate" data-pos="top"></div>
+      <div class="mp-plate" data-pos="right"></div>
+      <div class="mp-hud">
+        <span class="mp-round" id="mp-round"></span>
+        <span class="mp-timer" id="mp-timer"></span>
+        <button class="plain" id="mp-leave" type="button">Leave game</button>
+      </div>
+      <p class="say mp-say" id="mp-say" role="status" aria-live="polite"></p>
+      <div class="choices mp-choices" id="mp-choices" hidden></div>
+      <div class="log mp-log" id="mp-log" role="log" aria-label="What happened"></div>
+      <div class="result" id="mp-result" hidden>
+        <h2 id="mp-result-title"></h2>
+        <p id="mp-result-text"></p>
+        <div class="again"><button class="choice primary" id="mp-result-close" type="button">Back to the table menu</button></div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="tip" id="tip" hidden></div>
@@ -1444,16 +1637,21 @@ $("#back").onclick = () => parent.postMessage({ type: "bored:close" }, "*");
 $("#to-gacha").onclick = () => parent.postMessage({ type: "bored:open-game", slug: "poke-gacha" }, "*");
 
 /* ── Leaderboard ──────────────────────────────────────────────────────── */
-const boards = { normal: [], hard: [] };
+const boards = { normal: [], hard: [], multiplayer: [] };
 let boardMode = "normal";
 function drawBoard(mode) {
-  const panel = $("#board-" + mode), rows = boards[mode];
+  const panel = $("#board-" + mode), rows = boards[mode], mp = mode === "multiplayer";
   const table = el("table", "board");
-  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net tokens</th><th class="n">Best streak</th></tr></thead>';
+  // Multiplayer ranks total game wins, then games played (no tokens involved).
+  table.innerHTML = mp
+    ? '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Wins</th><th class="n">Games</th></tr></thead>'
+    : '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net tokens</th><th class="n">Best streak</th></tr></thead>';
   const body = document.createElement("tbody");
   for (let rank = 1; rank <= 10; rank++) {
     const row = body.insertRow(), entry = rows[rank - 1];
-    const cells = entry ? [rank, String(entry.handle || "unnamed"), Number(entry.coins_won || 0).toLocaleString("en-US"), String(entry.best_streak || 0)] : [rank, "—", "—", "—"];
+    const cells = !entry ? [rank, "—", "—", "—"]
+      : mp ? [rank, String(entry.handle || "unnamed"), String(entry.wins || 0), String(entry.games || 0)]
+      : [rank, String(entry.handle || "unnamed"), Number(entry.coins_won || 0).toLocaleString("en-US"), String(entry.best_streak || 0)];
     cells.forEach((text, k) => {
       const cell = row.insertCell();
       if (k === 1 && entry) {
@@ -1482,13 +1680,725 @@ for (const tab of tabs) tab.onclick = () => {
     other.setAttribute("aria-selected", String(on));
     document.getElementById(other.getAttribute("aria-controls")).hidden = !on;
   }
-  boardMode = tab.id === "tab-hard" ? "hard" : "normal";
+  boardMode = tab.id.replace("tab-", "");
   $("#board-empty").hidden = boards[boardMode].length > 0;
 };
-drawBoard("normal");
-drawBoard("hard");
-loadBoard("normal");
-loadBoard("hard");
+for (const mode of ["normal", "hard", "multiplayer"]) { drawBoard(mode); loadBoard(mode); }
+
+/* ── Multiplayer: 2 to 4 players at one table, live, through Bored Together ──
+   The hub's live bridge (window.__boredLive, src/hub/together-live.js) gives the
+   room's lobby and one ordered log of actions. Every screen replays the same log
+   through the same rules, so every screen holds the same game:
+     load   {round, n, shells, items}  the shells and each seat's two items, rolled
+                                       by the host's screen (the lowest seat still at
+                                       the table); another screen steps in if it's late
+     item   {turn, box, target}        the turn's player uses an item (target: Thunder Wave)
+     shoot  {turn, target}             the turn's player fires at a seat (their own included)
+     expire {turn}                     30 seconds ran out: the turn's player shoots themself
+     leave  {}                         the sender is out for good
+   An action for a turn that is already over is ignored, so a late timer or a
+   second load never counts twice. Normal rules, no Giratina: first to 2 rounds,
+   2/3/4 HP, 2 items a load, clockwise turns, a blank at yourself keeps the turn.
+   The paralysis roll comes from the room's seed and the turn number, so every
+   screen rolls the same. Outside a live room, window.__boredLobby (the lobby
+   bridge) opens rooms: create one, join by code, or answer an invitation. */
+let mpLive = null, mpLobby = null;
+try { mpLive = window.__boredLive || null; } catch {}
+try { mpLobby = window.__boredLobby || null; } catch {}
+const MP_TURN_MS = 30000;
+const MP_POS = { 2: ["bottom", "top"], 3: ["bottom", "left", "top"], 4: ["bottom", "left", "top", "right"] };
+const MP_ANGLE = { top: 0, right: 90, bottom: 180, left: 270 };
+const MP_ROOM = { unjoined: "drop", cpus: 0, timer: 0, mode: "ffa" };
+let M = null, mpMe = 0, mpRoom = null, mpIsHost = false, mpSeq = 0, mpBusy = false, mpSending = false, mpPick = null;
+let mpFinished = false, mpGunAt = 180, mpClock = { key: "" }, mpLoadClock = { key: "" }, mpExit = false;
+const mpQueue = [], mpOnline = {}, buddyOf = {}, mpView = [];
+
+// A fixed 0-1 number per (seed, turn): every screen gets the same paralysis roll.
+function mpRoll(seed, turn) {
+  let a = (Number(seed) ^ Math.imul(turn, 0x9E3779B1)) | 0;
+  a = a + 0x6D2B79F5 | 0;
+  let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+
+/* The rules. Pure state changes; each pushes what happened to m.ev for the screen. */
+const mpUp = (m, i) => !m.p[i].out && !m.p[i].left;
+const mpLiving = m => m.p.map((_, i) => i).filter(i => mpUp(m, i));
+const mpNext = (m, i) => { for (let k = 1; k <= m.n; k++) { const j = (i + k) % m.n; if (mpUp(m, j)) return j; } return i; };
+const mpName = i => i === mpMe ? "You" : M ? M.names[i] : "Player";
+const mpSays = (i, you, they) => mpName(i) + " " + (i === mpMe ? you : they);
+const mpLog = (m, text, kind = "", seat = null) => m.ev.push({ t: "log", text, kind, seat });
+function mpGame(seats, seed) {
+  const n = seats.length;
+  return { n, seed: Number(seed) || 1, names: seats.map((s, i) => String(s.handle || "Player " + (i + 1)).slice(0, 40)),
+    p: seats.map(() => ({ hp: 0, max: 0, items: emptyBoxes(), band: false, para: false, waveBan: -1, turns: 0, knows: null, out: false, left: false })),
+    wins: Array(n).fill(0), round: 0, loads: 0, shells: [], loaded: [0, 0], turn: 0, turnNo: 0, phase: "load", resume: false, winner: null, ev: [] };
+}
+function mpRound(m) {
+  m.round++;
+  const hp = RULES.hp[Math.min(m.round, 3) - 1];
+  for (const s of m.p) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveBan: -1, knows: null, out: s.left });
+  // The first turn moves one seat clockwise each round.
+  let first = (m.round - 1) % m.n;
+  if (!mpUp(m, first)) first = mpNext(m, first);
+  Object.assign(m, { turn: first, shells: [], phase: "load", resume: false });
+  mpLog(m, "Round " + m.round + ". " + hp + " HP each. " + mpSays(first, "go first.", "goes first."), "round");
+  m.ev.push({ t: "round-start" });
+}
+function mpStartTurn(m) {
+  for (let guard = 0; guard < 16; guard++) {
+    m.turnNo++;
+    const s = m.p[m.turn];
+    s.turns++;
+    if (!s.para) break;
+    // Paralysis lasts one turn and stops it only half the time.
+    s.para = false;
+    const stuck = mpRoll(m.seed, m.turnNo) < PARALYSIS;
+    mpLog(m, stuck ? mpSays(m.turn, "are paralyzed! You can't move!", "is paralyzed! They can't move!")
+                   : mpSays(m.turn, "are paralyzed... but you moved anyway!", "is paralyzed... but moved anyway!"), "status");
+    if (!stuck) break;
+    m.turn = mpNext(m, m.turn);
+  }
+  m.ev.push({ t: "turn" });
+}
+const mpShellsOk = list => Array.isArray(list) && list.length >= 3 && list.length <= 8 && list.every(x => x === 0 || x === 1) && list.includes(0) && list.includes(1);
+function mpLoad(m, a) {
+  if (m.phase !== "load" || a.round !== m.round || a.n !== m.loads + 1 || !mpShellsOk(a.shells) || !Array.isArray(a.items)) return;
+  m.loads++;
+  m.shells = a.shells.map(Boolean);
+  const live = m.shells.filter(Boolean).length;
+  m.loaded = [live, m.shells.length - live];
+  for (const s of m.p) s.knows = null;
+  mpLog(m, "Loaded " + live + " live / " + (m.shells.length - live) + " blank. The shells go in shuffled.", "status");
+  m.ev.push({ t: "load", live, blank: m.shells.length - live });
+  m.p.forEach((s, i) => {
+    if (!mpUp(m, i)) return;
+    const got = [], lost = [];
+    for (const key of (Array.isArray(a.items[i]) ? a.items[i] : []).slice(0, 2)) {
+      if (!POOL.includes(key)) continue;
+      const box = s.items.indexOf(null);
+      if (box < 0) lost.push(ITEMS[key].name); else { s.items[box] = key; got.push(ITEMS[key].name); }
+    }
+    if (got.length) mpLog(m, mpSays(i, "get ", "gets ") + got.join(" and ") + ".");
+    if (lost.length) mpLog(m, (i === mpMe ? "Your" : m.names[i] + "'s") + " side is full, " + lost.join(" and ") + (lost.length > 1 ? " are" : " is") + " lost.");
+  });
+  m.phase = "turn";
+  // An Eject Button that emptied the gun mid-turn: the same player carries on.
+  if (m.resume) { m.resume = false; m.ev.push({ t: "turn" }); } else mpStartTurn(m);
+}
+const mpMine = (m, seat, a) => m.phase === "turn" && seat === m.turn && a.turn === m.turnNo && mpUp(m, seat);
+const mpWaveOk = (m, i) => m.p[i].turns > m.p[i].waveBan;
+const mpWaveTargets = (m, i) => mpLiving(m).filter(t => t !== i && !m.p[t].para);
+function mpItem(m, seat, a) {
+  if (!mpMine(m, seat, a) || !(a.box >= 0 && a.box < 8)) return;
+  const me = m.p[seat], key = me.items[a.box];
+  switch (key) {
+    case "potion":
+      if (me.hp >= me.max) return;
+      me.hp++;
+      mpLog(m, mpSays(seat, "used a Potion. +1 HP.", "used a Potion. +1 HP."), "you", seat);
+      break;
+    case "scope":
+      me.knows = m.shells[0];
+      // Only the player who looked sees what it was.
+      mpLog(m, seat === mpMe ? "Scope Lens: the shell in the chamber is " + (m.shells[0] ? "live." : "blank.") : m.names[seat] + " used Scope Lens and peered into the chamber.", seat === mpMe ? "secret" : "", seat);
+      break;
+    case "eject": {
+      const shell = m.shells.shift();
+      for (const s of m.p) s.knows = null;
+      mpLog(m, mpName(seat) + " used an Eject Button. Out pops a " + (shell ? "live" : "blank") + " shell.", "you", seat);
+      break;
+    }
+    case "band":
+      if (me.band) return;
+      me.band = true;
+      mpLog(m, mpSays(seat, "put on a Choice Band. Your next live shot does 2 damage.", "put on a Choice Band. Their next live shot does 2 damage."), "you", seat);
+      break;
+    case "wave": {
+      const t = a.target;
+      if (!mpWaveOk(m, seat) || !mpWaveTargets(m, seat).includes(t)) return;
+      m.p[t].para = true;
+      me.waveBan = me.turns + 1;
+      mpLog(m, mpName(seat) + " used Thunder Wave! " + mpSays(t, "are paralyzed! You may be unable to move!", "is paralyzed! They may be unable to move!"), "status", seat);
+      break;
+    }
+    case "trick":
+      m.shells[0] = !m.shells[0];
+      for (const s of m.p) if (s.knows !== null) s.knows = !s.knows;
+      mpLog(m, mpName(seat) + " used Trick Room. The shell in the chamber flips.", "you", seat);
+      break;
+    default: return;
+  }
+  m.ev.unshift({ t: "item", seat, box: a.box, key });
+  me.items[a.box] = null;
+  if (!m.shells.length) { mpLog(m, "The gun is empty."); Object.assign(m, { phase: "load", resume: true }); }
+}
+function mpShoot(m, seat, target) {
+  const me = m.p[seat], them = m.p[target], self = seat === target;
+  const dmg = me.band ? 2 : 1, banded = me.band;
+  me.band = false;
+  const live = m.shells.shift();
+  for (const s of m.p) s.knows = null;
+  mpLog(m, self ? mpSays(seat, "point the gun at yourself...", "points the gun at themself...") : mpSays(seat, "aim at ", "aims at ") + (target === mpMe ? "you" : m.names[target]) + "...", seat === mpMe ? "you" : "");
+  m.ev.push({ t: "aim", seat, target });
+  if (live) {
+    them.hp = Math.max(0, them.hp - dmg);
+    m.ev.push({ t: "bang", target, hp: them.hp });
+    mpLog(m, "*BANG* Live! " + mpSays(target, "lose ", "loses ") + dmg + " HP" + (banded ? " (Choice Band)." : "."), "live");
+  } else {
+    m.ev.push({ t: "click" });
+    mpLog(m, "*click* Blank." + (banded ? " The Choice Band is wasted." : ""));
+  }
+  if (them.hp <= 0) { them.out = true; mpLog(m, mpSays(target, "fainted. You're out this round.", "fainted and is out this round."), "round"); }
+  const standing = mpLiving(m);
+  if (standing.length <= 1) return mpRoundEnd(m, standing[0]);
+  m.turn = !m.shells.length || !(self && !live) ? mpNext(m, seat) : seat;
+  if (!m.shells.length) {
+    mpLog(m, "That was the last shell. " + mpSays(m.turn, "go", "goes") + " first on the new load.");
+    Object.assign(m, { phase: "load", resume: false });
+  } else {
+    if (m.turn === seat) mpLog(m, mpSays(seat, "keep the turn.", "keeps the turn."));
+    mpStartTurn(m);
+  }
+}
+function mpRoundEnd(m, winner) {
+  if (winner === undefined) winner = m.turn;
+  m.wins[winner]++;
+  mpLog(m, mpSays(winner, "take round " + m.round + ".", "takes round " + m.round + "."), "round");
+  m.ev.push({ t: "round", winner, round: m.round });
+  const left = m.p.map((_, i) => i).filter(i => !m.p[i].left);
+  if (m.wins[winner] >= 2 || left.length <= 1) return mpOver(m, m.wins[winner] >= 2 ? winner : left[0]);
+  mpRound(m);
+}
+function mpOver(m, winner) {
+  Object.assign(m, { phase: "over", winner });
+  mpLog(m, mpSays(winner, "win the table!", "wins the table!"), "round");
+  m.ev.push({ t: "over", winner });
+}
+function mpLeave(m, seat) {
+  const s = m.p[seat];
+  if (!s || s.left || m.phase === "over") return;
+  const wasUp = mpUp(m, seat);
+  Object.assign(s, { left: true, out: true });
+  mpLog(m, mpSays(seat, "left the table.", "left the table."), "status");
+  const left = m.p.map((_, i) => i).filter(i => !m.p[i].left);
+  if (left.length <= 1) return mpOver(m, left[0] === undefined ? seat : left[0]);
+  const standing = mpLiving(m);
+  if (wasUp && standing.length <= 1) return mpRoundEnd(m, standing[0]);
+  if (m.turn === seat) {
+    m.turn = mpNext(m, seat);
+    if (m.phase === "turn") mpStartTurn(m); else m.resume = false;
+  }
+}
+function mpApply(m, action) {
+  m.ev = [];
+  const seat = action.seat, a = action.args || {};
+  if (m.phase === "over" || !(seat >= 0 && seat < m.n)) return m.ev;
+  switch (action.type) {
+    case "load": if (!m.p[seat].left) mpLoad(m, a); break;
+    case "item": mpItem(m, seat, a); break;
+    case "shoot": if (mpMine(m, seat, a) && a.target >= 0 && a.target < m.n && mpUp(m, a.target)) mpShoot(m, seat, a.target); break;
+    case "expire":
+      if (m.phase === "turn" && a.turn === m.turnNo) {
+        mpLog(m, mpSays(m.turn, "ran out of time. The gun goes off at you.", "ran out of time. The gun turns on them."), "status");
+        mpShoot(m, m.turn, m.turn);
+      }
+      break;
+    case "leave": mpLeave(m, seat); break;
+  }
+  return m.ev;
+}
+// The host's screen rolls each load: the shells, and two items for every seat still in.
+function mpCompose(m) {
+  const { total, live } = rollLoad();
+  const shells = shuffle(Array.from({ length: total }, (_, k) => k < live ? 1 : 0));
+  const items = m.p.map((s, i) => {
+    if (!mpUp(m, i)) return [];
+    const hand = s.items.filter(Boolean), out = [];
+    for (let k = 0; k < 2; k++) { const key = pickItem(hand); hand.push(key); out.push(key); }
+    return out;
+  });
+  return { round: m.round, n: m.loads + 1, shells, items };
+}
+const mpHostSeat = m => m.p.findIndex(s => !s.left);
+
+/* The screen. */
+const mpPos = i => MP_POS[M.n][(i - mpMe + M.n) % M.n];
+const mpCanAct = () => !!M && M.phase === "turn" && M.turn === mpMe && mpUp(M, mpMe) && !mpBusy && !mpSending && mpQueue.length === 0;
+function mpSay(text) { $("#mp-say").textContent = text; }
+function mpWrite(e) {
+  const box = $("#mp-log");
+  box.appendChild(el("p", e.kind, e.text));
+  while (box.childElementCount > 80) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+  mpSay(e.text);
+}
+function buddyNode(handle) {
+  const box = el("span", "mp-buddy"), b = buddyOf[handle];
+  if (b) {
+    const img = el("img");
+    img.src = SPRITE_DIR + (b.shiny ? "shiny/" : "") + b.species + ".png";
+    img.alt = "";
+    box.appendChild(img);
+  } else box.appendChild(el("span", "none", String(handle || "?").slice(0, 1).toUpperCase()));
+  return box;
+}
+async function loadBuddies(handles, redraw) {
+  const want = [...new Set(handles.filter(h => typeof h === "string" && h && !(h in buddyOf)))].slice(0, 4);
+  if (!want.length) return;
+  for (const h of want) buddyOf[h] = null;
+  const reply = await ask("buddies", { handles: want }, 5000);
+  if (reply && reply.ok && reply.buddies) Object.assign(buddyOf, reply.buddies);
+  redraw();
+}
+function mpSetGun(deg) {
+  const delta = ((deg - mpGunAt) % 360 + 540) % 360 - 180;
+  mpGunAt += delta;
+  $("#mp-gun").style.transform = "translateZ(14px) rotate(" + mpGunAt + "deg)";
+}
+
+/* Live: the room's lobby. */
+function mpShow(which) {
+  $("#mp").hidden = false;
+  $("#mp-room-wrap").hidden = which !== "lobby";
+  $("#mp-tablewrap").hidden = which !== "table";
+}
+function mpLobbyNote(text) { $("#mp-lobby-note").textContent = text; }
+function drawRoom(room) {
+  mpRoom = room;
+  mpShow("lobby");
+  const seats = (room.seats || []).filter(s => s.state !== "left").sort((a, b) => a.seat - b.seat);
+  const mine = seats.find(s => s.seat === room.me) || {};
+  const host = mine.user && mine.user === room.host || mpIsHost;
+  $("#mp-code-line").replaceChildren();
+  if (room.code) $("#mp-code-line").append("Room code", el("b", "", room.code), " Friends join with this code from the Multiplayer button.");
+  else $("#mp-code-line").textContent = "This room has no code right now.";
+  const list = $("#mp-seats-list");
+  list.replaceChildren();
+  const cap = Math.max(2, Math.min(4, Number(room.capacity) || 4));
+  for (let k = 0; k < cap; k++) {
+    const s = seats[k], li = el("li", s ? "" : "empty");
+    if (!s) { li.append(el("span", "mp-buddy"), el("span", "", "Empty seat"), el("span", "state", "")); list.appendChild(li); continue; }
+    const isHost = s.user === room.host;
+    const state = isHost ? "Host" : s.state === "ready" ? "Ready" : s.state === "invited" ? "Invited" : "Not ready";
+    li.append(buddyNode(s.handle), el("span", "", String(s.handle || "Player") + (s.seat === room.me ? " (you)" : "")),
+      el("span", "state" + (isHost ? " host" : s.state === "ready" ? " ready" : ""), state));
+    list.appendChild(li);
+  }
+  loadBuddies(seats.map(s => s.handle), () => { if (mpRoom === room && !M) drawRoom(room); });
+  const joined = seats.filter(s => s.state === "joined" || s.state === "ready");
+  const waiting = joined.filter(s => s.user !== room.host && s.state !== "ready");
+  $("#mp-ready").hidden = host;
+  $("#mp-ready").textContent = mine.state === "ready" ? "Not ready" : "Ready";
+  $("#mp-start").hidden = !host;
+  $("#mp-newcode").hidden = !host;
+  $("#mp-start").disabled = joined.length < 2 || waiting.length > 0;
+  $("#mp-leave-lobby").textContent = host ? "Close room" : "Leave room";
+  if (!$("#mp-lobby-note").dataset.held) mpLobbyNote(host
+    ? joined.length < 2 ? "Waiting for a friend to join. Two to four players."
+      : waiting.length ? "Waiting for everyone to be ready." : "Everyone is ready. Start when you like."
+    : mine.state === "ready" ? "Ready. The host starts the game." : "Press Ready when you are.");
+}
+async function mpRoomCall(op, payload) {
+  for (const b of document.querySelectorAll("#mp-lobby button")) b.disabled = true;
+  try {
+    const room = await mpLive.call(op, payload);
+    if (room && room.status === "active") return mpHello();
+    if (room) drawRoom(room);
+  } catch (error) {
+    mpLobbyNote(error.message || "That didn't go through.");
+    if (mpRoom) { const note = $("#mp-lobby-note"); note.dataset.held = "1"; setTimeout(() => { delete note.dataset.held; }, 4000); }
+  }
+  for (const b of document.querySelectorAll("#mp-lobby button")) b.disabled = false;
+  if (mpRoom && mpRoom.status === "lobby") drawRoom(mpRoom);
+}
+$("#mp-ready").onclick = () => {
+  const mine = ((mpRoom && mpRoom.seats) || []).find(s => s.seat === mpRoom.me) || {};
+  mpRoomCall("lobby", { ready: mine.state !== "ready" });
+};
+$("#mp-start").onclick = () => mpRoomCall("start");
+$("#mp-newcode").onclick = () => mpRoomCall("new-code");
+$("#mp-leave-lobby").onclick = async () => {
+  try { await mpLive.call("leave"); } catch {}
+  mpLive.call("exit").catch(() => {});
+};
+
+/* Live: the table. */
+function mpBuildTable() {
+  mpShow("table");
+  $("#mp-log").replaceChildren();
+  mpView.length = 0;
+  for (const zone of document.querySelectorAll(".mp-zone")) { zone.classList.add("vacant"); zone.replaceChildren(); zone.dataset.sig = ""; }
+  for (const plate of document.querySelectorAll(".mp-plate")) { plate.classList.add("vacant"); plate.replaceChildren(); plate.onclick = null; }
+  for (const hp of document.querySelectorAll(".mp-hp")) { hp.classList.add("vacant"); hp.replaceChildren(); }
+  for (let i = 0; i < M.n; i++) {
+    const pos = mpPos(i), zone = document.querySelector('.mp-zone[data-pos="' + pos + '"]'), plate = document.querySelector('.mp-plate[data-pos="' + pos + '"]');
+    zone.classList.remove("vacant");
+    plate.classList.remove("vacant");
+    const who = el("span", "who", M.names[i]), flags = el("span", "flags"), bolts = document.querySelector('.mp-hp[data-pos="' + pos + '"]');
+    bolts.classList.remove("vacant");
+    plate.append(buddyNode(M.names[i]), who, flags);
+    plate.onclick = () => mpPlateClick(i);
+    mpView[i] = { zone, plate, flags, bolts, prev: null };
+  }
+  loadBuddies(M.names, () => {
+    if (!M) return;
+    for (let i = 0; i < M.n; i++) mpView[i].plate.firstChild.replaceWith(buddyNode(M.names[i]));
+  });
+  $("#mp-gun").style.transition = "none";
+  mpSetGun(MP_ANGLE[mpPos(M.turn)] + 180);
+  void $("#mp-gun").offsetWidth;
+  $("#mp-gun").style.transition = "";
+}
+function mpDrawSlots(i) {
+  const v = mpView[i], s = M.p[i], mine = i === mpMe, open = mine && mpCanAct();
+  const sig = s.items.join() + "|" + open + "|" + (mine ? [s.hp >= s.max, s.band, mpWaveOk(M, i) && mpWaveTargets(M, i).length > 0, mpPick ? mpPick.box : -1].join() : "");
+  if (v.zone.dataset.sig === sig) return;
+  v.zone.dataset.sig = sig;
+  v.zone.replaceChildren();
+  for (let box = 0; box < 8; box++) {
+    const slot = el("div", "mp-slot"), key = s.items[box];
+    v.zone.appendChild(slot);
+    if (!key) continue;
+    const item = el("button", "item");
+    item.type = "button";
+    const art = el("img");
+    art.src = ITEM_DIR + ITEMS[key].art + ".png";
+    art.alt = ITEMS[key].name;
+    item.appendChild(art);
+    item.dataset.box = box;
+    item.setAttribute("aria-label", ITEMS[key].name + ". " + ITEMS[key].tip);
+    if (mine) {
+      item.disabled = !open || (key === "potion" && s.hp >= s.max) || (key === "band" && s.band) ||
+        (key === "wave" && !(mpWaveOk(M, i) && mpWaveTargets(M, i).length));
+      item.onclick = () => mpUseItem(box);
+    } else item.tabIndex = -1;
+    item.onmouseenter = event => showTip(key, event);
+    item.onmousemove = event => moveTip(event);
+    item.onmouseleave = () => { $("#tip").hidden = true; };
+    slot.appendChild(item);
+  }
+}
+function mpDrawBolts(i, hp) {
+  const v = mpView[i], s = M.p[i];
+  const before = v.prev === null ? hp : v.prev;
+  v.bolts.innerHTML = BOLT.repeat(s.max);
+  v.bolts.setAttribute("aria-label", hp + " of " + s.max + " HP");
+  [...v.bolts.children].forEach((bolt, k) => { if (k >= hp) bolt.classList.add(k < before ? "breaking" : "dead"); });
+  v.prev = hp;
+}
+function mpRender() {
+  if (!M || !mpView.length) return;
+  const act = mpCanAct();
+  if (!act) mpPick = null;
+  const waveTo = mpPick ? mpWaveTargets(M, mpMe) : [];
+  for (let i = 0; i < M.n; i++) {
+    const s = M.p[i], v = mpView[i];
+    mpDrawSlots(i);
+    if (v.prev !== s.hp || v.bolts.childElementCount !== s.max) mpDrawBolts(i, s.hp);
+    const flags = [i === mpMe && "you", M.wins[i] && "rounds won " + M.wins[i], s.left ? "left" : s.out && "out", s.para && "paralyzed", s.band && "Choice Band on",
+      mpOnline[i] === false && !s.left && "away"].filter(Boolean);
+    v.flags.textContent = flags.join(", ");
+    v.plate.classList.toggle("turn", M.phase === "turn" && M.turn === i);
+    v.plate.classList.toggle("out", s.out);
+    v.plate.classList.toggle("target", act && (mpPick ? waveTo.includes(i) : mpUp(M, i)));
+  }
+  $("#mp-round").textContent = M.phase === "over" ? "Game over" : "Round " + M.round + ". First to 2.";
+  const choices = $("#mp-choices");
+  choices.replaceChildren();
+  choices.hidden = !act;
+  if (act) {
+    const button = (text, cls, fn) => { const b = el("button", "choice" + (cls ? " " + cls : ""), text); b.type = "button"; b.onclick = fn; choices.appendChild(b); };
+    if (mpPick) {
+      for (const t of waveTo) button("Paralyze " + M.names[t], "primary", () => mpPlateClick(t));
+      button("Cancel", "quiet", () => { mpPick = null; mpRender(); });
+    } else {
+      for (const t of mpLiving(M)) if (t !== mpMe) button("Shoot " + M.names[t], "primary", () => mpPlateClick(t));
+      button("Shoot yourself", "", () => mpPlateClick(mpMe));
+    }
+  }
+  // The gun's grip faces whoever holds it.
+  if (M.phase === "turn" && !mpBusy) mpSetGun(MP_ANGLE[mpPos(M.turn)] + 180);
+  if (!mpBusy && M.phase === "turn") {
+    const you = M.p[mpMe], known = you.knows;
+    mpSay(act ? (mpPick ? "Who gets the Thunder Wave?" : "Your turn. Use items, then shoot someone: click their side." + (known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.")))
+      : M.turn === mpMe ? "Sending..." : M.names[M.turn] + "'s turn.");
+  }
+}
+async function mpSend(type, args) {
+  mpSending = true;
+  mpPick = null;
+  $("#tip").hidden = true;
+  mpRender();
+  const safety = setTimeout(() => { mpSending = false; mpRender(); }, 9000);
+  try { await mpLive.call("send", { type, args }); }
+  catch (error) { clearTimeout(safety); mpSending = false; mpSay("That didn't go through: " + (error.message || "try again.")); mpRender(); }
+}
+function mpUseItem(box) {
+  if (!mpCanAct()) return;
+  const key = M.p[mpMe].items[box];
+  if (key === "wave") {
+    const targets = mpWaveTargets(M, mpMe);
+    if (targets.length === 1) return mpSend("item", { turn: M.turnNo, box, target: targets[0] });
+    mpPick = { box };
+    return mpRender();
+  }
+  mpSend("item", { turn: M.turnNo, box });
+}
+function mpPlateClick(i) {
+  if (!mpCanAct() || !mpUp(M, i)) return;
+  if (mpPick) {
+    if (mpWaveTargets(M, mpMe).includes(i)) mpSend("item", { turn: M.turnNo, box: mpPick.box, target: i });
+    return;
+  }
+  mpSend("shoot", { turn: M.turnNo, target: i });
+}
+
+// Plays what one action did. `fast` (catching up on a log) only writes the log.
+async function mpAnimate(events, fast) {
+  for (const e of events) {
+    if (e.t === "log") { mpWrite(e); continue; }
+    if (fast) continue;
+    const v = mpView[e.seat !== undefined ? e.seat : e.target];
+    switch (e.t) {
+      case "load": {
+        const row = $("#mp-shells");
+        row.replaceChildren();
+        const shells = [...Array(e.live).fill("live"), ...Array(e.blank).fill("blank")].map(kind => { const s = el("div", "shell"); s.innerHTML = shellArt(kind); return s; });
+        for (const s of shells) { row.appendChild(s); sfx.click(); await wait(90); }
+        await wait(1300);
+        for (const s of shells) s.classList.add("gone");
+        sfx.chk();
+        await wait(350);
+        row.replaceChildren();
+        break;
+      }
+      case "item": {
+        const node = v && v.zone.querySelector('.item[data-box="' + e.box + '"]');
+        if (node) { node.classList.add("glow"); await wait(e.seat === mpMe ? 0 : 380); node.classList.add("using"); await wait(520); }
+        break;
+      }
+      case "aim":
+        $("#mp-gun").classList.add("lift");
+        mpSetGun(MP_ANGLE[mpPos(e.target)]);
+        await wait(1100);
+        break;
+      case "bang":
+        fx.restart($("#mp-flash"), "on");
+        fx.restart($("#scene"), "shaking");
+        if (e.target === mpMe) fx.restart($("#redflash"), "on");
+        if (v) { fx.restart(v.plate, "flinch"); mpDrawBolts(e.target, e.hp); v.plate.classList.toggle("out", e.hp <= 0); }
+        await wait(900);
+        $("#mp-gun").classList.remove("lift");
+        break;
+      case "click":
+        sfx.click();
+        await wait(650);
+        $("#mp-gun").classList.remove("lift");
+        break;
+      case "round":
+        $("#mp-choices").hidden = true;
+        await fx.lightsOut(mpSays(e.winner, "take round " + e.round + ".", "takes round " + e.round + "."),
+          M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".");
+        break;
+    }
+  }
+}
+async function mpPump(fast = false) {
+  if (mpBusy) return;
+  mpBusy = true;
+  try {
+    while (mpQueue.length) {
+      const action = mpQueue.shift();
+      if (!(action.seq > mpSeq)) continue;
+      mpSeq = action.seq;
+      if (action.seat === mpMe && (action.type === "item" || action.type === "shoot")) mpSending = false;
+      const events = mpApply(M, action);
+      // A long backlog (opening a game already under way) is caught up without animation.
+      await mpAnimate(events, fast || mpQueue.length > 4);
+      if (!fast) mpRender();
+    }
+  } finally { mpBusy = false; }
+  mpAfter();
+}
+function mpAfter() {
+  mpRender();
+  if (M.phase === "over") mpEnd();
+}
+function mpEnd() {
+  $("#mp-choices").hidden = true;
+  $("#mp-timer").textContent = "";
+  if (!mpFinished && !M.p[mpMe].left) {
+    mpFinished = true;
+    // Every screen reports the winner it computed; the room ends once two agree.
+    mpLive.call("finish", { winner: M.winner, why: "won" }).catch(() => { mpFinished = false; });
+  }
+  $("#mp-result-title").textContent = M.winner === mpMe ? "You win the table." : M.names[M.winner] + " wins the table.";
+  $("#mp-result-text").textContent = "Rounds: " + M.names.map((name, i) => (i === mpMe ? "you" : name) + " " + M.wins[i]).join(", ") + ". No tokens at this table; the win counts on the Multiplayer board.";
+  $("#mp-result").hidden = false;
+}
+$("#mp-result-close").onclick = () => mpLive.call("exit").catch(() => {});
+$("#mp-leave").onclick = async () => {
+  const button = $("#mp-leave");
+  if (!M || M.phase === "over" || M.p[mpMe].left) return mpLive.call("exit").catch(() => {});
+  if (!button.dataset.confirm) { button.dataset.confirm = "1"; button.textContent = "Leave and be out"; return; }
+  if (mpExit) return;
+  mpExit = true;
+  button.disabled = true;
+  // What leaving does, worked out here: if it ends the game, this screen's claim goes in before it closes.
+  const after = JSON.parse(JSON.stringify(M));
+  mpApply(after, { seat: mpMe, type: "leave", args: {} });
+  try {
+    await mpLive.call("send", { type: "leave", args: {} });
+    if (after.phase === "over") await mpLive.call("finish", { winner: after.winner, why: "left" });
+  } catch {}
+  mpLive.call("exit").catch(() => {});
+};
+
+// The turn clock and the host's chores, four times a second.
+function mpTick() {
+  if (!M || M.phase === "over" || mpExit) return;
+  const now = Date.now(), order = M.p.map((_, i) => i).filter(i => !M.p[i].left), rank = Math.max(0, order.indexOf(mpMe));
+  const timer = $("#mp-timer");
+  if (M.phase === "turn" && !mpBusy) {
+    const key = M.turnNo + ":" + M.loads;
+    if (mpClock.key !== key) mpClock = { key, at: now, sent: false };
+    const left = Math.max(0, MP_TURN_MS - (now - mpClock.at));
+    timer.textContent = Math.ceil(left / 1000) + "s";
+    timer.classList.toggle("low", left < 10000);
+    // The turn's own screen sends it at once; the others wait a moment in case that screen has gone.
+    const grace = M.turn === mpMe ? 0 : 2500 + rank * 1500;
+    if (!mpClock.sent && !M.p[mpMe].left && now - mpClock.at > MP_TURN_MS + grace) {
+      mpClock.sent = true;
+      mpLive.call("send", { type: "expire", args: { turn: M.turnNo } }).catch(() => { mpClock.sent = false; });
+    }
+  } else timer.textContent = "";
+  if (M.phase === "load" && !M.p[mpMe].left) {
+    const key = M.round + ":" + (M.loads + 1);
+    if (mpLoadClock.key !== key) mpLoadClock = { key, at: now, sent: false };
+    const grace = mpHostSeat(M) === mpMe ? 0 : 6000 + rank * 2000;
+    if (!mpLoadClock.sent && now - mpLoadClock.at >= grace) {
+      mpLoadClock.sent = true;
+      mpLive.call("send", { type: "load", args: mpCompose(M) }).catch(() => { mpLoadClock.sent = false; });
+    }
+  }
+}
+async function mpHello() {
+  let r;
+  try { r = await mpLive.call("hello"); }
+  catch (error) { mpShow("lobby"); mpLobbyNote(error.message || "The room didn't answer."); return; }
+  const room = r.game || {};
+  mpIsHost = !!r.host;
+  if (room.status === "lobby") return drawRoom(room);
+  if (room.status !== "active" && room.status !== "completed") {
+    mpRoom = room;
+    mpShow("lobby");
+    $("#mp-seats-list").replaceChildren();
+    $("#mp-code-line").textContent = "";
+    for (const id of ["#mp-ready", "#mp-start", "#mp-newcode"]) $(id).hidden = true;
+    $("#mp-leave-lobby").textContent = "Back";
+    return mpLobbyNote("This room was closed.");
+  }
+  if (M) return;
+  mpRoom = room;
+  const seats = (room.start && room.start.seats) || [];
+  M = mpGame(seats, room.start && room.start.options && room.start.options.seed);
+  mpMe = Number.isInteger(room.me) && room.me >= 0 && room.me < M.n ? room.me : 0;
+  mpBuildTable();
+  mpRound(M);
+  mpAnimate(M.ev, true);
+  M.ev = [];
+  mpQueue.push(...(r.actions || []));
+  await mpPump(true);
+  mpRender();
+}
+if (mpLive) {
+  document.body.classList.add("live");
+  $("#lobby").hidden = true;
+  $("#dealer").classList.remove("away");
+  $("#dealer-img").src = SPRITE_DIR + "10007.png";
+  mpShow("lobby");
+  mpLobbyNote("Opening the room...");
+  for (const id of ["#mp-ready", "#mp-start", "#mp-newcode"]) $(id).hidden = true;
+  mpLive.on(event => {
+    if (!event) return;
+    if (event.event === "game" && event.game) {
+      if (event.game.status === "lobby") drawRoom(event.game);
+      else if (!M) mpHello();
+    } else if (event.event === "actions" && M) {
+      mpQueue.push(...(event.actions || []));
+      mpPump();
+    } else if (event.event === "presence") {
+      for (const s of event.seats || []) mpOnline[s.seat] = !!s.online;
+      mpRender();
+    } else if (event.event === "net") {
+      mpSay(event.online ? "Back online." : "Connection lost. Trying again...");
+    } else if (event.event === "removed") {
+      mpShow("lobby");
+      mpLobbyNote("The host removed you from this room.");
+      setTimeout(() => mpLive.call("exit").catch(() => {}), 2500);
+    }
+  });
+  setInterval(mpTick, 250);
+  mpHello();
+}
+
+/* Solo title screen: open, create or join a room through the lobby bridge. */
+function mpNote(text) { $("#mp-note").textContent = text; }
+async function mpPanel() {
+  $("#mp-panel").hidden = false;
+  const extra = $("#mp-together");
+  extra.hidden = true;
+  $("#mp-rooms").replaceChildren();
+  let status;
+  try { status = await mpLobby.call("status"); } catch (error) { return mpNote(error.message || "The arcade didn't answer."); }
+  if (!status.signedIn) {
+    mpNote("Sign in to Bored to play multiplayer.");
+    extra.textContent = "Sign in";
+    extra.dataset.op = "sign-in";
+    extra.hidden = false;
+    return;
+  }
+  if (!status.enrolled) {
+    mpNote("Multiplayer runs on Bored Together. Join it there first, then come back.");
+    extra.textContent = "Open Bored Together";
+    extra.dataset.op = "open-together";
+    extra.hidden = false;
+    return;
+  }
+  mpNote("Play live with 2 to 4 people. Same rules as Normal, no Giratina buffs, no tokens.");
+  const rooms = $("#mp-rooms"), add = (text, fn) => { const b = el("button", "mp-btn quiet", text); b.type = "button"; b.onclick = fn; rooms.appendChild(b); };
+  try {
+    const [invites, games] = await Promise.all([mpLobby.call("invites"), mpLobby.call("games")]);
+    for (const inv of invites || []) add("Join " + inv.host + "'s room (" + (inv.players || []).join(", ") + ")", () => mpGo("join", { invite: inv.id }));
+    for (const room of (games && games.live) || []) {
+      if (room.status === "lobby") add("Back to your room (" + room.players.map(p => p.name).join(", ") + ")", () => mpGo("open", { game: room.id }));
+      else if (room.status === "active") add("Back to your game (" + room.players.map(p => p.name).join(", ") + ")", () => mpGo("open", { game: room.id }));
+    }
+  } catch {}
+}
+async function mpGo(op, payload) {
+  for (const b of document.querySelectorAll("#mp-panel button")) b.disabled = true;
+  mpNote(op === "host" ? "Opening a room..." : "Joining...");
+  try { await mpLobby.call(op, payload); }
+  catch (error) { mpNote(error.message || "That didn't go through."); }
+  for (const b of document.querySelectorAll("#mp-panel button")) b.disabled = false;
+}
+if (mpLobby && !mpLive) {
+  $("#mp-open").hidden = false;
+  $("#mp-open").onclick = mpPanel;
+  $("#mp-close").onclick = () => { $("#mp-panel").hidden = true; };
+  $("#mp-create").onclick = () => mpGo("host", { settings: MP_ROOM, invitees: [], humans: 4 });
+  $("#mp-join").onclick = () => {
+    const code = $("#mp-code").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length < 4) return mpNote("Type the room code your friend sent you.");
+    mpGo("join-code", { code });
+  };
+  $("#mp-code").addEventListener("keydown", event => { if (event.key === "Enter") $("#mp-join").click(); });
+  $("#mp-together").onclick = () => mpLobby.call($("#mp-together").dataset.op || "open-together").catch(() => {});
+  mpLobby.on(event => { if (event && event.event === "account" && !$("#mp-panel").hidden) mpPanel(); });
+}
 
 // The hub reads this. Unscored in the arcade: rounds you've won this game, and whether it ended.
 // The board ranks `profit` from a real, won game. The frame is sandboxed, so the

@@ -397,7 +397,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // overwrite it and let a re-deal reroll the shared board.
       html = multiplayer?.mode === 'duel' ? html : injectSeed(html);
       if (multiplayer) html = multiplayer.document(html);
-      else if (slug === 'ashcrown') { activeLobby = createLobbyBridge({ frame: gameFrame, deps: lobbyDeps }); html = activeLobby.document(html); }
+      else if (slug === 'ashcrown' || slug === 'shotgun-roulette') { activeLobby = createLobbyBridge({ frame: gameFrame, game: slug, deps: lobbyDeps }); html = activeLobby.document(html); }
       // Civ Lite and Poké Idle keep their saves in the player's account. A live or turn-by-turn match lives on the
       // server and never touches saves, so only a solo document is offered the bridge.
       if (SAVE_GAMES[slug] && !multiplayer) { activeSaves = createSavesBridge({ frame: gameFrame, game: slug }); html = activeSaves.document(html); }

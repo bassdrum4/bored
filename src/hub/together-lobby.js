@@ -73,7 +73,9 @@ const players = g => (g.seats || []).filter(s => s.state !== 'left').map(s => ({
 //   openLive(id)       switch the player into that live game, as Bored Together does
 //   openSignIn()       the hub's sign-in
 //   openTogether()     the Bored Together page
-export function createLobbyBridge({ frame, deps = {} }) {
+// `game` is the live game this screen belongs to: Civ Lite ('ashcrown', the default) or Shotgun Roulette. Rooms it
+// creates are of that game, and its lists show only that game's rooms.
+export function createLobbyBridge({ frame, game = 'ashcrown', deps = {} }) {
   const channel = crypto.randomUUID();
   const rpc = deps.rpc || liveRPC, together = deps.together || togetherRPC;
   const account = deps.account || (() => (hasIdentity() ? { id: getSession()?.user?.id, name: getHandle() } : null));
@@ -93,7 +95,10 @@ export function createLobbyBridge({ frame, deps = {} }) {
     return task;
   }
   const dashboard = () => read('dashboard', () => together('dashboard'));
-  const rooms = () => read('list', async () => { const list = await rpc('list'); return Array.isArray(list) ? list : []; });
+  const rooms = () => read('list', async () => {
+    const list = await rpc('list');
+    return (Array.isArray(list) ? list : []).filter(g => (g && g.game ? g.game : 'ashcrown') === game);
+  });
   const uuid = value => { if (typeof value !== 'string' || !UUID.test(value)) throw new Error('Invalid request.'); return value; };
 
   async function status(me) {
@@ -163,7 +168,7 @@ export function createLobbyBridge({ frame, deps = {} }) {
       capacity = humans;
     }
     if (ids.length + 1 > capacity) throw new Error('There are more invitations than seats. Raise the human players, or invite fewer friends.');
-    const created = await rpc('create', { game: 'ashcrown', invite: ids, capacity, config: cleanSettings(settings) });
+    const created = await rpc('create', { game, invite: ids, capacity, config: cleanSettings(settings) });
     cache.clear();
     const id = uuid(created && created.id);
     if (!same(me.id)) throw new Error('Your account changed. Please try again.');

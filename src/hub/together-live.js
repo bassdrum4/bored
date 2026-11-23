@@ -6,7 +6,9 @@ import { subscribeChanges } from './realtime.js';
 // from one ordered log of actions. A room is the host plus min to max invited members (CPUs fill the rest). A room
 // opened from Civ Lite's Multiplayer screen can be as small as the host and a friend with a code (see together-lobby.js).
 export const TOGETHER_LIVE = Object.freeze({
-  ashcrown: { min: 1, max: 3 }
+  ashcrown: { min: 1, max: 3 },
+  // Shotgun Roulette: 2 to 4 players at one table, free for all, no CPUs (rooms are opened with unjoined: 'drop').
+  'shotgun-roulette': { min: 2, max: 4 }
 });
 
 // The six characters a room code is made of, from what somebody typed or pasted (even a whole invite, "Join my Civ Lite
