@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 881,
+  "count": 882,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"78adb03","date":"2026-11-23","author":"Codebuff","subject":"test: answer the invite reads the hub now makes on load"},
   {"sha":"3d23965","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette main leaderboard: log the submit path"},
   {"sha":"1ae7da1","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette on the main page leaderboard"},
   {"sha":"7031c3c","date":"2026-11-23","author":"Claude","subject":"Shotgun Roulette: Thunder Wave text without the odds"},
