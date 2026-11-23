@@ -2,15 +2,18 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 857,
+  "count": 860,
   "newest": "2026-11-22",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"39e2d18","date":"2026-11-22","author":"Claude","subject":"Collector: its own green tab, item-sprite icons, casino door, tutorial, dust shards 25:1 cap 30"},
   {"sha":"6cc0bc8","date":"2026-11-22","author":"Claude","subject":"Hub: the Collector's casino door"},
+  {"sha":"890f714","date":"2026-11-22","author":"Claude","subject":"Collector: say how the pacing was simulated"},
   {"sha":"fb38210","date":"2026-11-22","author":"Claude","subject":"Casino chips: a separate currency, daily login chips, Shotgun Roulette bets chips with a net-profit cap"},
+  {"sha":"d59089e","date":"2026-11-22","author":"Claude","subject":"Poké Gacha: the Collector machine, the Full Dex, dust, sets and badges"},
   {"sha":"80e36d6","date":"2026-11-22","author":"PenguinV360","subject":"Shotgun Roulette: Shadow Force 20% -> 15% on Hard","pr":297},
   {"sha":"a4cec4a","date":"2026-11-22","author":"PenguinV360","subject":"Shotgun Roulette: fixes from a Hard test log","pr":296},
   {"sha":"4f2e516","date":"2026-11-22","author":"Daniel Lowe","subject":"Replace in-game Resume menu action with feedback dialog","pr":293},
