@@ -68,6 +68,9 @@ async function lab(t) {
         }
       }
       if (address.pathname.startsWith('/rest/v1/rpc/bt_')) return reply(null);   // Bored Together's own background calls; not what is tested here
+      // Invite codes and recruiter medals are account-wide reads the hub makes on load: not what is tested here.
+      if (address.pathname === '/rest/v1/recruiter_board') return reply([]);
+      if (/^\/rest\/v1\/rpc\/(my_invite|sync_invite)$/.test(address.pathname)) return reply(null);
       if (address.pathname === '/rest/v1/profiles') return reply([{ handle: 'Fixture' }]);
       if (address.pathname === '/auth/v1/logout') return reply(null);
       if (['/rest/v1/announcements', '/rest/v1/announcement_reads', '/rest/v1/score_rules', '/rest/v1/leaderboard', '/rest/v1/daily_leaderboard', '/rest/v1/buddy_board', '/rest/v1/scores', '/rest/v1/player_state', '/rest/v1/daily_results', '/rest/v1/play_events', '/rest/v1/product_events', '/rest/v1/feedback_entries', '/rest/v1/analytics_admins', '/rest/v1/game_analytics_readers'].includes(address.pathname)) return reply(req.method() === 'GET' ? [] : null);
