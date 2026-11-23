@@ -27,7 +27,7 @@ import { createLibraryView } from './hub/library-view.js';
 import { createGameFinder } from './hub/game-finder.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
-import { initInvites, loadMedals, medalFor, medalLookup, recordPlayDay, renderInvites, syncInvite } from './hub/invites.js';
+import { initInvites, leadToInviteCode, loadMedals, medalFor, medalLookup, recordPlayDay, renderInvites, syncInvite } from './hub/invites.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createLivePlayer } from './hub/together-live.js';
@@ -1299,7 +1299,8 @@ initVoice();
 const navigation = createHubNavigation({
   togetherUI,
   onLeaderboard: () => loadLeaderboard(true),
-  onSettings: () => void renderInvites()
+  // Opening Settings is the nudge's destination: land on the invite code once.
+  onSettings: () => { void renderInvites(); leadToInviteCode(); }
 });
 
 // The same footer link routes to the dashboard this account may actually use.

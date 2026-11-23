@@ -4,7 +4,7 @@ import { ORDER } from '../games/catalog.js';
 import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 const announcementAdmin = createAnnouncementAdmin();
-let events = [], productEvents = [], feedbackRows = [], togetherSummary = null, popularitySummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
+let events = [], productEvents = [], feedbackRows = [], togetherSummary = null, popularitySummary = null, aggregateSummary = null, aggregateCohorts = [], inviteSummary = null, handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -389,6 +389,38 @@ function renderHistory() {
       c.school_returned == null ? 'Not mature' : c.school_returned + ' (' + percentage(c.school_returned,c.cohort) + ')'
     ]));
 }
+// Invite totals come from one admin-only aggregate over invite_codes and
+// recruits; the raw tables are readable by no client role at all.
+function renderInvitesView() {
+  const host = $('#invite-totals');
+  if (!host) return;
+  const data = inviteSummary;
+  if (!data || typeof data !== 'object') {
+    host.replaceChildren(el('p', 'Invite totals are unavailable.'));
+    for (const id of ['#invite-day-chart','#invite-table','#invite-recruiters'])
+      $(id)?.replaceChildren(el('p', 'No invite data available.'));
+    return;
+  }
+  const number = value => Number(value) || 0;
+  const issued = number(data.codes_total), redeemed = number(data.codes_redeemed_total);
+  const stats = [
+    ['Codes issued', issued], ['Codes redeemed', redeemed],
+    ['Redemption rate', issued ? Math.round(redeemed * 100 / issued) + '%' : '—'],
+    ['Pending recruits', number(data.pending_total)], ['Credited recruits', number(data.credited_total)],
+    ['Redeemed in range', number(data.redemptions)]
+  ];
+  host.replaceChildren(...stats.map(([label, value]) => {
+    const n = el('div'); n.className = 'analytics-stat';
+    n.append(el('strong', typeof value === 'number' ? value.toLocaleString() : value), el('span', label)); return n;
+  }));
+  const days = Array.isArray(data.days) ? data.days : [];
+  stackedDays('#invite-day-chart', days, d => d.day, d => d.redemptions, d => d.credited, ['Redeemed','Credited']);
+  table('#invite-table', ['Detroit date','Codes issued','Redeemed','Credited'],
+    days.map(d => [d.day, d.issued, d.redemptions, d.credited]));
+  const recruiters = Array.isArray(data.recruiters) ? data.recruiters : [];
+  table('#invite-recruiters', ['Recruiter','Credited','Pending'],
+    recruiters.map(r => [r.handle, r.credited, r.pending]));
+}
 function render() {
   const selected = $('#person').value;
   const rows = events.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
@@ -494,7 +526,7 @@ async function load() {
       }
     }
     // Independent visit/survey events do not inflate game-session totals.
-    const [productLoaded,feedbackLoaded,authoritativeTogether,serverRollup,serverCohorts,serverPopularity] = await Promise.all([
+    const [productLoaded,feedbackLoaded,authoritativeTogether,serverRollup,serverCohorts,serverPopularity,serverInvites] = await Promise.all([
       request('/rest/v1/product_events?select=*&received_at=gte.' + start.toISOString() +
         '&received_at=lt.' + end.toISOString() + '&order=received_at.asc&limit=20000'),
       request('/rest/v1/feedback_entries?select=*&created_at=gte.' + start.toISOString() +
@@ -506,6 +538,8 @@ async function load() {
       request('/rest/v1/rpc/analytics_retention_cohorts_v1',{method:'POST',
         body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => []),
       request('/rest/v1/rpc/analytics_game_popularity_v1',{method:'POST',
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => null),
+      request('/rest/v1/rpc/analytics_invites_v1',{method:'POST',
         body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => null)
     ]);
     const profiles = await request('/rest/v1/profiles?select=id,handle&order=id&limit=1000');
@@ -521,6 +555,7 @@ async function load() {
     feedbackRows = feedbackLoaded.filter(e => allowed.has(e));
     togetherSummary = authoritativeTogether;
     popularitySummary = serverPopularity;
+    inviteSummary = serverInvites;
     aggregateSummary = serverRollup;
     aggregateCohorts = Array.isArray(serverCohorts) ? serverCohorts : [];
     const excluded = loaded.length + flightLoaded.length - events.length;
@@ -528,7 +563,7 @@ async function load() {
     $('#person').replaceChildren(new Option('All players', ''), new Option('Unidentified guests', 'guest'),
       ...[...new Set(events.map(e => e.user_id).filter(Boolean))].map(id => new Option(handles[id] || id.slice(0, 8), id)));
     $('#person').value = [...$('#person').options].some(o => o.value === previous) ? previous : '';
-    page = 0; render(); renderHistory();
+    page = 0; render(); renderHistory(); renderInvitesView();
     const emptyReason = events.length ? '' : loaded.length + flightLoaded.length
       ? ' · Player report is empty because every recorded event in this selection was staff/admin activity.'
       : ' · No telemetry was received in this selection.';
@@ -536,7 +571,7 @@ async function load() {
       events.length.toLocaleString() + ' player events loaded · refreshed ' + dateTime(cutoff) + emptyReason +
       (excluded ? ' · ' + excluded.toLocaleString() + ' staff/admin events recorded and excluded' : '');
   } catch (error) {
-    events = []; productEvents = []; feedbackRows = []; togetherSummary = null; popularitySummary = null; aggregateSummary = null; aggregateCohorts = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
+    events = []; productEvents = []; feedbackRows = []; togetherSummary = null; popularitySummary = null; aggregateSummary = null; aggregateCohorts = []; inviteSummary = null; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();
     $('#status').textContent = error.message || 'Could not load analytics. Try again.';
   } finally { loading = false; $('#refresh').disabled = false; }

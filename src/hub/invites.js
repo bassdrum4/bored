@@ -11,6 +11,7 @@ import { dailyDate } from '../daily.js';
 
 const DAYS_KEY = 'bored.invite.days';
 const CODE_KEY = 'bored.invite.code';
+const NUDGE_KEY = 'bored.invite.nudge';
 const MEDALS_TTL = 60_000;
 const $ = selector => document.querySelector(selector);
 
@@ -189,6 +190,42 @@ export function inviteErrorMessage(error) {
   return message || 'That code did not work.';
 }
 
+/* ── The nudge dot ────────────────────────────────────────────────────────── */
+
+// A small pulsing dot beside Settings until this account has actually been led
+// to its invite code. The dismissal stores the account id, so someone else
+// signing in on this browser still gets their own nudge.
+function nudgeDoneFor() {
+  return String(readStored(NUDGE_KEY, '') || '');
+}
+
+export function refreshInviteNudge() {
+  const uid = getSession()?.user?.id || '';
+  const show = Boolean(uid) && nudgeDoneFor() !== uid;
+  for (const dot of document.querySelectorAll('.invite-dot')) dot.hidden = !show;
+  return show;
+}
+
+export function dismissInviteNudge() {
+  const uid = getSession()?.user?.id || '';
+  if (!uid || nudgeDoneFor() === uid) return;
+  writeStored(NUDGE_KEY, uid);
+  refreshInviteNudge();
+}
+
+/**
+ * The dot's whole job: open Settings on the code itself, then stop nudging.
+ * Called when the Settings view opens, so it works from the nav link and from
+ * the phone menu alike. The scroll waits a frame because the view is being
+ * revealed in the same turn.
+ */
+export function leadToInviteCode() {
+  if (!refreshInviteNudge()) return false;
+  dismissInviteNudge();
+  requestAnimationFrame(() => $('#invite-panel')?.scrollIntoView({ block: 'center' }));
+  return true;
+}
+
 /* ── The Settings panel ───────────────────────────────────────────────────── */
 
 function setText(selector, text) {
@@ -222,6 +259,7 @@ export function initInvites() {
     const code = String($('#invite-code')?.dataset.code || '');
     if (!code) return;
     setText('#invite-status', await copyCode(code) ? 'Code copied.' : 'Select the code and copy it.');
+    dismissInviteNudge();
   };
   const claim = $('#invite-claim');
   if (claim) claim.onclick = async () => {
@@ -248,6 +286,8 @@ export function initInvites() {
     event.preventDefault();
     claim?.click();
   });
+  window.addEventListener('bored:identity', refreshInviteNudge);
+  refreshInviteNudge();
   void renderInvites();
 }
 
