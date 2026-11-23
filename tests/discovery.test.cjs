@@ -287,6 +287,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
     if (url.pathname === '/rest/v1/product_events' && method === 'POST') return reply(null);
     if (url.pathname === '/rest/v1/rpc/bt_rpc') return reply({ enrolled: false });
     if (url.pathname === '/rest/v1/rpc/bt_invite_rpc') return reply({ enrolled: false, invites: [] });
+    // Invite codes and recruiter medals load on every signed-in page; this mock
+    // backend has no recruits, so the board is empty and nobody has a code yet.
+    if (url.pathname === '/rest/v1/recruiter_board') return reply([]);
+    if (url.pathname === '/rest/v1/rpc/my_invite' || url.pathname === '/rest/v1/rpc/sync_invite') return reply(null);
     if (url.pathname === '/rest/v1/announcements' || url.pathname === '/rest/v1/announcement_reads') return reply([]);
     // Role checks are expected on sign-in; this ordinary tester has no analytics access.
     if (url.pathname === '/rest/v1/analytics_admins' || url.pathname === '/rest/v1/game_analytics_readers') return reply([]);

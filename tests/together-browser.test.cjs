@@ -39,6 +39,19 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
         return req.respond({status:response.status,headers:cors,contentType:'application/json',body:await response.text()});
       }
       if(url.pathname==='/rest/v1/rpc/bored_popular_games')return reply([{game:'trackbound',ranking:1}]);
+      // Invite codes and recruiter medals are account-wide hub reads; the real SQL answers them, as it does the rest.
+      if(url.pathname==='/rest/v1/recruiter_board'||/^\/rest\/v1\/rpc\/(my_invite|sync_invite)$/.test(url.pathname)) {
+        const board=url.pathname==='/rest/v1/recruiter_board';
+        const body=board?{}:JSON.parse(req.postData());
+        const text=board?'select handle, credited from public.recruiter_board limit 5000'
+          :url.pathname.endsWith('my_invite')?'select public.my_invite() r':'select public.sync_invite($1,$2) r';
+        const pending=serial.then(()=>as(db,ids.includes(identity)?identity:null,async()=>{
+          const rows=(await db.query(text,board?[]:[body.p_code,body.p_days])).rows;
+          return board?rows:rows[0].r;
+        }));
+        serial=pending.catch(()=>{});
+        try{return reply(await pending);}catch(e){return reply({message:e.message,code:e.code},400);}
+      }
       if(url.pathname==='/rest/v1/rpc/bt_invite_rpc') {
         if(outages.has(identity))return req.abort('internetdisconnected');
         const {action,args}=JSON.parse(req.postData());calls.push({identity,action:'invite:'+action});

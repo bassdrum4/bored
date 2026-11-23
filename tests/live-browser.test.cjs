@@ -75,6 +75,18 @@ async function harness(t) {
         // Public seven-day ranks are unrelated to the live multiplayer protocol.
         return reply([{ game: 'trackbound', ranking: 1 }]);
       }
+      // Invite codes and recruiter medals are account-wide reads the hub makes on
+      // load; the real functions answer them here, as they do the rest of the account's reads.
+      if (address.pathname === '/rest/v1/recruiter_board') {
+        return rpc(async () => sql(as, 'select handle, credited from public.recruiter_board limit 5000'));
+      }
+      if (address.pathname === '/rest/v1/rpc/my_invite') {
+        return rpc(async () => (await sql(as, 'select public.my_invite() r'))[0].r);
+      }
+      if (address.pathname === '/rest/v1/rpc/sync_invite') {
+        const { p_code, p_days } = JSON.parse(req.postData());
+        return rpc(async () => (await sql(as, 'select public.sync_invite($1,$2) r', [p_code, p_days]))[0].r);
+      }
       if (address.pathname === '/rest/v1/rpc/bt_live_rpc') {
         const { action, args } = JSON.parse(req.postData());
         seen.push(action);
