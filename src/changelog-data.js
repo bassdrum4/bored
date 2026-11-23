@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 888,
+  "count": 889,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a4d9e7d","date":"2026-11-23","author":"Codebuff","subject":"Let announcements ask: polls and open-ended questions"},
   {"sha":"d270a59","date":"2026-11-23","author":"Claude","subject":"Beginner's Package, claimable tokens, cheaper Collector pulls, Set as buddy"},
   {"sha":"0f1cb0e","date":"2026-11-23","author":"Codebuff","subject":"Make the invite nudge dot bigger and give it a spreading halo"},
   {"sha":"930cd52","date":"2026-11-23","author":"Codebuff","subject":"Say what the invite code is for, and who is still pending"},
