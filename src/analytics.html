@@ -68,17 +68,21 @@
 </section>
 <section id="announcements-view" hidden>
   <h2>Announcements</h2>
-  <p class="analytics-note">Messages are delivered inside Bored the next time someone visits. Normal messages do not interrupt games. Guests can receive public messages; messages to specific users require an account.</p>
+  <p class="analytics-note">Messages are delivered inside Bored the next time someone visits. Normal messages do not interrupt games. Guests can receive public messages; messages to specific users require an account. Polls offer 2–8 answers and open-ended questions take a written reply; either needs a signed-in account to answer, one answer per account, and responses appear under the announcement below.</p>
   <form id="announcement-form" class="announcement-form">
     <label>Title <input id="announcement-title" type="text" minlength="3" maxlength="100" required placeholder="New game: Risk!"></label>
     <label>Message <textarea id="announcement-body" rows="4" maxlength="1000" required placeholder="Tell players what's new."></textarea></label>
     <div class="announcement-form-row">
+      <label>Type <select id="announcement-kind"><option value="message">Message</option><option value="poll">Poll</option><option value="question">Open-ended question</option></select></label>
       <label>Audience <select id="announcement-audience"><option value="everyone">Everyone (including guests)</option><option value="registered">Registered accounts</option><option value="selected">Specific accounts</option></select></label>
       <label>Importance <select id="announcement-priority"><option value="normal">Normal</option><option value="important">Important</option></select></label>
       <label>Expires <select id="announcement-expiry"><option value="1">After 1 day</option><option value="7" selected>After 7 days</option><option value="30">After 30 days</option><option value="never">Never</option></select></label>
     </div>
     <label id="announcement-recipients-row" hidden>Recipients (Ctrl/Cmd-click to select multiple)
       <select id="announcement-recipients" multiple size="7" aria-label="Specific account recipients"></select>
+    </label>
+    <label id="announcement-options-row" hidden>Poll answers (one per line, 2–8)
+      <textarea id="announcement-options" rows="4" maxlength="640" placeholder="Add a new mode&#10;Leave the games as they are"></textarea>
     </label>
     <label>Link to a game (optional) <input id="announcement-link" type="text" pattern="#[a-z0-9][a-z0-9-]{0,49}" placeholder="#risk"></label>
     <button id="announcement-send" type="submit">Publish announcement</button>

@@ -12,7 +12,8 @@
 .announcement-form input,.announcement-form textarea,.announcement-form select{width:100%;min-width:0;
   border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:9px;font:14px/1.5 Georgia,"Times New Roman",serif}
 .announcement-form input:focus,.announcement-form textarea:focus,.announcement-form select:focus{outline:2px solid var(--red);outline-offset:1px}
-.announcement-form-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.announcement-form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+#announcement-options{min-height:96px}
 #announcement-recipients{min-height:150px;font:12px var(--mono)}
 #announcement-send{justify-self:start;padding:10px 16px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font:12px var(--mono);cursor:pointer}
 #announcement-send:disabled{opacity:.5;cursor:default}
@@ -23,6 +24,11 @@
 .announcement-admin-item>p{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0}
 .announcement-admin-item .announcement-meta{font:11px var(--mono);color:var(--dim)}
 .announcement-admin-item .action{margin-top:8px}
+.announcement-admin-results{margin:10px 0;padding:9px 12px;border-left:2px solid var(--rule);font:12px/1.7 var(--mono)}
+.announcement-admin-results p{margin:0;overflow-wrap:anywhere}
+.announcement-admin-results ul{margin:5px 0 0 16px}
+.announcement-admin-results li{margin:4px 0;overflow-wrap:anywhere}
+.announcement-admin-results strong{font-weight:600}
 @media(max-width:650px){.announcement-form-row{grid-template-columns:1fr}.announcement-form{padding:12px}}
 
 /* Compact, accessible categorical breakdowns (counts remain visible in legend). */

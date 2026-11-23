@@ -98,3 +98,101 @@ test('announcement composer offers targeted delivery and deliberate unpublishing
   assert.match(module, /method: 'PATCH'/);
   assert.match(module, /method: 'POST'/);
 });
+
+test('a signed-in player votes in a poll and answers an open-ended question', async t => {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium']
+    .filter(Boolean).find(p => fs.existsSync(p));
+  assert.ok(executablePath);
+  const site = await serve(root);
+  let browser;
+  t.after(async () => { await browser?.close(); await site.close(); });
+  browser = await puppeteer.launch({ executablePath, headless: true });
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const posts = [{
+    id: 'poll-1', title: 'Which mode?', body: 'Pick one.', kind: 'poll',
+    options: ['More of this', 'Fewer games'], audience: 'everyone', recipient_id: null,
+    priority: 'normal', link_url: null, active: true,
+    published_at: new Date(Date.now() - 5000).toISOString(),
+    created_at: new Date().toISOString(), expires_at: null
+  }, {
+    id: 'question-1', title: 'What next?', body: 'Tell us.', kind: 'question', options: null,
+    audience: 'everyone', recipient_id: null, priority: 'normal', link_url: null, active: true,
+    published_at: new Date(Date.now() - 6000).toISOString(),
+    created_at: new Date(Date.now() - 60000).toISOString(), expires_at: null
+  }];
+  let voted = null, answered = null;
+  const cors = {
+    'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS',
+    'access-control-allow-headers': 'apikey,authorization,content-type,prefer'
+  };
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    const url = req.url();
+    if (url.startsWith(site.origin)) return req.continue();
+    const reply = (status, body) => req.respond({
+      status, contentType: 'application/json', headers: cors,
+      body: body === undefined ? '' : JSON.stringify(body)
+    });
+    if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers: cors });
+    if (url.includes('/rest/v1/announcements?')) return reply(200, posts);
+    if (url.includes('/rest/v1/announcement_reads?') && req.method() === 'GET') return reply(200, []);
+    if (url.includes('/rest/v1/announcement_responses?') && req.method() === 'GET') return reply(200, []);
+    if (url.includes('/rest/v1/announcement_reads?on_conflict')) return reply(204);
+    if (url.includes('/rest/v1/rpc/respond_to_announcement')) {
+      const body = JSON.parse(req.postData() || '{}');
+      if (body.p_choice) voted = body; else answered = body;
+      return reply(200, body.p_choice ? { choice: body.p_choice } : { answer: body.p_answer });
+    }
+    if (url.includes('/rest/v1/rpc/announcement_results')) return reply(200, [{ choice: 'More of this', votes: 1 }]);
+    return req.abort();
+  });
+  await page.evaluateOnNewDocument(user => {
+    localStorage.setItem('bored.session', JSON.stringify({
+      access_token: 'fixture-token', refresh_token: 'fixture-refresh',
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: user, is_anonymous: false, email: 'fixture@example.test' }
+    }));
+  }, userId);
+  await page.goto(site.url, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#announcement-banner:not([hidden])', { timeout: 10000 });
+  await page.click('#announcement-toggle');
+  await page.waitForSelector('#announcement-dialog[open]');
+
+  await page.click('#announcement-list .announcement-option');
+  await page.waitForFunction(() => document.getElementById('announcement-status').textContent === 'Vote recorded.');
+  assert.equal(voted.p_announcement, 'poll-1');
+  assert.equal(voted.p_choice, 'More of this');
+  assert.equal(await page.$eval('#announcement-list .announcement-chosen .announcement-result-label',
+    node => node.textContent), 'More of this');
+
+  const question = '#announcement-list .announcement-card:nth-child(2)';
+  await page.type(question + ' textarea', 'A fishing game');
+  await page.click(question + ' .announcement-submit');
+  await page.waitForFunction(() => document.getElementById('announcement-status').textContent === 'Answer sent.');
+  assert.equal(answered.p_announcement, 'question-1');
+  assert.equal(answered.p_answer, 'A fishing game');
+  assert.deepEqual(errors, []);
+});
+
+test('an announcement can be a message, a poll or an open-ended question', () => {
+  const html = fs.readFileSync(path.join(root, 'analytics.html'), 'utf8');
+  const admin = fs.readFileSync(path.join(root, 'hub', 'announcement-admin.js'), 'utf8');
+  const ui = fs.readFileSync(path.join(root, 'hub', 'announcements-ui.js'), 'utf8');
+  assert.match(html, /id="announcement-kind"/);
+  assert.match(html, /<option value="poll">Poll<\/option>/);
+  assert.match(html, /<option value="question">Open-ended question<\/option>/);
+  assert.match(html, /id="announcement-options"/);
+  // The composer publishes the kind and its listed answers with the message.
+  assert.match(admin, /kind, options, link_url/);
+  assert.match(admin, /Give the poll 2 to 8 answers/);
+  assert.match(admin, /announcement_responses/);
+  // Players answer through the functions; open-ended answers stay private to
+  // their author and the admins, and polls expose only a tally.
+  assert.match(ui, /rpc\/respond_to_announcement/);
+  assert.match(ui, /rpc\/announcement_results/);
+  assert.match(ui, /announcement-option/);
+  assert.match(ui, /announcement-response-hint/);
+});
