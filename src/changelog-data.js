@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 877,
+  "count": 878,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"152f352","date":"2026-11-23","author":"Codebuff","subject":"Give every account an invite code and tiered recruiter medals"},
   {"sha":"7ba436c","date":"2026-11-23","author":"PenguinV360","subject":"Shotgun Roulette: Griseous Orbs orbit around Giratina, not on its chest","pr":305},
   {"sha":"d832057","date":"2026-11-23","author":"PenguinV360","subject":"Shotgun Roulette: Griseous Orbs orbit Giratina","pr":304},
   {"sha":"e28b9b5","date":"2026-11-23","author":"PenguinV360","subject":"Full Dex: centred frame, whole sprites, page buttons, clearer filters and details","pr":303},
