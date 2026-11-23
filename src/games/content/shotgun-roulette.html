@@ -1106,6 +1106,7 @@ async function endGame(won, forfeit = false) {
         : "The arcade didn't confirm the payout. Check your wallet in Poké Gacha.";
     } else {
       setBalance(reply);
+      if (won && reply.profit > 0) game.profit = reply.profit;
       text = won
         ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " chips" + (reply.capped ? ", trimmed to stay under the 3,000-chip daily limit." : ".")
         : "Your bet of " + game.bet.toLocaleString("en-US") + " chips is gone.";
@@ -1452,7 +1453,11 @@ loadBoard("normal");
 loadBoard("hard");
 
 // The hub reads this. Unscored in the arcade: rounds you've won this game, and whether it ended.
-window.__boredSnapshot = () => ({ slug: "shotgun-roulette", rounds: g ? g.wins[YOU] : 0, finished: !!(g && g.over) });
+// The board ranks `profit` from a real, won game. The frame is sandboxed, so the
+// hub can't read this; src/hub/roulette.js records the same value when it pays
+// the win. Test games report real: false and never count.
+window.__boredSnapshot = () => ({ slug: "shotgun-roulette", rounds: g ? g.wins[YOU] : 0, finished: !!(g && g.over),
+  won: !!(g && g.over && g.wins[YOU] === 2), real: !!(g && !g.test), profit: (g && g.profit) || 0 });
 }
 </script>
 </body>
