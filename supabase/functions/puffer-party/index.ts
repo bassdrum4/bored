@@ -195,27 +195,36 @@ function etDate(now = Date.now()) {
 // the room's ratings stay in the isolate instead of costing a database round
 // trip on every poll and every answer. Both are re-read when they can change:
 // the book after its TTL, the ratings whenever applyRatings writes them.
-let bookCache: { date: string; at: number; book: Book } | null = null;
-const BOOK_TTL = 5 * 60_000;
+let bookCache: { requestedDate: string; at: number; book: Book } | null = null;
+let pendingBook: { requestedDate: string; job: Promise<Book> } | null = null;
+// A valid daily book cannot change during the day; fallbacks are retried quickly.
+const BOOK_TTL = 6 * 60 * 60_000;
+const STALE_BOOK_TTL = 30_000;
 const ratingsCache = new Map<string, { at: number; rows: Map<string, { rating: number; games: number }> }>();
 const RATINGS_TTL = 4_000;
 
 async function loadBook(): Promise<Book> {
   const date = etDate();
-  if (bookCache && bookCache.date === date && Date.now() - bookCache.at < BOOK_TTL) return bookCache.book;
-  let response = await sb('krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1');
-  let rows = response.ok ? await response.json() : [];
-  if (!rows?.[0]?.book) {
-    response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
-    rows = response.ok ? await response.json() : [];
-  }
-  const value = rows?.[0]?.book;
-  const book = typeof value === 'string' ? JSON.parse(value) : value;
-  if (!book?.prompts?.length || book.prompts.length !== ROUNDS) throw new HttpError('Puffer Party is between dives. Try again shortly.', 503);
-  // A book borrowed from an earlier day is not today's book, so it is never
-  // cached under today's date.
-  bookCache = { date: String(book.date || date), at: Date.now(), book };
-  return book;
+  const ttl = bookCache?.book.date === date ? BOOK_TTL : STALE_BOOK_TTL;
+  if (bookCache?.requestedDate === date && Date.now() - bookCache.at < ttl) return bookCache.book;
+  if (pendingBook?.requestedDate === date) return pendingBook.job;
+  const job = (async (): Promise<Book> => {
+    let response = await sb('krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1');
+    let rows = response.ok ? await response.json() : [];
+    if (!rows?.[0]?.book) {
+      response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
+      rows = response.ok ? await response.json() : [];
+    }
+    const value = rows?.[0]?.book;
+    const book = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!book?.prompts?.length || book.prompts.length !== ROUNDS)
+      throw new HttpError('Puffer Party is between dives. Try again shortly.', 503);
+    bookCache = { requestedDate: date, at: Date.now(), book };
+    return book;
+  })();
+  pendingBook = { requestedDate: date, job };
+  try { return await job; }
+  finally { if (pendingBook?.job === job) pendingBook = null; }
 }
 
 const cleanName = (value: unknown, seat: number) => {
