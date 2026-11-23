@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 866,
+  "count": 868,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,8 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"45062a0","date":"2026-11-23","author":"Daniel Lowe","subject":"test: align crossword spotlight ordering with expired new-game boost"},
+  {"sha":"7c21814","date":"2026-11-23","author":"Claude","subject":"Collector trades: keep the SQL in sql/, not supabase/migrations"},
+  {"sha":"663f2ba","date":"2026-11-23","author":"Claude","subject":"Collector trades: server-decided offer trades (SQL RPC) and the hub bridge"},
   {"sha":"dc7946b","date":"2026-11-23","author":"Claude","subject":"Collector QoL: dex grid, filters, wishlist, kept dupes, settings"},
   {"sha":"8dcc4cd","date":"2026-11-22","author":"Daniel Lowe","subject":"Verify Crossword spotlight expires automatically"},
   {"sha":"3cbeee3","date":"2026-11-22","author":"Daniel Lowe","subject":"Apply Crossword spotlight to popular shelf and game list"},
