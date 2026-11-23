@@ -179,10 +179,10 @@ test('roster cut: an owned cut line is refunded once with a note, and leaves the
 test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1-1 clear pays and unlocks 1-2', async t => {
   const { tab, game, errors } = await openWithMons(t);
   const tabs = await game.$$eval('#tabs [data-tab]', nodes => nodes.map(n => n.dataset.tab));
-  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests', 'card', 'wiki'], 'Story is the first of eight tabs, Wiki the last');
+  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests', 'card', 'wiki', 'collector'], 'Story first; the Collector last, apart from tower defense');
   // The tab bar and the purse fit on one line inside the frame.
-  const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), last = await rect(game, '#tabs [data-tab="wiki"]'), help = await rect(game, '#tabs .help');
-  assert.ok(purse.r <= bar.r + 0.5 && last.r <= help.l && help.r <= purse.l, 'eight tabs, help and the purse fit');
+  const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), last = await rect(game, '#tabs [data-tab="collector"]'), help = await rect(game, '#tabs .help');
+  assert.ok(purse.r <= bar.r + 0.5 && last.r <= help.l && help.r <= purse.l, 'nine tabs, help and the purse fit');
 
   await key(tab, '1');
   assert.equal(await game.evaluate(() => tab), 'story');
@@ -2203,7 +2203,7 @@ test('new player: Skip (clicked) ends the tutorial at every step of every tip, a
     assert.deepEqual([r.after.up, r.after.hidden, r.after.skip, r.after.tab], [false, true, true, 'story'], 'loop box ' + i);
   }
   // Each screen's tips.
-  for (const id of ['pull', 'eggs', 'dex', 'shop', 'quests']) {
+  for (const id of ['pull', 'eggs', 'dex', 'shop', 'quests', 'collector']) {
     const n = await game.evaluate(id => TIPS[id]().length, id);
     for (let i = 0; i < n; i++) {
       const r = await skipAt(new Function(`go(${JSON.stringify(id)}); if (tutor) tutorEnd(false); tip(${JSON.stringify(id)}, TIPS[${JSON.stringify(id)}](), { force: true });`), i);
@@ -2400,6 +2400,107 @@ test('projectiles point along their path in 8 directions and follow a moving tar
     const fr = await (await tab.$('#frame')).boundingBox(), [x0, y0, k] = r.rect;
     await tab.screenshot({ path: path.join(process.env.SHOT_DIR, 'aimed-shots.png'), clip: { x: fr.x + x0 + (r.cx - 130) * k, y: fr.y + y0 + (r.cy - 120) * k, width: 260 * k, height: 230 * k } });
   }
+  assert.deepEqual(errors, []);
+});
+
+test('the Collector: its own green tab with the machine, Full Dex, sets and dust shop; chips and dust only there; never TD', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // Screenshots (SHOT_DIR) can use the real pixel font (FONT_FILE, a local Jersey 10); the suite aborts webfonts.
+  if (process.env.FONT_FILE) await game.evaluate(async b64 => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const f = new FontFace('Jersey 10', bin.buffer);
+    await f.load(); document.fonts.add(f); document.querySelector('#frame').classList.remove('no-pixel'); refreshTop(); }, fs.readFileSync(process.env.FONT_FILE).toString('base64'));
+  const shot = async name => { if (process.env.SHOT_DIR) await (await tab.$('#frame')).screenshot({ path: path.join(process.env.SHOT_DIR, name + '.png') }); };
+  await game.evaluate(() => { const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); w.entries['test:chips'] = { at: Math.floor(Date.now() / 1000), g: { chips: 5000, dust: 1000 } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); tipsSeen.collector = true; refreshTop(); });
+  // Pull keeps tower defense's three machines; the purse there is coins and shards.
+  await game.evaluate(() => go('pull'));
+  assert.deepEqual(await game.evaluate(() => ORDER_M), ['move', 'legend', 'shiny']);
+  assert.deepEqual(await game.$$eval('#tabs .purse img', ns => ns.map(n => n.alt)), ['coins', 'shards']);
+  assert.equal(await game.$eval('#frame', n => n.classList.contains('col')), false);
+  const before = await game.evaluate(() => ({ owned: S.owned.length, pulls: S.pulls, eggs: S.eggs.length, chips: CS.chips, coins: S.balance.coins }));
+  // The Collector tab: green, chips and dust in the purse, the note on every view.
+  await key(tab, '9');
+  assert.equal(await game.evaluate(() => tab), 'collector', 'the ninth tab, on key 9');
+  assert.equal(await game.$eval('#frame', n => n.classList.contains('col')), true);
+  assert.equal(await game.$eval('#scr-collector .panel', n => getComputedStyle(n).borderTopColor), 'rgb(47, 143, 95)', 'green panels');
+  assert.deepEqual(await game.$$eval('#tabs .purse img', ns => ns.map(n => n.alt)), ['chips', 'dust']);
+  for (const m of ['machine', 'dex', 'sets', 'shop']) {
+    await game.evaluate(m => { fullMode = m; colUpdate(); }, m);
+    assert.equal(await game.$eval('#col-note', n => n.textContent), "Collection only, doesn't join your squad.", m);
+    assert.match(await game.$eval('#msg', n => n.textContent), /Collection only, doesn't join your squad\./, m + ' message');
+  }
+  await game.evaluate(() => { fullMode = 'machine'; colAt = 1; colUpdate(); });
+  // The tab bar and the purse (chips and dust here, often the widest numbers) fit on one line.
+  const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), dustImg = await rect(game, '#tabs .purse img:last-child');
+  assert.ok(purse.r <= bar.r + 0.5 && dustImg.r <= purse.r, 'the tabs and the chips-and-dust purse fit');
+  assert.deepEqual(await game.$$eval('#full-rows > div', ns => ns.map(n => n.textContent.replace(/\s+/g, ''))), ['x11Pull100', 'x1010Pulls900', 'Getchips→Casino', 'Rates·pity(R)', 'History(H)']);
+  assert.match(await game.$eval('#col-machine', n => n.textContent), /Casino today\s*\+0\s*\/ 3,000 net/);
+  assert.equal(await game.$eval('#col-machine img', n => n.getAttribute('src').endsWith('collector.png') && n.width), 130, 'the Pokédex at 5x');
+  await pause(200); await shot('collector-machine');
+  // A 10-pull: the reveal board, then the Full Dex, and nothing in tower defense.
+  await key(tab, 'Enter');
+  assert.equal(await game.$eval('#col-over', n => n.hidden), false);
+  await pause(2200); await shot('collector-reveal');
+  await key(tab, 'Enter');
+  assert.equal(await game.$eval('#col-over', n => n.hidden), true);
+  const after = await game.evaluate(() => ({ owned: S.owned.length, pulls: S.pulls, eggs: S.eggs.length, count: CS.count, chips: CS.chips, coins: S.balance.coins }));
+  assert.deepEqual([after.owned, after.pulls, after.eggs, after.coins], [before.owned, before.pulls, before.eggs, before.coins], 'tower defense and coins are untouched');
+  assert.equal(after.chips, before.chips - 900);
+  assert.ok(after.count >= 1 && after.count <= 10);
+  // Rates and history over the screen; any key closes.
+  await key(tab, 'r');
+  assert.match(await game.$eval('#col-over', n => n.textContent), /COLLECTOR RATES[\s\S]*0\.39%[\s\S]*1 in 64/);
+  await key(tab, 'Escape');
+  await key(tab, 'h');
+  assert.equal(await game.$$eval('#col-over .hist > div', ns => ns.length), 10);
+  await key(tab, 'Escape');
+  assert.equal(await game.$eval('#col-over', n => n.hidden), true);
+  // The Full Dex: 1025 rows; dust buys the three birds, which completes a set and pays its chips.
+  await key(tab, 'd');
+  assert.equal(await game.$$eval('#full-rows > div', ns => ns.length), 1025);
+  const birds = await game.evaluate(() => {
+    const chips = CS.chips, out = [];
+    for (const n of [144, 145, 146]) if (!CS.owned.includes(n)) { fullFilter = 'all'; fullAt = n - 1; fullFocus = 'acts'; fullActAt = 0; colUpdate(); out.push(fullActions(n)[0].label); runFull(fullActions(n)[0]); }
+    return { out, owned: [144, 145, 146].every(n => CS.owned.includes(n)), chips: CS.chips - chips, badges: CS.badges, msg: document.querySelector('#msg').textContent };
+  });
+  assert.ok(birds.owned && birds.badges.includes('birds') && birds.chips >= 300);
+  assert.ok(birds.out.every(l => l === 'Buy for 100 dust'));
+  assert.match(birds.msg, /Legendary birds \+300 chips/);
+  const buddy = await game.evaluate(() => { fullAt = 143; fullFocus = 'acts'; fullActAt = 0; colUpdate(); runFull(fullActions(144)[0]); fullFocus = 'list'; colUpdate(); return S.buddy && S.buddy.species; });
+  assert.equal(buddy, 144, 'a Full Dex mon as the buddy');
+  await shot('full-dex');
+  await key(tab, 's'); await game.evaluate(() => { setAt = CS.sets.findIndex(x => x.id === 'birds'); colUpdate(); });
+  await shot('full-sets');
+  // The dust shop: 10 shards for 250 dust, 30 a week.
+  await key(tab, 'x');
+  const shards = await game.evaluate(() => { const a = S.balance.shards; colKey({ key: 'Enter', preventDefault() {} }); return S.balance.shards - a; });
+  assert.equal(shards, 10);
+  assert.match(await game.$eval('#full-detail', n => n.textContent), /10\/30 this week/);
+  await shot('dust-shop');
+  // The card: back on tower defense's colours, coins in the purse, the birds badge and the buddy.
+  await key(tab, '7');
+  assert.equal(await game.$eval('#frame', n => n.classList.contains('col')), false);
+  const card = await game.evaluate(() => ({ badge: !!document.querySelector('#card-stats [data-badge="birds"]'), name: document.querySelector('#card-buddy').textContent }));
+  assert.ok(card.badge); assert.match(card.name, /Articuno/);
+  await shot('card');
+  // Get chips → Casino opens Shotgun Roulette through the hub.
+  await key(tab, '9');
+  await game.evaluate(() => { fullMode = 'machine'; colAt = 0; colUpdate(); });
+  await key(tab, 'g');
+  await tab.waitForFunction(() => window.current === 'shotgun-roulette', { timeout: 5000 });
+  assert.deepEqual(errors, []);
+});
+
+test('the Collector tutorial: the first visit walks chips, pulls, Full Dex against the TD Dex, dust and sets', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { delete tipsSeen.collector; tipsSeen._skip = false; if (tutor) tutorEnd(true); });
+  await key(tab, '9');
+  await game.waitForFunction(() => tutor && tutor.id === 'collector');
+  const texts = [];
+  for (let i = 0; i < 6; i++) { texts.push(await game.$eval('#tutor-box', n => n.textContent)); await key(tab, 'Enter'); }
+  const all = texts.join(' ');
+  for (const word of [/doesn't|Nothing here joins your squad/, /300 every day/, /casino/i, /A pull is 100 chips/, /Dex tab is your tower defense squad/, /dust/, /SP shards/, /Sets/, /badge/])
+    assert.match(all, word);
+  assert.equal(await game.evaluate(() => !!tutor), false, 'six steps, then done');
   assert.deepEqual(errors, []);
 });
 
