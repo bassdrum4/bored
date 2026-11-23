@@ -457,7 +457,7 @@ const ITEMS = {
   scope: { name: "Scope Lens", art: "scope-lens", tip: "See whether the shell in the chamber is live or blank. Only you see it." },
   eject: { name: "Eject Button", art: "eject-button", tip: "Throw out the shell in the chamber and see what it was." },
   band: { name: "Choice Band", art: "choice-band", tip: "Your next shot does 2 damage if it is live." },
-  wave: { name: "Thunder Wave", art: "tm-electric", tip: "Giratina skips its next turn. Can't stack, and can't be used two turns in a row." },
+  wave: { name: "Thunder Wave", art: "tm-electric", tip: "Paralyzes the opponent. They may be unable to move." },
   trick: { name: "Trick Room", art: "tm-psychic", tip: "Flip the shell in the chamber: live becomes blank, blank becomes live." },
   orb: { name: "Griseous Orb", art: "griseous-orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
 };
@@ -932,7 +932,8 @@ function useItem(i, index) {
       if (me.waveLock) return refuse("You can't use Thunder Wave two turns in a row.");
       other.para = true;
       me.waveLock = true;
-      log(N(i) + " used Thunder Wave! " + (mine ? "Giratina is" : "You're") + " paralyzed: half the time, that means losing the next turn.", mine ? "you" : "status");
+      log(mine ? "You used Thunder Wave! Giratina is paralyzed! It may be unable to move!"
+               : "Giratina used Thunder Wave! You're paralyzed! You may be unable to move!", mine ? "you" : "status");
       break;
     case "trick":
     case "orb":
