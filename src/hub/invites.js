@@ -299,7 +299,7 @@ export async function renderInvites() {
   const codeNode = $('#invite-code');
   if (!hasIdentity()) {
     if (codeNode) { codeNode.textContent = 'Sign in to get one.'; delete codeNode.dataset.code; }
-    setText('#invite-blurb', 'Bring someone in, and your name wears it.');
+    setText('#invite-blurb', "Want to have a cool badge by your name? Give someone this code when they're signing up, and you'll get credit for them.");
     setText('#invite-progress', 'Your code is waiting inside your account.');
     if (claimRow) claimRow.hidden = true;
     if (copy) copy.hidden = true;
@@ -322,11 +322,15 @@ export async function renderInvites() {
   const tier = inviteTier(credited);
   let progress = credited
     ? credited + (credited === 1 ? ' person in' : ' people in') + ' · ' + tierName(tier) + ' · ' + nextTierNote(credited)
-    : 'Nobody yet. Share the code and it counts once they play on two days.';
+    : 'No credit yet. It counts once someone you invite has played on two days.';
+  // Who is close matters more than a raw list of day counts: say how many
+  // people are still waiting, and how far each one has got.
   const pending = Array.isArray(info.pending) ? info.pending : [];
   if (pending.length) {
     const waiting = pending.map(row => Math.min(2, Math.max(0, Number(row.days) || 0)) + ' of 2 days');
-    progress += ' · waiting: ' + waiting.join(', ');
+    progress += ' ' + pending.length + (pending.length === 1
+      ? ' person you invited is still waiting' : ' people you invited are still waiting') +
+      ': ' + waiting.join(', ') + '. They count once they hit 2 of 2 days.';
   }
   setText('#invite-progress', progress);
 
