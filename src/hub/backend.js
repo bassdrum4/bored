@@ -270,11 +270,13 @@ export async function signIn(email, password) {
   return applySession(data);
 }
 
-export async function signUp(email, password, name) {
+export async function signUp(email, password, name, invite = '') {
   const redirectTo = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : '';
   const data = await request('/auth/v1/signup' + (redirectTo ? '?redirect_to=' + encodeURIComponent(redirectTo) : ''), {
     method: 'POST',
-    body: { email, password, data: { display_name: name } },
+    // The invite code rides in the metadata so it survives an email-confirmation
+    // round trip; the server still decides whether it is still usable.
+    body: { email, password, data: invite ? { display_name: name, invite_code: invite } : { display_name: name } },
     token: API_KEY
   });
   const payload = data.session || data;

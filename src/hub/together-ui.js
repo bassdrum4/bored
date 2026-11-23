@@ -5,6 +5,7 @@ import { PREVIEWS } from '../games/discovery.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
 import { TOGETHER_LIVE, LIVE_DEFAULTS } from './together-live.js';
 import { readStored, writeStored, removeStored } from './store.js';
+import { addMedal } from './invites.js';
 
 export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   const $ = s => document.querySelector(s);
@@ -444,7 +445,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         const picked = liveSelected.has(person.id);
         const row = node('label', undefined, 'bt-person');
         const who = node('div');
-        who.append(node('strong', person.handle), node('span', person.email || 'No email on this account', 'bt-caption'));
+        const whoName = node('strong', person.handle);
+        addMedal(whoName, person.handle);
+        who.append(whoName, node('span', person.email || 'No email on this account', 'bt-caption'));
         const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = picked; checkbox.id = 'bt-live-pick-' + person.id;
         checkbox.disabled = !picked && liveSelected.size >= maxInvites;
         checkbox.setAttribute('aria-label', 'Invite ' + person.handle);
@@ -520,7 +523,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         for (const person of outsiders) {
           const row = node('div', undefined, 'bt-person');
           const who = node('div');
-          who.append(node('strong', person.handle), node('span', 'Not in Bored Together', 'bt-caption'));
+          const whoName = node('strong', person.handle);
+          addMedal(whoName, person.handle);
+          who.append(whoName, node('span', 'Not in Bored Together', 'bt-caption'));
           const key = person.id + ':' + selectedGame;
           if (invited.has(key)) row.append(who, node('span', 'Invited', 'bt-caption'));
           else row.append(who, button('Invite', async () => {
@@ -599,8 +604,10 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         m.status === 'completed' ? (m.winner === owner ? 'Won' : m.winner ? 'Lost' : 'Draw')
           : unsent ? 'Not sent' : turn ? 'Your turn' : 'Their turn',
         'bt-chip' + (turn ? ' bt-chip-turn' : '')));
+    const opponentLine = node('p', 'with ' + (m.opponent?.handle || 'Former member'), 'bt-opponent');
+    addMedal(opponentLine, m.opponent?.handle);
     copy.append(head,
-      node('p', 'with ' + (m.opponent?.handle || 'Former member'), 'bt-opponent'),
+      opponentLine,
       node('p', duel ? runLine(m, turn)
         : m.status === 'active' ? (unsent
           ? 'Play the first turn to send it. Unplayed games disappear after 7 days.'
@@ -628,8 +635,10 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     const state = lobby ? ({ invited: 'invited', joined: 'joined', ready: 'ready' }[s.state] || s.state)
       : s.controller === 'cpu' ? 'a CPU is playing' : s.online ? 'online' : 'away';
     const item = node('li', undefined, 'bt-live-seat' + (s.online ? ' bt-online' : ''));
+    const seatName = node('strong', (s.handle || 'Player') + (s.seat === g.me ? ' (you)' : ''));
+    addMedal(seatName, s.handle);
     item.append(node('span', s.online ? '\u25cf ' : '\u25cb ', 'bt-dot'),
-      node('strong', (s.handle || 'Player') + (s.seat === g.me ? ' (you)' : '')), node('span', ' \u00b7 ' + state, 'bt-caption'));
+      seatName, node('span', ' \u00b7 ' + state, 'bt-caption'));
     item.setAttribute('aria-label', (s.handle || 'Player') + ', ' + state);
     return item;
   }
@@ -676,9 +685,11 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
       const hero = node('section', undefined, 'bt-hero');
       hero.setAttribute('aria-label', unsent ? 'Not sent yet' : 'Your move');
       const copy = node('div', undefined, 'bt-hero-copy');
+      const heroOpponent = node('p', 'with ' + (match.opponent?.handle || 'your opponent'), 'bt-opponent');
+      addMedal(heroOpponent, match.opponent?.handle);
       copy.append(node('p', unsent ? 'Not sent yet' : 'Your move', 'eyebrow'),
         node('h3', name(match.game), 'bt-hero-title'),
-        node('p', 'with ' + (match.opponent?.handle || 'your opponent'), 'bt-opponent'),
+        heroOpponent,
         node('p', duel ? runLine(match, true)
           : unsent ? 'Play your first turn and it goes to ' + (match.opponent?.handle || 'them') + '.'
           : 'The turn is yours.', 'bt-hero-line'),

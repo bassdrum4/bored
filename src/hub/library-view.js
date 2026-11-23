@@ -5,6 +5,7 @@ import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scor
 import { readStored, writeStored } from './store.js';
 import { backendReady, request, ANON_TOKEN } from './backend.js';
 import { popularityRanks, sortPopularGames, isNewGame, isFeatured } from './popularity.js';
+import { addMedal } from './invites.js';
 
 export function createLibraryView({ state, openGame, saveLibrary, track = () => {} }) {
 const $ = selector => document.querySelector(selector);
@@ -185,9 +186,13 @@ function cardBest(slug) {
   const own = bestValue(spec);
   if (leader) {
     const tied = leader.handles || [leader.handle];
-    line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' +
-      (tied.length === 1 ? tied[0] : tied.length + ' tied leaders');
-    if (tied.length > 1) line.title = 'Tied: ' + tied.join(', ');
+    if (tied.length === 1) {
+      line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' + tied[0];
+      addMedal(line, tied[0]);
+    } else {
+      line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' + tied.length + ' tied leaders';
+      line.title = 'Tied: ' + tied.join(', ');
+    }
   }
   else if (Number.isFinite(own) && own > 0) line.textContent = 'Your best ' + formatScore(own, spec);
   else line.textContent = 'No score yet';
@@ -201,8 +206,10 @@ function cardBest(slug) {
   tip.append(element('span', 'card-best-tip-title', 'Top ' + top.length + ' · ' + spec.name));
   top.forEach((row, index) => {
     const item = element('span', 'card-best-tip-row');
+    const tipName = element('span', 'card-best-tip-name', row.handle);
+    addMedal(tipName, row.handle);
     item.append(element('span', 'card-best-tip-rank', String(index + 1)),
-      element('span', 'card-best-tip-name', row.handle),
+      tipName,
       element('span', 'card-best-tip-value', formatScore(row.value, spec)));
     tip.append(item);
   });

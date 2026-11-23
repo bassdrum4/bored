@@ -1,4 +1,5 @@
 import { hasIdentity, getSession, request, freshSession, ANON_TOKEN } from './backend.js';
+import { loadMedals, medalFor } from './invites.js';
 
 // Trackbound's public tracks live on the Bored account, and only the hub has
 // the account. The game has no credentials of its own, so it asks over a channel
@@ -70,6 +71,9 @@ async function listTracks() {
     if (!getSession() || error.status !== 401) throw error;
     rows = await ask(ANON_TOKEN);
   }
+  // Public names carry the inviter's medal, so the medal list is read once here
+  // rather than asking the game to decorate names later.
+  await loadMedals();
   return {
     tracks: (Array.isArray(rows) ? rows : []).filter(row => row && typeof row.code === 'string' && row.name)
       .slice(0, LIST_LIMIT)
@@ -77,6 +81,7 @@ async function listTracks() {
         id: String(row.id || ''),
         name: String(row.name).slice(0, 32),
         handle: String(row.handle || 'Bored player').slice(0, 32),
+        tier: medalFor(row.handle),
         code: String(row.code).slice(0, 90),
         at: Number(row.at) || 0,
         best: (Array.isArray(row.best) ? row.best : [])
@@ -84,6 +89,7 @@ async function listTracks() {
           .slice(0, 4)
           .map(entry => ({
             handle: String(entry.handle || 'Bored player').slice(0, 32),
+            tier: medalFor(entry.handle),
             ms: Math.round(Number(entry.ms))
           })),
         mine: row.mine === true

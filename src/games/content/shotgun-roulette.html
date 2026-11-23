@@ -235,6 +235,14 @@
   .board .n { text-align: right; font-family: var(--mono); font-size: 12px }
   .board th.n { font: inherit; font-size: 14px }
   .board .rank { width: 3ch; font-family: var(--mono); font-size: 12px }
+  .iv-medal { display: inline-block; vertical-align: -.14em; margin-left: 4px; overflow: visible }
+  .iv-medal-face { fill: var(--iv-medal) }
+  .iv-medal-rim { fill: none; stroke: var(--iv-medal-rim); stroke-width: 1.6 }
+  .iv-medal-ring { fill: none; stroke: var(--iv-medal-rim); stroke-width: 1.1; opacity: .8 }
+  .iv-medal-pip { fill: #fffdf4 }
+  .iv-medal-1 { --iv-medal: #c08a4e; --iv-medal-rim: #8a5a24 }
+  .iv-medal-2 { --iv-medal: #c2cbd6; --iv-medal-rim: #7d8794 }
+  .iv-medal-3 { --iv-medal: #e3b845; --iv-medal-rim: #9a6f14 }
   .empty { margin-top: 10px; color: var(--dim); font-size: 14px }
 
   @media (prefers-reduced-motion: reduce) {
@@ -406,6 +414,28 @@ document.body.style.visibility = "visible";
 
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+// The inviter's medal, beside a name on the board. The hub sends the tier with
+// each row, so the sandboxed page never needs the account or the medal list.
+const INVITE_MEDALS = { 1: "Plus One", 2: "Enabler", 3: "Bad Influence" };
+function inviteMedal(tier) {
+  const rank = Number(tier) || 0;
+  if (!(rank >= 1 && rank <= 3)) return null;
+  const NS = "http://www.w3.org/2000/svg";
+  const make = (tag, attrs) => {
+    const node = document.createElementNS(NS, tag);
+    for (const key in attrs) node.setAttribute(key, String(attrs[key]));
+    return node;
+  };
+  const svg = make("svg", {
+    viewBox: "0 0 24 24", width: 11 + rank, height: 11 + rank,
+    class: "iv-medal iv-medal-" + rank, role: "img", "aria-label": INVITE_MEDALS[rank], focusable: "false"
+  });
+  if (rank === 3) svg.appendChild(make("circle", { cx: 12, cy: 12, r: 10.4, class: "iv-medal-ring" }));
+  svg.appendChild(make("circle", { cx: 12, cy: 12, r: rank === 3 ? 7.4 : 8, class: "iv-medal-rim" }));
+  svg.appendChild(make("circle", { cx: 12, cy: 12, r: rank === 3 ? 6.1 : 6.7, class: "iv-medal-face" }));
+  if (rank >= 2) svg.appendChild(make("circle", { cx: 12, cy: 12, r: 2.2, class: "iv-medal-pip" }));
+  return svg;
+}
 const wait = ms => new Promise(done => setTimeout(done, ms));
 const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 const shuffle = list => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
@@ -1387,7 +1417,11 @@ function drawBoard(mode) {
     const cells = entry ? [rank, String(entry.handle || "unnamed"), Number(entry.coins_won || 0).toLocaleString("en-US"), String(entry.best_streak || 0)] : [rank, "—", "—", "—"];
     cells.forEach((text, k) => {
       const cell = row.insertCell();
-      cell.textContent = text;
+      if (k === 1 && entry) {
+        cell.textContent = text;
+        const medal = inviteMedal(entry.tier);
+        if (medal) cell.appendChild(medal);
+      } else cell.textContent = text;
       cell.className = k === 0 ? "rank" : k > 1 ? "n" : "";
     });
   }

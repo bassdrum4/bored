@@ -1,5 +1,6 @@
 import { backendReady, getSession, getHandle, suggestedHandle, hasIdentity, renameHandle, authErrorMessage, signIn, signUp, signOut, adoptToken, setHandle, loadRules, freshSession, ensureProfile } from './backend.js';
 import { capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './player-storage.js';
+import { addMedal, syncInvite } from './invites.js';
 export function createAccountUI({ state: ui, activateProfile, applyPendingClaim, startClaimAuth, closeClaimDialog,
   loadLibrary, renderRecent, renderLibrary, renderDaily, renderLeaderboard, loadLeaderboard,
   syncSharedScores, restorePlayerState }) {
@@ -29,7 +30,9 @@ function renderAccount() {
   }
   action.hidden = false;
   if (!guest) {
-    state.append('Signed in as ', element('b', '', getHandle() || suggestedHandle()),
+    const nameNode = element('b', '', getHandle() || suggestedHandle());
+    addMedal(nameNode, getHandle());
+    state.append('Signed in as ', nameNode,
       ui.lbNotice ? ' · ' + ui.lbNotice : '. Best scores sync to the shared board.');
     action.textContent = 'Sign out';
     action.classList.remove('primary');
@@ -56,6 +59,8 @@ function openAuthDialog(mode = 'signin') {
   $('#auth-email-row').hidden = naming;
   $('#auth-pass-row').hidden = naming;
   $('#auth-name-row').hidden = authMode === 'signin';
+  $('#auth-invite-row').hidden = authMode !== 'signup';
+  if (authMode !== 'signup') $('#auth-invite').value = '';
   $('#auth-submit').textContent = authMode === 'signup' ? 'Create account' : naming ? 'Save name' : 'Sign in';
   const toggle = $('#auth-toggle');
   toggle.hidden = naming;
@@ -83,6 +88,7 @@ async function submitAuth(event) {
   const name = $('#auth-name').value.trim().slice(0, 20);
   const email = $('#auth-email').value.trim();
   const password = $('#auth-password').value;
+  const invite = $('#auth-invite').value.trim();
   if (authMode === 'name') {
     if (!name) { message.textContent = 'Choose a name first.'; return; }
     authBusy = true;
@@ -106,6 +112,9 @@ async function submitAuth(event) {
   if (!email || !password) { message.textContent = 'Email and password are required.'; return; }
   if (password.length < 6) { message.textContent = 'Use at least 6 characters for the password.'; return; }
   if (authMode === 'signup' && !name) { message.textContent = 'Choose a display name.'; return; }
+  if (authMode === 'signup' && invite && !/^\d{3,4}$/.test(invite)) {
+    message.textContent = 'Invite codes are 3 or 4 digits.'; return;
+  }
   authBusy = true;
   $('#auth-submit').disabled = true;
   message.textContent = authMode === 'signup' ? 'Creating your account…' : 'Signing in…';
@@ -114,7 +123,7 @@ async function submitAuth(event) {
       // New accounts may inherit this browser's guest scores only at signup;
       // signing into an existing account never imports somebody else's data.
       const guest = capturePlayerSnapshot();
-      const result = await signUp(email, password, name);
+      const result = await signUp(email, password, name, invite);
       if (!result.confirmed) {
         stashPendingSignup(result.userId, guest);
         openAuthDialog('signin');
@@ -123,12 +132,20 @@ async function submitAuth(event) {
       }
       activateProfile();
       adoptSignupProgress(result.userId, guest);
+      // The profile row is what a recruit credit hangs off; a name collision is
+      // handled the same way the next page load handles it.
+      try { await ensureProfile(name); } catch {}
+      if (invite) { try { await syncInvite(invite); } catch {} }
       // The guest profile carried the run already; this only clears the offer.
       applyPendingClaim();
       loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
     } else {
       await signIn(email, password);
       activateProfile();
+      // The invite code a confirmation page carried in the metadata is claimed
+      // on the first real session.
+      try { await ensureProfile(); } catch {}
+      try { await syncInvite(); } catch {}
       // An email-confirmed signup may require a separate sign-in rather than
       // redirecting with a session. Transfer only that pending signup's data.
       if (adoptSignupProgress(getSession()?.user?.id)) {
@@ -182,6 +199,8 @@ async function consumeAuthRedirect() {
   try {
     await adoptToken(access, refresh, Number(params.get('expires_in')) || 3600);
     activateProfile();
+    try { await ensureProfile(); } catch {}
+    try { await syncInvite(); } catch {}
     if (adoptSignupProgress(getSession()?.user?.id)) {
       loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
     }

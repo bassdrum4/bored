@@ -3,7 +3,7 @@
 const $ = id => document.getElementById(id);
 const PAGES = new Set(['home', 'library', 'leaderboard', 'together', 'settings']);
 
-export function createHubNavigation({ togetherUI, onLeaderboard }) {
+export function createHubNavigation({ togetherUI, onLeaderboard, onSettings = () => {} }) {
   let view = 'home';
 
   function setView(next, { scroll = false } = {}) {
@@ -32,6 +32,7 @@ export function createHubNavigation({ togetherUI, onLeaderboard }) {
 
   // The multiplayer badge remains controlled by the multiplayer module.
     if (next === 'leaderboard' && view !== 'leaderboard') onLeaderboard();
+    if (next === 'settings' && view !== 'settings') onSettings();
     view = next;
     if (!scroll || isTogether) return;
     if (next === 'library') $('library').scrollIntoView({ block: 'start' });

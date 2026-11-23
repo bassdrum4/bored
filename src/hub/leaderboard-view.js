@@ -1,6 +1,7 @@
 import { backendReady, request, getHandle, hasIdentity, authErrorMessage, ANON_TOKEN } from './backend.js';
 import { LB_GAMES, TRACKBOUND_PACE_ID, accountStandings, rankPoints, bestValue, formatScore } from './scores.js';
 import { dailyDate, dailyStreak } from '../daily.js';
+import { addMedal, loadMedals } from './invites.js';
 export function createLeaderboardView({ state, openGame, onBoard = () => {} }) {
 const $ = selector => document.querySelector(selector);
 function element(tag, className, text) {
@@ -132,6 +133,7 @@ function renderLeaderboard() {
     button.type = 'button';
     const rank = element('span', 'lb-rank', String(index + 1).padStart(2, '0'));
     const label = element('span', 'lb-name', name + (mine ? ' (you)' : ''));
+    addMedal(label, name);
     const buddy = buddyImage(key);
     if (buddy) label.prepend(buddy);
     const score = element('span', 'lb-score');
@@ -312,6 +314,7 @@ async function loadCareerDetails() {
 
 async function loadLeaderboard(force = false) {
   if (!backendReady()) { renderLeaderboard(); return; }
+  await loadMedals();
   const key = 'overall';
   const cached = state.lbCache.get(key);
   if (!force && cached && Date.now() - cached.at < 30000) {

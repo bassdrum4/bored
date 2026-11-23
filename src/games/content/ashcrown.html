@@ -371,7 +371,7 @@
   .lede { font-family: var(--font-display); font-size: 15px; color: var(--ink-2); max-width: 52ch; line-height: 1.55 }
   .seats { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0 }
   .seat {
-    display: grid; grid-template-columns: 14px minmax(0, 1fr) minmax(0, 190px) 58px; gap: 6px 10px; align-items: center;
+    display: grid; grid-template-columns: 14px minmax(0, 1fr) auto minmax(0, 190px) 58px; gap: 6px 10px; align-items: center;
     border: 1px solid var(--rule); border-radius: 3px; padding: 8px 10px; background: var(--panel);
   }
   .seat-note { grid-column: 2 / -1; font-size: 11px; color: var(--ink-3); line-height: 1.4 }
@@ -379,6 +379,16 @@
   .seat.cpu .who { color: var(--sea) }
   .seat[hidden] { display: none }
   .seat .dot { width: 14px; height: 14px }
+  /* The inviter's medal, beside a name in the live lobby and the multiplayer lists. */
+  .seat-medal { display: inline-flex; align-items: center; flex: none }
+  .iv-medal { display: inline-block; vertical-align: -.14em; margin-left: 3px; flex: none; overflow: visible }
+  .iv-medal-face { fill: var(--iv-medal) }
+  .iv-medal-rim { fill: none; stroke: var(--iv-medal-rim); stroke-width: 1.6 }
+  .iv-medal-ring { fill: none; stroke: var(--iv-medal-rim); stroke-width: 1.1; opacity: .8 }
+  .iv-medal-pip { fill: #fffdf4 }
+  .iv-medal-1 { --iv-medal: #b9773a; --iv-medal-rim: #79451c }
+  .iv-medal-2 { --iv-medal: #aeb6c2; --iv-medal-rim: #6b7584 }
+  .iv-medal-3 { --iv-medal: #d6a52f; --iv-medal-rim: #8a6112 }
   .seat input { width: 100% }
   .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px }
   .field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
@@ -857,6 +867,26 @@
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Invite medals for names this page prints itself. The hub publishes the map
+// (window.__boredMedals) and this page is same-origin, so no request is needed.
+const INVITE_MEDALS = { 1: 'Plus One', 2: 'Enabler', 3: 'Bad Influence' };
+function inviteTierFor(name) {
+  try {
+    const map = window.parent && window.parent.__boredMedals;
+    return (map && map[String(name || '').trim().toLowerCase()]) || 0;
+  } catch (error) { return 0; }
+}
+function inviteMedalSvg(tier) {
+  const rank = Number(tier) || 0;
+  if (!(rank >= 1 && rank <= 3)) return '';
+  const ring = rank === 3 ? '<circle cx="12" cy="12" r="10.4" class="iv-medal-ring"/>' : '';
+  const pip = rank >= 2 ? '<circle cx="12" cy="12" r="2.2" class="iv-medal-pip"/>' : '';
+  return '<svg class="iv-medal iv-medal-' + rank + '" viewBox="0 0 24 24" width="' + (11 + rank) + '" height="' + (11 + rank) +
+    '" role="img" aria-label="' + INVITE_MEDALS[rank] + '" focusable="false">' + ring +
+    '<circle cx="12" cy="12" r="' + (rank === 3 ? 7.4 : 8) + '" class="iv-medal-rim"/>' +
+    '<circle cx="12" cy="12" r="' + (rank === 3 ? 6.1 : 6.7) + '" class="iv-medal-face"/>' + pip + '</svg>';
+}
 
 // Integer hash in [0,1). Math.imul keeps every multiply inside 32 bits, so the
 // same coordinates give the same value on every device.
@@ -11055,6 +11085,7 @@ function buildStartScreen() {
     '<div class="seat" id="seat-' + i + '">' +
     '<span class="dot" id="seat-dot-' + i + '"></span>' +
     '<input type="text" id="seat-name-' + i + '" value="' + s.name + '" maxlength="18" aria-label="Player ' + (i + 1) + ' name">' +
+    '<span class="seat-medal" id="seat-medal-' + i + '"></span>' +
     '<select class="civ" id="seat-civ-' + i + '" aria-label="Player ' + (i + 1) + ' civ">' + civOptions + '</select>' +
     '<span class="who" id="seat-who-' + i + '"></span>' +
     '<div class="seat-note" id="seat-note-' + i + '"></div>' +
@@ -11817,6 +11848,8 @@ function liveLobbyRender(game, host) {
     const name = document.getElementById('seat-name-' + i), civ = document.getElementById('seat-civ-' + i), who = document.getElementById('seat-who-' + i);
     const dotEl = document.getElementById('seat-dot-' + i), note = document.getElementById('seat-note-' + i), remove = document.getElementById('seat-remove-' + i);
     remove.hidden = true;
+    const medalSlot = document.getElementById('seat-medal-' + i);
+    if (medalSlot) medalSlot.innerHTML = '';
     el.classList.toggle('cpu', !!row.cpu);
     dotEl.style.background = colors[i] ? colors[i][1] : 'transparent';
     dotEl.style.borderColor = colors[i] ? colors[i][0] : 'var(--ink-3)';
@@ -11845,6 +11878,7 @@ function liveLobbyRender(game, host) {
     remove.setAttribute('data-act', 'room-kick:' + s.seat);
     remove.setAttribute('aria-label', 'Remove ' + (s.handle || 'player'));
     name.value = (s.handle || 'Player') + (mine ? ' (you)' : '');
+    if (medalSlot) medalSlot.innerHTML = inviteMedalSvg(inviteTierFor(s.handle));
     const taken = new Set(people.filter(o => o.seat !== s.seat && o.civ).map(o => o.civ));
     for (const o of civ.options) o.disabled = taken.has(o.value);
     civ.value = CIVS[s.civ] ? s.civ : 'random';
@@ -12030,21 +12064,21 @@ function mpWhen(at) {
 }
 const mpMode = mode => (mode === 'coop' ? 'Co-op' : 'Free-for-all');
 function mpPlayers(list) {
-  return '<span class="mp-who">' + list.map(p => '<span class="' + (p.online ? 'on' : '') + '">' + (p.cpu ? '◇ ' : p.online ? '● ' : '○ ') + esc(p.name) + (p.you ? ' (you)' : '') +
+  return '<span class="mp-who">' + list.map(p => '<span class="' + (p.online ? 'on' : '') + '">' + (p.cpu ? '◇ ' : p.online ? '● ' : '○ ') + esc(p.name) + inviteMedalSvg(inviteTierFor(p.name)) + (p.you ? ' (you)' : '') +
     (p.cpu ? ' · a CPU is playing' : p.state === 'invited' ? ' · invited' : p.state === 'joined' ? ' · joined' : p.state === 'ready' ? ' · ready' : p.online ? '' : ' · away') + '</span>').join('') + '</span>';
 }
 function mpRows(data) {
   const invites = data.invites || [], live = (data.games && data.games.live) || [], turns = (data.games && data.games.turns) || [];
   const running = live.filter(g => g.status !== 'completed'), done = live.filter(g => g.status === 'completed');
-  const inviteRow = g => '<div class="mp-row" data-invite="' + esc(g.id) + '"><div class="mp-main"><span class="mp-name">' + esc(g.host) + ' invited you</span>' +
+  const inviteRow = g => '<div class="mp-row" data-invite="' + esc(g.id) + '"><div class="mp-main"><span class="mp-name">' + esc(g.host) + inviteMedalSvg(inviteTierFor(g.host)) + ' invited you</span>' +
     '<span class="mp-meta">' + mpMode(g.mode) + (mpWhen(g.at) ? ' · ' + esc(mpWhen(g.at)) : '') + '</span>' +
-    (g.players.length ? '<span class="mp-meta">Playing: ' + g.players.map(esc).join(', ') + '</span>' : '') + '</div>' +
+    (g.players.length ? '<span class="mp-meta">Playing: ' + g.players.map(n => esc(n) + inviteMedalSvg(inviteTierFor(n))).join(', ') + '</span>' : '') + '</div>' +
     '<div class="mp-acts"><button class="btn primary" data-act="mp-join:' + esc(g.id) + '">Join</button><button class="btn" data-act="mp-decline:' + esc(g.id) + '">Decline</button></div></div>';
   const gameRow = g => {
     const lobby = g.status === 'lobby', over = g.status === 'completed';
     const rejoin = !lobby && !over && (g.you.cpu || !g.you.online);
     const line = lobby ? (g.host ? 'Setting up · waiting for everyone to be ready' : 'In the lobby · the host starts the game')
-      : over ? (g.winner ? esc(g.winner) + ' won' : 'Finished') : 'Round ' + g.round + (g.you.cpu ? ' · a CPU is playing your civ until you rejoin' : ' · everyone plays at once');
+      : over ? (g.winner ? esc(g.winner) + inviteMedalSvg(inviteTierFor(g.winner)) + ' won' : 'Finished') : 'Round ' + g.round + (g.you.cpu ? ' · a CPU is playing your civ until you rejoin' : ' · everyone plays at once');
     return '<div class="mp-row" data-game="' + esc(g.id) + '"><div class="mp-main"><span class="mp-name">' + mpMode(g.mode) + ' · ' + g.players.length + ' players</span>' +
       '<span class="mp-meta">' + line + '</span>' + mpPlayers(g.players) + '</div>' +
       '<div class="mp-acts"><button class="btn' + (over ? '' : ' primary') + '" data-act="mp-open-game:' + esc(g.id) + '">' + (lobby ? 'Open lobby' : over ? 'View' : rejoin ? 'Rejoin' : 'Open') + '</button></div></div>';
@@ -12057,7 +12091,7 @@ function mpRows(data) {
     '<h3>Your live games' + (running.length ? ' · ' + running.length : '') + '</h3>' +
     (running.length ? running.map(gameRow).join('') : '<p class="mp-lead">No live games yet. Host one, or join an invite.</p>') +
     (done.length ? '<details class="mp-done"><summary>Finished · ' + done.length + '</summary>' + done.map(gameRow).join('') + '</details>' : '') +
-    (turns.length ? '<h3>Two-player games</h3>' + turns.map(t => '<div class="mp-row"><div class="mp-main"><span class="mp-name">With ' + esc(t.with) + '</span><span class="mp-meta">' + (t.yourTurn ? 'Your turn' : 'Their turn') + '</span></div></div>').join('') +
+    (turns.length ? '<h3>Two-player games</h3>' + turns.map(t => '<div class="mp-row"><div class="mp-main"><span class="mp-name">With ' + esc(t.with) + inviteMedalSvg(inviteTierFor(t.with)) + '</span><span class="mp-meta">' + (t.yourTurn ? 'Your turn' : 'Their turn') + '</span></div></div>').join('') +
       '<p class="mp-lead" style="margin-top:6px">These play turn by turn, so they open from Bored Together. <button class="btn" data-act="mp-together">Open Bored Together</button></p>' : '');
 }
 function mpHtml(data) {
@@ -12204,7 +12238,7 @@ function mpPickRender() {
   const box = document.getElementById('mp-people'), list = MP.members || [];
   document.getElementById('mp-count').textContent = MP.picked.size + ' of ' + MP_MAX_INVITED + ' invited';
   box.innerHTML = list.length ? list.map(m => '<label class="mp-person"><input type="checkbox" data-ref="' + esc(m.ref) + '"' + (MP.picked.has(m.ref) ? ' checked' : '') +
-    (!MP.picked.has(m.ref) && MP.picked.size >= MP_MAX_INVITED ? ' disabled' : '') + '><span>' + esc(m.name) + '</span></label>').join('')
+    (!MP.picked.has(m.ref) && MP.picked.size >= MP_MAX_INVITED ? ' disabled' : '') + '><span>' + esc(m.name) + inviteMedalSvg(inviteTierFor(m.name)) + '</span></label>').join('')
     : '<p class="hint">Nobody else has joined Bored Together yet. Anyone who joins appears here. You can still share the room code.</p>';
   UI.btnBegin.disabled = false;
   liveCpuChoices();

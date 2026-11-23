@@ -168,6 +168,26 @@ try {
           <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Which games get played, and for how long.</p></div>
             <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
         </section>
+        <section class="settings-panel" id="invite-panel" aria-labelledby="invite-heading">
+          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">✳</span><div>
+            <h3 id="invite-heading">Invites</h3>
+            <p id="invite-blurb">Bring someone in, and your name wears it.</p>
+          </div></div>
+          <div class="settings-row"><div>
+            <p class="invite-label">Your code</p>
+            <p id="invite-code" class="invite-code">Sign in to get one.</p>
+            <p id="invite-progress" class="invite-progress"></p>
+          </div><button id="invite-copy" class="action" type="button" hidden>Copy</button></div>
+          <div class="settings-row" id="invite-claim-row" hidden><div>
+            <label for="invite-claim-code">Were you invited?</label>
+            <p id="invite-claim-note">Add the code you were given.</p>
+          </div>
+          <div class="invite-claim-controls">
+            <input id="invite-claim-code" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="123" aria-label="Invite code">
+            <button id="invite-claim" class="action" type="button">Add code</button>
+          </div></div>
+          <p id="invite-status" class="settings-saved" role="status" aria-live="polite"></p>
+        </section>
       </div>
       <aside class="settings-sidebar">
         <div class="settings-aside"><p class="eyebrow">Just this browser</p><h3>Nothing to sign in for.</h3>
@@ -209,6 +229,7 @@ try {
     <label id="auth-email-row">Email<input id="auth-email" type="email" autocomplete="email" required></label>
     <label id="auth-pass-row">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label>
     <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required></label>
+    <label id="auth-invite-row" hidden>Invite code (optional)<input id="auth-invite" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="123"></label>
     <p id="auth-message" role="status" aria-live="polite"></p>
     <div class="dialog-actions">
       <button id="auth-submit" type="submit">Sign in</button>

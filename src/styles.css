@@ -635,3 +635,27 @@ body.playing #announcement-banner{display:none!important}
 #together>.section-heading .bo{margin-left:2px}
 #feedback-dialog .bo-heading,#enjoyment-dialog .bo-heading{margin-bottom:8px}
 #feedback-dialog .bo-heading h2,#enjoyment-dialog .bo-heading h2{margin:0}
+
+/* Invite medals: one deliberate bit of colour on an otherwise quiet name. */
+.bt-medal{display:inline-block;vertical-align:-.14em;margin-left:.32em;flex:none;overflow:visible}
+.bt-medal-face{fill:var(--medal)}
+.bt-medal-rim{fill:none;stroke:var(--medal-rim);stroke-width:1.6}
+.bt-medal-ring{fill:none;stroke:var(--medal-rim);stroke-width:1.1;opacity:.75}
+.bt-medal-pip{fill:var(--medal-pip,#fff)}
+.bt-medal-1{--medal:#b9773a;--medal-rim:#79451c;--medal-pip:#fff8ee}
+.bt-medal-2{--medal:#aeb6c2;--medal-rim:#6b7584;--medal-pip:#ffffff}
+.bt-medal-3{--medal:#d6a52f;--medal-rim:#8a6112;--medal-pip:#fffdf4}
+[data-theme="dark"] .bt-medal-1{--medal:#d08a46;--medal-rim:#f0c9a0;--medal-pip:#2a211a}
+[data-theme="dark"] .bt-medal-2{--medal:#c8d1dd;--medal-rim:#8e9aab;--medal-pip:#20242a}
+[data-theme="dark"] .bt-medal-3{--medal:#f0c04a;--medal-rim:#c69a3c;--medal-pip:#2a2416}
+
+/* Settings → Invites */
+#invite-blurb{font-size:13px;color:var(--dim);margin-top:3px}
+.invite-label{font:600 13px/1.5 var(--mono);margin:0}
+#invite-code{font:600 20px/1.4 var(--mono);letter-spacing:.22em;color:var(--ink);margin-top:5px}
+#invite-progress{font:11px/1.7 var(--mono);color:var(--dim);margin-top:6px}
+#invite-claim-row{flex-wrap:wrap}
+.invite-claim-controls{display:flex;gap:8px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end}
+#invite-claim-code{width:92px;padding:9px 10px;border:1px solid var(--rule);border-radius:0;
+  background:var(--paper);color:var(--ink);font:600 16px var(--mono);letter-spacing:.18em;text-align:center}
+#invite-status{display:block;padding:0 24px 18px;min-height:1em;font:11px/1.6 var(--mono);color:var(--dim)}

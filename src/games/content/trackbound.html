@@ -144,6 +144,15 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
   gap:8px;align-items:baseline;line-height:1.55}
 .track-board-row span{flex:none;font-size:10px;overflow-wrap:normal}
 .track-board-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The inviter's medal, beside a name in a track row or a course board. */
+.tb-medal{display:inline-block;vertical-align:-.14em;margin-left:3px;flex:none;overflow:visible}
+.tb-medal-face{fill:var(--tb-medal)}
+.tb-medal-rim{fill:none;stroke:var(--tb-medal-rim);stroke-width:1.6}
+.tb-medal-ring{fill:none;stroke:var(--tb-medal-rim);stroke-width:1.1;opacity:.8}
+.tb-medal-pip{fill:#fffdf4}
+.tb-medal-1{--tb-medal:#c08a4e;--tb-medal-rim:#8a5a24}
+.tb-medal-2{--tb-medal:#c2cbd6;--tb-medal-rim:#7d8794}
+.tb-medal-3{--tb-medal:#e3b845;--tb-medal-rim:#9a6f14}
 .track-board-value{color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
 .medalTable.courseBoard{display:flex;flex-direction:column;gap:0;font-size:11px}
 .courseBoard .courseHead{display:block;color:var(--dim);letter-spacing:.08em;padding:4px 0 5px}
@@ -3810,6 +3819,29 @@ function el(tag, className, text) {
   return node;
 }
 
+// The inviter's medal, carried beside a name the hub printed. The tier arrives
+// with the public track list; a missing or zero tier draws nothing.
+const INVITE_MEDALS = { 1: 'Plus One', 2: 'Enabler', 3: 'Bad Influence' };
+function inviteMedal(tier) {
+  const rank = Number(tier) || 0;
+  if (!(rank >= 1 && rank <= 3)) return null;
+  const NS = 'http://www.w3.org/2000/svg';
+  const make = (tag, attrs) => {
+    const node = document.createElementNS(NS, tag);
+    for (const key in attrs) node.setAttribute(key, String(attrs[key]));
+    return node;
+  };
+  const svg = make('svg', {
+    viewBox: '0 0 24 24', width: 11 + rank, height: 11 + rank,
+    class: 'tb-medal tb-medal-' + rank, role: 'img', 'aria-label': INVITE_MEDALS[rank], focusable: 'false'
+  });
+  if (rank === 3) svg.appendChild(make('circle', { cx: 12, cy: 12, r: 10.4, class: 'tb-medal-ring' }));
+  svg.appendChild(make('circle', { cx: 12, cy: 12, r: rank === 3 ? 7.4 : 8, class: 'tb-medal-rim' }));
+  svg.appendChild(make('circle', { cx: 12, cy: 12, r: rank === 3 ? 6.1 : 6.7, class: 'tb-medal-face' }));
+  if (rank >= 2) svg.appendChild(make('circle', { cx: 12, cy: 12, r: 2.2, class: 'tb-medal-pip' }));
+  return svg;
+}
+
 
 /* ── local track editor ─────────────────────────────────────────────────────
    A code describes only a sequence of whitelisted road pieces. This makes it
@@ -4509,7 +4541,10 @@ function renderPublicList(rows) {
   }
   rows.forEach(row => {
     const li = el('li');
-    li.appendChild(el('span', '', row.name + ' · ' + row.handle));
+    const byline = el('span', '', row.name + ' · ' + row.handle);
+    const bylineMedal = inviteMedal(row.tier);
+    if (bylineMedal) byline.appendChild(bylineMedal);
+    li.appendChild(byline);
     // The board for this course: the leader in the row, the rest of the top
     // four in a panel under it, opened by hover or by focusing the row's
     // buttons. A title bubble cannot carry a board and gets clipped here.
@@ -4528,8 +4563,11 @@ function renderPublicList(rows) {
         'Top ' + Math.min(times.length, 4) + ' · ' + row.name));
       times.slice(0, 4).forEach((entry, index) => {
         const line = el('div', 'track-board-row');
+        const boardName = el('span', 'track-board-name', String(entry.handle || 'Bored player'));
+        const boardMedal = inviteMedal(entry.tier);
+        if (boardMedal) boardName.appendChild(boardMedal);
         line.append(el('span', '', String(index + 1)),
-          el('span', 'track-board-name', String(entry.handle || 'Bored player')),
+          boardName,
           el('span', 'track-board-value', clock(entry.ms)));
         board.appendChild(line);
       });
@@ -4729,8 +4767,11 @@ async function paintCourseBoard(track) {
   board.appendChild(el('span', 'courseHead', 'Course board · top ' + times.length));
   times.forEach((entry, index) => {
     const line = el('span', 'courseRow');
+    const courseName = el('i', '', String(entry.handle || 'Bored player'));
+    const courseMedal = inviteMedal(entry.tier);
+    if (courseMedal) courseName.appendChild(courseMedal);
     line.append(el('b', '', String(index + 1)),
-      el('i', '', String(entry.handle || 'Bored player')),
+      courseName,
       el('span', 'courseTime', clock(entry.ms)));
     board.appendChild(line);
   });

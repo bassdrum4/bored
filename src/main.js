@@ -27,6 +27,7 @@ import { createLibraryView } from './hub/library-view.js';
 import { createGameFinder } from './hub/game-finder.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
+import { initInvites, loadMedals, medalFor, medalLookup, recordPlayDay, renderInvites, syncInvite } from './hub/invites.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createLivePlayer } from './hub/together-live.js';
@@ -331,6 +332,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (sandboxed) gameFrame.setAttribute('sandbox', 'allow-scripts');
   else gameFrame.removeAttribute('sandbox');
   activeSlug = previousSlug = slug;
+  // Opening a game is what "played today" means for invite credit. One write a
+  // day, and one sync so a pending recruit moves to 2 of 2 without waiting.
+  if (recordPlayDay()) void syncInvite().catch(() => {});
   // Ordinary games have shareable URLs; multiplayer sessions remain private.
   if (!multiplayer && location.hash !== '#' + slug) {
     history.pushState(null, '', '#' + slug);
@@ -1151,7 +1155,13 @@ addEventListener('message', event => {
         const answer = event.data.op === 'bet' && !hasIdentity()
           ? Promise.resolve({ ok: false, reason: 'signin' })
           : roulette(event.data);
-        answer.then(reply => {
+        answer.then(async reply => {
+          // The in-game board prints handles itself; add the inviter's tier so a
+          // name there wears the same medal as everywhere else.
+          if (reply && Array.isArray(reply.rows)) {
+            await loadMedals();
+            reply = { ...reply, rows: reply.rows.map(row => ({ ...row, tier: medalFor(row.handle) })) };
+          }
           if (gameFrame.contentWindow === frame) frame.postMessage({ type: 'bored:roulette-result', id, ...reply }, '*');
         });
       }
@@ -1248,12 +1258,41 @@ window.addEventListener('bored:identity', () => {
 });
 initAnnouncements();
 initAccount();
+initInvites();
+
+// Medals ride on the public recruiter list, read once and repainted wherever a
+// name is printed. A new account also looks again at its own invite state.
+let medalStamp = '';
+let medalUser = '';
+async function refreshMedals(force = false) {
+  const stamp = await loadMedals(force);
+  // Same-origin games (Civ Lite) print names themselves, so they get the map.
+  window.__boredMedals = medalLookup();
+  if (stamp === medalStamp) return;
+  medalStamp = stamp;
+  renderAccount();
+  renderLeaderboard();
+  renderLibrary();
+  togetherUI.refresh?.();
+}
+window.addEventListener('bored:identity', () => {
+  const uid = getSession()?.user?.id || '';
+  if (uid !== medalUser) {
+    medalUser = uid;
+    void syncInvite().catch(() => {});
+    void renderInvites();
+  }
+  // A sign-in is exactly when a credit may have landed since the last read.
+  void refreshMedals(true);
+});
+void refreshMedals();
 initFeedback();
 initVoice();
 
 const navigation = createHubNavigation({
   togetherUI,
-  onLeaderboard: () => loadLeaderboard(true)
+  onLeaderboard: () => loadLeaderboard(true),
+  onSettings: () => void renderInvites()
 });
 
 // The same footer link routes to the dashboard this account may actually use.
