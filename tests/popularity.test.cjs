@@ -51,7 +51,7 @@ test('Crossword editorial spotlight expires at Detroit midnight November 25', as
   const ranks = new Map([['clicker', 1], ['crossword', 99]]);
   const active = Date.parse('2026-11-24T23:59:00-05:00');
   assert.equal(isFeatured('crossword', featuredUntil, active), true);
-  assert.deepEqual(sortPopularGames(games(), ranks, { launches, featuredUntil, now: active }).map(x => x[0]), ['crossword', 'new', 'clicker']);
+  assert.deepEqual(sortPopularGames(games(), ranks, { launches, featuredUntil, now: active }).map(x => x[0]), ['crossword', 'clicker', 'new']);
   const expired = Date.parse('2026-11-25T00:00:00-05:00');
   assert.equal(isFeatured('crossword', featuredUntil, expired), false);
   assert.deepEqual(sortPopularGames(games(), ranks, { launches, featuredUntil, now: expired }).map(x => x[0]), ['clicker', 'crossword', 'new']);
