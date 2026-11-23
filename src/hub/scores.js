@@ -129,6 +129,17 @@ const highScore = (id, name, unit, extra = {}) => ({
 
 export const HIGH_SCORE_GAMES = [
   highScore("ballistic-chickens", "Ballistic Chickens", "m", { metric: "meters", when: snapshot => snapshot.finished === true }),
+  // Biggest single-game profit (chips won minus the bet) from a real game that
+  // was won, either mode. The game is sandboxed, so src/hub/roulette.js posts it
+  // through recordBest when it pays a win; test games never get there. 1,000 is
+  // the most one game can make (a 500 bet at 3x on Hard). Shown as "+1,200".
+  highScore("shotgun-roulette", "Shotgun Roulette", "chips", {
+    metric: "profit", min: 1, max: 1000,
+    when: snapshot => snapshot.real === true && snapshot.won === true,
+    format: value => "+" + Math.round(value).toLocaleString("en-US"),
+    // Say in the console when this board posts, is refused, or has no rule yet.
+    logPosts: true
+  }),
   // Crossword ranks the clock on the day's grid. Two archive puzzles are not
   // the same test — a random Wednesday is nothing like a Sunday — so only a
   // solved daily posts, and anything under a minute is not a solve. The clock
@@ -446,6 +457,8 @@ export function bestValue(game) {
 export function formatScore(value, game) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '0 ' + game.unit;
+  // A spec may say how its numbers read (Shotgun Roulette: "+1,200").
+  if (typeof game.format === 'function') return game.format(number);
   // Hundredths read as a stopwatch rather than as a raw count: 4237 is 42.37 s.
   if (game.unit === 'centiseconds') return (Math.max(0, number) / 100).toFixed(2) + ' s';
   if (game.unit === 'seconds') {
@@ -601,7 +614,10 @@ export async function syncScores() {
   let posted = false;
   const accepted = [];
   for (const game of LB_GAMES) {
-    if (isLocalOnly(game.id)) continue;
+    if (isLocalOnly(game.id)) {
+      if (game.logPosts && bestValue(game)) console.log(game.name + ': no score rule on the server yet, so the best stays in this browser.');
+      continue;
+    }
     let score = bestValue(game);
     if (!score || !Number.isFinite(score)) continue;
     score = Math.round(score);
@@ -631,9 +647,11 @@ export async function syncScores() {
       if (!Number.isFinite(best)) return { error: new Error('Invalid score confirmation') };
       submitted[game.id] = best;
       accepted.push({ game: game.id, value: best });
+      if (game.logPosts) console.log(game.name + ': posted ' + formatScore(score, game) + ' to the main leaderboard; your best there is ' + formatScore(best, game) + '.');
       writeStored(submittedKey, submitted);
       if (best === score) posted = true;
     } catch (err) {
+      if (game.logPosts) console.log(game.name + ': the main leaderboard refused ' + formatScore(score, game) + '.', err.message || err);
       // A missing rule row means this game cannot post; every other game can.
       if (err.status !== 401 && err.code !== '23503' && !/foreign key/i.test(err.message || '')) {
         return { error: err };

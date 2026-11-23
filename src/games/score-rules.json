@@ -172,6 +172,11 @@
     "better": "high",
     "max_value": 2650
   },
+  "shotgun-roulette": {
+    "label": "Biggest profit from one won game",
+    "better": "high",
+    "max_value": 1000
+  },
   "poker": {
     "label": "Chips above the start stack",
     "better": "high",
