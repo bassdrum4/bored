@@ -20,6 +20,7 @@ import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, ac
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
 import { createRouletteBridge, rouletteWonOn, ROULETTE } from './hub/roulette.js';
+import { tradesBridge } from './hub/trades.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -769,7 +770,12 @@ window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); r
   casino: {
     today: () => ({ net: rouletteWonOn(readWallet(), defaultDailyDate()), cap: ROULETTE.dailyCap }),
     open: () => openGame('shotgun-roulette')
-  } };
+  },
+  // Collector trades (src/hub/trades.js): the server decides each one; the wallet mirrors it.
+  trades: tradesBridge({
+    flush: async () => { if (!getSession()) return; const merged = await pushPlayerState(localPlayerState()); if (merged) mergePlayerState(merged); },
+    onChange: () => { requestCloudPush(); renderBuddy(); }
+  }) };
 // Pokédoku asks this for the look a player's line wears (normal, shiny or an SP skin).
 window.__boredLooks = storedLooks();
 // Shotgun Roulette asks over postMessage (see the bored:roulette case below); the wallet stays here.
