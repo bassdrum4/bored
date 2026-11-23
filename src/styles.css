@@ -621,6 +621,29 @@ body.playing #announcement-banner{display:none!important}
 .announcement-actions a,.announcement-actions button{background:none;border:1px solid var(--rule);padding:6px 10px;
   color:var(--ink);text-decoration:none;font:11px var(--mono);cursor:pointer}
 .announcement-actions a:hover,.announcement-actions button:hover{border-color:var(--ink)}
+/* A poll or open-ended question lives in the dialog, under the message. */
+.announcement-response{display:grid;gap:8px;margin:2px 0 4px}
+.announcement-poll{display:grid;gap:6px}
+.announcement-option{text-align:left;background:none;border:1px solid var(--rule);padding:8px 10px;
+  color:var(--ink);font:12px/1.4 var(--mono);cursor:pointer;overflow-wrap:anywhere}
+.announcement-option:hover,.announcement-option:focus-visible{border-color:var(--ink)}
+.announcement-option[aria-pressed="true"]{border-color:var(--ink);background:var(--surface-sunk)}
+.announcement-option:disabled{opacity:.55;cursor:default}
+.announcement-tally{display:grid;gap:3px;border-top:1px solid var(--rule);padding-top:7px}
+.announcement-card .announcement-result{display:flex;justify-content:space-between;gap:12px;
+  font:11px/1.5 var(--mono);color:var(--dim);margin:0}
+.announcement-chosen .announcement-result-label{color:var(--ink);font-weight:600}
+.announcement-result-label{overflow-wrap:anywhere}
+.announcement-result-value{white-space:nowrap;text-align:right}
+.announcement-card .announcement-response-label{display:grid;gap:5px;font:11px/1.4 var(--mono);color:var(--dim)}
+.announcement-response textarea{width:100%;box-sizing:border-box;min-height:64px;resize:vertical;
+  border:1px solid var(--rule);background:var(--field);color:var(--ink);padding:8px;
+  font:13px/1.5 Georgia,"Times New Roman",serif}
+.announcement-response textarea:focus{outline:2px solid var(--red);outline-offset:1px}
+.announcement-submit{justify-self:start}
+.announcement-card .announcement-response-status{font:11px/1.5 var(--mono);color:var(--red);margin:0}
+.announcement-card .announcement-response-status:empty{display:none}
+.announcement-card .announcement-response-hint{font:11px/1.5 var(--mono);color:var(--dim);margin:0}
 .announcements-dialog{width:min(540px,calc(100vw - 32px));max-width:540px;max-height:min(82vh,760px);overflow:auto}
 .announcement-dialog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
 .announcement-dialog-head h2{margin:0}
