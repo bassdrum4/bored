@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 875,
+  "count": 876,
   "newest": "2026-11-23",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d832057","date":"2026-11-23","author":"PenguinV360","subject":"Shotgun Roulette: Griseous Orbs orbit Giratina","pr":304},
   {"sha":"e28b9b5","date":"2026-11-23","author":"PenguinV360","subject":"Full Dex: centred frame, whole sprites, page buttons, clearer filters and details","pr":303},
   {"sha":"3c3dcbc","date":"2026-11-23","author":"Daniel Lowe","subject":"Coalesce overlapping Together list and dashboard reads without caching live state"},
   {"sha":"2a9f715","date":"2026-11-23","author":"Daniel Lowe","subject":"Cache Puffer Party daily answer book and coalesce simultaneous loads"},
