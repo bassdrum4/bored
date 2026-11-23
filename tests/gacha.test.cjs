@@ -23,7 +23,8 @@ const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin', 'candyOffer',
   'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
   'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES', 'WELCOME', 'WELCOME_ID', 'claimCutRefund', 'isCut', 'CUT_REFUND', 'CUT_CANDY', 'buyCandyEgg', 'CANDY_EGG', 'candyEggPrice',
-  'COLLECTOR', 'colTier', 'colPools', 'collectorSets', 'collectorState', 'pullCollector', 'buyCollectorMon', 'buyDustShards', 'claimCollectorSets'
+  'COLLECTOR', 'colTier', 'colPools', 'collectorSets', 'collectorState', 'pullCollector', 'buyCollectorMon', 'buyDustShards', 'claimCollectorSets',
+  'buyCheapMissing', 'dustExtras', 'toggleWish', 'setsOf', 'collectorCounts'
 ], { ...daily, ...rewards, DEX, DEX_TYPES, DEX_LEGACY });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
 const { gachaState, pullEggs, hatchReady, evolve, upgrade, buySp, setBuddy, claimLogin, eggPools, bannerFor } = gacha;
@@ -659,7 +660,7 @@ test('Poké Gacha trophies: Dex %, first Epic, Legendary, shiny and SP skin; one
 });
 
 /* ── The Collector ───────────────────────────────────────────────────── */
-const { COLLECTOR, colTier, colPools, collectorSets, collectorState, pullCollector, buyCollectorMon, buyDustShards, claimCollectorSets } = gacha;
+const { COLLECTOR, colTier, colPools, collectorSets, collectorState, pullCollector, buyCollectorMon, buyDustShards, claimCollectorSets, buyCheapMissing, dustExtras, toggleWish, setsOf } = gacha;
 
 test('collector tiers: every species once, legendaries and mythicals are the rarest tier', () => {
   const pools = colPools();
@@ -671,7 +672,7 @@ test('collector tiers: every species once, legendaries and mythicals are the rar
   assert.deepEqual(COLLECTOR.rates, [204, 44, 7, 1]);
 });
 
-test('collector pulls cost chips, fill the Full Dex, never touch tower defense, and dupes pay dust', () => {
+test('collector pulls cost chips, fill the Full Dex, never touch tower defense, keep dupes and pay dust every pull', () => {
   let w = claimLogin(fresh({ coins: 5000 }), opts()).wallet;
   assert.equal(walletBalance(w).chips, 300, 'login pays the day\'s chips');
   assert.equal(pullCollector(w, opts({ count: 5 })).reason, 'unknown');
@@ -684,12 +685,22 @@ test('collector pulls cost chips, fill the Full Dex, never touch tower defense, 
   assert.deepEqual([after.owned, after.pulls, after.eggs.length], [before.owned, before.pulls, before.eggs.length], 'TD is unchanged');
   const species = one.mons[0].species;
   assert.deepEqual(collectorState(one.wallet, TODAY).owned, [species]);
-  // The same roll again is a dupe and pays dust by tier.
+  assert.equal(one.dust, COLLECTOR.pullDust[colTier(species)], 'a new one pays dust too');
+  // The same roll again is a dupe: kept, counted, and it pays the same dust.
   const again = pullCollector(one.wallet, opts({ rand: always(0.5) }));
   assert.equal(again.mons[0].fresh, false);
-  assert.equal(again.dust, COLLECTOR.dust[colTier(species)]);
-  assert.equal(collectorState(again.wallet, TODAY).dust, again.dust);
-  assert.equal(collectorState(again.wallet, TODAY).history.length, 2);
+  assert.equal(again.dust, COLLECTOR.pullDust[colTier(species)]);
+  const st = collectorState(again.wallet, TODAY);
+  assert.equal(st.dust, one.dust + again.dust);
+  assert.equal(st.copies[species], 2);
+  assert.deepEqual([st.extras, st.extraDust], [1, COLLECTOR.extra[colTier(species)]]);
+  assert.equal(st.history.length, 2);
+  // Extras into dust: one copy is always kept.
+  const dx = dustExtras(again.wallet, opts());
+  assert.deepEqual([dx.ok, dx.copies, dx.dust], [true, 1, COLLECTOR.extra[colTier(species)]]);
+  const after2 = collectorState(dx.wallet, TODAY);
+  assert.deepEqual([after2.copies[species], after2.owned, after2.dust], [1, [species], st.dust + dx.dust]);
+  assert.equal(dustExtras(dx.wallet, opts()).reason, 'none');
 });
 
 test('a 10-pull costs 900 and holds a Rare; the rarity pity carries across pulls', () => {
@@ -706,13 +717,13 @@ test('a 10-pull costs 900 and holds a Rare; the rarity pity carries across pulls
   assert.equal(collectorState(w, TODAY).pity.rare, 2);
 });
 
-test('shiny: 1 in 64; a shiny of one held only plain adds the shiny instead of dust', () => {
+test('shiny: 1 in 64; a shiny of one held only plain adds the shiny', () => {
   let w = fund(fresh({}), { chips: 1000 });
   w = pullCollector(w, opts({ rand: always(0.5) })).wallet;
   const seq = [0.5, 0.5, 0.001];
   let i = 0;
   const r = pullCollector(w, opts({ rand: () => seq[i++ % 3] }));
-  assert.deepEqual([r.mons[0].shiny, r.mons[0].newShiny, r.dust], [true, true, 0]);
+  assert.deepEqual([r.mons[0].shiny, r.mons[0].newShiny], [true, true]);
   assert.deepEqual(collectorState(r.wallet, TODAY).shiny, [r.mons[0].species]);
   // A Full Dex mon can be the buddy, shiny since it was pulled shiny.
   const b = setBuddy(r.wallet, r.mons[0].species, opts({ shiny: true }));
@@ -721,19 +732,53 @@ test('shiny: 1 in 64; a shiny of one held only plain adds the shiny instead of d
   assert.equal(setBuddy(r.wallet, 151, opts()).reason, 'not-owned', 'only what the Full Dex holds');
 });
 
-test('dust buys a missing species by tier, once, and shards up to 50 a week apart from coins', () => {
+test('dust buys a missing species by tier, the cheap ones in bulk, and shards up to 50 a week apart from coins', () => {
   let w = fund(fresh({}), { dust: 1000 });
-  assert.deepEqual(COLLECTOR.price, [10, 20, 50, 100]);
+  assert.deepEqual(COLLECTOR.price, [10, 25, 60, 150]);
   const mew = buyCollectorMon(w, 151, opts());
-  assert.deepEqual([mew.ok, mew.price, walletBalance(mew.wallet).dust], [true, 100, 900]);
+  assert.deepEqual([mew.ok, mew.price, walletBalance(mew.wallet).dust], [true, 150, 850]);
   assert.equal(buyCollectorMon(mew.wallet, 151, opts()).reason, 'owned');
-  assert.equal(buyCollectorMon(fund(fresh({}), { dust: 99 }), 151, opts()).reason, 'dust');
-  w = fund(fresh({}), { dust: 2000 });
-  for (let i = 0; i < 3; i++) { const r = buyDustShards(w, opts()); assert.equal(r.ok, true); w = r.wallet; }
-  assert.deepEqual([walletBalance(w).shards, walletBalance(w).dust], [30, 2000 - 750]);
+  assert.equal(buyCollectorMon(fund(fresh({}), { dust: 149 }), 151, opts()).reason, 'dust');
+  // Buy all cheap missing: Commons first, then Rares, while dust lasts; nothing Epic or Legendary.
+  const cheap = buyCheapMissing(fund(fresh({}), { dust: 1000 }), opts());
+  assert.equal(cheap.ok, true);
+  assert.equal(cheap.bought.length, 100, '1000 dust is 100 Commons');
+  assert.ok(cheap.bought.every(n => colTier(n) === 0));
+  assert.equal(walletBalance(cheap.wallet).dust, 0);
+  assert.equal(buyCheapMissing(fresh({}), opts()).reason, 'dust');
+  w = fund(fresh({}), { dust: 3000 });
+  for (let i = 0; i < 5; i++) { const r = buyDustShards(w, opts()); assert.equal(r.ok, true); w = r.wallet; }
+  assert.deepEqual([walletBalance(w).shards, walletBalance(w).dust], [50, 3000 - 2000]);
   assert.equal(buyDustShards(w, opts()).reason, 'limit');
   assert.equal(buyDustShards(w, { today: '2026-11-23', now: later() }).ok, true, 'a new week');
-  assert.equal(COLLECTOR.shards.dust / COLLECTOR.shards.shards, 25);
+  assert.equal(COLLECTOR.shards.dust / COLLECTOR.shards.shards, 40);
+});
+
+test('the wishlist: up to 10 missing species, twice as likely in their tier, flagged when pulled', () => {
+  let w = fund(fresh({}), { chips: 900 * 30 });
+  const legends = colPools()[3];
+  for (const n of legends.slice(0, 10)) { const r = toggleWish(w, n, opts()); assert.equal(r.ok, true); w = r.wallet; }
+  assert.equal(toggleWish(w, legends[10], opts()).reason, 'limit');
+  assert.deepEqual(collectorState(w, TODAY).wish, legends.slice(0, 10));
+  const off = toggleWish(w, legends[0], opts());
+  assert.deepEqual([off.on, collectorState(off.wallet, TODAY).wish.length], [false, 9]);
+  // Weighted pick: with rand at 0 the tier roll is Common, so force a Legendary pool through pity
+  // instead: the boost doubles each starred mon's weight, so the first starred mon fills twice the range.
+  const seq = [0.999, 0, 0.5];
+  let i = 0;
+  w = fund(fresh({}), { chips: 1000 });
+  w = toggleWish(w, legends[0], opts()).wallet;
+  const r = pullCollector(w, opts({ rand: () => [0.9999, 1.5 / (legends.length + 1), 0.5][i++ % 3] }));
+  assert.equal(r.mons[0].tier, 3);
+  assert.equal(r.mons[0].species, legends[0], 'the starred legend takes the first two shares');
+  assert.equal(r.mons[0].wish, true);
+  assert.deepEqual(collectorState(r.wallet, TODAY).wish, [], 'once caught it leaves the wishlist');
+  assert.equal(toggleWish(r.wallet, legends[0], opts()).reason, 'owned');
+});
+
+test('each species knows the sets it counts toward', () => {
+  assert.deepEqual(setsOf(6), ['gen1', 'type-fire', 'type-flying', 'starters-kanto']);
+  assert.ok(setsOf(144).includes('birds') && setsOf(144).includes('legendary'));
 });
 
 test('sets pay their chips once when complete and become badges; the Full Dex is a set of its own', () => {
@@ -742,7 +787,7 @@ test('sets pay their chips once when complete and become badges; the Full Dex is
   for (const id of ['gen1', 'gen9', 'type-fire', 'starters-kanto', 'birds', 'eevee', 'fossils', 'pseudo', 'ultra', 'paradox', 'legendary', 'mythical', 'all'])
     assert.ok(ids.includes(id), id);
   assert.equal(sets.find(s => s.id === 'all').nums.length, 1025);
-  let w = fund(fresh({}), { dust: 300 });
+  let w = fund(fresh({}), { dust: 450 });
   for (const n of [144, 145]) w = buyCollectorMon(w, n, opts()).wallet;
   assert.equal(collectorState(w, TODAY).badges.length, 0);
   const last = buyCollectorMon(w, 146, opts());

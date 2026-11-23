@@ -390,16 +390,16 @@ test('filters: the Dex bar opens one panel (type grid of two, class and tier chi
 test('Dex: uncaught lines are ??? with a silhouette, the egg they hatch from and no type; caught ones are named and checked', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; pref.dexSort = 'Number'; keep(); go('dex'); });
-  // The list: a caught row has its name, a colour sprite and a check; an uncaught one only its number.
-  const rowsSeen = await game.evaluate(() => [...document.querySelectorAll('#dex-rows > div')].map((r, i) => {
+  // The grid (PokeRogue's starter screen, 9 × 6 a page): a caught line in colour with its name; an uncaught one a silhouette, ???.
+  const rowsSeen = await game.evaluate(() => [...document.querySelectorAll('#dex-rows > .cell')].map((r, i) => {
     const num = dexList()[i];
-    return { caught: !!S.lines[num], text: r.textContent.trim(), name: name(num), dark: !!r.querySelector('.unseen'), check: !!r.querySelector('canvas:not(.unseen)'),
-      tip: r.querySelector('.mini').title };
+    return { caught: !!S.lines[num], title: r.title, name: name(formOf(num)), dark: !!r.querySelector('.unseen'), tip: r.querySelector('.mini').title };
   }));
-  assert.ok(rowsSeen.some(r => r.caught) && rowsSeen.some(r => !r.caught), 'the first rows hold both');
+  assert.equal(rowsSeen.length, 54, 'a full page');
+  assert.ok(rowsSeen.some(r => r.caught) && rowsSeen.some(r => !r.caught), 'the first page holds both');
   for (const r of rowsSeen) {
-    if (r.caught) { assert.ok(r.text.includes(r.name) && !r.dark && r.check, r.name + ' reads as caught'); }
-    else { assert.ok(!r.text.includes(r.name) && /\?\?\?/.test(r.text) && r.dark && r.tip === '???', r.text + ' hides its name'); }
+    if (r.caught) { assert.ok(r.title.includes(r.name) && !r.dark, r.name + ' reads as caught'); }
+    else { assert.ok(!r.title.includes(r.name) && /\?\?\?/.test(r.title) && r.dark && r.tip === '???', r.title + ' hides its name'); }
   }
   // The detail for an uncaught line: a silhouette that fills the cell, the egg and its icon, type ???.
   const line = await game.evaluate(() => { dexAt = dexList().findIndex(num => !S.lines[num]); dexUpdate(); return dexList()[dexAt]; });
@@ -440,7 +440,7 @@ test('Dex depth: Info shows the evolution chain with owned forms, class, range a
     lit: $('#dex-depth .chain').querySelectorAll('.form .mini:not(.unseen)').length, own: forms.slice(0, DEX_CHAIN_MAX).filter(n => S.owned.includes(n)).length, text: $('#dex-depth .chain').textContent }; }, line);
   assert.equal(chain.shown, Math.min(chain.forms, 7), 'every form, up to seven');
   assert.equal(chain.lit, chain.own, 'owned forms in colour, the rest dark');
-  assert.match(chain.text, new RegExp(chain.own + '/' + chain.forms + ' owned'));
+  assert.match(chain.text, new RegExp(chain.own + '/' + chain.forms));
   const tip = await game.evaluate(() => tipOf(dexList()[dexAt]));
   const u = await game.evaluate(n => T.squad([n])[0], tip);
   const lineText = await game.$eval('#dex-depth .line', n => n.textContent);
@@ -642,18 +642,22 @@ test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real rew
   assert.deepEqual(errors, []);
 });
 
-test('sound: off until turned on (M or the speaker), kept per device, and pulls, hatches and battles make their sounds', async t => {
+test('sound: off until turned on (M or Settings), kept per device, and pulls, hatches and battles make their sounds', async t => {
   const { tab, game, errors } = await openWithMons(t);
   // Record which sounds would play, without needing speakers.
   await game.evaluate(() => { window.__heard = []; for (const k of Object.keys(SOUNDS)) { const f = SOUNDS[k]; SOUNDS[k] = a => { __heard.push(k); f(a); }; } });
   assert.equal(await game.evaluate(() => soundOn()), false, 'muted on a fresh device');
   await game.evaluate(() => { go('pull'); turnCrank(); });
   assert.deepEqual(await game.evaluate(() => [__heard.length, SFX.ctx]), [0, null], 'muted: nothing plays and no audio is opened');
-  // The speaker sits beside "?" and the tab bar still fits.
-  assert.equal(await game.$eval('#tabs .help .speaker', n => n.title), 'Sound off (M)');
+  // The gear beside "?" opens Settings, which shows the sound; M turns it on anywhere, and the tab bar still fits.
+  assert.match(await game.$eval('#tabs .help .gear', n => n.title), /sound off \(M\)/);
   await key(tab, 'm');
   assert.equal(await game.evaluate(() => soundOn()), true);
-  assert.equal(await game.$eval('#tabs .help .speaker', n => n.title), 'Sound on (M)');
+  assert.match(await game.$eval('#tabs .help .gear', n => n.title), /sound on \(M\)/);
+  await key(tab, ',');
+  assert.match(await game.$eval('#settings', n => n.textContent), /Sound \(M\)\s*On[\s\S]*Volume[\s\S]*Animation speed[\s\S]*Reduce effects[\s\S]*Skip tutorials/);
+  await key(tab, 'Backspace');
+  assert.equal(await game.$eval('#settings', n => n.hidden), true);
   assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).sound), true, 'kept on this device');
   const tabs = await game.$eval('#tabs', n => [n.scrollWidth, n.clientWidth]);
   assert.ok(tabs[0] <= tabs[1], 'the tab bar does not overflow');
@@ -1259,7 +1263,7 @@ test('Dex: the row shows the form that fights with its line under it, a clear ch
   assert.equal(coins - await game.evaluate(() => S.balance.coins), await game.evaluate(() => T.levelCost(1)));
   // Evolve: the row now reads Weavile, with "Sneasel line" under it; the chain shows both, an arrow, checks under the sprites.
   await game.evaluate(l => runDex(dexActions(l).find(a => /^Evolve/.test(a.label))), sneasel);
-  const row = await game.$eval('#dex-rows .at', n => n.textContent);
+  const row = await game.$eval('#dex-rows .at', n => n.title);
   assert.match(row, /Weavile.*Sneasel line/);
   await game.evaluate(() => { dexFocus = 'list'; dexUpdate(); });
   const chain = await game.$eval('#dex-depth .chain', n => ({ text: n.textContent, forms: n.querySelectorAll('.form').length, over: [...n.querySelectorAll('.form')].some(f => { const [a, b] = f.children; return b && b.getBoundingClientRect().left < a.getBoundingClientRect().right - 1; }) }));
@@ -2423,10 +2427,17 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   assert.equal(await game.$eval('#frame', n => n.classList.contains('col')), true);
   assert.equal(await game.$eval('#scr-collector .panel', n => getComputedStyle(n).borderTopColor), 'rgb(47, 143, 95)', 'green panels');
   assert.deepEqual(await game.$$eval('#tabs .purse img', ns => ns.map(n => n.alt)), ['chips', 'dust']);
+  // The note on every view (in the list panel, or the details panel in the grid views), never in the message box.
   for (const m of ['machine', 'dex', 'sets', 'shop']) {
     await game.evaluate(m => { fullMode = m; colUpdate(); }, m);
-    assert.equal(await game.$eval('#col-note', n => n.textContent), "Collection only, doesn't join your squad.", m);
-    assert.match(await game.$eval('#msg', n => n.textContent), /Collection only, doesn't join your squad\./, m + ' message');
+    const seen = await game.evaluate(() => [...document.querySelectorAll('#scr-collector *')].some(n => n.offsetParent && n.children.length === 0 && n.textContent === "Collection only, doesn't join your squad."));
+    assert.ok(seen, m + ' shows the note');
+    assert.doesNotMatch(await game.$eval('#msg', n => n.textContent), /Collection only/, m + ': the message box keeps its room');
+    // Whole rows only: the list is a whole number of rows tall.
+    const fit = await game.$eval('#full-rows', n => { const r = n.firstElementChild; return !r || n.clientHeight % r.offsetHeight === 0; });
+    assert.ok(fit, m + ' shows whole rows');
+    // The sub-tabs keep their full names.
+    assert.deepEqual(await game.$$eval('#full-keys .klabel', ns => ns.slice(0, 4).map(n => n.scrollWidth <= n.clientWidth + 1)), [true, true, true, true], m + ' sub-tabs fit');
   }
   await game.evaluate(() => { fullMode = 'machine'; colAt = 1; colUpdate(); });
   // The tab bar and the purse (chips and dust here, often the widest numbers) fit on one line.
@@ -2448,33 +2459,61 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   assert.ok(after.count >= 1 && after.count <= 10);
   // Rates and history over the screen; any key closes.
   await key(tab, 'r');
-  assert.match(await game.$eval('#col-over', n => n.textContent), /COLLECTOR RATES[\s\S]*0\.39%[\s\S]*1 in 64/);
+  assert.match(await game.$eval('#col-over', n => n.textContent), /COLLECTOR RATES[\s\S]*0\.39%[\s\S]*1 in 64[\s\S]*2× in its tier/);
   await key(tab, 'Escape');
   await key(tab, 'h');
   assert.equal(await game.$$eval('#col-over .hist > div', ns => ns.length), 10);
   await key(tab, 'Escape');
   assert.equal(await game.$eval('#col-over', n => n.hidden), true);
-  // The Full Dex: 1025 rows; dust buys the three birds, which completes a set and pays its chips.
+  // The Full Dex: a 9×7 icon grid a page, uncaught as ???; dust buys the three birds, which completes a set.
   await key(tab, 'd');
-  assert.equal(await game.$$eval('#full-rows > div', ns => ns.length), 1025);
+  await game.evaluate(() => { Object.assign(colF, { gen: 0, type: '', own: 'all', tier: -1, set: '', sort: 'num', q: '' }); colUpdate(); });
+  assert.equal(await game.$$eval('#full-rows > .cell', ns => ns.length), 63);
+  assert.match(await game.$eval('#full-filters', n => n.textContent), /Gen\s*Type\s*Caught\s*Rarity\s*Sets\s*No\.[\s\S]*1\/17/);
+  const unseen = await game.evaluate(() => { const n = CS.owned.includes(150) ? 151 : 150; fullAt = n - 1; colUpdate(); return document.querySelector('#full-detail .title').textContent; });
+  assert.equal(unseen, '???');
+  // Filters: Gen 1 only, Legendary only, then the wishlist; search finds owned names only.
+  await key(tab, 'g'); await key(tab, 'r'); await key(tab, 'r'); await key(tab, 'r'); await key(tab, 'r');
+  assert.deepEqual(await game.evaluate(() => fullList()), [144, 145, 146, 150, 151]);
+  await key(tab, 'g', 9); await key(tab, 'r');
+  await game.evaluate(() => { colF.q = 'mewtwo'; colUpdate(); });
+  assert.equal(await game.evaluate(() => fullList().length), 0, 'an uncaught name is not searchable');
+  await game.evaluate(() => { colF.q = '150'; colUpdate(); });
+  assert.deepEqual(await game.evaluate(() => fullList()), [150], 'a number is');
+  // The wishlist: W stars a missing mon; the grid marks it.
+  await game.evaluate(() => { colF.q = ''; fullAt = 149; colUpdate(); });
+  await key(tab, 'w');
+  assert.deepEqual(await game.evaluate(() => CS.wish), [150]);
+  assert.equal(await game.$eval('#full-rows .cell.at', n => n.classList.contains('wish') && n.querySelector('.br').textContent), '♥');
   const birds = await game.evaluate(() => {
     const chips = CS.chips, out = [];
     for (const n of [144, 145, 146]) if (!CS.owned.includes(n)) { fullFilter = 'all'; fullAt = n - 1; fullFocus = 'acts'; fullActAt = 0; colUpdate(); out.push(fullActions(n)[0].label); runFull(fullActions(n)[0]); }
     return { out, owned: [144, 145, 146].every(n => CS.owned.includes(n)), chips: CS.chips - chips, badges: CS.badges, msg: document.querySelector('#msg').textContent };
   });
   assert.ok(birds.owned && birds.badges.includes('birds') && birds.chips >= 300);
-  assert.ok(birds.out.every(l => l === 'Buy for 100 dust'));
+  assert.ok(birds.out.every(l => l === 'Buy for 150 dust'));
   assert.match(birds.msg, /Legendary birds \+300 chips/);
   const buddy = await game.evaluate(() => { fullAt = 143; fullFocus = 'acts'; fullActAt = 0; colUpdate(); runFull(fullActions(144)[0]); fullFocus = 'list'; colUpdate(); return S.buddy && S.buddy.species; });
   assert.equal(buddy, 144, 'a Full Dex mon as the buddy');
+  // Each mon shows the sets it counts toward.
+  assert.match(await game.$eval('#full-detail .sets', n => n.textContent), /Gen 1: Kanto[\s\S]*Legendary birds 3\/3/);
   await shot('full-dex');
   await key(tab, 's'); await game.evaluate(() => { setAt = CS.sets.findIndex(x => x.id === 'birds'); colUpdate(); });
   await shot('full-sets');
-  // The dust shop: 10 shards for 250 dust, 30 a week.
+  // Sets: closest to done first.
+  const order = await game.evaluate(() => sortedSets().filter(x => !x.complete).slice(0, 3).map(x => x.need - x.have));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  // The dust shop: dust all extras, buy all cheap missing, 10 shards for 400 dust (50 a week).
   await key(tab, 'x');
-  const shards = await game.evaluate(() => { const a = S.balance.shards; colKey({ key: 'Enter', preventDefault() {} }); return S.balance.shards - a; });
-  assert.equal(shards, 10);
-  assert.match(await game.$eval('#full-detail', n => n.textContent), /10\/30 this week/);
+  const shop = await game.evaluate(() => {
+    const a = S.balance.shards, d0 = CS.dust; dustAt = 2; colKey({ key: 'Enter', preventDefault() {} });
+    const shards = S.balance.shards - a;
+    const before = CS.count; dustAt = 0; colKey({ key: 'Enter', preventDefault() {} });
+    return { shards, bought: CS.count - before, text: document.querySelector('#full-detail').textContent };
+  });
+  assert.equal(shop.shards, 10);
+  assert.ok(shop.bought > 0, 'buy all cheap missing bought some');
+  assert.match(shop.text, /10\/50 this week/);
   await shot('dust-shop');
   // The card: back on tower defense's colours, coins in the purse, the birds badge and the buddy.
   await key(tab, '7');
@@ -2482,6 +2521,11 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   const card = await game.evaluate(() => ({ badge: !!document.querySelector('#card-stats [data-badge="birds"]'), name: document.querySelector('#card-buddy').textContent }));
   assert.ok(card.badge); assert.match(card.name, /Articuno/);
   await shot('card');
+  // The TD Dex in the same grid layout, and Settings.
+  await key(tab, '4'); await pause(150); await shot('td-dex');
+  await key(tab, ','); await pause(100); await shot('settings');
+  assert.equal(await game.$eval('#settings', n => n.hidden), false);
+  await key(tab, 'Backspace');
   // Get chips → Casino opens Shotgun Roulette through the hub.
   await key(tab, '9');
   await game.evaluate(() => { fullMode = 'machine'; colAt = 0; colUpdate(); });

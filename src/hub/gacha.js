@@ -732,28 +732,34 @@ export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {
    530 or more, Rare 450 to 529, Common the rest. The rarity pity is the eggs' (RARITY_PITY),
    a 10-pull holds at least one Rare, and 1 in SHINY_ODDS.shiny is shiny, as on Shiny UP.
 
-   A species pulled again is a dupe and pays dust by tier; a shiny of one held only plain
-   is not a dupe, it adds the shiny. Dust buys any missing species (priced by tier) or shards
-   (COLLECTOR.shards, a weekly limit of its own beside the coin shop's).
+   Dupes are kept, as in TCG Pocket: each species has a count. Every pull pays dust by tier
+   (COLLECTOR.pullDust), and extra copies can be turned into dust (COLLECTOR.extra each; one
+   copy is always kept). Dust buys any missing species (COLLECTOR.price) or shards
+   (COLLECTOR.shards, a weekly limit of its own beside the coin shop's). A wishlist of up to
+   COLLECTOR.wish.max missing species makes each of them COLLECTOR.wish.boost times as likely
+   within its tier.
 
-   Pacing, simulated with 10-pulls and dust spent on the cheapest missing species, sets paying
-   chips as they complete: about 140 days to 1025 at 600 chips a day, 85 at 1000, 280 on
-   login chips alone.
+   Pacing, simulated with 10-pulls, extras turned into dust and dust spent on the cheapest
+   missing species, sets paying chips as they complete: about 110 days to 1025 at 1000 chips a
+   day, 180 at 600, 360 on login chips alone.
 
-   Shards from dust are 25 dust each, at most 30 a week (750 dust, the same weekly dust as before
-   but fewer shards). Simulated over 16 weeks with every shard source (TD duplicates, the coin
-   shop's 50, the weekly challenge's 50): a normal player's skin goes from 5.1 weeks to 4.7 (2.8 to
-   2.6 using the coin shop), a strong casino player's from 2.8 to 2.2. At 15 a shard and 50 a week
-   the casino player's fell to 1.9. Dust alone makes a skin in 10 weeks.
+   Shards from dust are 40 dust each, at most 50 a week. With every shard source over 16 weeks
+   (TD duplicates, the coin shop's 50, the weekly challenge's 50) and all dust going to shards,
+   a normal player's skin goes from 5.2 weeks to 4.1; a strong casino player reaches the cap
+   whatever the rate, 2.8 to 1.9 weeks. Dust alone makes a skin in 6 weeks at 2,000 dust a week.
 
    Sets pay chips once (col:set:<id>) and show as badges on the Trainer card; 'all' is the
    Full Dex itself and has a badge of its own. */
 export const COLLECTOR = Object.freeze({
   pull: 100, ten: 900, batch: 10,
   rates: [204, 44, 7, 1],
-  dust: [20, 40, 80, 200],
-  price: [10, 20, 50, 100],
-  shards: { dust: 250, shards: 10, perWeek: 30 },
+  pullDust: [5, 10, 25, 50],
+  extra: [10, 25, 60, 150],
+  price: [10, 25, 60, 150],
+  // "Buy all cheap missing" buys these tiers (Common, Rare), cheapest first.
+  cheap: [0, 1],
+  shards: { dust: 400, shards: 10, perWeek: 50 },
+  wish: { max: 10, boost: 2 },
   history: 30
 });
 export const COL_TIERS = ['Common', 'Rare', 'Epic', 'Legendary'];
@@ -814,27 +820,47 @@ export function collectorSets() {
   return (setCache = list);
 }
 
-// Entry readers. A pull's x.cp is [[species, flags], …]: flags 1 new, 2 shiny, 4 a new shiny.
-const COL_PULL = /^spend:col:/, COL_BUY = /^spend:cbuy:(\d{1,4})$/;
+// Entry readers. A pull's x.cp is [[species, flags], …]: flags 1 new, 2 shiny, 4 a new shiny,
+// 8 on the wishlist. A buy is spend:cbuy:<num> (the first) or spend:cbuy:<num>:<k>. Extras
+// turned into dust are spend:cdx:<uuid> with x.dx = [[species, copies], …]. A trade (the
+// trading PR) is col:trade:<id> with x = { in, out }.
+const COL_PULL = /^spend:col:/, COL_BUY = /^spend:cbuy:(\d{1,4})(?::\d{1,4})?$/, COL_DX = /^spend:cdx:/, COL_TRADE = /^col:trade:/;
 function readColPull(id, entry) {
   const x = object(entry.x);
   if (!COL_PULL.test(id) || !Array.isArray(x.cp) || !x.cp.length || x.cp.length > COLLECTOR.batch) return null;
-  const mons = x.cp.filter(p => Array.isArray(p) && validNum(p[0]) && Number.isInteger(p[1]) && p[1] >= 0 && p[1] <= 7);
+  const mons = x.cp.filter(p => Array.isArray(p) && validNum(p[0]) && Number.isInteger(p[1]) && p[1] >= 0 && p[1] <= 15);
   if (mons.length !== x.cp.length) return null;
-  return { id, at: entry.at, n: Number(x.n) || 0, day: typeof x.d === 'string' ? x.d : '', mons: mons.map(([s, f]) => ({ species: s, tier: colTier(s), fresh: !!(f & 1), shiny: !!(f & 2), newShiny: !!(f & 4) })),
+  return { id, at: entry.at, n: Number(x.n) || 0, day: typeof x.d === 'string' ? x.d : '', mons: mons.map(([s, f]) => ({ species: s, tier: colTier(s), fresh: !!(f & 1), shiny: !!(f & 2), newShiny: !!(f & 4), wish: !!(f & 8) })),
     chips: -(Number(entry.g?.chips) || 0), dust: Number(entry.g?.dust) || 0 };
+}
+/** Copies of each species held, and whether one was ever shiny: Map num → { n, shiny }. */
+export function collectorCounts(entries) {
+  const out = new Map(), at = num => out.get(num) || out.set(num, { n: 0, shiny: false }).get(num);
+  for (const [id, entry] of Object.entries(entries)) {
+    const x = object(entry.x);
+    const buy = id.match(COL_BUY);
+    if (buy) { const num = Number(buy[1]); if (validNum(num) && x.cb === num) at(num).n++; continue; }
+    if (COL_DX.test(id) && Array.isArray(x.dx)) { for (const p of x.dx) if (Array.isArray(p) && validNum(p[0]) && Number.isInteger(p[1]) && p[1] > 0) at(p[0]).n -= p[1]; continue; }
+    if (COL_TRADE.test(id)) { if (validNum(x.in)) { at(x.in).n++; if (x.sh === 1) at(x.in).shiny = true; } if (validNum(x.out)) at(x.out).n--; continue; }
+    const pull = COL_PULL.test(id) && readColPull(id, entry);
+    if (pull) for (const m of pull.mons) { const c = at(m.species); c.n++; if (m.shiny) c.shiny = true; }
+  }
+  for (const [num, c] of out) if (c.n <= 0) out.delete(num);
+  return out;
 }
 /** Species in the Full Dex, to whether one is shiny. Cheap; gachaState uses it for the buddy. */
 export function collectorOwned(entries) {
-  const out = new Map();
-  for (const [id, entry] of Object.entries(entries)) {
-    const buy = id.match(COL_BUY);
-    if (buy) { const num = Number(buy[1]); if (validNum(num) && object(entry.x).cb === num && !out.has(num)) out.set(num, false); continue; }
-    const pull = COL_PULL.test(id) && readColPull(id, entry);
-    if (pull) for (const m of pull.mons) out.set(m.species, out.get(m.species) || m.shiny);
-  }
-  return out;
+  return new Map([...collectorCounts(entries)].map(([num, c]) => [num, c.shiny]));
 }
+/** The wishlist: the latest cfg:wish entry, missing species only. */
+function readWish(entries, owned) {
+  let best = null;
+  for (const [id, entry] of Object.entries(entries)) if (id.startsWith('cfg:wish:') && (!best || id > best[0])) best = [id, entry];
+  const list = best && Array.isArray(object(best[1].x).w) ? best[1].x.w.filter(validNum) : [];
+  return [...new Set(list)].filter(n => !owned.has(n)).slice(0, COLLECTOR.wish.max);
+}
+/** The sets a species counts toward, by id. */
+export function setsOf(num) { return collectorSets().filter(s => s.id !== 'all' && s.nums.includes(num)).map(s => s.id); }
 const colCounters = pulls => {
   const count = { rare: 0, epic: 0, legendary: 0 };
   for (const p of pulls) for (const m of p.mons) countEgg(count, m.tier, 'collector');
@@ -845,8 +871,11 @@ export function collectorState(wallet, today = dailyDate()) {
   const merged = mergeWallet(wallet), entries = merged.entries, balance = walletBalance(merged);
   const pulls = Object.entries(entries).map(([id, e]) => readColPull(id, e)).filter(Boolean)
     .sort((a, b) => a.n - b.n || a.at - b.at || (a.id < b.id ? -1 : 1));
-  const owned = collectorOwned(entries);
+  const counts = collectorCounts(entries), owned = new Map([...counts].map(([n, c]) => [n, c.shiny]));
   const bought = Object.keys(entries).filter(id => COL_BUY.test(id)).length;
+  // Extra copies (beyond the one kept) and what turning them all into dust would pay.
+  let extras = 0, extraDust = 0;
+  for (const [num, c] of counts) if (c.n > 1) { extras += c.n - 1; extraDust += (c.n - 1) * COLLECTOR.extra[colTier(num)]; }
   const monday = mondayOfDay(today);
   let shardsWeek = 0;
   for (const id of Object.keys(entries)) if (id.startsWith('spend:cdust:' + monday + ':')) shardsWeek += COLLECTOR.shards.shards;
@@ -857,6 +886,8 @@ export function collectorState(wallet, today = dailyDate()) {
   });
   return {
     owned: [...owned.keys()].sort((a, b) => a - b), shiny: [...owned].filter(([, sh]) => sh).map(([n]) => n).sort((a, b) => a - b),
+    copies: Object.fromEntries([...counts].map(([n, c]) => [n, c.n])), extras, extraDust,
+    wish: readWish(entries, owned),
     total: DEX.length, count: owned.size, bought,
     chips: balance.chips || 0, dust: balance.dust || 0,
     pity: colCounters(pulls), pulls: pulls.reduce((t, p) => t + p.mons.length, 0),
@@ -867,7 +898,7 @@ export function collectorState(wallet, today = dailyDate()) {
   };
 }
 
-/** Pull 1 (100 chips) or 10 (900 chips, at least one Rare). Dupes pay dust in the same entry. */
+/** Pull 1 (100 chips) or 10 (900 chips, at least one Rare). Every mon pays dust by tier, in the same entry. */
 export function pullCollector(wallet, { count = 1, today = dailyDate(), now = Date.now(), rand = Math.random } = {}) {
   if (count !== 1 && count !== COLLECTOR.batch) return refuse(wallet, 'unknown');
   const state = collectorState(wallet, today);
@@ -888,14 +919,19 @@ export function pullCollector(wallet, { count = 1, today = dailyDate(), now = Da
   }
   if (count === COLLECTOR.batch && Math.max(...tiers) < 1) tiers[tiers.indexOf(0)] = 1;
   const held = new Map(state.owned.map(n => [n, state.shiny.includes(n)]));
+  const wish = new Set(state.wish);
   let dust = 0;
   const mons = tiers.map(tier => {
-    const pool = pools[tier], species = pool[Math.floor(rand() * pool.length)];
+    // Wishlisted species weigh COLLECTOR.wish.boost each in their tier, everyone else 1.
+    const pool = pools[tier], weight = n => wish.has(n) && !held.has(n) ? COLLECTOR.wish.boost : 1;
+    let pick = rand() * pool.reduce((t, n) => t + weight(n), 0), species = pool[pool.length - 1];
+    for (const n of pool) { pick -= weight(n); if (pick < 0) { species = n; break; } }
     const shiny = rand() < 1 / SHINY_ODDS.shiny, has = held.has(species), hadShiny = held.get(species);
     let flags = shiny ? 2 : 0;
     if (!has) flags |= 1;
     else if (shiny && !hadShiny) flags |= 4;
-    else dust += COLLECTOR.dust[tier];
+    if (wish.has(species) && !has) flags |= 8;
+    dust += COLLECTOR.pullDust[tier];
     held.set(species, hadShiny || shiny);
     return [species, flags];
   });
@@ -903,7 +939,7 @@ export function pullCollector(wallet, { count = 1, today = dailyDate(), now = Da
   if (!r.ok) return refuse(wallet, 'chips');
   const paid = claimCollectorSets(r.wallet, { today, now });
   return { wallet: paid.wallet, ok: true, dust, sets: paid.sets,
-    mons: mons.map(([species, f]) => ({ species, tier: colTier(species), fresh: !!(f & 1), shiny: !!(f & 2), newShiny: !!(f & 4) })) };
+    mons: mons.map(([species, f]) => ({ species, tier: colTier(species), fresh: !!(f & 1), shiny: !!(f & 2), newShiny: !!(f & 4), wish: !!(f & 8) })) };
 }
 /** Buy one missing species for the Full Dex with dust, priced by its tier. */
 export function buyCollectorMon(wallet, species, { today = dailyDate(), now = Date.now() } = {}) {
@@ -912,12 +948,59 @@ export function buyCollectorMon(wallet, species, { today = dailyDate(), now = Da
   if (!state.active) return refuse(wallet, 'inactive');
   if (state.owned.includes(species)) return refuse(wallet, 'owned');
   const price = COLLECTOR.price[colTier(species)];
-  const r = spendFrom(wallet, { dust: price }, { id: 'cbuy:' + species, now, x: { cb: species } });
+  const merged = mergeWallet(wallet);
+  let slot = 0;
+  while (merged.entries['spend:cbuy:' + species + (slot ? ':' + slot : '')]) slot++;
+  const r = spendFrom(merged, { dust: price }, { id: 'cbuy:' + species + (slot ? ':' + slot : ''), now, x: { cb: species } });
   if (!r.ok) return refuse(wallet, 'dust');
   const paid = claimCollectorSets(r.wallet, { today, now });
   return { wallet: paid.wallet, ok: true, price, sets: paid.sets };
 }
-/** 10 shards for 150 dust, up to 50 shards a week (Monday to Sunday), apart from the coin shop's 50. */
+/** Buy every missing Common and Rare that dust covers, cheapest first. ok when one was bought. */
+export function buyCheapMissing(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = collectorState(wallet, today);
+  if (!state.active) return refuse(wallet, 'inactive');
+  const have = new Set(state.owned), pools = colPools();
+  let next = mergeWallet(wallet), dust = state.dust;
+  const bought = [];
+  for (const tier of COLLECTOR.cheap) for (const num of pools[tier]) {
+    if (have.has(num) || dust < COLLECTOR.price[tier]) continue;
+    let slot = 0;
+    while (next.entries['spend:cbuy:' + num + (slot ? ':' + slot : '')]) slot++;
+    const r = spendFrom(next, { dust: COLLECTOR.price[tier] }, { id: 'cbuy:' + num + (slot ? ':' + slot : ''), now, x: { cb: num } });
+    if (!r.ok) break;
+    next = r.wallet; dust -= COLLECTOR.price[tier]; bought.push(num);
+  }
+  if (!bought.length) return refuse(wallet, 'dust');
+  const paid = claimCollectorSets(next, { today, now });
+  return { wallet: paid.wallet, ok: true, bought, dust: state.dust - dust, sets: paid.sets };
+}
+/** Turn every extra copy into dust (one of each is always kept), or only `species`'s extras. */
+export function dustExtras(wallet, { species = null, today = dailyDate(), now = Date.now() } = {}) {
+  const counts = collectorCounts(mergeWallet(wallet).entries);
+  const pairs = [...counts].filter(([num, c]) => c.n > 1 && (species == null || num === species)).map(([num, c]) => [num, c.n - 1]);
+  if (!pairs.length) return refuse(wallet, 'none');
+  let next = mergeWallet(wallet), dust = 0;
+  // A few entries if there are many species, so each stays within the ledger's payload limit.
+  for (let i = 0; i < pairs.length; i += 100) {
+    const part = pairs.slice(i, i + 100), gain = part.reduce((t, [num, k]) => t + k * COLLECTOR.extra[colTier(num)], 0);
+    next.entries['spend:cdx:' + uuid()] = { at: seconds(now), g: { dust: gain }, x: { dx: part } };
+    dust += gain;
+  }
+  return { wallet: next, ok: true, dust, copies: pairs.reduce((t, [, k]) => t + k, 0) };
+}
+/** Star or unstar a missing species on the wishlist (at most COLLECTOR.wish.max). */
+export function toggleWish(wallet, species, { today = dailyDate(), now = Date.now() } = {}) {
+  if (!validNum(species)) return refuse(wallet, 'unknown');
+  const state = collectorState(wallet, today);
+  if (state.owned.includes(species)) return refuse(wallet, 'owned');
+  const on = state.wish.includes(species), list = on ? state.wish.filter(n => n !== species) : state.wish.concat(species);
+  if (!on && state.wish.length >= COLLECTOR.wish.max) return refuse(wallet, 'limit');
+  const next = mergeWallet(wallet);
+  next.entries['cfg:wish:' + Math.floor(now).toString(36).padStart(9, '0') + '-' + uuid()] = { at: seconds(now), x: { w: list } };
+  return { wallet: next, ok: true, on: !on, wish: list };
+}
+/** 10 shards for 400 dust, up to 50 shards a week (Monday to Sunday), apart from the coin shop's 50. */
 export function buyDustShards(wallet, { today = dailyDate(), now = Date.now() } = {}) {
   const state = collectorState(wallet, today), c = COLLECTOR.shards;
   if (state.shop.shardsLeft < c.shards) return refuse(wallet, 'limit');
@@ -996,6 +1079,10 @@ export function gachaBridge({ onChange = () => {} } = {}) {
       pull: act((w, o) => pullCollector(w, o)),
       buy: act((w, o) => buyCollectorMon(w, o.species, o)),
       buyShards: act((w, o) => buyDustShards(w, o)),
+      buyCheap: act((w, o) => buyCheapMissing(w, o)),
+      dustExtras: act((w, o) => dustExtras(w, o)),
+      wish: act((w, o) => toggleWish(w, o.species, o)),
+      setsOf,
       claimSets: act((w, o) => claimCollectorSets(w, o))
     }
   };

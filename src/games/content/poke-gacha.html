@@ -76,7 +76,7 @@ canvas, img { image-rendering: pixelated; display: block }
 /* The Collector's tab is green on every screen, so it never reads as part of tower defense. */
 #tabs .panel.coltab { border-color: #2f8f5f; color: #9fe0b4 } #tabs .panel.coltab.on { background: #2f8f5f; color: var(--paper) }
 #tabs .purse { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: default }
-#tabs .help { cursor: pointer; padding: 4px 7px; display: flex; align-items: center; gap: 7px }
+#tabs .help { cursor: pointer; padding: 4px 5px; display: flex; align-items: center; gap: 5px }
 #tabs .help .speaker { cursor: pointer }
 /* The fallback font is wider: tighter tabs keep a five-digit purse on the bar. */
 #frame.no-pixel #tabs .panel { padding: 4px 3px; font: 600 14px/22px Arial, Helvetica, sans-serif }
@@ -195,13 +195,17 @@ canvas, img { image-rendering: pixelated; display: block }
 #hatch .grid .tag { height: 16px; line-height: 16px; text-align: center }
 
 /* Dex */
-#dex-list { left: 8px; top: 8px; width: 248px; height: 264px; display: flex; flex-direction: column }
-#dex-rows { height: 180px; flex: none }
+/* PokeRogue's starter screen: the details on the left, the icon grid (9 × 6 a page) and its filter bar on the right. */
+#dex-list { left: 248px; top: 8px; width: 384px; height: 264px; display: flex; flex-direction: column; padding: 4px 3px }
+#dex-list .title { margin-bottom: 0 }
+#dex-rows { height: 174px; flex: none }
 /* Dex rows hold the 40x30 mini sprite at 1x, so they are 30px tall: 6 whole rows under the filter bar. */
 #dex-rows > div { height: 30px }
-#dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 96px 18px 120px; gap: 2px 12px }
+#dex-detail { left: 8px; top: 8px; width: 232px; height: 264px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 96px 18px 120px; gap: 2px 12px }
 #dex-info { min-width: 0 }
 #dex-info > div { overflow: hidden; text-overflow: ellipsis }
+/* Name, egg, type and candy in the 96px beside the sprite. */
+#dex-info .title { line-height: 28px; margin-bottom: 0 } #dex-info > div:not(.title):not(.egg-line) { line-height: 16px }
 #dex-detail .cell { width: 96px; height: 96px }
 #dex-acts { grid-column: 1 / -1; grid-row: 3; height: 120px }
 /* Below the picture: Info (the line's chain, class and base stats) or Candy & looks (the actions). */
@@ -209,7 +213,11 @@ canvas, img { image-rendering: pixelated; display: block }
 #dex-tabs span { border: 1px solid var(--dim); padding: 0 4px; line-height: 16px; cursor: pointer; white-space: nowrap }
 #dex-tabs span.on { color: var(--gold); border-color: var(--gold) }
 #dex-depth { grid-column: 1 / -1; grid-row: 3; height: 120px; display: flex; flex-direction: column; gap: 4px; padding-top: 6px; cursor: pointer }
-#dex-depth .chain { display: flex; align-items: center; gap: 4px; height: 46px; white-space: nowrap }
+#dex-depth .chain { display: flex; align-items: center; gap: 2px; height: 46px; white-space: nowrap }
+/* In the narrower details panel beside the grid: tighter padding, and the chain's arrows and lines wrap rather than spill. */
+#dex-detail { padding: 6px }
+#dex-depth .chain .arrow { font-size: 16px }
+#dex-depth .line { flex-wrap: wrap; height: auto; min-height: 20px; white-space: normal }
 #dex-depth .chain .form { display: flex; align-items: flex-end; gap: 1px }
 #dex-depth .chain .arrow { color: var(--gold); font: 400 var(--title)/20px var(--pixel) }
 #dex-rows .two { display: flex; flex-direction: column; line-height: 16px }
@@ -259,7 +267,36 @@ canvas, img { image-rendering: pixelated; display: block }
 #full-list { left: 8px; top: 8px; width: 304px; height: 264px; display: flex; flex-direction: column }
 #full-list .title { margin-bottom: 0 }
 #col-note { color: var(--gold); line-height: 18px; margin-bottom: 4px }
-#full-rows { height: 166px; flex: none }
+/* Whole rows only: five 30px rows. */
+#full-rows { height: 150px; flex: none }
+/* The Full Dex (and the TD Dex) as PokeRogue's starter screen: details on the left, the icon grid on the right. */
+#scr-collector.grid #full-list { left: 248px; width: 384px; padding: 4px 3px }
+#full-filters { gap: 2px } #full-filters > * { flex: none } #full-filters .klabel:first-child { overflow: visible }
+#full-filters .klabel { padding: 0 3px }
+#scr-collector.grid #full-detail { left: 8px; width: 232px; padding: 6px 8px }
+#scr-collector.grid #full-title, #scr-collector.grid #col-note { display: none }
+#scr-collector.grid #full-rows { height: 203px }
+#full-filters input { font: 400 var(--body)/18px var(--pixel); color: var(--paper); background: var(--ink); border: 1px solid var(--dim); padding: 0 4px; width: 58px; height: 20px; outline: none }
+.igrid { display: grid; grid-template-columns: repeat(var(--cols, 9), 40px); grid-auto-rows: 29px; column-gap: 1px; align-content: start; overflow: hidden }
+.igrid > .cell { position: relative; width: 40px; height: 29px; overflow: hidden; cursor: pointer }
+.igrid > .cell.at { outline: 2px solid var(--gold); outline-offset: -2px }
+/* A grid inside a list container (#full-rows, #dex-rows) drops the list rows' height, padding and arrow. */
+#full-rows.igrid > .cell, #dex-rows.igrid > .cell { height: 29px; padding: 0; display: block; gap: 0 }
+#full-rows.igrid > .cell::before, #dex-rows.igrid > .cell::before { content: none }
+.igrid > .cell.wish { box-shadow: inset 0 0 0 1px var(--gold) }
+.igrid > .cell .b { position: absolute; font: 400 10px/10px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--paper); pointer-events: none }
+.igrid > .cell .tl { left: 1px; top: 1px } .igrid > .cell .tr { right: 1px; top: 1px; color: var(--gold) }
+.igrid > .cell .bl { left: 1px; bottom: 1px; color: var(--gold) } .igrid > .cell .br { right: 1px; bottom: 1px; color: var(--gold) }
+.fbar .page { margin-left: auto; color: var(--dim) }
+#full-detail .sets { color: var(--dim); font-size: 16px; line-height: 16px; height: 32px; overflow: hidden; white-space: normal }
+#full-detail .note { color: var(--gold); font-size: 16px; line-height: 16px }
+#scr-collector.grid #full-detail .info > div { font-size: 16px; line-height: 15px }
+#scr-collector.grid #full-detail .cell { width: 80px; height: 60px }
+#scr-collector.grid #full-acts > div { height: 24px }
+/* Settings: over the screen, from the gear by "?". */
+#settings { left: 140px; top: 16px; width: 360px; height: 248px; padding: 6px 12px; z-index: 70 }
+#settings .rows > div { height: 28px }
+#tabs .help .gear { cursor: pointer }
 #col-machine { display: flex; flex-direction: column; align-items: center; gap: 4px }
 #col-machine .stat { display: flex; justify-content: space-between; width: 100%; height: 22px; align-items: center; border-bottom: 1px solid var(--ink) }
 #col-machine .stat > span:last-child { display: flex; align-items: center; gap: 4px }
@@ -544,10 +581,11 @@ img.mirror { scale: -1 1 }
         <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div id="dex-tabs"></div><div class="rows scroll" id="dex-acts"></div><div id="dex-depth" hidden></div></div>
       </section>
       <section id="scr-collector" class="screen" hidden>
-        <div class="panel" id="full-list"><div class="title" id="full-title">COLLECTOR</div><div id="col-note">Collection only, doesn't join your squad.</div><div class="fbar" id="full-keys"></div><div class="rows scroll" id="full-rows"></div></div>
+        <div class="panel" id="full-list"><div class="title" id="full-title">COLLECTOR</div><div id="col-note">Collection only, doesn't join your squad.</div><div class="fbar" id="full-keys"></div><div class="fbar" id="full-filters" hidden></div><div class="rows scroll" id="full-rows"></div></div>
         <div class="panel" id="full-detail"></div>
         <div class="panel" id="col-over" hidden></div>
       </section>
+      <div class="panel" id="settings" hidden></div>
       <section id="scr-shop" class="screen" hidden>
         <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="rows scroll" id="shop-list"></div></div>
         <div class="panel right-panel" id="shop-preview"></div>
@@ -586,6 +624,38 @@ const G = (() => { try { return parent !== window && parent.__boredGacha ? paren
 const PREF = "bored.poke-gacha.ui";
 const pref = (() => { try { return JSON.parse(localStorage.getItem(PREF) || "null") || {}; } catch { return {}; } })();
 const keep = () => { try { localStorage.setItem(PREF, JSON.stringify(pref)); } catch {} };
+/* Settings (the gear by "?", or ,): volume, animation speed, reduce effects, skip tutorials.
+   Kept on this device with the rest of pref. */
+const VOLUMES = [0.25, 0.5, 0.75, 1], SPEEDS = [1, 1.5, 2, 4];
+const volume = () => VOLUMES.includes(pref.vol) ? pref.vol : 1;
+// Reveal and hatch timings are divided by the speed: 4x is nearly instant.
+const animScale = () => 1 / (SPEEDS.includes(pref.speed) ? pref.speed : 1);
+// Reduce effects: no flashes, no machine jiggle, no screen shake.
+const calm = () => pref.calm === true;
+let settingsAt = 0;
+function settingsRows() {
+  return [
+    { label: "Sound (M)", value: soundOn() ? "On" : "Off", run: () => toggleSound() },
+    { label: "Volume", value: Math.round(volume() * 100) + "%", run: () => { pref.vol = VOLUMES[(VOLUMES.indexOf(volume()) + 1) % VOLUMES.length]; if (SFX.out) SFX.out.gain.value = 0.22 * volume(); } },
+    { label: "Animation speed", value: (SPEEDS.includes(pref.speed) ? pref.speed : 1) + "×", run: () => { pref.speed = SPEEDS[(SPEEDS.indexOf(SPEEDS.includes(pref.speed) ? pref.speed : 1) + 1) % SPEEDS.length]; } },
+    { label: "Reduce effects", value: calm() ? "On" : "Off", run: () => { pref.calm = !calm(); } },
+    { label: "Skip tutorials", value: tipsSeen._skip ? "On" : "Off", run: () => { tipsSeen._skip = !tipsSeen._skip; saveTips(); if (tutor && tipsSeen._skip) tutorEnd(true); } },
+    { label: "Close", value: "", run: () => closeSettings() }
+  ];
+}
+function openSettings() { $("#settings").hidden = false; settingsAt = 0; drawSettings(); }
+function closeSettings() { $("#settings").hidden = true; if (SCREENS[tab]) SCREENS[tab][0](); }
+function drawSettings() {
+  const box = $("#settings"), list = el("div", "rows"), items = settingsRows();
+  rows(list, items.map(x => ({ label: x.label, right: x.value ? [el("span", "num", x.value)] : "" })), settingsAt, (i, click) => { settingsAt = i; if (click) { items[i].run(); keep(); if (!$("#settings").hidden) drawSettings(); } });
+  box.replaceChildren(el("div", "title", "SETTINGS"), list, el("div", "dim", "Enter changes · Backspace closes"));
+}
+function settingsKey(e) {
+  const items = settingsRows();
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); settingsAt = (settingsAt + (e.key === "ArrowUp" ? -1 : 1) + items.length) % items.length; return drawSettings(); }
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); items[settingsAt].run(); keep(); if (!$("#settings").hidden) drawSettings(); return; }
+  if (e.key === "Backspace" || e.key === ",") { e.preventDefault(); closeSettings(); }
+}
 let tab = pref.tab || "pull", machine = pref.machine || "move", S = null;
 // The Collector's state (G.collector), or null on a hub without it.
 let CS = null;
@@ -656,6 +726,7 @@ const PIXEL_MAPS = {
  "candy": ["kk..kkkkk..kk", "kekk22w11kkek", "keek2w111keek", "kee0111100eek", "keek11100keek", "kekk01000kkek", "kk..kkkkk..kk"],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
+ "gear": ["...kkk...", ".kkk1kkk.", ".k11111k.", "kk1kkk1kk", "k11k.k11k", "kk1kkk1kk", ".k11111k.", ".kkk1kkk.", "...kkk..."],
  "sound-on": ["....k.....", "...k1k..k.", "kkk11k.k1k", "k1111k.k1k", "k1111k.k1k", "kkk11k.k1k", "...k1k..k.", "....k....."],
  "sound-off": ["....k.....", "...k1k....", "kkk11k....", "k1111k....", "k1111k....", "kkk11k....", "...k1k....", "....k....."],
  "star": ["........k........", ".......k3k.......", ".......k3k.......", "......k321k......", "......k321k......", ".kkkkk32221kkkkk.", "k333332222211111k", ".k3222222222221k.", "..k32222222221k..", "...k322222221k...", "....k3222221k....", "....k3222221k....", "...k322222221k...", "...k3211k2221k...", "..k321kk.kk221k..", "..k31k.....k21k..", "...kk.......kk..."],
@@ -1115,7 +1186,7 @@ function audio() {
     if (!SFX.ctx) {
       const A = window.AudioContext || window.webkitAudioContext;
       if (!A) return null;
-      SFX.ctx = new A(); SFX.out = SFX.ctx.createGain(); SFX.out.gain.value = 0.22; SFX.out.connect(SFX.ctx.destination);
+      SFX.ctx = new A(); SFX.out = SFX.ctx.createGain(); SFX.out.gain.value = 0.22 * volume(); SFX.out.connect(SFX.ctx.destination);
     }
     if (SFX.ctx.state === "suspended") { const r = SFX.ctx.resume(); if (r && r.catch) r.catch(() => {}); }
     return SFX.ctx;
@@ -1181,6 +1252,7 @@ function toggleSound() {
 }
 function turnCrank() {
   sfx("pull");
+  if (calm()) return;
   const start = performance.now();
   const tick = now => {
     const t = Math.min(1, (now - start) / 420);
@@ -1239,9 +1311,9 @@ function startReveal(eggs, seen, owned) {
   box.replaceChildren(head, grid);
   box.className = "panel"; box.hidden = false; $("#menu").hidden = true;
   // One egg every beat after the crank; a short hush before a Legendary.
-  const beat = big ? 110 : 60;
-  let at = 420;
-  const times = list.map(x => { if (x.tier >= 3) at += 350; const t = at; at += beat; return t; });
+  const k = animScale(), beat = (big ? 110 : 60) * k;
+  let at = 420 * k;
+  const times = list.map(x => { if (x.tier >= 3) at += 350 * k; const t = at; at += beat; return t; });
   reveal = { list, cells, counts, shown: 0, done: false, timers: [] };
   list.forEach((x, i) => reveal.timers.push(setTimeout(() => showEgg(i), times[i])));
   reveal.timers.push(setTimeout(finishReveal, at + 150));
@@ -1253,8 +1325,9 @@ function showEgg(i) {
   c.classList.add("in"); rv.shown++;
   if (x.tier >= 2 && !rv.quiet) {
     sfx(x.tier >= 3 ? "legend" : "epic");
+    if (calm()) return;
     c.classList.add("flash"); setTimeout(() => c.classList.remove("flash"), 450);
-    const box = $("#reveal"), cls = x.tier >= 3 ? "flash3" : "flash2";
+    const box = rv.box || $("#reveal"), cls = x.tier >= 3 ? "flash3" : "flash2";
     box.classList.add(cls); setTimeout(() => box.classList.remove(cls), 450);
   }
 }
@@ -1267,7 +1340,7 @@ function finishReveal() {
   const parts = [], c = rv.counts;
   for (let t = 4; t >= 0; t--) if (c[t]) parts.push(c[t] + " " + (t === 4 ? "Banner" : TIER_NAME[t]));
   const fresh = rv.list.filter(x => x.isNew).length;
-  say(parts.join(", ") + (fresh ? " · " + fresh + " NEW" : "") + ". Enter: close.");
+  say(rv.line ? rv.line + " Enter: close." : parts.join(", ") + (fresh ? " · " + fresh + " NEW" : "") + ". Enter: close.");
 }
 function endReveal() {
   if (!reveal) return;
@@ -1279,7 +1352,9 @@ function endReveal() {
   if (tab === "collector") colUpdate();
 }
 // Enter or a click: everything at once, then close.
+// S skips straight to the end; holding any key skips too (a repeat).
 function revealKey(e) {
+  if (!reveal.done && (e.key === "s" || e.key === "S" || e.repeat)) { e.preventDefault(); return finishReveal(); }
   if (e.key === "Enter" || e.key === " " || e.key === "Backspace") { e.preventDefault(); if (reveal.done) endReveal(); else finishReveal(); }
   else if (/^[1-9]$/.test(e.key)) endReveal();
 }
@@ -1725,15 +1800,12 @@ function dexUpdate() {
     return say("Nothing matches " + filtSummary("dex") + ". Clear the filters (Delete) or change them (/).");
   }
   if (dexAt >= list.length) dexAt = list.length - 1;
-  // Caught: the line's mini sprite in colour, its name and a gold check. Not caught: a
-  // black silhouette, the number and ???.
-  // A caught line shows the form it fights as; when that is not the base form, "Sneasel line" under it.
-  const rowLabel = num => { if (!owned.has(num)) return String(num).padStart(4, "0") + " ???";
-    const f = formOf(num), lab = el("span", "two"); lab.append(el("span", "", String(num).padStart(4, "0") + " " + name(f)));
-    if (f !== num) lab.append(el("span", "sub", name(num) + " line")); return lab; };
-  rows($("#dex-rows"), list.map(num => ({ icon: owned.has(num) ? mini(formOf(num), S.lines[num].look) : mini(num, "normal", true),
-    label: rowLabel(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
-    dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
+  // A dense grid: caught in colour with its hatch count (top left) and a star if shiny; uncaught a silhouette, ???.
+  const pg = iconGrid($("#dex-rows"), list.map(num => { const l = S.lines[num];
+    return { icon: l ? mini(formOf(num), l.look) : mini(num, "normal", true), tl: l && l.hatches > 1 ? l.hatches : "", tr: l && l.shiny ? "★" : "",
+      title: l ? String(num).padStart(4, "0") + " " + name(formOf(num)) + (formOf(num) !== num ? " (" + name(num) + " line)" : "") : String(num).padStart(4, "0") + " ???", cls: l ? "caught" : "" }; }),
+    dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); }, { rows: 6 });
+  $("#dex-keys").append(el("span", "page", pg.page + "/" + pg.pages));
   const line = list[dexAt], l = S.lines[line], tip = l ? formOf(line) : line;
   const shown = l && isSkin(l.look) && skinOf(l.look) ? skinForm(l.look, tip) : tip;
   $("#dex-pic").replaceChildren(l ? sprite(shown, G.lookFor(shown)) : silhouette(line));
@@ -1741,10 +1813,11 @@ function dexUpdate() {
   // Which egg it hatches from, with that egg's icon: Common 3★, Rare 4★, Epic 5★, Legendary 6★.
   egg.append("#" + String(tip).padStart(4, "0") + " ·", eggImg(stars - 3), TIER_NAME[stars - 3] + " egg · " + stars + "★");
   // Then the type (??? until caught), and for a caught line its candy.
-  const more = el("div", l ? "" : "dim");
-  if (l) more.append(el("span", "dim", G.dex[tip - 1][1]), " · ", el("span", "num", l.candy), " ", lineCandy(line), " · hatched ", el("span", "num", l.hatches));
+  // Type on one line, candy and hatches on the next, so both fit beside the sprite.
+  const more = el("div", l ? "" : "dim"), more2 = el("div");
+  if (l) { more.append(el("span", "dim", G.dex[tip - 1][1])); more2.append(el("span", "num", l.candy), " ", lineCandy(line), " · hatched ", el("span", "num", l.hatches)); }
   else more.append("Type ??? · not caught");
-  info.replaceChildren(el("div", "title", l ? name(tip) : "???"), egg, more);
+  info.replaceChildren(el("div", "title", l ? name(tip) : "???"), egg, more, more2);
   const acts = dexActions(line);
   if (actAt >= acts.length) actAt = Math.max(0, acts.length - 1);
   if (!acts.length) dexFocus = "list";
@@ -1814,15 +1887,17 @@ function dexDepth(line, tip) {
     if (last && G.stageOf(n) !== last) chain.append(el("span", "arrow", "→"));
     last = G.stageOf(n);
     const f = el("span", "form"), has = own.has(n);
-    f.append(has ? miniStyle(el("span", "mini"), n, G.lookFor(n), 1.5) : miniStyle(el("span", "mini unseen"), n, "normal", 1.5));
+    // At 1x with 1x checks, so a three-form chain fits the details panel beside the grid.
+    f.append(has ? miniStyle(el("span", "mini"), n, G.lookFor(n), 1) : miniStyle(el("span", "mini unseen"), n, "normal", 1));
     // Owned: a check beside the form (never over the sprite); the one that fights is gold.
-    if (has) f.append(n === tip ? check(true) : check(false));
+    if (has) f.append(n === tip ? mapCanvas("check", { k: C.ink, 1: C.gold }, 1) : mapCanvas("dot", { k: C.ink, 1: C.dim }, 1));
     f.title = has ? name(n) + (n === tip ? " (fights)" : "") : "???";
     chain.append(f);
   });
   if (forms.length > DEX_CHAIN_MAX) chain.append(el("span", "dim", "+" + (forms.length - DEX_CHAIN_MAX)));
   const owned = forms.filter(n => own.has(n)).length;
-  chain.append(el("span", "dim", " " + owned + "/" + forms.length + " owned"));
+  const ownedNote = el("span", "dim", " " + owned + "/" + forms.length); ownedNote.title = owned + " of " + forms.length + " forms owned";
+  chain.append(ownedNote);
   const parts = [chain];
   const u = T && T.squad ? T.squad([tip])[0] : null, c = u && T.classes[u.cls];
   if (u && c) { const ln = el("div", "line"); ln.append(classIcon(u.cls), c.name, " · Range ", el("span", "num", u.range), " · cost ", el("span", "num", u.cost)); parts.push(ln); }
@@ -1839,9 +1914,9 @@ function dexKey(e) {
   const k = e.key;
   if (dexBuy) { e.preventDefault(); return answerCandy(k === "Enter" || k === " "); }
   if (dexFocus === "list") {
-    const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k], list = dexList();
+    const list = dexList(), to = gridMove(k, dexAt, list.length, 9, 6);
     if (FILTER_KEYS.dex.test(k)) { e.preventDefault(); return filtKey("dex", k.length === 1 ? k.toLowerCase() : k); }
-    if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(list.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
+    if (to !== null) { e.preventDefault(); dexAt = to; actAt = 0; return dexUpdate(); }
     if (k === "Enter" || k === " ") { e.preventDefault(); if (list[dexAt] && dexActions(list[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
     if (k === "Backspace") { e.preventDefault(); go("pull"); }
   } else {
@@ -2130,25 +2205,75 @@ function badgeStrip() {
 // Enter: to the Dex, where the buddy is set.
 function cardKey(e) { if (e.key === "Enter") { e.preventDefault(); go("dex"); } }
 
+/* ── A dense icon grid, as on PokeRogue's starter screen ───────────────────
+   cols × rows mini sprites a page, a badge in each corner (count, shiny, NEW, wishlist),
+   the picked one framed. Arrows move by one and by a row; PageUp/PageDown by a page. */
+function iconGrid(container, list, at, onPick, { cols = 9, rows = 7 } = {}) {
+  const per = cols * rows, page = Math.floor(Math.max(0, at) / per), from = page * per;
+  container.classList.add("igrid"); container.style.setProperty("--cols", cols);
+  container.replaceChildren(...list.slice(from, from + per).map((it, k) => {
+    const i = from + k, c = el("div", "cell" + (i === at ? " at" : "") + (it.cls ? " " + it.cls : ""));
+    c.dataset.row = i; c.append(it.icon);
+    for (const pos of ["tl", "tr", "bl", "br"]) if (it[pos] !== undefined && it[pos] !== "") c.append(el("span", "b " + pos, String(it[pos])));
+    if (it.title) c.title = it.title;
+    return c;
+  }));
+  container.onclick = e => { const r = e.target.closest("[data-row]"); if (r) onPick(Number(r.dataset.row), true); };
+  return { page: page + 1, pages: Math.max(1, Math.ceil(list.length / per)) };
+}
+function gridMove(k, at, n, cols = 9, rows = 7) {
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols, PageUp: -cols * rows, PageDown: cols * rows }[k];
+  return step === undefined ? null : Math.max(0, Math.min(n - 1, at + step));
+}
+
 /* ── The Collector: its own tab, apart from tower defense ──────────────────
    Four views on one screen, all in green: the machine (pull for chips, the door to the
-   casino, rates and history), the Full Dex, the sets and the dust shop. Every view says it
-   is a collection only. Keys: P machine, D Full Dex, S sets, X dust shop; on the machine,
-   R rates and pity, H history, G the casino. */
-let fullAt = 0, fullMode = "machine", fullFilter = "all", fullFocus = "list", fullActAt = 0, setAt = 0, colAt = 0, colOver = null;
-const FULL_FILTERS = ["all", "have", "missing"];
+   casino, rates and history), the Full Dex (an icon grid with filters), the sets and the
+   dust shop. Keys: P machine, D Full Dex, S sets, X dust shop, Backspace back; on the machine
+   R rates, H history, G the casino. In the Full Dex: G gen, T type, C caught, R rarity,
+   E sets, O sort, / search, W wishlist. */
+let fullAt = 0, fullMode = "machine", fullFocus = "list", fullActAt = 0, setAt = 0, colAt = 0, colOver = null, dustAt = 0;
 const COL_NOTE = "Collection only, doesn't join your squad.";
-const fullList = () => { const have = new Set(CS.owned), all = Array.from({ length: CS.total }, (_, i) => i + 1);
-  return fullFilter === "have" ? all.filter(n => have.has(n)) : fullFilter === "missing" ? all.filter(n => !have.has(n)) : all; };
+const GENS = [[1, 151], [152, 251], [252, 386], [387, 493], [494, 649], [650, 721], [722, 809], [810, 905], [906, 1025]];
+const COL_SORTS = ["num", "name", "rarity", "count"], COL_SORT_NAME = { num: "No.", name: "Name", rarity: "Rarity", count: "Count" };
+const colF = Object.assign({ gen: 0, type: "", own: "all", tier: -1, set: "", sort: "num", q: "" }, pref.colF || {});
+const keepColF = () => { pref.colF = { ...colF, q: "" }; keep(); };
+// Pulled and not looked at yet: a NEW badge until it is picked in the grid.
+const colNew = new Set(Array.isArray(pref.colNew) ? pref.colNew : []);
+const keepNew = () => { pref.colNew = [...colNew].slice(-300); keep(); };
 const casinoToday = () => { try { return G.casino && G.casino.today ? G.casino.today() : null; } catch { return null; } };
 const signed = n => (n < 0 ? "−" : "+") + Math.abs(n).toLocaleString("en-US");
-function colSay(text) { say(text + " " + COL_NOTE); }
+const colName = num => CS && CS.owned.includes(num) ? name(num) : "???";
+function colSay(text) { say(text); }
+// The 5 incomplete sets closest to done, for the Sets filter and the Sets view's order.
+const closeSets = () => CS.sets.filter(st => !st.complete && st.id !== "all").sort((a, b) => (a.need - a.have) - (b.need - b.have) || b.have / b.need - a.have / a.need);
+function fullList() {
+  const have = new Set(CS.owned), wish = new Set(CS.wish), tierOf = G.collector.tierOf;
+  const inSet = colF.set && colF.set !== "wish" ? new Set((G.collector.sets().find(x => x.id === colF.set) || { nums: [] }).nums) : null;
+  const q = colF.q.trim().toLowerCase();
+  let list = Array.from({ length: CS.total }, (_, i) => i + 1).filter(n =>
+    (!colF.gen || (n >= GENS[colF.gen - 1][0] && n <= GENS[colF.gen - 1][1])) &&
+    (!colF.type || G.dex[n - 1][1].split("/").includes(colF.type)) &&
+    (colF.own === "all" || (colF.own === "have") === have.has(n)) &&
+    (colF.tier < 0 || tierOf(n) === colF.tier) &&
+    (colF.set !== "wish" || wish.has(n)) && (!inSet || inSet.has(n)) &&
+    // Search finds only what you own by name (uncaught stay ???), or any number.
+    (!q || (/^\d+$/.test(q) ? String(n).startsWith(q.replace(/^0+/, "")) : have.has(n) && name(n).toLowerCase().includes(q))));
+  const c = CS.copies;
+  if (colF.sort === "name") list.sort((a, b) => colName(a).localeCompare(colName(b)) || a - b);
+  if (colF.sort === "rarity") list.sort((a, b) => tierOf(b) - tierOf(a) || a - b);
+  if (colF.sort === "count") list.sort((a, b) => (c[b] || 0) - (c[a] || 0) || a - b);
+  return list;
+}
 function fullActions(num) {
   const R = G.collector.rules, have = CS.owned.includes(num), shiny = CS.shiny.includes(num), price = R.price[G.collector.tierOf(num)];
-  if (!have) return [{ label: "Buy for " + price + " dust", icon: dustIcon(), off: CS.dust < price, about: "Spend " + price + " dust to put " + name(num) + " in the Full Dex.",
-    run: () => G.collector.buy({ species: num }) }];
+  if (!have) return [
+    { label: "Buy for " + price + " dust", icon: dustIcon(), off: CS.dust < price, about: "Spend " + price + " dust on No. " + num + ".", run: () => G.collector.buy({ species: num }) },
+    { label: CS.wish.includes(num) ? "Unstar (W)" : "Star for the wishlist (W)", about: "Starred: twice as likely in its tier, " + CS.wish.length + "/" + R.wish.max + " starred.", run: () => G.collector.wish({ species: num }) }];
   const out = [{ label: "Make buddy", about: "Show " + name(num) + " on your card and next to your name.", run: () => G.setBuddy({ species: num }) }];
   if (shiny) out.push({ label: "Make buddy (shiny)", about: "Show shiny " + name(num) + " as your buddy.", run: () => G.setBuddy({ species: num, shiny: true }) });
+  const extra = (CS.copies[num] || 1) - 1;
+  if (extra) out.push({ label: "Dust " + extra + " extra (+" + extra * R.extra[G.collector.tierOf(num)] + ")", icon: dustIcon(), about: "Turn the extra copies into dust. One always stays.", run: () => G.collector.dustExtras({ species: num }) });
   return out;
 }
 // The machine's menu: two pulls, the casino, rates and history.
@@ -2157,8 +2282,8 @@ function colMenu() {
   return [
     { label: menuLine({ times: "x1", label: "1 Pull" }), icon: chipIcon(), right: [el("span", "num", R.pull)], off: CS.chips < R.pull, about: R.pull + " chips: 1 Pokémon for the Full Dex.", run: () => colPull(1) },
     { label: menuLine({ times: "x10", label: "10 Pulls" }), icon: chipIcon(), right: [el("span", "num", R.ten)], off: CS.chips < R.ten, about: R.ten + " chips: 10 Pokémon, 1 Rare or better.", run: () => colPull(10) },
-    { label: "Get chips → Casino", off: !(G.casino && G.casino.open), about: "Open Shotgun Roulette: bet chips, win up to 3,000 a day, net of losses. Its ← Poké Gacha button brings you back.", run: () => { G.casino.open(); return { ok: true, quiet: true }; } },
-    { label: "Rates · pity (R)", about: "The Collector's rates, its own pity, and what a duplicate pays.", run: () => { colOver = "rates"; return { ok: true, quiet: true }; } },
+    { label: "Get chips → Casino", off: !(G.casino && G.casino.open), about: "Shotgun Roulette pays chips, up to 3,000 a day net. Its ← Poké Gacha button comes back.", run: () => { G.casino.open(); return { ok: true, quiet: true }; } },
+    { label: "Rates · pity (R)", about: "Rates, pity, and the dust each pull pays.", run: () => { colOver = "rates"; return { ok: true, quiet: true }; } },
     { label: "History (H)", about: "Your last Collector pulls, newest first.", run: () => { colOver = "history"; return { ok: true, quiet: true }; } }
   ];
 }
@@ -2166,32 +2291,52 @@ function colUpdate() {
   drawBackdrop();
   if (!CS) return say("The Collector needs the latest Bored. Reload the page.");
   titled($("#full-title"), "COLLECTOR", CS.count + "/" + CS.total);
-  const keys = [keyLabel("p", "Pull", fullMode === "machine"), keyLabel("d", "Full Dex", fullMode === "dex"), keyLabel("s", "Sets", fullMode === "sets"), keyLabel("x", "Dust shop", fullMode === "shop")];
-  if (fullMode === "dex") keys.push(keyLabel("f", fullFilter === "all" ? "All" : fullFilter === "have" ? "Have" : "Missing"));
+  const grid = fullMode === "dex";
+  // Back: in the title line on the narrow views, in the sub-tab bar on the wide grid.
+  if (fullMode !== "machine" && !grid) { const b = keyLabel("Backspace", "‹ Back"); b.classList.add("pager"); b.style.float = "right"; b.style.marginTop = "6px"; $("#full-title").append(b); }
+  $("#scr-collector").classList.toggle("grid", grid);
+  const keys = [keyLabel("p", "Pull", fullMode === "machine"), keyLabel("d", "Full Dex", grid), keyLabel("s", "Sets", fullMode === "sets"), keyLabel("x", "Dust shop", fullMode === "shop")];
+  if (grid) keys.push(keyLabel("Backspace", "‹ Back"));
   $("#full-keys").replaceChildren(...keys);
+  $("#full-filters").hidden = !grid;
+  $("#full-rows").classList.remove("igrid");
   overUpdate();
   const box = $("#full-detail");
   if (fullMode === "machine") return colMachine(box);
   if (fullMode === "sets") return fullSets(box);
   if (fullMode === "shop") return fullShop(box);
-  const list = fullList(), have = new Set(CS.owned), shiny = new Set(CS.shiny), tiers = G.collector.tiers;
-  if (!list.length) { $("#full-rows").replaceChildren(el("p", "dim", fullFilter === "have" ? "Nothing yet: pull on the machine (P)." : "Nothing missing. You did it.")); box.replaceChildren(); return colSay("F changes the filter."); }
-  if (fullAt >= list.length) fullAt = list.length - 1;
-  rows($("#full-rows"), list.map(num => ({ icon: mini(num, shiny.has(num) ? "shiny" : "normal", !have.has(num)),
-    label: String(num).padStart(4, "0") + " " + name(num), off: !have.has(num),
-    right: have.has(num) ? (shiny.has(num) ? [el("span", "gold", "★"), check(true)] : [check(true)]) : [el("span", "dim", tiers[G.collector.tierOf(num)][0])] })),
-    fullFocus === "list" ? fullAt : -1, i => { fullAt = i; fullFocus = "list"; fullActAt = 0; colUpdate(); });
-  const num = list[fullAt], owned = have.has(num), tier = G.collector.tierOf(num), R = G.collector.rules;
-  const pic = el("div", "cell"); pic.append(sprite(num, shiny.has(num) ? "shiny" : "normal", !owned));
+  fullDex(box);
+}
+function fullDex(box) {
+  const list = fullList(), have = new Set(CS.owned), shiny = new Set(CS.shiny), wish = new Set(CS.wish), tiers = G.collector.tiers, tierOf = G.collector.tierOf;
+  if (fullAt >= list.length) fullAt = Math.max(0, list.length - 1);
+  const pg = iconGrid($("#full-rows"), list.map(num => ({ icon: mini(num, shiny.has(num) ? "shiny" : "normal", !have.has(num)),
+    tl: CS.copies[num] > 1 ? CS.copies[num] : "", tr: shiny.has(num) ? "★" : "", bl: colNew.has(num) ? "NEW" : "", br: wish.has(num) ? "♥" : "",
+    cls: wish.has(num) ? "wish" : "", title: "No. " + num + " " + colName(num) })),
+    fullAt, i => { fullAt = i; fullFocus = "list"; fullActAt = 0; colUpdate(); });
+  // The filter bar: Gen · Type · Caught · Rarity · Sets · Sort, the search box and the page.
+  const setName = colF.set === "wish" ? "Wishlist" : colF.set ? (CS.sets.find(x => x.id === colF.set) || {}).name || "Sets" : "Sets";
+  const search = el("input"); search.id = "col-search"; search.placeholder = "/ find"; search.value = colF.q; search.title = "Search by name (owned) or number";
+  search.oninput = () => { colF.q = search.value; fullAt = 0; colUpdate(); $("#col-search").focus(); const v = $("#col-search").value; $("#col-search").setSelectionRange(v.length, v.length); };
+  $("#full-filters").replaceChildren(keyLabel("g", colF.gen ? "Gen " + colF.gen : "Gen", !!colF.gen), keyLabel("t", colF.type || "Type", !!colF.type),
+    keyLabel("c", colF.own === "all" ? "Caught" : colF.own === "have" ? "Have" : "Missing", colF.own !== "all"), keyLabel("r", colF.tier < 0 ? "Rarity" : tiers[colF.tier], colF.tier >= 0),
+    keyLabel("e", setName.length > 10 ? setName.slice(0, 9) + "…" : setName, !!colF.set), keyLabel("o", COL_SORT_NAME[colF.sort], colF.sort !== "num"), search, el("span", "page", pg.page + "/" + pg.pages));
+  if (!list.length) { $("#full-rows").replaceChildren(el("p", "dim", "Nothing matches. Clear a filter.")); box.replaceChildren(el("div", "title", "FULL DEX"), el("div", "gold", COL_NOTE)); return colSay("Nothing matches these filters."); }
+  const num = list[fullAt], owned = have.has(num), tier = tierOf(num), R = G.collector.rules;
+  if (owned && colNew.delete(num)) keepNew();
+  // The mini sprite at 2x, so the note, the sets and three actions fit beside the grid.
+  const pic = el("div", "cell"); pic.append(miniStyle(el("span", "mini" + (owned ? "" : " unseen")), num, shiny.has(num) ? "shiny" : "normal", 2));
   const info = el("div", "info");
-  info.append(el("div", "title", name(num)), el("div", "", "#" + String(num).padStart(4, "0") + " · " + tiers[tier]),
-    el("div", "dim", G.dex[num - 1][1]), el("div", owned ? "gold" : "dim", owned ? (shiny.has(num) ? "In the Full Dex, shiny" : "In the Full Dex") : "Missing · " + R.price[tier] + " dust"));
+  info.append(el("div", "", "No. " + String(num).padStart(4, "0")), el("div", "gold", tiers[tier]),
+    el("div", "dim", owned ? G.dex[num - 1][1] : "???"), el("div", owned ? "" : "dim", owned ? "×" + (CS.copies[num] || 1) + (shiny.has(num) ? " · ★" : "") : R.price[tier] + " dust"));
   const top = el("div", "top"); top.append(pic, info);
+  const sets = (G.collector.setsOf(num) || []).map(id => { const st = CS.sets.find(x => x.id === id); return st ? st.name + " " + st.have + "/" + st.need : id; });
   const acts = fullActions(num), actBox = el("div", "rows"); actBox.id = "full-acts";
   if (fullActAt >= acts.length) fullActAt = acts.length - 1;
   rows(actBox, acts.map(a => ({ icon: a.icon || null, label: a.label, off: a.off })), fullFocus === "acts" ? fullActAt : -1, (i, click) => { fullActAt = i; fullFocus = "acts"; if (click) runFull(acts[i]); else colUpdate(); });
-  box.replaceChildren(top, actBox, el("div", "dim", "Not your TD Dex: these never fight. The Dex tab is your squad's."));
-  colSay(fullFocus === "acts" && acts[fullActAt] ? acts[fullActAt].about : "Enter: actions · F filter.");
+  const head = el("div", "title"); titled(head, colName(num).toUpperCase());
+  box.replaceChildren(head, el("div", "note", COL_NOTE), top, el("div", "sets", "Sets: " + (sets.join(" · ") || "—")), actBox);
+  colSay(fullFocus === "acts" && acts[fullActAt] ? acts[fullActAt].about : "Arrows move · Enter: actions · W wishlist · / search");
 }
 function colMachine(box) {
   const menu = colMenu();
@@ -2206,7 +2351,7 @@ function colMachine(box) {
     stat("Dust", el("span", "num", CS.dust), " ", dustIcon()),
     stat("Casino today", today ? el("span", "num", signed(today.net)) : el("span", "dim", "—"), el("span", "dim", " / " + (today ? today.cap : 3000).toLocaleString("en-US") + " net")));
   box.replaceChildren(wrap);
-  colSay(menu[colAt].about + (CS.login ? " Today's " + G.collector.chipsPerDay + " chips are in." : ""));
+  colSay(menu[colAt].about);
 }
 function runCol(item) {
   if (!item) return;
@@ -2219,38 +2364,42 @@ function colPull(count) {
   const r = G.collector.pull({ count });
   if (!r.ok) { colSay(REASONS[r.reason] || "Not now."); return r; }
   sfx("pull");
+  for (const m of r.mons) if (m.fresh) colNew.add(m.species);
+  keepNew();
   refreshTop();
-  const sets = (r.sets || []).map(st => st.name + " +" + st.chips + " chips").join(", ");
-  const line = (r.mons.length === 1 ? name(r.mons[0].species) + (r.mons[0].fresh ? ", new for the Full Dex" : r.mons[0].newShiny ? ", now shiny" : "") : r.mons.filter(m => m.fresh).length + " new")
-    + (r.dust ? " · +" + r.dust + " dust" : "") + (sets ? " · Set complete: " + sets : "") + ".";
+  const sets = (r.sets || []).map(st => st.name + " +" + st.chips).join(", ");
+  const wished = r.mons.filter(m => m.wish).map(m => name(m.species));
+  const line = (r.mons.length === 1 ? name(r.mons[0].species) + (r.mons[0].fresh ? ", new" : r.mons[0].newShiny ? ", now shiny" : "") : r.mons.filter(m => m.fresh).length + " new")
+    + " · +" + r.dust + " dust" + (wished.length ? " · Wishlist: " + wished.join(", ") : "") + (sets ? " · Set: " + sets : "") + ".";
   colUpdate();
-  if (r.mons.length >= REVEAL_MIN) startMonReveal(r.mons, r.dust);
-  else { const got = el("div", "eggs"); for (const m of r.mons) { const g = el("span"); g.append(mini(m.species, m.shiny ? "shiny" : "normal")); if (m.fresh || m.newShiny) g.append(el("span", "gold", m.fresh ? "NEW" : "★")); got.append(g); }
-    say(line + " " + COL_NOTE, got); $("#msg").classList.add("with-eggs"); }
+  if (r.mons.length >= REVEAL_MIN) startMonReveal(r.mons, r.dust, line);
+  else { const got = el("div", "eggs"); for (const m of r.mons) { const g = el("span"); g.append(mini(m.species, m.shiny ? "shiny" : "normal")); if (m.fresh || m.newShiny) g.append(el("span", "gold", m.wish ? "♥ NEW" : m.fresh ? "NEW" : "★")); got.append(g); }
+    say(line, got); $("#msg").classList.add("with-eggs"); }
   return { ok: true, quiet: true };
 }
-function startMonReveal(mons, dust) {
+function startMonReveal(mons, dust, line) {
   if (reveal) for (const t of reveal.timers) clearTimeout(t);
   colOver = null;
-  const list = mons.map(m => ({ tier: m.tier, isNew: m.fresh, shiny: m.shiny, species: m.species }));
+  const list = mons.map(m => ({ tier: m.tier, isNew: m.fresh, shiny: m.shiny, wish: m.wish, species: m.species }));
   const box = $("#col-over"), grid = el("div", "grid");
   const cells = list.map(x => {
-    const c = el("div", "egg t" + x.tier);
+    const c = el("div", "egg t" + x.tier + (x.wish ? " wish" : ""));
     c.title = name(x.species) + " · " + G.collector.tiers[x.tier];
-    c.append(miniStyle(el("span", "mini"), x.species, x.shiny ? "shiny" : "normal", 2), el("div", "tag " + (x.isNew || x.shiny ? "gold" : "dim"), x.isNew ? "NEW" : x.shiny ? "shiny" : name(x.species)));
+    c.append(miniStyle(el("span", "mini"), x.species, x.shiny ? "shiny" : "normal", 2), el("div", "tag " + (x.isNew || x.shiny ? "gold" : "dim"), x.wish ? "♥ NEW" : x.isNew ? "NEW" : x.shiny ? "shiny" : name(x.species)));
     grid.append(c); return c;
   });
   const counts = [0, 0, 0, 0, 0]; for (const x of list) counts[x.tier]++;
   const head = el("div", "head");
-  head.append(el("span", "gold", list.length + " POKÉMON"), el("span", "dim", "  for the Full Dex" + (dust ? " · +" + dust + " dust" : "")));
+  head.append(el("span", "gold", list.length + " POKÉMON"), el("span", "dim", "  +" + dust + " dust · S skips"));
   box.replaceChildren(head, grid);
   box.className = "panel reveal"; box.hidden = false;
-  let at = 300;
-  const times = list.map(x => { if (x.tier >= 3) at += 350; const t = at; at += 110; return t; });
-  reveal = { list, cells, counts, shown: 0, done: false, timers: [], box };
+  const k = animScale();
+  let at = 300 * k;
+  const times = list.map(x => { if (x.tier >= 3) at += 350 * k; const t = at; at += 110 * k; return t; });
+  reveal = { list, cells, counts, shown: 0, done: false, timers: [], box, line };
   list.forEach((x, i) => reveal.timers.push(setTimeout(() => showEgg(i), times[i])));
-  reveal.timers.push(setTimeout(finishReveal, at + 150));
-  say("The Collector whirs… " + COL_NOTE);
+  reveal.timers.push(setTimeout(finishReveal, at + 150 * k));
+  say("The Collector whirs… S skips.");
 }
 // Rates and pity, or the history, over the whole screen (R, H; any key or a click closes).
 function overUpdate() {
@@ -2262,22 +2411,21 @@ function overUpdate() {
   pity.append("Pity: Rare ", el("span", "num", p.rare + "/" + PITY[0]), " · Epic ", el("span", "num", p.epic + "/" + PITY[1]), " · Legendary ", el("span", "num", p.legendary + "/" + PITY[2]));
   if (colOver === "rates") {
     const grid = el("div", "grid");
-    G.collector.tiers.forEach((t, i) => grid.append(el("span", "", t), el("span", "num", pct(R.rates[i]) + " · dupe " + R.dust[i] + " dust")));
-    grid.append(el("span", "", "Shiny"), el("span", "num", "1 in " + SHINY_IN.shiny));
-    return box.replaceChildren(el("div", "title", "COLLECTOR RATES"), grid, pity, el("div", "dim", "Its own pity, apart from the eggs'. Legendary is every legendary and mythical."), el("div", "dim", COL_NOTE + " R or a click closes."));
+    G.collector.tiers.forEach((t, i) => grid.append(el("span", "", t), el("span", "num", pct(R.rates[i]) + " · +" + R.pullDust[i] + " dust · buy " + R.price[i])));
+    grid.append(el("span", "", "Shiny"), el("span", "num", "1 in " + SHINY_IN.shiny), el("span", "", "Wishlist"), el("span", "num", R.wish.boost + "× in its tier"));
+    return box.replaceChildren(el("div", "title", "COLLECTOR RATES"), grid, pity, el("div", "dim", "Every pull pays dust. Its own pity, apart from the eggs'."), el("div", "dim", COL_NOTE + " Any key or a click closes."));
   }
   const list = el("div", "rows scroll hist");
   for (const pull of CS.history) for (const m of pull.mons) {
     const r = el("div"), w = el("span", "who");
     w.append(mini(m.species, m.shiny ? "shiny" : "normal"), name(m.species));
     r.append(el("span", "dim", (pull.day || "").slice(5) || "—"), el("span", "gold", G.collector.tiers[m.tier]), w);
-    if (m.fresh) r.append(el("span", "gold", "NEW"));
+    if (m.fresh) r.append(el("span", "gold", m.wish ? "♥ NEW" : "NEW"));
     if (m.shiny) r.append(el("span", "gold", "shiny"));
-    if (!m.fresh && !m.newShiny) r.append(el("span", "dim", "+" + R.dust[m.tier] + " dust"));
     list.append(r);
   }
   if (!CS.history.length) list.append(el("p", "dim", "No Collector pulls yet."));
-  box.replaceChildren(el("div", "title", "COLLECTOR HISTORY"), list, pity, el("div", "dim", COL_NOTE + " H or a click closes."));
+  box.replaceChildren(el("div", "title", "COLLECTOR HISTORY"), list, pity, el("div", "dim", COL_NOTE + " Any key or a click closes."));
 }
 function runFull(action) {
   if (!action || action.off) return colSay(action && action.off ? REASONS.dust : "Not now.");
@@ -2285,32 +2433,49 @@ function runFull(action) {
   refreshTop(); colUpdate();
   if (!r.ok) return colSay(REASONS[r.reason] || "Not now.");
   const sets = (r.sets || []).map(st => st.name + " +" + st.chips + " chips").join(", ");
-  colSay("Done." + (sets ? " Set complete: " + sets + "." : ""));
+  colSay(r.dust && r.copies ? "+" + r.dust + " dust." : "Done." + (sets ? " Set complete: " + sets + "." : ""));
 }
+// Sets: the ones closest to done first, then the complete ones.
+const sortedSets = () => closeSets().concat(CS.sets.filter(st => st.id === "all" && !st.complete), CS.sets.filter(st => st.complete));
 function fullSets(box) {
-  const sets = CS.sets;
+  const sets = sortedSets();
   if (setAt >= sets.length) setAt = sets.length - 1;
   rows($("#full-rows"), sets.map(st => ({ icon: st.claimed ? badgeOf(st) : null, label: st.name, off: !st.claimed,
     right: [el("span", "num", st.have + "/" + st.need)].concat(st.claimed ? [check(true)] : [el("span", "dim", "+" + st.chips)]) })), setAt, i => { setAt = i; colUpdate(); });
   const st = sets[setAt], def = G.collector.sets().find(x => x.id === st.id), have = new Set(CS.owned);
   const missing = def.nums.filter(n => !have.has(n)), minis = el("div", "minis");
-  for (const n of missing.slice(0, 24)) minis.append(mini(n, "normal", true));
-  box.replaceChildren(el("div", "title", st.name.toUpperCase()), el("div", "", st.group + " · " + st.have + "/" + st.need + " · pays " + st.chips + " chips"),
-    el("div", st.claimed ? "gold" : "dim", st.claimed ? "Complete. Its badge is on your Trainer card." : missing.length + " to go" + (missing.length > 24 ? ", the first 24:" : ":")), minis);
-  colSay("Each set pays its chips once and puts a badge on your card. The Full Dex itself is the last set.");
+  for (const n of missing.slice(0, 18)) minis.append(mini(n, "normal", true));
+  box.replaceChildren(el("div", "title", st.name.toUpperCase()), el("div", "", st.group + " · " + st.have + "/" + st.need + " · " + st.chips + " chips"),
+    el("div", st.claimed ? "gold" : "dim", st.claimed ? "Complete: its badge is on your card." : missing.length + " to go" + (missing.length > 18 ? ", the first 18:" : ":")), minis, el("div", "gold", COL_NOTE));
+  colSay("Closest to done first. Each set pays chips once and gives a card badge.");
+}
+function shopRows() {
+  const R = G.collector.rules, sh = R.shards, left = CS.shop.shardsLeft;
+  return [
+    { icon: dustIcon(), label: "Buy all cheap missing", off: CS.dust < R.price[0], right: [el("span", "dim", "C·R")], about: "Buys every missing Common, then Rare, while dust lasts.", run: () => G.collector.buyCheap() },
+    { icon: dustIcon(), label: "Dust all extras (keep 1)", off: !CS.extras, right: [el("span", "num", "+" + CS.extraDust)], about: CS.extras + " extra copies → " + CS.extraDust + " dust. One of each always stays.", run: () => G.collector.dustExtras() },
+    { icon: shardIcon(), label: sh.shards + " shards for " + sh.dust + " dust", off: left < sh.shards || CS.dust < sh.dust, right: [el("span", "num", left + " left")], about: "Up to " + sh.perWeek + " shards a week, apart from the coin shop's.", run: () => G.collector.buyShards() }
+  ];
 }
 function fullShop(box) {
-  const R = G.collector.rules.shards, left = CS.shop.shardsLeft;
-  rows($("#full-rows"), [{ icon: shardIcon(), label: R.shards + " shards for " + R.dust + " dust", off: left < R.shards || CS.dust < R.dust, right: [el("span", "num", left + " left")] }], 0,
-    () => { const r = G.collector.buyShards(); refreshTop(); colUpdate(); colSay(r.ok ? "Bought " + R.shards + " shards." : REASONS[r.reason] || "Not now."); });
-  box.replaceChildren(el("div", "title", "DUST SHOP"), el("div", "", "Shards from dust: " + (R.perWeek - left) + "/" + R.perWeek + " this week."),
-    el("div", "dim", "Apart from the coin shop's limit. Shards buy SP skins in the Shop tab, the one thing dust reaches outside the Collector."),
-    el("div", "dim", "A missing species is bought on its Full Dex page (D)."));
-  colSay("Enter buys " + R.shards + " shards for " + R.dust + " dust, up to " + R.perWeek + " a week.");
+  const list = shopRows(), sh = G.collector.rules.shards;
+  if (dustAt >= list.length) dustAt = list.length - 1;
+  rows($("#full-rows"), list.map(x => ({ icon: x.icon, label: x.label, off: x.off, right: x.right })), dustAt, (i, click) => { dustAt = i; if (click) runShop(list[i]); else colUpdate(); });
+  box.replaceChildren(el("div", "title", "DUST SHOP"), el("div", "", "Dust: " + CS.dust + " · extras: " + CS.extras),
+    el("div", "", "Shards from dust: " + (sh.perWeek - CS.shop.shardsLeft) + "/" + sh.perWeek + " this week."),
+    el("div", "dim", "Shards buy SP skins in the Shop tab."), el("div", "gold", COL_NOTE));
+  colSay(list[dustAt].about);
 }
+function runShop(item) {
+  if (item.off) return colSay(REASONS.dust);
+  const r = item.run(); refreshTop(); colUpdate();
+  colSay(!r.ok ? REASONS[r.reason] || "Not now." : r.bought ? "Bought " + r.bought.length + " for " + r.dust + " dust." : r.copies ? r.copies + " extras → +" + r.dust + " dust." : "Bought shards.");
+}
+const cycle = (list, v) => list[(list.indexOf(v) + 1) % list.length];
 function colKey(e) {
   const k = e.key, mode = m => { e.preventDefault(); fullMode = m; fullFocus = "list"; colOver = null; colUpdate(); };
   if (colOver) { if (k !== "Shift") { e.preventDefault(); colOver = null; colUpdate(); } return; }
+  if (k === "Backspace") { e.preventDefault(); if (fullMode === "dex" && fullFocus === "acts") { fullFocus = "list"; return colUpdate(); } return fullMode === "machine" ? null : mode("machine"); }
   if (k === "p" || k === "P") return mode("machine");
   if (k === "d" || k === "D") return mode("dex");
   if (k === "s" || k === "S") return mode(fullMode === "sets" ? "machine" : "sets");
@@ -2324,23 +2489,35 @@ function colKey(e) {
     if (k === "Enter" || k === " ") { e.preventDefault(); return runCol(menu[colAt]); }
     return;
   }
-  if (fullMode === "shop") { if (k === "Enter") { e.preventDefault(); const r = G.collector.buyShards(); refreshTop(); colUpdate(); colSay(r.ok ? "Bought shards." : REASONS[r.reason] || "Not now."); } else if (k === "Backspace") mode("machine"); return; }
-  if (fullMode === "sets") {
-    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); setAt = Math.max(0, Math.min(CS.sets.length - 1, setAt + (k === "ArrowUp" ? -1 : 1))); colUpdate(); }
-    else if (k === "Backspace") mode("machine");
+  if (fullMode === "shop") {
+    const list = shopRows();
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); dustAt = (dustAt + (k === "ArrowUp" ? -1 : 1) + list.length) % list.length; return colUpdate(); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); return runShop(list[dustAt]); }
     return;
   }
-  if (k === "f" || k === "F") { e.preventDefault(); fullFilter = FULL_FILTERS[(FULL_FILTERS.indexOf(fullFilter) + 1) % 3]; fullAt = 0; return colUpdate(); }
-  const list = fullList(), acts = list.length ? fullActions(list[fullAt]) : [];
-  const step = k === "ArrowUp" ? -1 : k === "ArrowDown" ? 1 : k === "PageUp" ? -8 : k === "PageDown" ? 8 : 0;
-  if (step) {
-    e.preventDefault();
-    if (fullFocus === "acts") fullActAt = (fullActAt + (step > 0 ? 1 : -1) + acts.length) % acts.length;
-    else fullAt = Math.max(0, Math.min(list.length - 1, fullAt + step));
-    return colUpdate();
+  if (fullMode === "sets") {
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); setAt = Math.max(0, Math.min(CS.sets.length - 1, setAt + (k === "ArrowUp" ? -1 : 1))); colUpdate(); }
+    return;
   }
-  if (k === "Enter" || k === " ") { e.preventDefault(); if (fullFocus === "acts") return runFull(acts[fullActAt]); fullFocus = "acts"; fullActAt = 0; return colUpdate(); }
-  if (k === "Backspace") { e.preventDefault(); if (fullFocus === "acts") { fullFocus = "list"; colUpdate(); } else mode("machine"); }
+  // The Full Dex: filters, search, wishlist, then the grid and its actions.
+  const filt = f => { e.preventDefault(); f(); fullAt = 0; keepColF(); colUpdate(); };
+  if (k === "/") { e.preventDefault(); const box = $("#col-search"); if (box) box.focus(); return; }
+  if (k === "g" || k === "G") return filt(() => { colF.gen = (colF.gen + 1) % 10; });
+  if (k === "t" || k === "T") return filt(() => { colF.type = cycle([""].concat(G.types || Object.keys(TYPE_HEX)), colF.type); });
+  if (k === "c" || k === "C") return filt(() => { colF.own = cycle(["all", "have", "missing"], colF.own); });
+  if (k === "r" || k === "R") return filt(() => { colF.tier = colF.tier >= 3 ? -1 : colF.tier + 1; });
+  if (k === "e" || k === "E") return filt(() => { colF.set = cycle(["", "wish"].concat(closeSets().slice(0, 5).map(st => st.id)), colF.set); });
+  if (k === "o" || k === "O") return filt(() => { colF.sort = cycle(COL_SORTS, colF.sort); });
+  const list = fullList(), acts = list.length ? fullActions(list[fullAt]) : [];
+  if (k === "w" || k === "W") { e.preventDefault(); const num = list[fullAt]; if (num && !CS.owned.includes(num)) { const r = G.collector.wish({ species: num }); refreshTop(); colUpdate(); colSay(r.ok ? (r.on ? "Starred." : "Unstarred.") : REASONS[r.reason] || "Not now."); } return; }
+  if (fullFocus === "acts") {
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); fullActAt = (fullActAt + (k === "ArrowUp" ? -1 : 1) + acts.length) % acts.length; return colUpdate(); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); return runFull(acts[fullActAt]); }
+    return;
+  }
+  const to = gridMove(k, fullAt, list.length);
+  if (to !== null) { e.preventDefault(); fullAt = to; return colUpdate(); }
+  if (k === "Enter" || k === " ") { e.preventDefault(); fullFocus = "acts"; fullActAt = 0; return colUpdate(); }
 }
 
 /* ── Story: chapter 1, the squad, and battles ──────────────────────────────
@@ -4394,7 +4571,8 @@ function wikiEntries(page) {
     ].concat(G && G.collector ? [{ id: "collector", icon: chipIcon(), label: "Collector", lines: [
       "Its own tab: any of the 1025 for casino chips (" + G.collector.rules.pull + " a pull, " + G.collector.rules.ten + " for 10), straight into the Full Dex. It never unlocks tower defense.",
       "Chips: " + G.collector.chipsPerDay + " a day for logging in, and Shotgun Roulette pays in chips. Same rates and pity as eggs, its own counters; shiny 1 in " + SHINY_IN.shiny + ".",
-      "Dupes give dust (" + G.collector.rules.dust.join(" / ") + " by tier). Dust buys a missing species (" + G.collector.rules.price.join(" / ") + ") or " + G.collector.rules.shards.shards + " shards for " + G.collector.rules.shards.dust + ", up to " + G.collector.rules.shards.perWeek + " a week.",
+      "Every pull pays dust (" + G.collector.rules.pullDust.join(" / ") + " by tier) and dupes are kept; extras turn into dust (" + G.collector.rules.extra.join(" / ") + "), always keeping one.",
+      "Dust buys a missing species (" + G.collector.rules.price.join(" / ") + ") or " + G.collector.rules.shards.shards + " shards for " + G.collector.rules.shards.dust + ", up to " + G.collector.rules.shards.perWeek + " a week. Star up to " + G.collector.rules.wish.max + " missing mons: each is " + G.collector.rules.wish.boost + "× as likely.",
       "It is a collection only: nothing from the Collector joins your squad, and its chips and dust show only on its tab.",
       "Sets (generations, types, starters, legends, families) pay chips once and give a badge on your card."] }] : []);
   }
@@ -4491,9 +4669,10 @@ function refreshTop() {
   $("#tabs").replaceChildren(...shownTabs().map(([id, label], i) => {
     const t = el("div", "panel" + (tab === id && !picking ? " on" : ""));
     t.append(el("span", "", label));
-    if ((id === "eggs" && ready) || (id === "quests" && fresh)) {
+    const canPull = id === "collector" && CS && CS.chips >= G.collector.rules.pull;
+    if ((id === "eggs" && ready) || (id === "quests" && fresh) || canPull) {
       const d = mapCanvas("dot", { k: C.ink, 1: C.red }); d.classList.add("alert");
-      d.title = id === "eggs" ? "An egg is ready to hatch" : "New rewards since you last looked";
+      d.title = id === "eggs" ? "An egg is ready to hatch" : id === "collector" ? "You have chips for a pull" : "New rewards since you last looked";
       t.append(d);
     }
     t.dataset.tab = id;
@@ -4503,17 +4682,20 @@ function refreshTop() {
   }));
   // Coins and shards on tower defense's tabs; chips and dust only on the Collector's.
   const purse = el("div", "panel purse"), col = tab === "collector" && CS;
-  // Five-digit chips or dust read as "12.3k" here, so the purse still fits beside nine tabs.
-  const short = n => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n);
+  // Chips or dust from 1,000 read as "5.3k" here, so the purse fits beside nine tabs (the exact
+  // numbers are on the Collector's machine view and dust shop).
+  const short = n => n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n);
   if (col) purse.append(el("span", "num", short(CS.chips)), chipIcon(), el("span", "num", short(CS.dust)), dustIcon());
   else purse.append(el("span", "num", S.balance.coins), coin(), el("span", "num", S.balance.shards), shardIcon());
   purse.title = col ? "Casino chips and Collector dust" : "Coins and shards";
   $("#frame").classList.toggle("col", tab === "collector");
-  // "?" and the speaker share one small panel: tips for this screen, and sound on or off.
-  const help = el("div", "panel help"), q = el("span", "", "?"), spk = mapCanvas(soundOn() ? "sound-on" : "sound-off", { k: C.ink, 1: soundOn() ? C.paper : C.dim });
+  // "?" and the gear share one small panel: tips for this screen, and Settings (sound, volume,
+  // speed, effects, tutorials). M still turns the sound on and off anywhere.
+  const help = el("div", "panel help"), q = el("span", "", "?");
   q.title = "Tips for this screen"; q.dataset.help = 1;
-  spk.classList.add("speaker"); spk.dataset.sound = 1; spk.title = soundOn() ? "Sound on (M)" : "Sound off (M)";
-  help.append(q, spk);
+  const gear = mapCanvas("gear", { k: C.ink, 1: soundOn() ? C.paper : C.dim }); gear.classList.add("gear"); gear.dataset.settings = 1;
+  gear.title = "Settings (,) · sound " + (soundOn() ? "on" : "off") + " (M)";
+  help.append(q, gear);
   $("#tabs").append(help, purse);
 }
 // Every key, from the keyboard or a [data-press] label.
@@ -4559,6 +4741,8 @@ function onKey(e) {
   }
   // With the panel open, Enter or Backspace closes it; other keys still reach the list behind.
   if (filtOpen && (e.key === "Enter" || e.key === "Backspace")) { e.preventDefault(); return closeFilters(); }
+  if (!$("#settings").hidden) return settingsKey(e);
+  if (e.key === "," && !battle && !picking) { e.preventDefault(); return openSettings(); }
   if (wikiOver) return wikiKey(e);
   if (tutor && tutorKey(e)) return;
   if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
@@ -4634,7 +4818,7 @@ if (!G) {
     const t = e.target.closest("[data-wtab]"), ty = e.target.closest("[data-type]");
     if (t) { wikiPage = t.dataset.wtab; wikiAt = 0; wikiUpdate(); } else if (ty) { wikiType = ty.dataset.type; wikiUpdate(); }
   });
-  $("#tabs").onclick = e => { if (e.target.closest("[data-sound]")) return toggleSound(); if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
+  $("#tabs").onclick = e => { if (e.target.closest("[data-sound]")) return toggleSound(); if (e.target.closest("[data-settings]")) return openSettings(); if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
     if (!battle || battle.talk.length || battle.done) return;
