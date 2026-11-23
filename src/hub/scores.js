@@ -133,7 +133,7 @@ export const HIGH_SCORE_GAMES = [
   // was won, either mode. The game is sandboxed, so src/hub/roulette.js posts it
   // through recordBest when it pays a win; test games never get there. 1,000 is
   // the most one game can make (a 500 bet at 3x on Hard). Shown as "+1,200".
-  highScore("shotgun-roulette", "Shotgun Roulette", "chips", {
+  highScore("shotgun-roulette", "Shotgun Roulette", "tokens", {
     metric: "profit", min: 1, max: 1000,
     when: snapshot => snapshot.real === true && snapshot.won === true,
     format: value => "+" + Math.round(value).toLocaleString("en-US"),

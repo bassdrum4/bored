@@ -2426,7 +2426,7 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   assert.equal(await game.evaluate(() => tab), 'collector', 'the ninth tab, on key 9');
   assert.equal(await game.$eval('#frame', n => n.classList.contains('col')), true);
   assert.equal(await game.$eval('#scr-collector .panel', n => getComputedStyle(n).borderTopColor), 'rgb(47, 143, 95)', 'green panels');
-  assert.deepEqual(await game.$$eval('#tabs .purse img', ns => ns.map(n => n.alt)), ['chips', 'dust']);
+  assert.deepEqual(await game.$$eval('#tabs .purse img', ns => ns.map(n => n.alt)), ['tokens', 'dust']);
   // The note on every view (in the list panel, or the details panel in the grid views), never in the message box.
   for (const m of ['machine', 'dex', 'sets', 'shop']) {
     await game.evaluate(m => { fullMode = m; colUpdate(); }, m);
@@ -2444,7 +2444,7 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   // The tab bar and the purse (chips and dust here, often the widest numbers) fit on one line.
   const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), dustImg = await rect(game, '#tabs .purse img:last-child');
   assert.ok(purse.r <= bar.r + 0.5 && dustImg.r <= purse.r, 'the tabs and the chips-and-dust purse fit');
-  assert.deepEqual(await game.$$eval('#full-rows > div', ns => ns.map(n => n.textContent.replace(/\s+/g, ''))), ['x11Pull100', 'x1010Pulls900', 'Getchips→Casino', 'Rates·history(R,H)', 'Trades(K)']);
+  assert.deepEqual(await game.$$eval('#full-rows > div', ns => ns.map(n => n.textContent.replace(/\s+/g, ''))), ['x11Pull60', 'x1010Pulls600', 'Claim300dailytokens', 'Gettokens→Casino', 'Rates·history(R,H)', 'Trades(K)']);
   assert.match(await game.$eval('#col-machine', n => n.textContent), /Casino today\s*\+0\s*\/ 3,000 net/);
   assert.equal(await game.$eval('#col-machine img', n => n.getAttribute('src').endsWith('collector.png') && n.width), 130, 'the Pokédex at 5x');
   await pause(200); await shot('collector-machine');
@@ -2456,7 +2456,7 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   assert.equal(await game.$eval('#col-over', n => n.hidden), true);
   const after = await game.evaluate(() => ({ owned: S.owned.length, pulls: S.pulls, eggs: S.eggs.length, count: CS.count, chips: CS.chips, coins: S.balance.coins }));
   assert.deepEqual([after.owned, after.pulls, after.eggs, after.coins], [before.owned, before.pulls, before.eggs, before.coins], 'tower defense and coins are untouched');
-  assert.equal(after.chips, before.chips - 900);
+  assert.equal(after.chips, before.chips - 600, 'a 10-pull costs 600 tokens');
   assert.ok(after.count >= 1 && after.count <= 10);
   // Rates and history over the screen; any key closes.
   await key(tab, 'r');
@@ -2515,7 +2515,7 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   });
   assert.ok(birds.owned && birds.badges.includes('birds') && birds.chips >= 300);
   assert.ok(birds.out.every(l => l === 'Buy for 150 dust'));
-  assert.match(birds.msg, /Legendary birds \+300 chips/);
+  assert.match(birds.msg, /Legendary birds \+300 tokens/);
   const buddy = await game.evaluate(() => { fullAt = 143; fullFocus = 'acts'; fullActAt = 0; colUpdate(); runFull(fullActions(144)[0]); fullFocus = 'list'; colUpdate(); return S.buddy && S.buddy.species; });
   assert.equal(buddy, 144, 'a Full Dex mon as the buddy');
   // Each mon shows the sets it counts toward.
@@ -2621,7 +2621,7 @@ test('the Collector tutorial: the first visit walks chips, pulls, Full Dex again
   const texts = [];
   for (let i = 0; i < 6; i++) { texts.push(await game.$eval('#tutor-box', n => n.textContent)); await key(tab, 'Enter'); }
   const all = texts.join(' ');
-  for (const word of [/doesn't|Nothing here joins your squad/, /300 every day/, /casino/i, /A pull is 100 chips/, /Dex tab is your tower defense squad/, /dust/, /SP shards/, /Sets/, /badge/])
+  for (const word of [/doesn't|Nothing here joins your squad/, /300 every day/, /casino/i, /A pull is 60 tokens/, /Dex tab is your tower defense squad/, /dust/, /SP shards/, /Sets/, /badge/])
     assert.match(all, word);
   assert.equal(await game.evaluate(() => !!tutor), false, 'six steps, then done');
   assert.deepEqual(errors, []);

@@ -20,6 +20,7 @@ import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, ac
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
 import { createRouletteBridge, rouletteWonOn, ROULETTE } from './hub/roulette.js';
+import { createClaims } from './hub/claims.js';
 import { tradesBridge } from './hub/trades.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
@@ -350,6 +351,8 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (slug === 'poke-gacha' && !multiplayer) {
     try { if (activateStoredWallet()) requestCloudPush(); } catch {}
   }
+  // The Beginner's Package, the first time a player opens the collection or the casino.
+  if ((slug === 'poke-gacha' || slug === 'shotgun-roulette') && !multiplayer) offerBeginnerPackage();
   // Hidden admin previews are intentionally absent from ORDER. Keep them out
   // of Jump Back In, where shelfGame requires public catalog metadata.
   if (!adminPreview) {
@@ -767,7 +770,11 @@ function activateProfile() {
 
 // The page calls the gacha through `parent.__boredGacha`, so the hub's wallet
 // is the only copy: every pull, hatch and spend is written here and synced.
+// Tokens a player claims (Beginner's Package, daily, bailout), recorded per account on the
+// server; the Collector (G.claims), the casino and the Beginner's Package dialog share it.
+const claims = createClaims({ onChange: () => { requestCloudPush(); renderBuddy(); } });
 window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); renderBuddy(); } }),
+  claims,
   // Tower defense: battles, rewards and missions (src/hub/td.js).
   td: tdBridge({ onChange: () => requestCloudPush() }),
   // The Collector's way to chips: today's net at Shotgun Roulette against its cap, and a door to it.
@@ -783,7 +790,68 @@ window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); r
 // Pokédoku asks this for the look a player's line wears (normal, shiny or an SP skin).
 window.__boredLooks = storedLooks();
 // Shotgun Roulette asks over postMessage (see the bored:roulette case below); the wallet stays here.
-const roulette = createRouletteBridge({ onChange: () => requestCloudPush() });
+const roulette = createRouletteBridge({ onChange: () => requestCloudPush(), claims });
+
+/* ── Beginner's Package ───────────────────────────────────────────────────── */
+// Once per account: 1,000 tokens and a starter of the player's choice for the
+// collection, which also becomes their buddy if they have none. Offered the
+// first time a player opens Poké Gacha (the collection) or Shotgun Roulette
+// (the casino) in a visit, until it is claimed; older accounts get it too.
+let beginnerOffered = false;
+function offerBeginnerPackage() {
+  let state;
+  try { state = claims.state(); } catch { return; } // still starting up
+  // It's per account, so it's offered to signed-in players; guests see "Sign in to claim"
+  // beside the claim buttons instead of a popup over every visit.
+  if (beginnerOffered || state.beginner.claimed || !state.signedIn) return;
+  beginnerOffered = true;
+  const dialog = $('#beginner-dialog'), grid = $('#beginner-starters'), claim = $('#beginner-claim'), note = $('#beginner-note');
+  let chosen = null;
+  note.textContent = '';
+  $('#beginner-blurb').textContent = state.signedIn
+    ? state.rewards.beginner.toLocaleString('en-US') + ' tokens + a starter buddy. Pick your starter: it joins your collection and shows next to your name.'
+    : state.rewards.beginner.toLocaleString('en-US') + ' tokens + a starter buddy, once per account. Sign in to claim it.';
+  grid.hidden = !state.signedIn;
+  grid.replaceChildren(...state.starters.map(num => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'starter-pick';
+    button.setAttribute('aria-pressed', 'false');
+    const name = gachaMon(num)?.name || 'No. ' + num;
+    button.title = name;
+    button.setAttribute('aria-label', name);
+    const art = document.createElement('img');
+    art.src = './games/content/pokedoku/sprites/' + num + '.png';
+    art.alt = '';
+    art.width = art.height = 48;
+    button.append(art);
+    button.onclick = () => {
+      chosen = num;
+      for (const other of grid.children) other.setAttribute('aria-pressed', String(other === button));
+      claim.disabled = false;
+      note.textContent = name + '.';
+    };
+    return button;
+  }));
+  claim.textContent = state.signedIn ? 'Claim' : 'Sign in';
+  claim.disabled = state.signedIn;
+  claim.onclick = async () => {
+    if (!state.signedIn) { dialog.close(); $('#account-action').click(); return; }
+    claim.disabled = true;
+    note.textContent = 'Claiming…';
+    const result = await claims.claim('beginner', { species: chosen });
+    if (result.ok) {
+      note.textContent = 'Claimed: ' + result.tokens.toLocaleString('en-US') + ' tokens and ' + (gachaMon(chosen)?.name || 'your starter') + '.';
+      setTimeout(() => dialog.close(), 1400);
+    } else {
+      note.textContent = { claimed: 'This account already has its Beginner\'s Package.', signin: 'Sign in to claim it.',
+        server: 'The claim didn\'t go through. Try again in a moment.' }[result.reason] || 'The claim didn\'t go through.';
+      claim.disabled = result.reason === 'claimed';
+    }
+  };
+  $('#beginner-later').onclick = () => dialog.close();
+  if (!dialog.open) dialog.showModal();
+}
 
 // SP skins are hand-made art listed in games/content/poke-gacha/sp/skins.json.
 // Until the list loads (or if it is empty) nothing rolls or sells SP.

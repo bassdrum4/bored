@@ -31,8 +31,12 @@ export const WALLET_KEY = 'bored.wallet';
 export const CURRENCIES = ['coins', 'waves', 'regular', 'plus', 'premium', 'gold', 'shards', 'chips', 'dust'];
 // Casino chips and Collector dust are their own economy (the Collector machine in Poké Gacha,
 // Shotgun Roulette): nothing converts coins or vouchers into chips, and chips never buy TD goods.
-// Every account gets CHIPS.login chips once a Detroit day (claimDailyChips), under chips:login:<day>.
-export const CHIPS = Object.freeze({ login: 300 });
+// Players see this currency as "tokens" (collection tokens; the casino bets the same ones).
+// Claimed by the player (src/hub/claims.js, recorded per account on the server):
+//   chips:login:<day>    the daily claim, CHIPS.login once a Detroit day (claimDailyChips)
+//   chips:bailout:<day>  CHIPS.bailout once a day while under CHIPS.bailoutBelow (claimBailout)
+//   col:beginner         the Beginner's Package: CHIPS.beginner and a starter (gacha.js claimBeginner)
+export const CHIPS = Object.freeze({ login: 300, beginner: 1000, bailout: 100, bailoutBelow: 10 });
 // Candy is one balance per species line: `candy:<line>`.
 const currencyOk = name => CURRENCIES.includes(name) || /^candy:[a-z0-9-]{1,40}$/.test(name);
 export const COINS_PER_REGULAR = 100;
@@ -397,11 +401,16 @@ export function spendFrom(wallet, cost, { id = null, now = Date.now(), gain = {}
   return { wallet: next, ok: true, id: key };
 }
 
-/** The day's login chips, once per Detroit day. A no-op before the wallet is activated. */
+/** The day's tokens, once per Detroit day, when the player claims them. */
 export function claimDailyChips(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  return grantOnce(mergeWallet(wallet), 'chips:login:' + today, { chips: CHIPS.login }, { now });
+}
+
+/** The broke bailout: CHIPS.bailout tokens once a day, only while under CHIPS.bailoutBelow. */
+export function claimBailout(wallet, { today = dailyDate(), now = Date.now() } = {}) {
   const next = mergeWallet(wallet);
-  if (!next.entries.on) return { wallet: next, changed: false };
-  return grantOnce(next, 'chips:login:' + today, { chips: CHIPS.login }, { now });
+  if ((walletBalance(next).chips || 0) >= CHIPS.bailoutBelow) return { wallet: next, changed: false, reason: 'balance' };
+  return grantOnce(next, 'chips:bailout:' + today, { chips: CHIPS.bailout }, { now });
 }
 
 /** 100 coins buys one Regular voucher. */

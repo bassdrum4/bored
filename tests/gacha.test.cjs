@@ -674,12 +674,14 @@ test('collector tiers: every species once, legendaries and mythicals are the rar
 
 test('collector pulls cost chips, fill the Full Dex, never touch tower defense, keep dupes and pay dust every pull', () => {
   let w = claimLogin(fresh({ coins: 5000 }), opts()).wallet;
-  assert.equal(walletBalance(w).chips, 300, 'login pays the day\'s chips');
+  assert.equal(walletBalance(w).chips || 0, 0, 'login no longer pays tokens: the player claims them');
+  w = rewards.claimDailyChips(w, opts()).wallet;
+  assert.equal(walletBalance(w).chips, 300, 'the daily claim pays 300');
   assert.equal(pullCollector(w, opts({ count: 5 })).reason, 'unknown');
   assert.equal(pullCollector(fund(fresh({}), { coins: 9999 }), opts()).reason, 'chips', 'coins never buy pulls');
   const one = pullCollector(w, opts({ rand: always(0.5) }));
   assert.equal(one.ok, true);
-  assert.equal(walletBalance(one.wallet).chips, 200);
+  assert.equal(walletBalance(one.wallet).chips, 300 - COLLECTOR.pull);
   const before = gachaState(w, TODAY);
   const after = gachaState(one.wallet, TODAY);
   assert.deepEqual([after.owned, after.pulls, after.eggs.length], [before.owned, before.pulls, before.eggs.length], 'TD is unchanged');
@@ -703,10 +705,11 @@ test('collector pulls cost chips, fill the Full Dex, never touch tower defense, 
   assert.equal(dustExtras(dx.wallet, opts()).reason, 'none');
 });
 
-test('a 10-pull costs 900 and holds a Rare; the rarity pity carries across pulls', () => {
-  let w = fund(fresh({}), { chips: 900 * 50 });
+test('a 10-pull costs 600 (60 a pull) and holds a Rare; the rarity pity carries across pulls', () => {
+  assert.deepEqual([COLLECTOR.pull, COLLECTOR.ten], [60, 600]);
+  let w = fund(fresh({}), { chips: COLLECTOR.ten * 50 });
   const ten = pullCollector(w, opts({ count: 10, rand: always(0) }));
-  assert.equal(walletBalance(ten.wallet).chips, 900 * 49);
+  assert.equal(walletBalance(ten.wallet).chips, COLLECTOR.ten * 49);
   assert.equal(ten.mons.length, 10);
   assert.ok(ten.mons.some(m => m.tier >= 1), 'at least one Rare');
   // rand() just under 204/256 always rolls Common: the rare pity upgrades the 10th.
