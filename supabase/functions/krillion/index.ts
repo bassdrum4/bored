@@ -257,32 +257,41 @@ async function fetchReference(date: string): Promise<Book> {
   return validateReference(await todayResponse.json(), await revealResponse.json(), date);
 }
 
-let memo: Loaded | null = null;
-
+// Per-isolate cache keyed by requested date. Archive play can span several dates.
+const books = new Map<string, { loaded: Loaded; until: number }>();
+const loadingBooks = new Map<string, Promise<Loaded>>();
 async function loadBook(date: string): Promise<Loaded> {
-  if (memo && memo.book.date === date) return memo;
-  const cached = await cachedBook(date);
-  if (cached?.prompts?.length === 7) {
-    memo = { book: cached, stale: false };
-    return memo;
-  }
-  try {
-    const fresh = await fetchReference(date);
-    try {
-      await storeBook(fresh);
-    } catch (error) {
-      console.warn('Krillion cache write unavailable:', error instanceof Error ? error.message : String(error));
+  const hit = books.get(date);
+  if (hit && Date.now() < hit.until) return hit.loaded;
+  const inflight = loadingBooks.get(date);
+  if (inflight) return inflight;
+  const job = (async (): Promise<Loaded> => {
+    const cached = await cachedBook(date);
+    let loaded: Loaded;
+    if (cached?.prompts?.length === 7) {
+      loaded = { book: cached, stale: false };
+    } else {
+      try {
+        const fresh = await fetchReference(date);
+        try { await storeBook(fresh); }
+        catch (error) {
+          console.warn('Krillion cache write unavailable:', error instanceof Error ? error.message : String(error));
+        }
+        loaded = { book: fresh, stale: false };
+      } catch (error) {
+        const latest = await latestBook();
+        if (!latest?.prompts?.length) throw error;
+        loaded = { book: latest, stale: true };
+      }
     }
-    memo = { book: fresh, stale: false };
-    return memo;
-  } catch (error) {
-    const latest = await latestBook();
-    if (latest?.prompts?.length === 7) {
-      memo = { book: latest, stale: true };
-      return memo;
-    }
-    throw error;
-  }
+    // Do not pin an older fallback book as today's puzzle. Retry that shortly.
+    books.set(date, { loaded, until: Date.now() + (loaded.stale ? 30_000 : 6 * 60 * 60_000) });
+    if (books.size > 20) books.delete(books.keys().next().value!);
+    return loaded;
+  })();
+  loadingBooks.set(date, job);
+  try { return await job; }
+  finally { loadingBooks.delete(date); }
 }
 
 const publicBook = (loaded: Loaded) => ({
