@@ -183,7 +183,12 @@ export function createRouletteBridge({ onChange = () => {}, log = (...args) => c
               // builds the snapshot from the profit it just paid, which only a
               // real, won game produces. Test games never reach settle.
               if (profit > 0) {
-                try { recordBest('shotgun-roulette', { slug: 'shotgun-roulette', profit, won: true, real: true, finished: true }); }
+                try {
+                  const improved = recordBest('shotgun-roulette', { slug: 'shotgun-roulette', profit, won: true, real: true, finished: true });
+                  console.log('Shotgun Roulette: real win, +' + profit + ' profit. ' +
+                    (improved ? 'New best; ' + (hasIdentity() ? 'posting it to the main leaderboard.' : 'kept in this browser until you sign in.')
+                              : 'Not above your best, so nothing new to post.'));
+                }
                 catch (error) { log('Shotgun Roulette: best not recorded.', error.message); }
               }
             } else reason = paid.reason;

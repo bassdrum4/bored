@@ -136,7 +136,9 @@ export const HIGH_SCORE_GAMES = [
   highScore("shotgun-roulette", "Shotgun Roulette", "chips", {
     metric: "profit", min: 1, max: 1000,
     when: snapshot => snapshot.real === true && snapshot.won === true,
-    format: value => "+" + Math.round(value).toLocaleString("en-US")
+    format: value => "+" + Math.round(value).toLocaleString("en-US"),
+    // Say in the console when this board posts, is refused, or has no rule yet.
+    logPosts: true
   }),
   // Crossword ranks the clock on the day's grid. Two archive puzzles are not
   // the same test — a random Wednesday is nothing like a Sunday — so only a
@@ -612,7 +614,10 @@ export async function syncScores() {
   let posted = false;
   const accepted = [];
   for (const game of LB_GAMES) {
-    if (isLocalOnly(game.id)) continue;
+    if (isLocalOnly(game.id)) {
+      if (game.logPosts && bestValue(game)) console.log(game.name + ': no score rule on the server yet, so the best stays in this browser.');
+      continue;
+    }
     let score = bestValue(game);
     if (!score || !Number.isFinite(score)) continue;
     score = Math.round(score);
@@ -642,9 +647,11 @@ export async function syncScores() {
       if (!Number.isFinite(best)) return { error: new Error('Invalid score confirmation') };
       submitted[game.id] = best;
       accepted.push({ game: game.id, value: best });
+      if (game.logPosts) console.log(game.name + ': posted ' + formatScore(score, game) + ' to the main leaderboard; your best there is ' + formatScore(best, game) + '.');
       writeStored(submittedKey, submitted);
       if (best === score) posted = true;
     } catch (err) {
+      if (game.logPosts) console.log(game.name + ': the main leaderboard refused ' + formatScore(score, game) + '.', err.message || err);
       // A missing rule row means this game cannot post; every other game can.
       if (err.status !== 401 && err.code !== '23503' && !/foreign key/i.test(err.message || '')) {
         return { error: err };
