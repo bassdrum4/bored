@@ -290,6 +290,12 @@ canvas, img { image-rendering: pixelated; display: block }
 .fbar .page { margin-left: auto; color: var(--dim) }
 #full-detail .sets { color: var(--dim); font-size: 16px; line-height: 16px; height: 32px; overflow: hidden; white-space: normal }
 #full-detail .note { color: var(--gold); font-size: 16px; line-height: 16px }
+/* A mon in a line of text (Trades): its mini sprite inline, rows tall enough for it. */
+#scr-collector .who { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap }
+#scr-collector .who .mini { display: inline-block }
+#full-detail #full-acts { height: auto } #full-detail #full-acts > div { height: 32px }
+#full-detail .small { font-size: 16px; line-height: 16px }
+#full-detail .hist { height: 150px } #full-detail .hist > div { display: flex; align-items: center; gap: 6px; height: 30px; padding-left: 0 }
 #scr-collector.grid #full-detail .info > div { font-size: 16px; line-height: 15px }
 #scr-collector.grid #full-detail .cell { width: 80px; height: 60px }
 #scr-collector.grid #full-acts > div { height: 24px }
@@ -2283,8 +2289,8 @@ function colMenu() {
     { label: menuLine({ times: "x1", label: "1 Pull" }), icon: chipIcon(), right: [el("span", "num", R.pull)], off: CS.chips < R.pull, about: R.pull + " chips: 1 Pokémon for the Full Dex.", run: () => colPull(1) },
     { label: menuLine({ times: "x10", label: "10 Pulls" }), icon: chipIcon(), right: [el("span", "num", R.ten)], off: CS.chips < R.ten, about: R.ten + " chips: 10 Pokémon, 1 Rare or better.", run: () => colPull(10) },
     { label: "Get chips → Casino", off: !(G.casino && G.casino.open), about: "Shotgun Roulette pays chips, up to 3,000 a day net. Its ← Poké Gacha button comes back.", run: () => { G.casino.open(); return { ok: true, quiet: true }; } },
-    { label: "Rates · pity (R)", about: "Rates, pity, and the dust each pull pays.", run: () => { colOver = "rates"; return { ok: true, quiet: true }; } },
-    { label: "History (H)", about: "Your last Collector pulls, newest first.", run: () => { colOver = "history"; return { ok: true, quiet: true }; } }
+    { label: "Rates · history (R, H)", about: "R: rates, pity and the dust each pull pays. H: your last pulls.", run: () => { colOver = "rates"; return { ok: true, quiet: true }; } },
+    { label: "Trades (K)", off: !G.trades, about: "Trade Collector mons with other players: same rarity, a dust fee, 3 a day.", run: () => { openTrades(); return { ok: true, quiet: true }; } }
   ];
 }
 function colUpdate() {
@@ -2305,6 +2311,7 @@ function colUpdate() {
   if (fullMode === "machine") return colMachine(box);
   if (fullMode === "sets") return fullSets(box);
   if (fullMode === "shop") return fullShop(box);
+  if (fullMode === "trades") return tradesView(box);
   fullDex(box);
 }
 function fullDex(box) {
@@ -2471,15 +2478,116 @@ function runShop(item) {
   const r = item.run(); refreshTop(); colUpdate();
   colSay(!r.ok ? REASONS[r.reason] || "Not now." : r.bought ? "Bought " + r.bought.length + " for " + r.dust + " dust." : r.copies ? r.copies + " extras → +" + r.dust + " dust." : "Bought shards.");
 }
+/* ── Trades: offer-based, decided by the server (src/hub/trades.js, the collector_trades SQL) ──
+   The list: a new offer, the open offers (yours first), then your history. A new offer is
+   built on the right: Give (←/→ through what you own, extras first), Want (←/→ through the same
+   rarity, wishlist and missing first), For (anyone, or one player's handle), Post. */
+const trade = { offers: [], history: [], loading: false, error: "", at: 0, give: 0, want: 0, forHandle: "", formAt: 0 };
+async function loadTrades() {
+  trade.loading = true; trade.error = ""; if (fullMode === "trades") colUpdate();
+  const [o, h] = await Promise.all([G.trades.offers(), G.trades.history()]);
+  trade.loading = false;
+  trade.offers = o.ok ? o.offers || [] : []; trade.history = h.ok ? h.trades || [] : [];
+  trade.error = !o.ok ? o.reason : !h.ok ? h.reason : "";
+  refreshTop();
+  if (tab === "collector" && fullMode === "trades") colUpdate();
+}
+function openTrades() { fullMode = "trades"; fullFocus = "list"; colOver = null; trade.at = 0; colUpdate(); if (G.trades) loadTrades(); }
+const tradeItems = () => [{ kind: "new" }].concat(trade.offers.map(o => ({ kind: "offer", o })), [{ kind: "history" }]);
+// What you can give (owned, extras first) and want (the same tier: wishlist, then missing, then the rest).
+const giveList = () => CS.owned.slice().sort((a, b) => (CS.copies[b] || 1) - (CS.copies[a] || 1) || a - b);
+function wantList(give) {
+  const tier = G.collector.tierOf(give), have = new Set(CS.owned), wish = new Set(CS.wish);
+  return Array.from({ length: CS.total }, (_, i) => i + 1).filter(n => n !== give && G.collector.tierOf(n) === tier)
+    .sort((a, b) => (wish.has(b) - wish.has(a)) || (have.has(a) - have.has(b)) || a - b);
+}
+const monLine = (num, label) => { const s_ = el("span", "who"); s_.append(label ? label + " " : "", mini(num, "normal", !CS.owned.includes(num)), colName(num)); return s_; };
+function tradesView(box) {
+  const items = tradeItems(), fees = G.trades.rules.fees;
+  if (trade.at >= items.length) trade.at = items.length - 1;
+  rows($("#full-rows"), items.map(it => it.kind === "new" ? { label: "New offer…" } : it.kind === "history" ? { label: "History (" + trade.history.length + ")" }
+    : { icon: mini(it.o.give, "normal"), label: (it.o.mine ? "You" : it.o.handle) + ": " + colName(it.o.give) + " → " + colName(it.o.want), right: [el("span", "dim", it.o.for_handle ? "for " + it.o.for_handle : "")] }),
+    trade.at, (i, click) => { trade.at = i; fullFocus = "list"; if (click && items[i].kind !== "history") fullFocus = "acts"; colUpdate(); });
+  const head = [el("div", "title", "TRADES"), el("div", "note", COL_NOTE)];
+  if (!G.trades.signedIn()) { box.replaceChildren(...head, el("div", "", "Sign in to trade.")); return colSay("Trading needs an account (7 days old or more)."); }
+  const it = items[trade.at];
+  if (trade.loading) { box.replaceChildren(...head, el("div", "dim", "Loading…")); return colSay("Asking the server…"); }
+  if (it.kind === "history") {
+    const list = el("div", "rows scroll hist");
+    for (const t of trade.history) { const r = el("div"); r.append(el("span", "dim", String(t.done_at || "").slice(5, 10)), monLine(t.got, "+"), monLine(t.gave, "−"), el("span", "dim", t.other)); list.append(r); }
+    if (!trade.history.length) list.append(el("p", "dim", "No trades yet."));
+    box.replaceChildren(...head, list);
+    return colSay(trade.error || "Every finished trade, newest first. The server keeps the record.");
+  }
+  if (it.kind === "offer") {
+    const o = it.o, acts = o.mine ? [{ label: "Cancel this offer", run: () => G.trades.cancel({ id: o.id }) }] : [{ label: "Accept: give " + colName(o.want), off: !CS.owned.includes(o.want), run: () => G.trades.accept({ id: o.id }) }];
+    const actBox = el("div", "rows"); actBox.id = "full-acts";
+    rows(actBox, acts.map(a => ({ label: a.label, off: a.off })), fullFocus === "acts" ? 0 : -1, (i, click) => { fullFocus = "acts"; if (click) runTrade(acts[0]); else colUpdate(); });
+    box.replaceChildren(...head, el("div", "", (o.mine ? "You" : o.handle) + " give" + (o.mine ? "" : "s")), monLine(o.give), el("div", "", "and want"), monLine(o.want),
+      el("div", "dim", "Fee: " + o.fee + " dust each · " + G.collector.tiers[o.tier]), actBox);
+    return colSay(trade.error || (o.mine ? "Your offer: cancel it to free the mon." : CS.owned.includes(o.want) ? "Enter, then Enter again, to accept." : "You do not have " + colName(o.want) + " to give."));
+  }
+  // A new offer.
+  const gives = giveList();
+  if (!gives.length) { box.replaceChildren(...head, el("div", "dim", "Pull something first.")); return colSay("You need a Collector mon to offer."); }
+  if (!gives.includes(trade.give)) trade.give = gives[0];
+  const wants = wantList(trade.give);
+  if (!wants.includes(trade.want)) trade.want = wants[0];
+  const tier = G.collector.tierOf(trade.give);
+  const form = [
+    { label: monLine(trade.give, "Give ‹›"), about: "←/→ picks what you give (extras first)." },
+    { label: monLine(trade.want, "Want ‹›"), about: "←/→ picks what you want: the same rarity, wishlist and missing first." },
+    { label: "For: " + (trade.forHandle || "anyone"), about: "Enter types a player's handle (empty is anyone)." },
+    { label: "Post offer (fee " + fees[tier] + " dust)", off: CS.dust < fees[tier], about: "Posts it. The fee is paid when someone accepts." }
+  ];
+  const fbox = el("div", "rows"); fbox.id = "full-acts";
+  rows(fbox, form.map(f => ({ label: f.label, off: f.off })), fullFocus === "acts" ? trade.formAt : -1, (i, click) => { fullFocus = "acts"; trade.formAt = i; if (click) tradeForm(form, i, 0); else colUpdate(); });
+  box.replaceChildren(...head, fbox, el("div", "dim small", "Same rarity only · 3 trades a day · 1 Legendary a week"));
+  colSay(trade.error || (fullFocus === "acts" ? form[trade.formAt].about : "Enter to build an offer."));
+}
+async function runTrade(a) {
+  if (!a || a.off) return colSay("You do not have that one to give.");
+  colSay("Asking the server…");
+  const r = await a.run();
+  trade.error = r.ok ? "" : r.reason;
+  if (r.ok && r.trade) colSay("Traded: +" + name(r.trade.got) + ", −" + name(r.trade.gave) + ", " + r.trade.fee + " dust.");
+  fullFocus = "list"; await loadTrades();
+}
+function tradeForm(form, i, step) {
+  if (i < 2 && step) {
+    const list = i === 0 ? giveList() : wantList(trade.give), key = i === 0 ? "give" : "want";
+    trade[key] = list[(list.indexOf(trade[key]) + step + list.length) % list.length];
+    if (i === 0) trade.want = 0;
+    return colUpdate();
+  }
+  if (i === 2 && !step) { const h = prompt("Offer for one player (their handle), or empty for anyone:", trade.forHandle); if (h !== null) trade.forHandle = h.trim().slice(0, 40); return colUpdate(); }
+  if (i === 3 && !step && !form[3].off) return runTrade({ run: () => G.trades.post({ give: trade.give, want: trade.want, forHandle: trade.forHandle }) });
+}
+function tradesKey(e) {
+  const k = e.key, items = tradeItems();
+  if (fullFocus === "list") {
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); trade.at = (trade.at + (k === "ArrowUp" ? -1 : 1) + items.length) % items.length; return colUpdate(); }
+    if ((k === "Enter" || k === " ") && items[trade.at].kind !== "history") { e.preventDefault(); fullFocus = "acts"; trade.formAt = 0; return colUpdate(); }
+    return;
+  }
+  const it = items[trade.at];
+  if (it.kind === "offer") { if (k === "Enter" || k === " ") { e.preventDefault(); const o = it.o; return runTrade(o.mine ? { run: () => G.trades.cancel({ id: o.id }) } : { off: !CS.owned.includes(o.want), run: () => G.trades.accept({ id: o.id }) }); } return; }
+  const form = [0, 1, 2, 3];
+  if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); trade.formAt = (trade.formAt + (k === "ArrowUp" ? -1 : 1) + 4) % 4; return colUpdate(); }
+  if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); return tradeForm(form, trade.formAt, k === "ArrowLeft" ? -1 : 1); }
+  if (k === "Enter" || k === " ") { e.preventDefault(); const tier = G.collector.tierOf(trade.give); return tradeForm([0, 1, 2, { off: CS.dust < G.trades.rules.fees[tier] }], trade.formAt, 0); }
+}
 const cycle = (list, v) => list[(list.indexOf(v) + 1) % list.length];
 function colKey(e) {
   const k = e.key, mode = m => { e.preventDefault(); fullMode = m; fullFocus = "list"; colOver = null; colUpdate(); };
   if (colOver) { if (k !== "Shift") { e.preventDefault(); colOver = null; colUpdate(); } return; }
-  if (k === "Backspace") { e.preventDefault(); if (fullMode === "dex" && fullFocus === "acts") { fullFocus = "list"; return colUpdate(); } return fullMode === "machine" ? null : mode("machine"); }
+  if (k === "Backspace") { e.preventDefault(); if ((fullMode === "dex" || fullMode === "trades") && fullFocus === "acts") { fullFocus = "list"; return colUpdate(); } return fullMode === "machine" ? null : mode("machine"); }
   if (k === "p" || k === "P") return mode("machine");
   if (k === "d" || k === "D") return mode("dex");
   if (k === "s" || k === "S") return mode(fullMode === "sets" ? "machine" : "sets");
   if (k === "x" || k === "X") return mode(fullMode === "shop" ? "machine" : "shop");
+  if ((k === "k" || k === "K") && G.trades) { e.preventDefault(); return openTrades(); }
+  if (fullMode === "trades") return tradesKey(e);
   if (fullMode === "machine") {
     const menu = colMenu();
     if (k === "r" || k === "R") { e.preventDefault(); colOver = "rates"; return colUpdate(); }

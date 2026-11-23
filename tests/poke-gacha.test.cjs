@@ -2443,7 +2443,7 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   // The tab bar and the purse (chips and dust here, often the widest numbers) fit on one line.
   const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), dustImg = await rect(game, '#tabs .purse img:last-child');
   assert.ok(purse.r <= bar.r + 0.5 && dustImg.r <= purse.r, 'the tabs and the chips-and-dust purse fit');
-  assert.deepEqual(await game.$$eval('#full-rows > div', ns => ns.map(n => n.textContent.replace(/\s+/g, ''))), ['x11Pull100', 'x1010Pulls900', 'Getchips→Casino', 'Rates·pity(R)', 'History(H)']);
+  assert.deepEqual(await game.$$eval('#full-rows > div', ns => ns.map(n => n.textContent.replace(/\s+/g, ''))), ['x11Pull100', 'x1010Pulls900', 'Getchips→Casino', 'Rates·history(R,H)', 'Trades(K)']);
   assert.match(await game.$eval('#col-machine', n => n.textContent), /Casino today\s*\+0\s*\/ 3,000 net/);
   assert.equal(await game.$eval('#col-machine img', n => n.getAttribute('src').endsWith('collector.png') && n.width), 130, 'the Pokédex at 5x');
   await pause(200); await shot('collector-machine');
@@ -2531,6 +2531,53 @@ test('the Collector: its own green tab with the machine, Full Dex, sets and dust
   await game.evaluate(() => { fullMode = 'machine'; colAt = 0; colUpdate(); });
   await key(tab, 'g');
   await tab.waitForFunction(() => window.current === 'shotgun-roulette', { timeout: 5000 });
+  assert.deepEqual(errors, []);
+});
+
+test('Collector trades: post an offer, accept one, cancel yours, and the history, through the hub (stubbed server)', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // A stand-in for the server: offers and history in memory; accept mirrors the trade into the wallet like src/hub/trades.js.
+  await game.evaluate(() => {
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); const now = Math.floor(Date.now() / 1000);
+    w.entries['test:dust'] = { at: now, g: { dust: 500 } };
+    w.entries['spend:col:test'] = { at: now, g: { chips: -900 }, x: { cp: [[1, 1], [1, 0], [7, 1]], n: 0, d: '2026-11-01' } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); tipsSeen.collector = true; refreshTop();
+    const db = { offers: [{ id: 41, handle: 'misty', give: 4, want: 7, tier: 0, fee: 5, for_handle: null, mine: false }], history: [], posted: [] };
+    window.__db = db;
+    G.trades = { rules: { fees: [5, 15, 30, 75] }, signedIn: () => true,
+      offers: async () => ({ ok: true, offers: db.offers }), history: async () => ({ ok: true, trades: db.history }),
+      post: async o => { db.posted.push(o); db.offers.unshift({ id: 50, handle: 'you', give: o.give, want: o.want, tier: 0, fee: 5, for_handle: o.forHandle || null, mine: true }); return { ok: true, id: 50 }; },
+      cancel: async o => { db.offers = db.offers.filter(x => x.id !== o.id); return { ok: true }; },
+      accept: async o => { const x = db.offers.find(y => y.id === o.id); db.offers = db.offers.filter(y => y !== x);
+        const row = { id: x.id, got: x.give, gave: x.want, fee: x.fee, other: x.handle, done_at: new Date().toISOString() }; db.history.unshift(row);
+        const w2 = JSON.parse(parent.localStorage.getItem('bored.wallet')); w2.entries['col:trade:' + x.id] = { at: Math.floor(Date.now() / 1000), g: { dust: -x.fee }, x: { in: x.give, out: x.want } };
+        parent.localStorage.setItem('bored.wallet', JSON.stringify(w2)); return { ok: true, trade: { got: x.give, gave: x.want, fee: x.fee } }; } };
+  });
+  await key(tab, '9'); await key(tab, 'k');
+  await game.waitForFunction(() => !trade.loading && document.querySelectorAll('#full-rows > div').length === 3);
+  assert.deepEqual(await game.$$eval('#full-rows > div', ns => ns.map(n => n.textContent.trim())), ['New offer…', 'misty: Charmander → Squirtle', 'History (0)'].map(x => x.replace('Charmander', '???')));
+  // Accept misty's offer: give Squirtle, get Charmander, pay 5 dust.
+  const dust = await game.evaluate(() => CS.dust);
+  await key(tab, 'ArrowDown'); await key(tab, 'Enter'); await key(tab, 'Enter');
+  await game.waitForFunction(() => window.__db.history.length === 1 && !trade.loading);
+  assert.deepEqual(await game.evaluate(() => [CS.owned.includes(4), CS.owned.includes(7), CS.copies[1], CS.dust]), [true, false, 2, dust - 5]);
+  // Post an offer: give the extra Bulbasaur, want the first of the same rarity (wishlist and missing first).
+  await game.evaluate(() => { trade.at = 0; fullFocus = 'list'; colUpdate(); });
+  await key(tab, 'Enter');
+  if (process.env.SHOT_DIR) await (await tab.$('#frame')).screenshot({ path: path.join(process.env.SHOT_DIR, 'trades.png') });
+  const form = await game.$$eval('#full-acts > div', ns => ns.map(n => n.textContent));
+  assert.match(form[0], /Give.*Bulbasaur/); assert.match(form[3], /Post offer \(fee 5 dust\)/);
+  await key(tab, 'ArrowDown', 3); await key(tab, 'Enter');
+  await game.waitForFunction(() => window.__db.posted.length === 1 && !trade.loading);
+  assert.equal(await game.evaluate(() => window.__db.posted[0].give), 1);
+  assert.equal(await game.evaluate(() => G.collector.tierOf(window.__db.posted[0].want)), 0, 'the same rarity');
+  // Cancel it, and the history lists the trade.
+  await game.evaluate(() => { trade.at = 1; fullFocus = 'list'; colUpdate(); });
+  assert.match(await game.$eval('#full-rows .at', n => n.textContent), /^You:/);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  await game.waitForFunction(() => !window.__db.offers.some(o => o.mine) && !trade.loading);
+  await game.evaluate(() => { trade.at = tradeItems().length - 1; colUpdate(); });
+  assert.match(await game.$eval('#full-detail', n => n.textContent), /TRADES[\s\S]*Collection only[\s\S]*misty/);
   assert.deepEqual(errors, []);
 });
 
