@@ -1,6 +1,6 @@
 // Collector trades, hub side: the page's calls, the server's answers, and the wallet's mirror.
 //
-// The server (supabase/migrations/*_collector_trades.sql) decides every trade in one transaction
+// The server (sql/collector_trades.sql) decides every trade in one transaction
 // and keeps the only record of it. This module only asks (post, cancel, accept, list) and then
 // mirrors each finished trade into the wallet as col:trade:<id> = { g: { dust: -fee }, x: { in, out } },
 // once, so the Full Dex and the dust balance show it. Before any server check it pushes the
