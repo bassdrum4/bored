@@ -8,6 +8,11 @@
 // a rank of its own.
 
 export const NEW_GAME_BOOST_DAYS = 3;
+
+export function isFeatured(slug, featuredUntil, now = Date.now()) {
+  const expiry = Date.parse(featuredUntil?.[slug] || '');
+  return Number.isFinite(expiry) && now < expiry;
+}
 const DAY = 86400000;
 
 export function popularityRanks(rows) {
@@ -43,13 +48,15 @@ export function isNewGame(slug, launches, now = Date.now(), days = NEW_GAME_BOOS
  * offline fallback the library relies on.
  */
 export function sortPopularGames(games, ranks, options = {}) {
-  const { launches, now = Date.now(), days = NEW_GAME_BOOST_DAYS } = options;
+  const { launches, featuredUntil, now = Date.now(), days = NEW_GAME_BOOST_DAYS } = options;
   const boost = new Map();
   for (const [slug] of games) {
     if (isNewGame(slug, launches, now, days)) boost.set(slug, launchTime(slug, launches));
   }
-  if (!ranks?.size && !boost.size) return games;
+  const featured = new Set(games.filter(([slug]) => isFeatured(slug, featuredUntil, now)).map(([slug]) => slug));
+  if (!ranks?.size && !boost.size && !featured.size) return games;
   return games.sort((a, b) => {
+    if (featured.has(a[0]) !== featured.has(b[0])) return featured.has(a[0]) ? -1 : 1;
     const firstLaunch = boost.get(a[0]) ?? 0;
     const secondLaunch = boost.get(b[0]) ?? 0;
     if (firstLaunch && secondLaunch) return secondLaunch - firstLaunch;
