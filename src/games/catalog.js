@@ -38,6 +38,8 @@ export const FRESH_GAMES = ["ballistic-chickens", "getaway-shootout", "shotgun-r
 // game nobody has opened yet has no rank and used to sit under every ranked
 // game; a launch inside the boost window is shown above them instead. Only
 // recent launches matter, and `games:add` stamps every new game here.
+// Temporary editorial pin, expiring at midnight Detroit time November 25.
+export const FEATURED_UNTIL = Object.freeze({ crossword: '2026-11-25T05:00:00Z' });
 export const LAUNCHED = {
   "ballistic-chickens": "2026-11-22",
   "getaway-shootout": "2026-11-21",
