@@ -127,10 +127,10 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   const canRecord = () => enabled && production && !staffBrowser;
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
   let visitor = canRecord() ? getVisitorId() : null;
-  let detach = () => {}, lastFlush = now(), flushTimer = null, flushAt = 0;
+  let detach = () => {}, flushTimer = null, flushAt = 0;
   let checkedAccount = null, adminCheck = null, scopedReader = null;
   // One row is an expensive thing to write. The insert dirties its heap page
-  // and a page in each index behind it, and after every checkpoint each of
+  // and a page in each index behind it, and after each database flush each of
   // those pages is written out again in full as an 8 KB page image in the
   // write-ahead log. A single-row request therefore costs tens of kilobytes of
   // disk writes for a few hundred bytes of data, while a request carrying
@@ -201,8 +201,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     input();
     if (run?.ready && !run.context.external && !run.interacted) {
       run.interacted = true;
-      emit('interaction');
-      scheduleFlush();
+
     }
   };
   const uuid = () => crypto.randomUUID();
@@ -235,8 +234,8 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     const value = score(run.game, valid);
     if (value > 0 && (!run.best || (isLower(run.game) ? value < run.best : value > run.best))) run.best = value;
     pending.push({ id: uuid(), visitor_id: visitor, session_id: run.id, user_id: run.user, game: run.game, kind,
-      active_ms: Math.min(65000, Math.floor(run.active)), visible_ms: Math.min(65000, Math.floor(run.visible)),
-      details: { ...run.context, ...details, best_score: run.best || 0, ...(Number.isFinite(value) ? { score: value } : {}), snapshot: cleanSnapshot(valid) }
+      active_ms: Math.min(86400000, Math.floor(run.active)), visible_ms: Math.min(86400000, Math.floor(run.visible)),
+      details: { ...run.context, loaded: run.ready, ...(run.loadMs != null ? { load_ms: run.loadMs } : {}), round_finished: run.everFinished, ...details, best_score: run.best || 0, ...(Number.isFinite(value) ? { score: value } : {}), snapshot: cleanSnapshot(valid) }
     });
     run.active = run.visible = 0;
     // Memory-only bounded retries; never leave private activity in shared-browser storage.
@@ -308,8 +307,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     finally {
       busy = false;
       // Events queued while a request was in flight (including close/pagehide)
-      // should join the next request rather than wait for the 60-second
-      // checkpoint. A keepalive flush is the page leaving, so it cannot wait.
+      // should join the next request. A keepalive flush on exit cannot wait.
       if (delivered && enabled && pending.length) {
         if (keepalive) queueMicrotask(() => void flush(true));
         else flushSoon();
@@ -341,15 +339,14 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (!external && !frameConfirmed && snapshot(run.game)?.slug !== run.game) return;
     if (run.ready) return;
     sample(); run.ready = true;
-    emit('checkpoint', { loaded: true, load_ms: Math.round(now() - run.opened) });
-    scheduleFlush();
+    run.loadMs = Math.round(now() - run.opened);
     detach();
     if (external) {
       // Nothing inside the frame can be read, but the frame taking focus means the
       // player reached into the game rather than the hub around it.
       const engage = () => {
         input();
-        if (run?.ready && !run.interacted) { run.interacted = true; emit('interaction'); scheduleFlush(); }
+        if (run?.ready && !run.interacted) run.interacted = true;
       };
       frame?.addEventListener('focus', engage);
       detach = () => frame?.removeEventListener('focus', engage);
@@ -374,7 +371,6 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       const finished = !!(state?.finished || state?.won || state?.solved || state?.handOver);
       if (finished && !run.finished) {
         run.everFinished = true;
-        emit('checkpoint', { round_finished: true });
         track('game_result', { game: run.game, surface: 'game',
           result: state?.won || state?.solved ? 'win' : 'finished' });
         flushSoon();
@@ -382,10 +378,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       if (run) run.finished = finished;
     }
     if (run && !run.ready && !run.context.external) ready();
-    if (now() - lastFlush >= 60000) {
-      if (run?.ready) emit('checkpoint');
-      lastFlush = now(); flushSoon();
-    }
+    if (pending.length && !busy && !flushTimer) scheduleFlush();
   }, 1000);
   // Going hidden is a boundary, not a pause: the queue has nothing more coming
   // to join it, and the tab may be closed from the task switcher without a
@@ -393,8 +386,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   // the page if it is discarded. Coming back into view is not urgent.
   const visibility = () => {
     sample();
-    emit('checkpoint');
-    if (document.hidden) void flush(true); else flushSoon();
+    if (document.hidden) void flush(true); else if (pending.length) flushSoon();
   };
   let suspended = null;
   const leave = () => { suspended = run && { game: run.game, context: run.context }; emit('end', { reason: 'page_exit' }); run = null; detach(); void flush(true); };
@@ -408,8 +400,8 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   // Product telemetry is deliberately categorical. Never send search text,
   // raw keystrokes, URLs, arbitrary game state, or announcement contents.
   function track(kind, payload = {}) {
-    const allowed = ['visit','bt_view','bt_enroll','bt_challenge','bt_random','bt_open','bt_move','bt_complete','bt_rematch','bt_delete','bt_leave',
-      'card_impression','library_action','favorite_change','save_action','announcement_impression','announcement_click',
+    const allowed = ['bt_enroll','bt_challenge','bt_random','bt_move','bt_complete','bt_rematch','bt_delete','bt_leave',
+      'library_action','favorite_change','save_action','announcement_impression','announcement_click',
       'game_result','game_friction','help_open','tutorial_step'];
     if (!canRecord() || !allowed.includes(kind)) return;
     const { game = null, match_id = null, announcement_id = null } = payload || {};
@@ -438,13 +430,13 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     // Keep all generated events until delivered; do not silently discard busy-session telemetry.
     scheduleFlush();
   }
-  track('visit');
   return {
     start, end, ready, track,
     frameInput() { if (run?.ready && !run.context.external) gameInput(); },
     visitorId: () => enabled ? visitor : null,
     isGameSuppressed: suppressGame,
     event(kind, details) {
+      if (!['error','daily_complete'].includes(kind)) return;
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;
       // Safe error classification, never stack traces or raw error text.
       if (kind === 'error') details = { ...details, phase: run?.ready ? 'playing' : 'loading' };
@@ -455,7 +447,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     setEnabled(value) {
       if (!value) { run = null; pending = []; clearTimeout(flushTimer); flushTimer = null; flushAt = 0; detach(); visitor = null; removeStored(VISITOR_KEY); }
       enabled = !!value; writeStored(ANALYTICS_PREFERENCE, enabled);
-      if (canRecord() && !visitor) { visitor = getVisitorId(); track('visit'); }
+      if (canRecord() && !visitor) visitor = getVisitorId();
     },
     // Used by isolated tests; the app creates one tracker for its lifetime.
     dispose() { clearInterval(tick); clearTimeout(flushTimer); detach(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', resume); }
