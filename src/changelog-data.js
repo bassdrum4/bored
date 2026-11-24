@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 921,
+  "count": 922,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"be1f82fa","date":"2026-11-24","author":"bassdrum4","subject":"Cut telemetry disk IO by batching writes and dropping unused indexes"},
   {"sha":"5fc682b2","date":"2026-11-24","author":"bassdrum4","subject":"Read only the hub rows the page actually prints"},
   {"sha":"2b1f598e","date":"2026-11-24","author":"bassdrum4","subject":"Guard the top-three view on databases with no shared board"},
   {"sha":"c0e30a5f","date":"2026-11-24","author":"Codebuff","subject":"Fix GeoPeaks' reversed steering and move it behind the admin preview"},
