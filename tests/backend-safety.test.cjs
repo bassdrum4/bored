@@ -11,7 +11,7 @@ function load(file, names, deps) {
     (...Object.values(deps));
 }
 
-function harness(handler) {
+function harness(handler, clock = Date) {
   const saved = new Map();
   saved.set('bored.session', JSON.stringify({
     access_token: 'old', refresh_token: 'old-refresh',
@@ -21,10 +21,10 @@ function harness(handler) {
     readStored: (key, fallback) => saved.has(key) ? JSON.parse(saved.get(key)) : fallback,
     writeStored: (key, value) => { saved.set(key, JSON.stringify(value)); return true; },
     removeStored: key => saved.delete(key),
-    fetch: handler
+    fetch: handler, Date: clock
   };
   return { saved, api: load('src/hub/backend.js',
-    ['freshSession', 'refreshSession', 'getSession', 'hasIdentity', 'signIn'], deps) };
+    ['freshSession', 'refreshSession', 'getSession', 'hasIdentity', 'signIn', 'request'], deps) };
 }
 const ok = value => ({ ok: true, status: 200, text: async () => JSON.stringify(value) });
 const newTokens = () => ({ access_token: 'fresh', refresh_token: 'fresh-refresh',
@@ -189,4 +189,47 @@ test('short and over-long notes never reach the server', async () => {
   await assert.rejects(api.sendFeedback({ message: 'hi' }), /little more/);
   await assert.rejects(api.sendFeedback({ message: 'x'.repeat(2001) }), /2000/);
   assert.equal(sent.length, 0);
+});
+
+test('gateway failures share a cooldown, then allow only one probe', async () => {
+  let now = 100000, calls = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const { api } = harness(async () => {
+    calls++;
+    if (calls <= 2) return { ok: false, status: 521, text: async () => '<html>down</html>' };
+    if (calls === 3) { await gate; return ok(['recovered']); }
+    return ok([]);
+  }, { now: () => now });
+  await assert.rejects(api.request('/a'), { status: 521 });
+  await assert.rejects(api.request('/b'), { status: 521 });
+  await assert.rejects(api.request('/c'), { code: 'BORED_BACKEND_COOLDOWN' });
+  assert.equal(calls, 2);
+  now += 6100;
+  const probe = api.request('/c');
+  await assert.rejects(api.request('/d', { method: 'POST', body: {} }), { code: 'BORED_BACKEND_COOLDOWN' });
+  assert.equal(calls, 3);
+  release();
+  assert.deepEqual(await probe, ['recovered']);
+  assert.deepEqual(await api.request('/d'), []);
+  assert.equal(calls, 4);
+});
+
+test('failed probes increase cooldown and ordinary refusals do not trip it', async () => {
+  let now = 100000, calls = 0;
+  const { api } = harness(async () => {
+    calls++;
+    if (calls <= 3) return { ok: false, status: 503, text: async () => '<html>down</html>' };
+    return { ok: false, status: 400, text: async () => JSON.stringify({ message: 'bad input' }) };
+  }, { now: () => now });
+  await assert.rejects(api.request('/a'), { status: 503 });
+  await assert.rejects(api.request('/a'), { status: 503 });
+  now += 6100;
+  await assert.rejects(api.request('/a'), { status: 503 });
+  now += 6100;
+  await assert.rejects(api.request('/b'), { code: 'BORED_BACKEND_COOLDOWN' });
+  now += 5000;
+  await assert.rejects(api.request('/b'), { status: 400 });
+  await assert.rejects(api.request('/b'), { status: 400 });
+  await assert.rejects(api.request('/b'), { status: 400 });
+  assert.equal(calls, 6);
 });
