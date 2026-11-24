@@ -138,3 +138,23 @@ test('static snapshots use local matching and verify every score against static 
   assert.equal(h.bank().length,0);
   assert.equal(h.stats().upstream,0);
 });
+
+test('generated static day is complete before publication and rejects partial data',async()=>{
+  const {mkdtemp,rm,unlink,writeFile}=require('node:fs/promises');
+  const {tmpdir}=require('node:os');
+  const {join}=require('node:path');
+  const {build}=await import('../scripts/krillion-static.mjs');
+  const {validate}=await import('../scripts/krillion-validate.mjs');
+  const dir=await mkdtemp(join(tmpdir(),'krillion-publish-'));
+  try{
+    const day={date:'2026-11-24',dayNumber:132,prompts:Array.from({length:7},(_,i)=>({id:'p'+(i+1),text:'Question '+i,answers:[{answer:'Mercury',tier:'schooler'}]}))};
+    await build(dir,day.date,day,day);
+    await validate(dir,day.date);
+    const target=join(dir,day.date,'0','0.json.gz');
+    await unlink(target);
+    await assert.rejects(validate(dir,day.date),/Incomplete/);
+    await writeFile(target,'not gzip');
+    await assert.rejects(validate(dir,day.date),/Invalid gzip/);
+    await assert.rejects(build(dir,day.date,day,{...day,prompts:day.prompts.map(p=>({...p,id:'p1'}))}),/Prompt IDs/);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});

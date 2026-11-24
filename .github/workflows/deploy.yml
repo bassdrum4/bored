@@ -20,13 +20,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Only the scheduled/manual build can write generated data. A normal push
+  # has no write token and never contacts the upstream Krillion API.
+  krillion:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Build and persist verified daily assets
+        run: bash scripts/krillion-publish.sh build
+
   deploy:
+    needs: krillion
     # Publish the main source tree after refreshing the generated changelog.
-    if: github.ref == 'refs/heads/main'
+    # A failed scheduled build must not replace the live site. Push builds
+    # proceed when the daily job was intentionally skipped.
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && (needs.krillion.result == 'success' || needs.krillion.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -36,10 +54,12 @@ jobs:
       - uses: actions/checkout@v5
         with:
           # The changelog generator needs complete history, not a shallow clone.
+          ref: main
           fetch-depth: 0
+          persist-credentials: true
       - uses: actions/configure-pages@v5
-      - name: Restore or build daily Krillion assets
-        run: bash scripts/krillion-publish.sh
+      - name: Restore validated Krillion assets (read-only)
+        run: bash scripts/krillion-publish.sh restore
       - name: Regenerate changelog from main history
         run: node scripts/changelog.mjs
       # The hub asks for game documents with this stamp in the query string, so
@@ -47,7 +67,7 @@ jobs:
       - name: Stamp the deploy with its commit
         run: |
           printf '{"commit":"%s","published":"%s"}\n' \
-            "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > src/version.json
+            "$(git rev-parse HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > src/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: src
