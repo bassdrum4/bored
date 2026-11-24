@@ -1,8 +1,9 @@
 // Build one immutable daily snapshot, with a browser round file and small
 // server-verifiable lookup shards. No service role key or database is needed.
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { TIERS, normalize, stripArticle, numberValue, etDate } from '../src/games/content/krillion/rules.mjs';
 
 const keyOf = value => normalize(stripArticle(value));
@@ -58,14 +59,14 @@ export async function build(root, date, today, reveal) {
     await writeFile(join(dir,round,'answers.json.gz'),gzipSync(JSON.stringify(rows),{level:6}));
     await writeFile(join(dir,round,'sheet.json'),JSON.stringify(sheet));
     // Empty shards are written too: a 404 means missing data, not a wrong answer.
-    await Promise.all(shards.map((s,j)=>writeFile(join(dir,round,j+'.json'),JSON.stringify(s))));
+    await Promise.all(shards.map((s,j)=>writeFile(join(dir,round,j+'.json.gz'),gzipSync(JSON.stringify(s),{level:6}))));
     manifest.prompts.push({id:String(prompt.id),text:prompt.text});
   }
   // Manifest is the commit marker; never publish a partial day.
   await writeFile(join(dir,'manifest.json'),JSON.stringify(manifest));
   return manifest;
 }
-if (process.argv[1] && import.meta.url===new URL('file:'+process.argv[1]).href) {
+if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   const root=process.argv[2], date=process.argv[3]||etDate();
   if (!root) throw new Error('Usage: node scripts/krillion-static.mjs OUTPUT [YYYY-MM-DD]');
   const [today,reveal]=await Promise.all([fetchJson('https://krillion.io/api/today'),fetchJson('https://krillion.io/api/reveal?date='+date)]);
