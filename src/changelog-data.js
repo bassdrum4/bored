@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 941,
+  "count": 942,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"e592cfbf","date":"2026-11-24","author":"Daniel Lowe","subject":"Visual overhaul for GeoPeaks: alpine panorama, snow and forests","pr":336},
   {"sha":"232d7cd1","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix CI fixture setup and browser test timing regressions","pr":335},
   {"sha":"88ec8e35","date":"2026-11-24","author":"Daniel Lowe","subject":"Complete Krillion static cutover, archive references and verified DB cleanup","pr":334},
   {"sha":"0b7ed990","date":"2026-11-24","author":"Daniel Lowe","subject":"Bring GeoPeaks closer to an open-mountain ski simulator","pr":333},
