@@ -42,13 +42,13 @@ test('discovery keeps its controls and fits small screens', async t => {
     }
     // The hub deliberately withholds preview src until an IntersectionObserver
     // sees the card. Verify every actual asset, then exercise the lazy path.
-    const previewResponses = await page.$eval('#grid img', async images => Promise.all(images.map(async image => {
+    const previewResponses = await page.$$eval('#grid img', async images => Promise.all(images.map(async image => {
       const src = image.dataset.previewSrc || image.getAttribute('src');
       const response = await fetch(src);
       return { src, ok: response.ok };
     })));
     assert.ok(previewResponses.every(row => row.ok), JSON.stringify(previewResponses.filter(row=>!row.ok)));
-    await page.$eval('#grid img', images => images.at(-1).scrollIntoView({block:'center'}));
+    await page.$$eval('#grid img', images => images.at(-1).scrollIntoView({block:'center'}));
     await page.waitForFunction(() => {const image=Array.from(document.querySelectorAll('#grid img')).at(-1);return image?.complete && image.naturalWidth>0;});
     await page.evaluate(() => window.scrollTo(0,0));
     // The entry document is hand-written markup: it carries no games and no
