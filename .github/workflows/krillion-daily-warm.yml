@@ -1,9 +1,9 @@
 name: Warm Krillion daily
 on:
   schedule:
-    # 12:45 AM Eastern in winter, 1:45 AM in summer: the reveal lands at 00:10 and
-    # the bank fills one prompt every couple of minutes after that.
-    - cron: '45 5 * * *'
+    # Give the scheduled Pages deployment time to publish its static snapshot.
+    # If that fails, /today still starts the legacy bounded answer-bank build.
+    - cron: '30 6 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Populate and verify today's server-side book
+      - name: Verify today's static snapshot or warm the existing fallback
         env:
           KRILLION_URL: https://djdpttltfmwkofdrvkem.supabase.co/functions/v1/krillion/today
           KRILLION_PUBLIC_KEY: sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ
