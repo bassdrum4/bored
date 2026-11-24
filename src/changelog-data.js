@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 910,
+  "count": 912,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -14,6 +14,8 @@ export const CHANGELOG = [
   {"sha":"68dddeec","date":"2026-11-24","author":"Codebuff","subject":"Record that GeoPeaks shipped without the browser suite"},
   {"sha":"f76f4449","date":"2026-11-24","author":"Codebuff","subject":"Add GeoPeaks: ski twelve real summits traced from open elevation data"},
   {"sha":"4d74ac63","date":"2026-11-24","author":"bassdrum4","subject":"Record that main's CI was already red before the banner work"},
+  {"sha":"412aac49","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP test: a 3-round game can end on the most round wins after round 3"},
+  {"sha":"cfae91ab","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP: host settings, faster pacing, the Remote"},
   {"sha":"67a95eed","date":"2026-11-24","author":"bassdrum4","subject":"Hold the announcement banner until the boot screen clears"},
   {"sha":"f2639803","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP: items, buddies and Giratina keep their real colours"},
   {"sha":"f6393cb2","date":"2026-11-24","author":"bassdrum4","subject":"Answer announcements in the banner instead of opening it"},
