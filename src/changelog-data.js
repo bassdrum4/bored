@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 918,
+  "count": 919,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c0e30a5f","date":"2026-11-24","author":"Codebuff","subject":"Fix GeoPeaks' reversed steering and move it behind the admin preview"},
   {"sha":"47a12ebe","date":"2026-11-24","author":"bassdrum4","subject":"Read only the top three of each board until the page is opened"},
   {"sha":"ccdfd8de","date":"2026-11-24","author":"bassdrum4","subject":"Stop holding the loading screens, and defer offscreen previews"},
   {"sha":"34f72055","date":"2026-11-24","author":"bassdrum4","subject":"Read Supabase gateway pages as outages, not JSON"},
