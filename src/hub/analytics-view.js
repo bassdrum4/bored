@@ -162,12 +162,11 @@ function renderEngagement(rows) {
   const data = summarizeEngagement(rows, products, feedback, new Date(detroitMidnight(shiftDay($('#through').value, 1)) - 1));
   const percent = (numerator, denominator) => denominator ? Math.round(numerator / denominator * 100) + '%' : 'Not enough history';
   const stats = [
-    ['Visitors with an ID', data.uniqueVisitors], ['Meaningful sessions', data.meaningful],
+    ['Players with an ID', data.uniqueVisitors], ['Meaningful sessions', data.meaningful],
     ['Players meaningfully engaged', data.identifiedEngaged],
     ['Next-school-week retention', percent(data.retention.returned,data.retention.eligible)],
     ['Eligible retention cohort', data.retention.eligible],
     ['Repeat-game rate', percent(data.repeatGame.returned,data.repeatGame.eligible)],
-    ['Game interactions', data.interacting],
     ['Average enjoyment rating', data.survey.average === null ? 'No feedback' : data.survey.average.toFixed(1) + ' / 5']
   ];
   $('#engagement-kpis').replaceChildren(...stats.map(([label,value]) => {
@@ -178,7 +177,7 @@ function renderEngagement(rows) {
     ['Game','Opens','Meaningful sessions','Engaged players','Repeat players (matured)'],
     data.games.map(g => [names[g.game]||g.game,g.sessions,g.meaningful,g.engagedPlayers,g.repeatPlayers]));
   stackedDays('#engagement-visitors-chart', data.visitorsByDay, d => d.day, d => d.new, d => d.returning);
-  table('#engagement-visitors',['Detroit date','New tracked visitors','Returning tracked visitors'],
+  table('#engagement-visitors',['Detroit date','New tracked players','Returning tracked players'],
     data.visitorsByDay.map(d=>[d.day,d.new,d.returning]));
   const match = togetherSummary && !Array.isArray(togetherSummary) ? togetherSummary : {};
   const multiplayer = [
@@ -192,8 +191,8 @@ function renderEngagement(rows) {
   // Client funnel counts explain intent and dropoff; match outcomes above
   // remain authoritative even when the sender closes the browser early.
   const labels = {
-    bt_view:'Together opened',bt_enroll:'Members enrolled',bt_challenge:'Direct challenges sent',
-    bt_random:'Random-match requests',bt_open:'Match views',
+    bt_enroll:'Members enrolled',bt_challenge:'Direct challenges sent',
+    bt_random:'Random-match requests',
     bt_move:'Successful client move submissions',bt_complete:'Client-reported completions',
     bt_rematch:'Rematch requests',bt_delete:'Matches deleted',bt_leave:'Members leaving'
   };
@@ -239,7 +238,7 @@ async function deleteFeedback(row) {
 }
 
 /** Flight-specific aggregates use the same admin-protected events as Bored.
- * A sortie is a session ID, not a raw event count (checkpoints are repeated). */
+ * A sortie is a session ID, not a raw event count. */
 function renderF14(rows) {
   const chosen = $('#game').value;
   $('#f14-section').hidden = Boolean(chosen && chosen !== 'f-14');
@@ -254,7 +253,6 @@ function renderF14(rows) {
     const s = sessions.get(e.session_id), d = e.details || {};
     s.active += e.active_ms || 0;
     s.visible += e.visible_ms || 0;
-    s.interacted ||= e.kind === 'interaction';
     if (typeof d.mode === 'string') s.mode = d.mode;
     if (typeof d.aircraft === 'string') s.aircraft = d.aircraft;
     if (Number.isFinite(d.kills)) s.kills = Math.max(s.kills, d.kills);
@@ -268,7 +266,7 @@ function renderF14(rows) {
   }
   const flights = [...sessions.values()];
   const active = flights.reduce((sum, s) => sum + s.active, 0);
-  const engaged = flights.filter(s => s.interacted || s.active >= 60000).length;
+  const engaged = flights.filter(s => s.active >= 60000).length;
   const recovered = flights.filter(s => s.outcome === 'Recovered').length;
   const successes = flights.filter(s => s.outcome === 'Mission success').length;
   const crashes = flights.filter(s => s.outcome === 'Crashed').length;
@@ -313,7 +311,7 @@ function renderHistory() {
       : [['Game opens (including Together)', totals.launches]]),
     ['Meaningful sessions', totals.meaningful],
     ['Tracked browsers', totals.browsers], ['Active game time', duration(totals.active_ms)],
-    ['Error sessions', totals.error_sessions], ['Site visits', aggregateSummary.site?.visits || 0]
+    ['Error sessions', totals.error_sessions]
   ];
   $('#history-totals').replaceChildren(...items.map(([name, value]) => {
     const n = el('div'); n.className = 'analytics-stat';
@@ -373,7 +371,6 @@ function renderHistory() {
   table('#history-sources', ['Launch source','Launches','Meaningful','Active time'],
     (aggregateSummary.sources || []).map(r => [r.source,r.launches,r.meaningful,duration(r.active_ms)]));
   const actions = (aggregateSummary.ui_events || [])
-    .filter(e => e.kind !== 'visit')
     .sort((a,b) => b.events-a.events || a.kind.localeCompare(b.kind))
     .slice(0,100);
   rankedChart('#history-ui-chart', actions, e => [e.kind,e.action_name].filter(Boolean).join(' · '), e => e.events);
@@ -381,7 +378,7 @@ function renderHistory() {
     e.kind, names[e.game] || e.game || '—',e.surface || '—',e.action_name || '—',e.events,e.browsers
   ]));
   stackedDays('#history-cohorts-chart',aggregateCohorts.filter(c=>c.d1_returned!=null),c=>c.first_day,c=>c.d1_returned,c=>Math.max(0,c.cohort-c.d1_returned),['D1 returned','Did not return D1']);
-  table('#history-cohorts',['First visit','Browsers','D1 returns','D7 returns','Next school day','School-day returns'],
+  table('#history-cohorts',['First play','Browsers','D1 returns','D7 returns','Next school day','School-day returns'],
     aggregateCohorts.map(c => [c.first_day,c.cohort,
       c.d1_returned == null ? 'Not mature' : c.d1_returned + ' (' + percentage(c.d1_returned,c.cohort) + ')',
       c.d7_returned == null ? 'Not mature' : c.d7_returned + ' (' + percentage(c.d7_returned,c.cohort) + ')',
