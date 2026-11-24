@@ -38,6 +38,35 @@ const PARTY_ID = (() => {
   } catch { return crypto.randomUUID(); }
 })();
 
+let matcherWorker=null, matcherSeq=0, matcherWarm='';
+const matcherWaiters=new Map();
+function partyMatcher(){
+  if(!matcherWorker){
+    matcherWorker=new Worker(new URL('./static-worker.mjs',import.meta.url),{type:'module'});
+    matcherWorker.onmessage=({data})=>matcherWaiters.get(data.id)?.(data.key);
+  }
+  return matcherWorker;
+}
+function warmPartyPrompt(prompt){
+  if(!prompt?.staticDate)return;
+  const key=prompt.staticDate+'/'+prompt.staticRound;
+  if(key===matcherWarm)return;
+  matcherWarm=key;
+  try{partyMatcher().postMessage({date:prompt.staticDate,round:prompt.staticRound});}catch{}
+}
+async function partyCandidate(input){
+  const p=state.view?.prompt;
+  if(!p?.staticDate)return null;
+  try{
+    const worker=partyMatcher(),id=++matcherSeq;
+    return await new Promise(resolve=>{
+      const finish=value=>{clearTimeout(timer);matcherWaiters.delete(id);resolve(value);};
+      const timer=setTimeout(()=>finish(null),900);
+      matcherWaiters.set(id,finish);
+      worker.postMessage({id,date:p.staticDate,round:p.staticRound,input});
+    });
+  }catch{return null;}
+}
 async function api(path, data) {
   const response = await fetch(API_BASE + '/' + path, {
     cache: 'no-store',
@@ -51,6 +80,7 @@ async function api(path, data) {
     error.status = response.status;
     throw error;
   }
+  if(body.prompt)warmPartyPrompt(body.prompt);
   return body;
 }
 
@@ -658,7 +688,8 @@ $('answer-form').addEventListener('submit', async event => {
   state.busy = true;
   $('submit-btn').disabled = true;
   try {
-    const view = await api('party/answer', { code: state.code, answer });
+    const candidate=await partyCandidate(answer);
+    const view = await api('party/answer', { code: state.code, answer, ...(candidate?{candidate}:{}) });
     input.value = '';
     paint(view);
     // The room only hears about an answer over the wire, so tell it now
