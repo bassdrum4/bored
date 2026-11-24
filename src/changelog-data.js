@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 904,
+  "count": 906,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"68dddeec","date":"2026-11-24","author":"Codebuff","subject":"Record that GeoPeaks shipped without the browser suite"},
+  {"sha":"f76f4449","date":"2026-11-24","author":"Codebuff","subject":"Add GeoPeaks: ski twelve real summits traced from open elevation data"},
   {"sha":"4d74ac63","date":"2026-11-24","author":"bassdrum4","subject":"Record that main's CI was already red before the banner work"},
   {"sha":"67a95eed","date":"2026-11-24","author":"bassdrum4","subject":"Hold the announcement banner until the boot screen clears"},
   {"sha":"f6393cb2","date":"2026-11-24","author":"bassdrum4","subject":"Answer announcements in the banner instead of opening it"},
