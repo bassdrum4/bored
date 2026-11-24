@@ -142,7 +142,10 @@ async function matchStored(date: string, promptId: string, input: string): Promi
 // server still owns the timer, accepted answer, tier, score and run state.
 const STATIC_BASE = 'https://bassdrum4.github.io/bored/krillion-data/';
 async function staticJson(path: string, gzip = false) {
-  for (const base of [STATIC_BASE, 'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/']) {
+  const date=path.split('/')[0];
+  const archived='https://raw.githubusercontent.com/bassdrum4/bored/krillion-archive-'+date+'/';
+  const recent=Date.parse(etDate())-Date.parse(date)<=2*86400000;
+  for (const base of recent ? [STATIC_BASE, 'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/',archived] : [archived]) {
     try {
       const res = await fetch(base + path, { signal: AbortSignal.timeout(4000) });
       if (!res.ok || !res.body) continue;
@@ -153,9 +156,7 @@ async function staticJson(path: string, gzip = false) {
 }
 async function staticBook(date: string): Promise<Book | null> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  // Older, database-backed archive days should not cost an extra network hop.
-  const age = Date.parse(etDate()) - Date.parse(date);
-  if (age < 0 || age > 2 * 86400000) return null;
+  if (date > etDate()) return null;
   try {
     const b = await staticJson(date + '/manifest.json');
     if (b?.date !== date || b.staticAnswers !== true || !Number.isInteger(b.dayNumber) ||
@@ -412,6 +413,9 @@ async function loadBook(date: string): Promise<Loaded> {
           body:JSON.stringify([{date}])
         });
         await noted.body?.cancel().catch(()=>{});
+        // Metadata only: the archive refs contain the answer data. This also
+        // makes new static prompts eligible for practice dives.
+        await storeBook(snapshot);
       } catch {}
       const loaded = { book: snapshot, stale: false };
       books.set(date, {loaded,until:Date.now()+60*60_000});
