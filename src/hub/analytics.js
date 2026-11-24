@@ -34,6 +34,22 @@ export function runtimeErrorMetadata(data) {
   };
 }
 
+// A minimal frame-local signal works even in an opaque-origin sandbox. It never
+// reads storage, game state, credentials, text, or input values.
+export const ANALYTICS_FRAME_BRIDGE = `<script>
+(function () {
+  function send(type) { parent.postMessage({ type: type }, '*'); }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { send('bored:telemetry-ready'); }, { once: true });
+  } else send('bored:telemetry-ready');
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (name) {
+    document.addEventListener(name, function (event) {
+      if (event.isTrusted) send('bored:telemetry-input');
+    }, { passive: true, capture: true });
+  });
+})();
+</script>`;
+
 export const ANALYTICS_PREFERENCE = 'bored.analytics.enabled';
 export const VISITOR_KEY = 'bored.analytics.visitor';
 const QA_SESSION_KEY = 'bored.analytics.qa-session';
@@ -295,9 +311,9 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     emit('start');
     scheduleFlush();
   }
-  function ready(external = false) {
+  function ready(external = false, frameConfirmed = false) {
     if (!run) return;
-    if (!external && snapshot(run.game)?.slug !== run.game) return;
+    if (!external && !frameConfirmed && snapshot(run.game)?.slug !== run.game) return;
     if (run.ready) return;
     sample(); run.ready = true;
     emit('checkpoint', { loaded: true, load_ms: Math.round(now() - run.opened) });
@@ -392,6 +408,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   track('visit');
   return {
     start, end, ready, track,
+    frameInput() { if (run?.ready && !run.context.external) gameInput(); },
     visitorId: () => enabled ? visitor : null,
     isGameSuppressed: suppressGame,
     event(kind, details) {
