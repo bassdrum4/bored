@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
-<link rel="stylesheet" href="./styles.css?bored-build=20261122-getaway-host-loading-v3">
+<link rel="stylesheet" href="./styles.css?bored-build=20261124-bo-loading-v1">
 <link rel="stylesheet" href="./hub/paper-layout.css">
 <link rel="stylesheet" href="./hub/game-finder.css">
 <script>
@@ -26,6 +26,30 @@ try {
 </script>
 </head>
 <body>
+<div id="hub-loading" class="game-loading" role="status" aria-live="polite">
+  <div class="game-loading-content">
+    <div class="game-loading-top"><span class="game-loading-brand">Bored<span>.</span></span><span class="game-loading-kicker">THE ARCADE</span></div>
+    <svg class="bo game-loading-bo" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
+    <h2>Nothing to do.<br>Yet.</h2>
+    <p id="hub-loading-message" class="game-loading-message">Getting the games ready…</p>
+    <div class="game-loading-track is-indeterminate" aria-hidden="true"><span class="game-loading-fill"></span></div>
+    <small>No ads. No homework. Almost there.</small>
+    <button id="hub-loading-retry" class="action" type="button" hidden>Reload Bored</button>
+  </div>
+</div>
+<noscript><style>#hub-loading{display:none!important}</style><p>Bored needs JavaScript to load its games.</p></noscript>
+<script>
+  // The boot screen must also work when the module graph fails to load.
+  const bootLoading = document.getElementById('hub-loading');
+  const bootRetry = document.getElementById('hub-loading-retry');
+  bootRetry.addEventListener('click', () => location.reload());
+  setTimeout(() => {
+    if (bootLoading.hidden) return;
+    document.getElementById('hub-loading-message').textContent = 'Still waiting. If Bored is stuck, try reloading.';
+    bootLoading.querySelector('.game-loading-track').hidden = true;
+    bootRetry.hidden = false;
+  }, 8000);
+</script>
 
 <a class="skip-link" href="#library">Skip to the good stuff</a>
 <main id="hub">
@@ -341,19 +365,20 @@ try {
   <!-- Bored owns this loading view; Getaway Shootout's Unity document does not render it. -->
   <div id="getaway-loading" class="game-loading" role="status" aria-live="polite" hidden>
     <div class="game-loading-content">
-      <span class="game-loading-kicker">BORED / LOADING</span>
-      <h2>Getaway Shootout</h2>
-      <p id="getaway-loading-message">Preparing the getaway…</p>
+      <div class="game-loading-top"><span class="game-loading-brand">Bored<span>.</span></span><span class="game-loading-kicker">NOW LOADING</span></div>
+      <svg class="bo game-loading-bo" id="game-loading-bo" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
+      <h2 id="game-loading-title">Getaway Shootout</h2>
+      <p id="getaway-loading-message" class="game-loading-message">Preparing the getaway…</p>
       <div id="getaway-loading-track" class="game-loading-track" role="progressbar" aria-label="Game loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <span id="getaway-loading-fill" class="game-loading-fill"></span>
       </div>
       <p id="getaway-loading-percent" class="game-loading-percent">0%</p>
-      <small>Hang on to your hat. Press Esc to leave.</small>
+      <small>Bo is waiting too. Press Esc or use the game menu to leave.</small>
     </div>
   </div>
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; pointer-lock; clipboard-write; encrypted-media; picture-in-picture"></iframe>
 </div>
 <script type="module" src="./hub/watchdog.js"></script>
-<script type="module" src="./main.js?bored-build=20261122-game-finder-v1"></script>
+<script type="module" src="./main.js?bored-build=20261124-bo-loading-v1"></script>
 </body>
 </html>

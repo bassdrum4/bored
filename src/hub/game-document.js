@@ -12,9 +12,9 @@ function escapeHtml(value) {
 function frameStandIn(message, detail) {
   return '<!doctype html><html><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Game</title><style>' +
-    'html,body{height:100%}body{margin:0;display:grid;place-content:center;gap:6px;background:#fff;' +
-    'color:#111;text-align:center;padding:24px;font:14px/1.5 system-ui,-apple-system,sans-serif}' +
-    'p{margin:0;font-weight:600}span{color:#666}</style></head><body>' +
+    '*{box-sizing:border-box}html,body{min-height:100%;margin:0}body{min-height:100vh;display:grid;place-content:center;gap:12px;background:#f5f2ea;' +
+    'color:#191713;text-align:center;padding:28px;font:13px/1.5 ui-monospace,monospace}' +
+    'p{margin:0;font:700 clamp(24px,6vw,44px)/1.1 Georgia,serif;overflow-wrap:anywhere}span{color:#6b6558}</style></head><body>' +
     '<p>' + escapeHtml(message) + '</p><span>' + escapeHtml(detail) + '</span></body></html>';
 }
 
