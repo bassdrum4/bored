@@ -2391,14 +2391,18 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   const WIDE = ["c8a848", "e0c870", "3a5a8a", "7090b8", "a84838", "d07858", "6a4a8a", "9a78b8",
                 "707070", "a8a8a0", "d0d0c8", "c08890", "c87838", "4a8a88", "1c2440", "303030"];
   const CAM = [0, 1.78, 4.15];
+  // Items, buddies and Giratina are drawn on their own layer at twice the room's resolution, after the room's
+  // palette and dither, so they keep the sprites' real colours (the room's palette made Thunder Wave and Trick
+  // Room look alike). The room's depth is drawn first, so the table and rim still hide what they should.
+  const SHARP = 1, BUDDY_TINT = 0xd8d0c8;
   // Giratina's height, worked out from my eye at CAM: at z -10 the line over the far buddy's head is y 1.36
   // and the top of the screen y 4.94, so a 3.3 plane centred at 3.15 sits between them and never covers a buddy.
-  const GIRATINA_Y = 3.15;
+  const GIRATINA_Y = 3.3;
   // Item boxes: one 4x2 grid per seat, centred in front of that player in the seat's own frame (local x, z;
   // +z is toward the player). Boxes 0-3 are the row nearest the player, 4-7 the row toward the turntable.
   // Each seat's grid stays inside its own quarter of the table, so no two seats ever share a spot.
   const SLOT = k => [[-0.84, -0.28, 0.28, 0.84][k % 4], [1.86, 1.34][Math.floor(k / 4)]];
-  let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
+  let T = null, renderer, rt, rtPost, rtSharp, depthOnly, composite, compositeScene, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
   let redSpot, gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
   const spots = [], sides = {}, cache = {};
   const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0, atMe: 0, atMeGoal: 0 };
@@ -2677,7 +2681,8 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       s.items = [];
       for (let k = 0; k < 8; k++) {
         const [x, z] = SLOT(k);
-        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, fog: true }));
+        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, fog: false }));
+        sprite.layers.set(SHARP);
         const shadow = add(new T.PlaneGeometry(0.36, 0.2), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
         shadow.rotation.x = -Math.PI / 2;
         sprite.scale.set(0.44, 0.44, 1);
@@ -2694,10 +2699,11 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         box(0.9, 1.0, 0.08, chairMat, 0, 0.08, 0.38, chair);
         for (const x of [-0.4, 0.4]) box(0.06, 0.5, 0.06, chairMat, x, -0.7, -0.35, chair);
         // The buddy stands upright behind the charge box, feet below the rim, hinged at the feet so it can fall.
-        const size = pos === "top" ? 1.75 : 1.6;
+        const size = 1.6;
         const yaw = new T.Group(); yaw.position.set(0, -0.06, 2.95); yaw.rotation.y = facing(2.95); g.add(yaw);
         const fall = new T.Group(); yaw.add(fall);
-        const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, side: T.DoubleSide }), 0, size / 2, 0, fall);
+        const buddy = add(new T.PlaneGeometry(size, size), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, side: T.DoubleSide, fog: false, color: BUDDY_TINT }), 0, size / 2, 0, fall);
+        buddy.layers.set(SHARP);
         buddy.userData.pick = { kind: "seat", pos };
         Object.assign(s, { buddy, buddyKey: "", buddyFall: fall, buddyYaw: yaw, buddySize: size });
         // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
@@ -2717,6 +2723,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
 
     // My buddy, peeking up from the bottom-left corner of my view.
     myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, color: 0xd8c8b0, fog: false }));
+    myBuddy.layers.set(SHARP);
     myBuddy.position.set(-0.6, -0.32, -0.8);
     myBuddy.rotation.z = 0.12;
     cam.add(myBuddy);
@@ -2759,7 +2766,8 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
 
     // Giratina hosts from behind the far side, lit from below.
-    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false }), 0, 3.8, -10);
+    giratina = add(new T.PlaneGeometry(3.3, 3.3), new T.MeshBasicMaterial({ map: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false, color: 0xa89cb0 }), 0, 3.8, -10);
+    giratina.layers.set(SHARP);
     // Lit from below by the table's glow.
     const under = new T.PointLight(0x9a7aa8, 1.8, 7, 1); under.position.set(0, 1.0, -6.6); scene.add(under);
 
@@ -2792,14 +2800,6 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         "  vec2 px = floor(vUv * uRes);",
         "  vec4 src = texture2D(tScene, vUv);",
         "  vec3 c = src.rgb; float m = kind(src.a);",
-        // A rim around the Pokémon: cold purple for Giratina, warm for buddies.
-        "  if (m == 0.0) {",
-        "    vec2 o = 1.0 / uRes; float g = 0.0, b = 0.0;",
-        "    float n1 = kind(texture2D(tScene, vUv + vec2(o.x, 0.0)).a), n2 = kind(texture2D(tScene, vUv - vec2(o.x, 0.0)).a);",
-        "    float n3 = kind(texture2D(tScene, vUv + vec2(0.0, o.y)).a), n4 = kind(texture2D(tScene, vUv - vec2(0.0, o.y)).a);",
-        "    if (n1 == 1.0 || n2 == 1.0 || n3 == 1.0 || n4 == 1.0) c = mix(c, vec3(0.44, 0.38, 0.66), 0.8);",
-        "    else if (n1 == 2.0 || n2 == 2.0 || n3 == 2.0 || n4 == 2.0) c = mix(c, vec3(0.66, 0.5, 0.32), 0.6);",
-        "  }",
         "  c += uFlash * vec3(0.6, 0.5, 0.36);",
         "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
         "  c *= mix(m > 0.0 ? 0.25 : 0.03, 1.0, smoothstep(0.72, 0.2, d));",
@@ -2825,6 +2825,45 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       depthTest: false, depthWrite: false
     }));
     post.frustumCulled = false;
+    // Pass 2, at twice the resolution: the dithered room (scaled up, nearest) with the sharp layer on top.
+    const sharpGLSL = [
+        // The sharp layer, at twice the room's resolution, in its own colours: vignette, flashes and a light
+        // two-tone dither so it sits in the room, but no palette. A rim where it meets the room:
+        // cold purple round Giratina, warm round buddies.
+        "  vec2 hi = uRes * 2.0, hp2 = floor(vUv * hi);",
+        "  vec4 o = texture2D(tSharp, vUv);",
+        "  if (o.a > 0.1) {",
+        "    vec3 sc = o.rgb * mix(0.35, 1.0, smoothstep(0.78, 0.25, d));",
+        "    sc += uFlash * vec3(0.45, 0.38, 0.27);",
+        "    sc = mix(sc, vec3(0.42, 0.12, 0.09), uHit * 0.4);",
+        "    sc = mix(sc, vec3(0.36, 0.08, 0.06), uEdge * smoothstep(0.32, 0.7, d) * 0.7);",
+        "    sc *= bayer(hp2) > 0.5 ? 0.9 : 1.0;",
+        "    best = sc;",
+        "  } else {",
+        "    vec2 q = 1.0 / hi;",
+        "    float n1 = texture2D(tSharp, vUv + vec2(q.x, 0.0)).a, n2 = texture2D(tSharp, vUv - vec2(q.x, 0.0)).a;",
+        "    float n3 = texture2D(tSharp, vUv + vec2(0.0, q.y)).a, n4 = texture2D(tSharp, vUv - vec2(0.0, q.y)).a;",
+        "    float near = max(max(n1, n2), max(n3, n4));",
+        "    float lo = min(min(n1 > 0.1 ? n1 : 1.0, n2 > 0.1 ? n2 : 1.0), min(n3 > 0.1 ? n3 : 1.0, n4 > 0.1 ? n4 : 1.0));",
+        "    if (near > 0.1 && lo < 0.42) best = mix(best, vec3(0.44, 0.38, 0.66), 0.85);",
+        "    else if (near > 0.1 && lo < 0.67) best = mix(best, vec3(0.66, 0.5, 0.32), 0.6);",
+        "  }"
+    ].join("\n");
+    composite = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+      uniforms: { tRoom: { value: rtPost.texture }, tSharp: { value: rtSharp.texture }, uRes: post.material.uniforms.uRes,
+                  uFlash: post.material.uniforms.uFlash, uHit: post.material.uniforms.uHit, uEdge: post.material.uniforms.uEdge },
+      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      fragmentShader: [
+        "uniform sampler2D tRoom, tSharp; uniform vec2 uRes; uniform float uFlash, uHit, uEdge; varying vec2 vUv;",
+        "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
+        "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
+        "void main(){",
+        "  vec3 best = texture2D(tRoom, vUv).rgb;",
+        "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
+      ].join("\n") + "\n" + sharpGLSL + "\n  gl_FragColor = vec4(best, 1.0);\n}",
+      depthTest: false, depthWrite: false
+    }));
+    composite.frustumCulled = false;
   }
   let postScene, postCam;
 
@@ -2877,7 +2916,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const url = p ? buddyURL(name) : "";
         if (s.buddyKey !== url + "|" + name) {
           s.buddyKey = url + "|" + name;
-          s.buddy.material.map = s.buddy.material.emissiveMap = url ? imageTex(url, silhouette) : imageTex("", silhouette);
+          s.buddy.material.map = url ? imageTex(url, silhouette) : imageTex("", silhouette);
           s.buddy.material.needsUpdate = true;
         }
         s.out = !!(p && p.out);
@@ -3088,7 +3127,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       s.buddyFall.position.x = flinching ? (Math.random() - 0.5) * 0.1 : 0;
       b.position.y = s.buddySize / 2 + Math.sin(t * 2 + k * 1.7) * 0.03 * (1 - s.faint);
       if (flinching) b.material.color.setRGB(1.4, 0.45, 0.4);
-      else b.material.color.setScalar(hovered ? 1.35 : 1 - s.faint * 0.7);
+      else b.material.color.setHex(BUDDY_TINT).multiplyScalar(hovered ? 1.2 : 1 - s.faint * 0.65);
       k++;
     }
     myBuddy.position.y = -0.32 + Math.sin(t * 1.7) * 0.01;
@@ -3112,10 +3151,29 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     anim.hit = Math.max(0, anim.hit - dt * 2.5);
     if (anim.flash > 0) anim.flash--;
     if (anim.muzzle > 0) anim.muzzle--;
+    cam.layers.set(0);
     renderer.setRenderTarget(rt);
     renderer.render(scene, cam);
-    renderer.setRenderTarget(null);
+    // The sharp layer: the room's depth only (no colour), then the sprites against it.
+    const bg = scene.background;
+    scene.background = null; scene.overrideMaterial = depthOnly; dust.visible = false;
+    for (const f of fogs) f.mesh.visible = false;
+    renderer.setRenderTarget(rtSharp);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear();
+    renderer.autoClear = false;
+    renderer.render(scene, cam);
+    scene.overrideMaterial = null;
+    cam.layers.set(SHARP);
+    renderer.render(scene, cam);
+    renderer.autoClear = true;
+    cam.layers.set(0);
+    scene.background = bg; dust.visible = true;
+    for (const f of fogs) f.mesh.visible = true;
+    renderer.setRenderTarget(rtPost);
     renderer.render(postScene, postCam);
+    renderer.setRenderTarget(null);
+    renderer.render(compositeScene, postCam);
   }
 
   R3.start = async () => {
@@ -3125,12 +3183,17 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       const canvas = $("#mp-3d");
       renderer = new T.WebGLRenderer({ canvas, antialias: false, powerPreference: "low-power" });
       renderer.setPixelRatio(1);
-      renderer.setSize(W, H, false);
+      renderer.setSize(W * 2, H * 2, false);
       rt = new T.WebGLRenderTarget(W, H, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+      rtSharp = new T.WebGLRenderTarget(W * 2, H * 2, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+      rtPost = new T.WebGLRenderTarget(W, H, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, depthBuffer: false });
+      depthOnly = new T.MeshBasicMaterial({ colorWrite: false });
       build();
       postScene = new T.Scene(); postScene.add(post);
+      compositeScene = new T.Scene(); compositeScene.add(composite);
       postCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
       caster = ray(); mouse = new T.Vector2();
+      caster.layers.enableAll();
       canvas.addEventListener("pointermove", onMove);
       canvas.addEventListener("pointerleave", () => { mouseIn = false; hover = null; $("#tip").hidden = true; canvas.style.cursor = "default"; });
       canvas.addEventListener("pointerdown", onDown);
