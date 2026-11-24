@@ -242,14 +242,26 @@
   .board .n { text-align: right; font-family: var(--mono); font-size: 12px }
   .board th.n { font: inherit; font-size: 14px }
   .board .rank { width: 3ch; font-family: var(--mono); font-size: 12px }
-  .iv-medal { display: inline-block; vertical-align: -.14em; margin-left: 4px; overflow: visible }
-  .iv-medal-face { fill: var(--iv-medal) }
-  .iv-medal-rim { fill: none; stroke: var(--iv-medal-rim); stroke-width: 1.6 }
-  .iv-medal-ring { fill: none; stroke: var(--iv-medal-rim); stroke-width: 1.1; opacity: .8 }
-  .iv-medal-pip { fill: #fffdf4 }
-  .iv-medal-1 { --iv-medal: #c08a4e; --iv-medal-rim: #8a5a24 }
-  .iv-medal-2 { --iv-medal: #c2cbd6; --iv-medal-rim: #7d8794 }
-  .iv-medal-3 { --iv-medal: #e3b845; --iv-medal-rim: #9a6f14 }
+  /* The inviter's name treatment on the board: the name itself carries the tier. */
+  .inv-name { position: relative; display: inline-block; padding: 0 .04em .16em; line-height: 1.15 }
+  .inv-name-1 { font-weight: 600; padding-bottom: .2em;
+    background-image: linear-gradient(180deg,#f0c9a0,#d08a46 50%,#b9773a 85%,#e8b781);
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent }
+  .inv-name-1::after { content: ""; position: absolute; left: 0; right: 0; bottom: .02em; height: 1px; background: #e0b57e }
+  .inv-name-2 { font-style: italic; padding-bottom: .34em; background-repeat: no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 9' preserveAspectRatio='none'%3E%3Cpath d='M2 6.4C22 3.1 48 3.2 70 5.1c11 1 21 .9 27-1' fill='none' stroke='%23c8d1dd' stroke-width='1.3' stroke-linecap='round'/%3E%3Ccircle cx='97' cy='4.1' r='1.3' fill='%23c8d1dd'/%3E%3C/svg%3E");
+    background-position: 0 100%; background-size: 100% .34em }
+  .inv-name-3 { font-weight: 600; padding: 0 .44em .04em;
+    background-image: linear-gradient(180deg,#fff0b8,#f0c04a 38%,#e88a3a 70%,#e05a4a);
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent }
+  .inv-name-3::before, .inv-name-3::after { content: ""; position: absolute; bottom: .02em; width: .48em; height: .9em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Cpath d='M21 59 C 10 55 3 45 6 34 C 8 27 12 24 11 17 C 15 21 18 22 19 16 C 20 10 24 7 26 2 C 27 8 31 10 32 15 C 33 20 30 23 29 26 C 33 24 35 20 35 16 C 39 27 38 38 33 45 C 29 52 25 56 21 59 Z' fill='%23f0c04a'/%3E%3Cpath d='M21 54 C 14 50 11 43 13 36 C 15 31 18 29 17 23 C 21 28 24 31 25 36 C 26 42 24 49 21 54 Z' fill='%23e07a5f'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: center; background-size: contain;
+    animation: inv-name-flicker 3.4s ease-in-out infinite }
+  .inv-name-3::before { left: 0 }
+  .inv-name-3::after { right: 0; transform: scaleX(-1); animation-delay: 1.1s }
+  @keyframes inv-name-flicker { 0%, 100% { opacity: .84 } 50% { opacity: 1 } }
+  @media (prefers-reduced-motion: reduce) { .inv-name-3::before, .inv-name-3::after { animation: none } }
   .empty { margin-top: 10px; color: var(--dim); font-size: 14px }
 
   /* ── Multiplayer: the room panel, the room lobby, and the square table ── */
@@ -700,27 +712,17 @@
 {
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-// The inviter's medal, beside a name on the board. The hub sends the tier with
-// each row, so the sandboxed page never needs the account or the medal list.
+// The inviter's name treatment on the board. The hub sends the tier with each
+// row, so the sandboxed page never needs the account or the tier list.
 const INVITE_MEDALS = { 1: "Plus One", 2: "Enabler", 3: "Bad Influence" };
-function inviteMedal(tier) {
+function inviteName(text, tier) {
+  const span = el("span", "", String(text == null ? "" : text));
   const rank = Number(tier) || 0;
-  if (!(rank >= 1 && rank <= 3)) return null;
-  const NS = "http://www.w3.org/2000/svg";
-  const make = (tag, attrs) => {
-    const node = document.createElementNS(NS, tag);
-    for (const key in attrs) node.setAttribute(key, String(attrs[key]));
-    return node;
-  };
-  const svg = make("svg", {
-    viewBox: "0 0 24 24", width: 11 + rank, height: 11 + rank,
-    class: "iv-medal iv-medal-" + rank, role: "img", "aria-label": INVITE_MEDALS[rank], focusable: "false"
-  });
-  if (rank === 3) svg.appendChild(make("circle", { cx: 12, cy: 12, r: 10.4, class: "iv-medal-ring" }));
-  svg.appendChild(make("circle", { cx: 12, cy: 12, r: rank === 3 ? 7.4 : 8, class: "iv-medal-rim" }));
-  svg.appendChild(make("circle", { cx: 12, cy: 12, r: rank === 3 ? 6.1 : 6.7, class: "iv-medal-face" }));
-  if (rank >= 2) svg.appendChild(make("circle", { cx: 12, cy: 12, r: 2.2, class: "iv-medal-pip" }));
-  return svg;
+  if (rank >= 1 && rank <= 3) {
+    span.className = "inv-name inv-name-" + rank;
+    span.title = INVITE_MEDALS[rank];
+  }
+  return span;
 }
 const wait = ms => new Promise(done => setTimeout(done, ms));
 const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -1752,9 +1754,8 @@ function drawBoard(mode) {
     cells.forEach((text, k) => {
       const cell = row.insertCell();
       if (k === 1 && entry) {
-        cell.textContent = text;
-        const medal = inviteMedal(entry.tier);
-        if (medal) cell.appendChild(medal);
+        cell.textContent = "";
+        cell.appendChild(inviteName(text, entry.tier));
       } else cell.textContent = text;
       cell.className = k === 0 ? "rank" : k > 1 ? "n" : "";
     });

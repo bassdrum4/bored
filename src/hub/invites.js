@@ -1,9 +1,9 @@
 // Invites: one short code per account, a recruit credit once the person who
-// used it has opened a game on two different days, and the medal the inviter
-// wears beside their name everywhere the hub prints it.
+// used it has opened a game on two different days, and the name treatment the
+// inviter wears everywhere the hub prints their name.
 //
 // The day count is this browser's own record. It is deliberately trusted: a
-// forged count only ever inflates its own inviter's cosmetic medal, so there is
+// forged count only ever inflates its own inviter's cosmetic name, so there is
 // nothing on the server to protect by proving it.
 import { request, hasIdentity, getSession, ANON_TOKEN } from './backend.js';
 import { readStored, writeStored, removeStored } from './store.js';
@@ -28,31 +28,33 @@ export function tierName(tier) {
   return tier >= 3 ? 'Bad Influence' : tier === 2 ? 'Enabler' : tier === 1 ? 'Plus One' : '';
 }
 
-/* ── The medal itself ─────────────────────────────────────────────────────── */
+/* ── The name itself ──────────────────────────────────────────────────────── */
 
-const SVG = 'http://www.w3.org/2000/svg';
-function shape(tag, attrs) {
-  const node = document.createElementNS(SVG, tag);
-  for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, String(value));
-  return node;
-}
+// The name is the decoration: metal and a hairline for Plus One, an italic
+// swash for Enabler, ember and flames for Bad Influence. The drawing lives in
+// styles.css, so dark mode and reduced motion never touch this file.
+const TIER_CLASS = { 1: 'inv-name inv-name-1', 2: 'inv-name inv-name-2', 3: 'inv-name inv-name-3' };
 
-// A small rosette: a filled disc with a darker rim, a centre pip at Enabler,
-// and an outer ring at Bad Influence. Colours live in styles.css so dark mode
-// can brighten them without touching the drawing.
-export function medalMark(tier) {
-  if (!(tier >= 1 && tier <= 3)) return null;
-  const size = 11 + tier;
-  const svg = shape('svg', {
-    viewBox: '0 0 24 24', width: size, height: size,
-    class: 'bt-medal bt-medal-' + tier, role: 'img', 'aria-label': tierName(tier),
-    focusable: 'false'
-  });
-  if (tier === 3) svg.append(shape('circle', { cx: 12, cy: 12, r: 10.4, class: 'bt-medal-ring' }));
-  svg.append(shape('circle', { cx: 12, cy: 12, r: tier === 3 ? 7.4 : 8, class: 'bt-medal-rim' }));
-  svg.append(shape('circle', { cx: 12, cy: 12, r: tier === 3 ? 6.1 : 6.7, class: 'bt-medal-face' }));
-  if (tier >= 2) svg.append(shape('circle', { cx: 12, cy: 12, r: 2.2, class: 'bt-medal-pip' }));
-  return svg;
+function wrapName(parent, handle, tier) {
+  const name = String(handle || '').trim();
+  const doc = parent.ownerDocument;
+  if (!name || !doc) return null;
+  const wanted = name.toLowerCase();
+  const walker = doc.createTreeWalker(parent, NodeFilter.SHOW_TEXT);
+  let target = null, at = -1;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const index = node.nodeValue.toLowerCase().lastIndexOf(wanted);
+    if (index >= 0) { target = node; at = index; }
+  }
+  if (!target) return null;
+  const span = doc.createElement('span');
+  span.className = TIER_CLASS[tier];
+  span.title = tierName(tier);
+  span.textContent = target.nodeValue.slice(at, at + name.length);
+  const rest = target.splitText(at);
+  rest.nodeValue = rest.nodeValue.slice(name.length);
+  target.parentNode.insertBefore(span, rest);
+  return span;
 }
 
 let medalTiers = new Map();
@@ -69,13 +71,12 @@ export function medalLookup() {
   return Object.fromEntries(medalTiers);
 }
 
-/** Adds the inviter's medal to a name element, once. */
+/** Dresses the printed name itself in the inviter's tier, once. */
 export function addMedal(parent, handle) {
   const tier = medalFor(handle);
   if (!parent || !tier) return parent;
-  if (parent.querySelector?.(':scope > .bt-medal')) return parent;
-  const mark = medalMark(tier);
-  if (mark) parent.append(mark);
+  if (parent.querySelector?.('.inv-name')) return parent;
+  wrapName(parent, handle, tier);
   return parent;
 }
 
