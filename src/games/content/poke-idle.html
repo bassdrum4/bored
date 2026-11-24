@@ -126,6 +126,8 @@
   .mon .nm { width: 100%; text-align: center; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; overflow-wrap: anywhere }
   .mon.empty { border-style: dashed; background: none; cursor: default; min-height: 64px }
   .mon.empty:hover { border-color: var(--rule) }
+  .mon.ghost .pic img { opacity: .28; filter: grayscale(1) } .mon.ghost .nm { color: var(--dim) }
+  .ptag { color: var(--gold); font-weight: 700 } #title .head .ptag { margin-right: auto }
   .mon .eff { position: absolute; top: 2px; left: 3px; font-weight: 700 }
   .mon .star { position: absolute; top: 2px; right: 3px; color: var(--gold); font-weight: 700 }
   .mon.inparty { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink) }
@@ -321,7 +323,7 @@
 <main>
   <div class="tip syncask" id="syncask" role="alertdialog" aria-labelledby="syncask-h" hidden></div>
   <section id="title" hidden>
-    <div class="head"><h1 id="sign">Poké Idle</h1><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
+    <div class="head"><h1 id="sign">Poké Idle</h1><b class="ptag" id="t-prest" hidden></b><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
     <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
     <div class="t-grid">
       <div class="field" id="t-field"></div>
@@ -333,7 +335,7 @@
   <section id="pick" hidden>
     <div class="title">
       <h1>Pick your first partner</h1>
-      <p>Poké Idle. Your party fights on its own; you just help.</p>
+      <p id="pickline">Poké Idle. Your party fights on its own; you just help.</p>
       <div><button class="lbl" id="pickback" type="button">Back to title</button></div>
     </div>
     <div class="starters" id="starters"></div>
@@ -345,7 +347,7 @@
   </section>
 
   <div id="game" hidden>
-    <div id="top"><span class="row"><h1>Poké Idle</h1><button class="lbl" id="totitle" type="button">Title screen</button></span><span class="hud"><span>$<b id="money">0</b></span><span>Dex <b id="dexn">0</b>/1025</span><span>Badges <b id="badgen">0</b>/36</span><span>Lv cap <b id="capn">8</b></span></span></div>
+    <div id="top"><span class="row"><h1>Poké Idle</h1><button class="lbl" id="totitle" type="button">Title screen</button></span><span class="hud"><span class="ptag" id="hudp" hidden></span><span>$<b id="money">0</b></span><span>Dex <b id="dexn">0</b>/1025</span><span>Badges <b id="badgen">0</b>/36</span><span>Lv cap <b id="capn">8</b></span></span></div>
     <div id="tabs" role="tablist">
       <button class="on" data-tab="battle" type="button">Battle</button>
       <button data-tab="party" type="button">Party &amp; Box</button>
@@ -383,7 +385,7 @@
     </section>
 
     <section id="t-party" class="box" hidden>
-      <h2>Party</h2>
+      <h2>Party <span class="ptag small" id="partyp" hidden></span></h2>
       <div class="small muted" id="partyhint"></div>
       <div class="party" id="party"></div>
       <div class="small muted" id="teamline"></div>
@@ -569,8 +571,8 @@ const REGIONS = [
 const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUNGEON_SIZE = 8;
 // Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
 const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 5.3, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
-// Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it.
-const shinyOdds = () => (S.charm ? 3 : 1) / 4096;
+// Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it, and each prestige doubles it up to ×8 (see Prestige).
+const shinyOdds = () => (S.charm ? 3 : 1) * prestigeShiny() / 4096;
 const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
@@ -686,7 +688,7 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
 let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, prestige: 0, lifeDex: {}, lifeShiny: {}, last: Date.now() });
 let S = readSlot(slot);
 // Your save in your Bored account (see "Saves in your account" further down). openAt is the save's time as this page
 // found it, before anything here touched it.
@@ -1223,7 +1225,8 @@ const FINAL_P1 = [393, 394, 225, 991, 395].map(mon).concat([ICE_FACE_FOE, NOICE_
 const PROF_EMPOLEON = (({ cr, flags, gen }) => ({ id: "prof-empoleon", num: 395, kind: "mega", img: SPRITE_DIR + "prof-empoleon.png", name: "Prof Penguin's Mega Empoleon", types: ["Water", "Steel"],
   hp: 255, atk: 110, def: 170, spa: 130, spd: 170, spe: 50, bst: 885, cr, flags, gen, evos: [] }))(mon(395));
 TIER[PROF_EMPOLEON.id] = 0;
-const sideQuests = () => { const all = ACH.filter(a => a.group === "Side quests"); return [all.filter(a => S.ach[a.id] || a.have() >= a.need).length, all.length]; };
+// After a prestige the achievements stay but the Lab locks again: only this run's progress counts.
+const sideQuests = () => { const all = ACH.filter(a => a.group === "Side quests"); return [all.filter(a => (!S.prestige && S.ach[a.id]) || a.have() >= a.need).length, all.length]; };
 const finalOpen = () => { const [got, all] = sideQuests(); return got >= all; };
 // His real team against your party now: see above. Ties (a party that can't touch several of them) go to the
 // stronger one: lower tier, then higher stat total.
@@ -1271,7 +1274,7 @@ $("#finalbox").onclick = e => { if (e.target.closest("[data-final]")) finalGo();
 // Party changes wait for the end of a boss fight, but the break in Prof Penguin's showdown is free.
 const bossLocked = () => !!(B && B.kind !== "route" && !(B.kind === "final" && B.brk != null));
 function finalWin() {
-  const first = !S.beat, prize = rewardFor(B.L, B.i, 50); S.money += prize;
+  const first = !S.beat, prize = rewardFor(B.L, B.i, 50); S.money += prize; S.pbeat = 1;
   if (first) {
     S.beat = arcadeDay();
     const sp = SPECIALS[PROF_SP], had = S.box[sp.num];
@@ -1280,7 +1283,7 @@ function finalWin() {
     S.mail.got[PROF_LETTER] = 1;
     showCredits();
   }
-  toast(first ? `You beat Prof Penguin! +$${fmt(prize)}. His Mega Empoleon is yours, and he left you a letter in Mail.` : `Prof Penguin rematch won. +$${fmt(prize)}.`);
+  toast(first ? `You beat Prof Penguin! +$${fmt(prize)}. His Mega Empoleon is yours, and he left you a letter in Mail.` : `Prof Penguin rematch won. +$${fmt(prize)}.${S.prestige ? " You can prestige again from the title screen." : ""}`);
 }
 function showCredits() {
   const el = $("#credits");
@@ -1291,6 +1294,41 @@ function showCredits() {
   el.hidden = false; el.querySelector("[data-credits]").focus();
 }
 $("#credits").onclick = e => { if (e.target.closest("[data-credits]")) $("#credits").hidden = true; };
+// ── Prestige, after Prof Penguin: start the journey over from Kanto Route 1 with a new starter, for bonuses that last.
+// S.prestige counts them. XP is ×PRESTIGE_XP from Prestige 1 on; shinies are ×2 a prestige up to ×PRESTIGE_SHINY_MAX
+// (1/4096, 1/2048, 1/1024, 1/512), and the Shiny Charm's ×3 stacks on top once you win it again. One prestige per win
+// over Prof Penguin in that run (S.pbeat); a save that beat him before prestige came out has its first one ready.
+// What stays is PRESTIGE_KEEP (the lifetime dex and shinies among it), the Battle Tower best and SP editions, which come along
+// at the new level cap in their SP look. Saved teams stay as templates (see loadTeam). Everything else starts over.
+const PRESTIGE_XP = 2, PRESTIGE_SHINY_MAX = 8;
+const PRESTIGE_KEEP = ["ach", "mail", "stats", "beat", "teams", "set", "tut", "daily", "test", "owner", "touched", "prestige", "lifeDex", "lifeShiny"];
+const prestigeShiny = (p = S.prestige || 0) => Math.min(PRESTIGE_SHINY_MAX, 2 ** p);
+const prestigeXp = () => S.prestige ? PRESTIGE_XP : 1;
+const nextShiny = () => prestigeShiny((S.prestige || 0) + 1);
+const canPrestige = () => !!(S && !S.pick && (S.pbeat || (S.beat && !S.prestige)));
+const PRESTIGE_RESETS = ["your Box and party", "money", "balls, items, Linking Cords and Protein", "badges and Champions", "dungeons and side quests", "dungeon tickets",
+  "Mega Stones, Max Soup and Gigantamax forms", "the Shiny Charm", "region progress: routes, Zygarde Cells, Wishing Pieces and Plates", "Prof Penguin's Lab: beat him again to prestige again"];
+const PRESTIGE_STAYS = ["achievements", "Mail", "your Battle Tower best", "stats counters (wins, taps, evolutions)", "the day you beat the game", "saved teams, as templates: loading one fills in the members you have",
+  "your lifetime Pokédex, which is your leaderboard score", "every shiny line: the first one of a line you catch again comes out shiny", "special editions (SP), at the new level cap, in their SP look"];
+function prestigeCard() {
+  const p = (S.prestige || 0) + 1, odds = Math.round(4096 / nextShiny());
+  return `<h2>Prestige to P${p}?</h2><p class="small">You start a new journey from Kanto Route 1 with a new starter. For good: XP ×${PRESTIGE_XP} and shinies ×${nextShiny()} (1 in ${odds}${nextShiny() >= PRESTIGE_SHINY_MAX ? ", the most there is" : ""}), and the Shiny Charm's ×3 on top once you win it again.</p>
+    <p class="small"><b>Resets</b></p><ul class="small">${PRESTIGE_RESETS.map(t => `<li>${t}</li>`).join("")}</ul>
+    <p class="small"><b>Stays</b></p><ul class="small">${PRESTIGE_STAYS.map(t => `<li>${t}</li>`).join("")}</ul>
+    <div class="row"><button class="lbl danger" type="button" data-act="prestige">Prestige to P${p}</button><button class="lbl" type="button" data-act="keep">Not yet</button></div>`;
+}
+function prestige() {
+  if (!canPrestige()) return;
+  shineLines();
+  const old = S, next = fresh();
+  for (const k of PRESTIGE_KEEP) if (old[k] !== undefined) next[k] = old[k];
+  next.tower = { best: old.tower ? old.tower.best || 0 : 0, runs: old.tower ? old.tower.runs || 0 : 0 };
+  next.prestige = (old.prestige || 0) + 1; next.pick = 1;
+  S = next;
+  for (const [k, b] of Object.entries(old.box)) if (b.special && SPECIALS[b.special]) S.box[k] = { xp: Math.pow(levelCap(), 3), shiny: false, special: b.special, look: "special" };
+  B = null; viewR = 0; dexR = 0; detail = null; panel = "save";
+  save(); showPick();
+}
 function startLoc(loc) {
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
@@ -1577,8 +1615,8 @@ function backToRoute() {
   B = null; startLoc({ kind: "route", r, k }); renderAll();
 }
 function addMon(num, L, shiny, vid) {
-  const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num);
-  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny };
+  const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num), again = !had && !shiny && !lineWasShiny && lineRecorded(num);
+  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again };
   else if (shiny) shineOne(had);
   shineLines();
   const newForm = v ? unlockVar(num, vid, !had) : false;
@@ -1587,6 +1625,7 @@ function addMon(num, L, shiny, vid) {
   if (!had) msgs.push(`${(v || mon(num)).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
   else if (newForm) msgs.push(`${v.name}! It joins as a form of your ${mon(num).name}: pick it in its detail in Party & Box.`);
   // The shiny toast comes once per line: a second shiny of a line that already shines says nothing new.
+  if (again) msgs.push(`${(v || mon(num)).name} came out shiny: you had its line shiny before you prestiged.${familyOf(num).length > 1 ? " The whole line shines again." : ""}`);
   if (shiny && !lineWasShiny) msgs.push(`A shiny ${(v || mon(num)).name}!${familyOf(num).length > 1 ? " Its whole evolution line is shiny for you now." : ""} Party & Box can switch the look back.`);
   if (msgs.length) toast(msgs.join(" "));
   // Cosmog is a gift the first time you catch Solgaleo or Lunala; Cosmoem comes from evolving it.
@@ -1612,10 +1651,37 @@ function familyOf(n) {
 }
 const lineShiny = n => familyOf(n).some(m => S.box[m] && S.box[m].shiny);
 const shineOne = b => { if (b.shiny) return; b.shiny = true; if (!b.special) b.look = "shiny"; };
-function shineLines() { if (!S || !S.box) return; for (const k of Object.keys(S.box)) if (S.box[k].shiny) for (const m of familyOf(+k)) if (S.box[m]) shineOne(S.box[m]); }
+// Every shiny line is also recorded outside the save, in its own store (SHINY_KEY: { line: 1 }, keyed by the line's
+// lowest dex number), which Classic and the coming Story Mode share and a prestige never touches: the first one of a
+// recorded line you catch comes out shiny, and the rule above does the rest. Loading a save merges its shiny lines in.
+// The test account never writes to it. The store lives in this browser only (not in the account) for now.
+const SHINY_KEY = "bored.poke-idle.shinylines.v1";
+const lineKey = n => familyOf(n)[0];
+function readShinyLines() { try { const v = JSON.parse(localStorage.getItem(SHINY_KEY)); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } }
+const lineRecorded = n => !!readShinyLines()[lineKey(n)];
+function recordShinyLines() {
+  if (!S || !S.box || S.test || slot === TEST_KEY) return;
+  const store = readShinyLines(); let added = false;
+  for (const k of Object.keys(S.box)) if (S.box[k].shiny && !store[lineKey(+k)]) { store[lineKey(+k)] = 1; added = true; }
+  if (added) try { localStorage.setItem(SHINY_KEY, JSON.stringify(store)); } catch {}
+}
+// The lifetime dex: every species this save has ever had in its Box (S.lifeDex), and every one it has had shiny
+// (S.lifeShiny). A prestige keeps both, so the leaderboard score (their sum) never goes down.
+function recordLife() {
+  S.lifeDex = S.lifeDex || {}; S.lifeShiny = S.lifeShiny || {};
+  for (const [k, b] of Object.entries(S.box)) { S.lifeDex[k] = 1; if (b.shiny) S.lifeShiny[k] = 1; }
+}
+const lifeDex = () => Object.keys(S.lifeDex || {}).length, lifeShiny = () => Object.keys(S.lifeShiny || {}).length;
+const boardScore = () => lifeDex() + lifeShiny();
+function shineLines() {
+  if (!S || !S.box) return;
+  for (const k of Object.keys(S.box)) if (S.box[k].shiny) for (const m of familyOf(+k)) if (S.box[m]) shineOne(S.box[m]);
+  recordShinyLines(); recordLife();
+}
 function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSMOG]) return false; S.box[COSMOG] = { xp: Math.pow(levelCap(), 3), shiny: false }; return true; }
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
 function gainXp(xp) {
+  xp *= prestigeXp();
   const top = Math.pow(levelCap(), 3), lead = Math.min(top, Math.max(0, ...S.party.map(n => S.box[n].xp))), leadL = Math.max(0, ...S.party.map(n => level(n)));
   for (const n of S.party.slice()) {
     const b = S.box[n], before = level(n), mult = Math.min(CATCH_MAX, Math.pow(2, Math.max(0, leadL - before) / CATCH_UP));
@@ -1754,6 +1820,7 @@ function renderAll() { renderTop(); renderLocs(); renderMinis(); if (tab === "pa
 function renderTop() {
   $("#top h1").textContent = S && S.test ? "Poké Idle (test)" : "Poké Idle";
   $("#mailn").textContent = unreadMail() || "";
+  $("#hudp").hidden = !S.prestige; $("#hudp").textContent = S.prestige ? "P" + S.prestige : ""; $("#hudp").title = S.prestige ? "Prestige " + S.prestige : "";
   $("#dexn").textContent = Object.keys(S.box).length;
   $("#badgen").textContent = Object.keys(S.badges).length;
   $("#capn").textContent = levelCap();
@@ -1764,7 +1831,7 @@ function renderLocs() {
     + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Prof Penguin's Lab sits at the top of every list.
-  items.push({ kind: "final", r: FINAL_R, note: S.beat ? `graduated ${S.beat}` : finalOpen() ? "2 phases, no ticket" : `${sqGot}/${sqAll} side quests`, done: !!S.beat });
+  items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
   // Today's boss, the same for every player, under the Lab in every list.
   { const m = dailyBoss(); items.push({ kind: "daily", r: frontier(), types: m.types, note: dailyWon() ? "beaten today" : `${m.name} · Lv ${levelCap()}`, done: dailyWon() }); }
   if (r === TRAIN_R) TRAIN_TYPES.forEach((t, k) => items.push({ kind: "route", r, k, train: t, note: `Lv ${levelCap()} · ×${TRAIN_XP} XP` }));
@@ -1802,7 +1869,8 @@ function monTile(n, opts = {}) {
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
   const foe = B && B.foe ? B.foe.m : null;
-  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
+  const gh = ghosts();
+  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true, form: true }) : ghostTile(gh[i - S.party.length])).join("");
 }
 // Box search: part of a name (the species', or a regional or quest form you have, so "galarian" finds your Galarian
 // forms) or a Dex number ("25" or "#025").
@@ -1832,16 +1900,20 @@ function saveTeam() {
   if (i >= 0) T[i] = team; else if (T.length >= TEAM_SLOTS) { toast(`You have ${TEAM_SLOTS} teams. Delete one to save another.`); return; } else T.push(team);
   save(); renderParty(); toast(i >= 0 ? `${name} updated.` : `Saved your party as ${name}.`);
 }
+// A saved team is a template: loading it fills in the members you own, and the rest show as faded empty slots until
+// you have them (after a prestige, most of a team starts out that way). S.tmpl is the last team loaded.
+const ghosts = () => (S.tmpl || []).filter(n => !S.box[n]).slice(0, Math.max(0, 6 - S.party.length));
+const ghostTile = n => n ? `<div class="mon empty ghost" title="${esc(mon(n).name)}: not in your Box yet" aria-label="${esc(mon(n).name)}, not in your Box yet"><span class="pic"><img class="spr" src="${sprite(n)}" alt="" loading="lazy"></span><span class="nm">${esc(mon(n).name)}</span><span>not caught</span></div>` : '<div class="mon empty" aria-hidden="true"></div>';
 function loadTeam(i) {
   if (bossLocked()) { toast("Switch teams between battles."); return; }
   const t = (S.teams || [])[i]; if (!t) return;
-  const party = t.party.filter(n => S.box[n]).slice(0, 6);
-  if (!party.length) { toast(`None of ${t.name} is in your Box anymore.`); return; }
+  const party = t.party.filter(n => S.box[n]).slice(0, 6), missing = t.party.length - party.length;
+  if (!party.length) { toast(`None of ${t.name} is in your Box yet.`); return; }
   for (const n of S.party) if (!party.includes(n)) dropForm(n);
-  S.party = party;
+  S.party = party; S.tmpl = t.party.slice(0, 6);
   if (t.mega && party.includes(t.mega.n) && S.key && S.stones[t.mega.f]) S.mega = { ...t.mega };
   if (t.gmax && party.includes(t.gmax) && S.band && S.gfactor[t.gmax]) S.gmax = t.gmax;
-  save(); renderAll(); toast(`${t.name} is your party now.`);
+  save(); renderAll(); toast(`${t.name} is your party now.${missing ? ` ${missing} of it ${missing > 1 ? "aren't" : "isn't"} in your Box yet: ${missing > 1 ? "they show" : "it shows"} as faded slots.` : ""}`);
 }
 const PARTY_HINT = "Drag to rearrange your party, drag a Box Pokémon onto a slot to swap it in, or drag one down to the Box. On a phone, hold it first. Tap any Pokémon for its details; EVOLVE means it can evolve now.";
 function renderParty() {
@@ -1854,7 +1926,9 @@ function renderParty() {
   const avgBulk = avg(n => bulkFor(fighter(n))), lvBulk = avg(n => bulkFor(fighter(n)) * underCap(battleLevel(n)) ** 2), under = Math.round(lvBulk) < Math.round(avgBulk);
   renderTeams();
   $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(lvBulk)}</b> on average${under ? ` at their levels (base ${Math.round(avgBulk)}; below the cap each counts × (level ÷ cap)²)` : ""}, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
-  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
+  const gh = ghosts();
+  $("#partyp").hidden = !S.prestige; $("#partyp").textContent = S.prestige ? "P" + S.prestige : ""; $("#partyp").title = S.prestige ? "Prestige " + S.prestige : "";
+  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : ghostTile(gh[i - S.party.length])).join("");
   // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
   const evoRank = n => { const o = evoOptions(n); return o.some(e => canEvolve(n, e)) ? 0 : o.length ? 1 : 2; };
   // Up to two types: a Pokémon has to have both (Water + Flying), in the form it's in.
@@ -2097,6 +2171,13 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "update-2026-11-24a", date: "Nov 24, 2026", from: "Prof Penguin", title: "Prestige",
+    body: `<ul><li>Beaten me? Then you can <b>prestige</b>: the Prestige button is on the title screen's save card, and it shows exactly what resets and what stays before you choose.</li>
+      <li>You start again from Kanto Route 1 with a new starter. For good: XP ×2, and shinies ×2 a prestige, up to ×8 (1 in 512). The Shiny Charm's ×3 stacks on top once you win it again.</li>
+      <li>Achievements, Mail, your Battle Tower best, your stats, saved teams and special editions stay. Every shiny line you've had is remembered: the first one of it you catch again comes out shiny.</li>
+      <li>Saved teams become templates: loading one fills in who you have, and shows the rest as faded slots.</li>
+      <li>Your leaderboard score is now your lifetime Pokédex: every species your save has ever had, plus every one it's had shiny. A prestige keeps it, so it never goes down.</li>
+      <li>One prestige per win over me, so the Lab is waiting. The Wiki's Prestige page has the details.</li></ul>` },
   { id: "update-2026-11-17a", date: "Nov 17, 2026", from: "Prof Penguin", title: "A shiny counts for its whole line",
     body: `<ul><li>Catch a shiny of any stage and its whole evolution line is shiny for you: a shiny Dreepy makes your Drakloak and Dragapult shiny, and any you get later come out shiny too. Branches count, so one shiny Eevee covers all of its evolutions.</li>
       <li>Your shinies from before count the same way: any line with a shiny in it is shiny all through now.</li>
@@ -2341,6 +2422,13 @@ function wikiSections() {
       <p><b>The break</b>: then your party is free for ${FINAL_BREAK}s. Load a saved team in Party & Box, or press Start phase 2.</p>
       <p><b>Phase 2</b>: his real team, picked against the party you bring when the break ends. Giratina in its Origin Forme leads, unless 3 or more of your party hit it 2× or harder. Then Tier 1 to 3 Pokémon your party hurts least (one Mega and one Gigantamax at most; his Arceus takes whichever Plate suits him), and last his own Mega Empoleon (Water/Steel, Tier 0, HP ${PROF_EMPOLEON.hp}, Def and Sp. Def ${PROF_EMPOLEON.def}). It's set so the best six of every tier, counting every matchup as even, only just win: cover many types so he can't counter all of you.</p>
       <p>Win the first time for his Mega Empoleon, a special edition (SP) of Empoleon: Water/Steel, Tier 1, total ${SPECIALS[PROF_SP].bst}. It's a permanent Mega: no Mega Stone, and it doesn't take your Mega slot. He also leaves you a letter, and the title screen remembers the day you beat the game.</p>` },
+    { id: "prestige", group: "Side quests", title: "Prestige", html: `<p>Once you've beaten Prof Penguin, the title screen's save card has a Prestige button. It asks first, with the list below. Prestige starts your journey over from Kanto Route 1 with a new starter, for bonuses that last. One prestige for each win over Prof Penguin, so beat him again to go again.</p>
+      <p><b>Bonuses</b>: XP ×${PRESTIGE_XP} from Prestige 1 on. Shinies ×2 a prestige, up to ×${PRESTIGE_SHINY_MAX}: 1 in 4096, then ${[1, 2, 3].map(p => "1 in " + 4096 / prestigeShiny(p)).join(", ")}. The Shiny Charm's ×3 stacks on top once you win it again: at P3, 3 in 512. Your prestige shows as P1, P2 ... on the title screen, its save card and the Party header.</p>
+      <p><b>Resets</b>: ${PRESTIGE_RESETS.join("; ")}.</p>
+      <p><b>Stays</b>: ${PRESTIGE_STAYS.join("; ")}.</p>
+      <p><b>Shiny lines</b>: every line you've had shiny is remembered in this browser, outside your save. After a prestige, the first member of one you catch again comes out shiny, and then the usual rule makes the whole line shiny (see Shinies).</p>
+      <p><b>Saved teams</b> become templates: loading one puts in the members you have, and the rest show as faded slots until you catch them.</p>
+      <p><b>Leaderboard</b>: your score is your lifetime Pokédex, every species this save has ever had plus every one it's had shiny, so a prestige never lowers it. The Classic board can then rank by prestige first, then lifetime Pokédex.</p>` },
     { id: "terminus", group: "Side quests", title: "Terminus Cave (Zygarde)", html: `<p>Zygarde's Last Stand, as at the end of Legends: Z-A. Once every Champion is beaten, Zygarde is in your Box and all 100 Zygarde Cells are in, Terminus Cave opens in Kalos's list. Zygarde fights in three Formes, 10%, 50% and Complete, at your level cap. Mega Zygarde is Tier 1, so it's set against Tier 2 and weaker (see Tiers). They're all Dragon and Ground, so Ice hits them four times over.</p><p>Win it once for the Zygardite. Like in Z-A, Zygarde only Mega Evolves from its Complete Forme: pick 100% in its detail, then Mega Evolve. Dungeons and the Shop never give its stone.</p>` },
     { id: "meteor", group: "Side quests", title: "Meteor Falls (Deoxys)", html: `<p>Once Hoenn's Champion is beaten and Deoxys is in your Box (from the Hoenn dungeon), Meteor Falls opens in Hoenn's list: Deoxys in its Attack, Defense and Speed Formes, back to back, at your level cap. The Formes are Tier 3, so it's set against Tier 4 and weaker (see Tiers). Win, and your Deoxys can take any of its four Formes, picked in its detail. All three are Tier 3, and none is simply better: Attack hits hardest but its bulk is ${Math.round(bulkOf(QFORMES[386][0]))}, Defense is a wall (bulk ${Math.round(bulkOf(QFORMES[386][1]))}) that hardly hits, Speed sits between.</p>` },
     { id: "weald", group: "Side quests", title: "Slumbering Weald (Zacian, Zamazenta)", html: `<p>Once every Champion is beaten and Zacian or Zamazenta is in your Box (from the Galar dungeon), the Slumbering Weald opens in Galar's list: Zacian, then Zamazenta, at your level cap. The Crowned forms are Tier 2, so it's set against Tier 3 and weaker (see Tiers). Win the Rusted Sword and Shield: Zacian can take its Crowned Sword form (Fairy/Steel, Attack 150, Speed 148) and Zamazenta its Crowned Shield (Fighting/Steel, Defense and Sp. Def 140), both Tier 2, picked in their details. Both start in their usual Hero form.</p>` },
@@ -2351,8 +2439,8 @@ function wikiSections() {
     { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone, and each region's dungeon drops its own generation's: Kanto's Gen 1 (Charizard, Gengar, Gyarados...), Johto's Gen 2, and so on to Paldea. ${pct(STONE_DROP)} of clears drop one, and only for a Pokémon you own: one in your party if it can, else one in your Box. The Ultra Wormhole and Area Zero count as Alola's and Paldea's. Stones per dungeon: ${REGIONS.map((R, r) => `${R.name} ${FORMS.filter(f => f.kind === "mega" && !f.quest && f.gen === r + 1).length}`).join(", ")}.</p><p>Out of luck? The Shop sells a random Mega Stone for a Pokémon you own for $${fmt(STONE_PRICE)}. The stones for Mega Rayquaza, Mega Mewtwo X and Y and Mega Zygarde only come from side quests (the Sky Pillar, Cerulean Cave and Terminus Cave), and Zygarde only Mega Evolves from its Complete Forme. Latiasite and Latiosite come from the Southern Island. The Tier 3 Megas' stones (${FORMS.filter(f => f.kind === "mega" && !f.quest && tierOf(f) === 3).map(f => f.name.replace("Mega ", "")).join(", ")}) only drop from their dungeon once its Tier 3s are out, and the Shop's random stone never gives them.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
     { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${raidSpecies().length} species with a Gigantamax form then needs its Gigantamax factor, won in Galar's <b>Max Raid Den</b> (Urshifu's comes from the Towers of Two Fists and Melmetal's from the Mystery Box instead): one Gigantamax Pokémon you can see before you go in, a Galar dungeon ticket a try, and as tough as a Champion (the strongest team for it you could have at the cap, with a modest Protein, only just wins). The den holds a species you don't have yet: one in your party if it can, else one in your Box, else any. Win and it can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it waits for you. Out of luck? The Shop sells random Max Soup for a species you own for $${fmt(SOUP_PRICE)}.</p><p>One Gigantamax Pokémon at a time, always on. Like a Mega, it fights with stats of its own, a Mega's worth on top of its usual ones (the average Mega's change): +${GMAX_STATS.main} to its better attacking stat, +${GMAX_STATS.off} to the other, +${GMAX_STATS.def} Def and Sp. Def, +${GMAX_STATS.spe} Speed. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
     { id: "regional", group: "Collection", title: "Regional forms", html: `<p>${VARIANTS.length} regional forms live in their own regions: Alolan in Alola, Galarian in Galar, Paldean in Paldea, and Hisuian in Sinnoh, which was Hisui long ago. They turn up on that region's routes like any wild Pokémon; Galarian Articuno, Zapdos and Moltres are among the Galar dungeon's legendaries.</p><p>A form belongs to its species, so catching an Alolan Rattata gives you Rattata (if you didn't have it) with its Alolan form, and picking the form in the detail keeps its level. Evolving the usual Pokémon inside a regional form's region gives that form, Pikachu into Alolan Raichu in Alola for one, and each form evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone. Forms aren't Pokédex entries, so they don't change your leaderboard score. Pokédex → Forms shows which you have.</p>` },
-    { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. Shinies go by evolution line: once you have a shiny of any stage, every member of its line you have is shiny, branches included (all of Eevee's), and any you get later comes out shiny too. A look you picked stays: an SP edition stays SP. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
-    { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
+    { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm, and each prestige doubles that, up to ×${PRESTIGE_SHINY_MAX} (see Prestige). Shinies go by evolution line: once you have a shiny of any stage, every member of its line you have is shiny, branches included (all of Eevee's), and any you get later comes out shiny too. A look you picked stays: an SP edition stays SP. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
+    { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>Your lifetime Pokédex: one point for every species this save has ever had and one more for each one it's ever had shiny, up to 2050. A prestige keeps it, so it never goes down. It posts to the arcade board when you're signed in.</p>` },
     { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
     { id: "mail", group: "Collection", title: "Mail", html: `<p>Update notes and gifts arrive in the Mail tab; the tab and the title screen show how many are new. Each gift can be claimed once per save, between battles.</p>` },
     { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Signed in on Bored, it also goes to your Bored account: at most once a minute while you play, and whenever you leave or switch tabs. Open Poké Idle on another device and it picks up where you left off. If two devices both played since they last met (two tabs at once, or one offline), you choose which save to keep. The test account never leaves the device.</p><p>Without an account, Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases your save (in your account too, when you're signed in), so copy the code first if you might want it back.</p>` }
@@ -2801,6 +2889,7 @@ function migrateSave() {
   if (!S.cosmog && (S.box[791] || S.box[792])) giftCosmog();
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
   if (S.champs[BAND_FROM]) S.band = 1;
+  S.prestige = S.prestige || 0; recordLife();
 }
 
 // ── Screens: title (the landing page), pick (a new save's starter), game.
@@ -2816,9 +2905,11 @@ function boot() {
 function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
 function showPick() {
   show("pick");
+  $("#pickline").textContent = S && S.pick ? `Prestige ${S.prestige}: a new journey. XP ×${PRESTIGE_XP} for good, shinies ×${prestigeShiny()}${S.charm ? "" : " (×" + 3 * prestigeShiny() + " once you win the Shiny Charm again)"}.` : "Poké Idle. Your party fights on its own; you just help.";
   $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img class="spr" data-ref="42" src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
 }
 function enter(t) {
+  if (S && S.pick) return showPick();
   show("game");
   if (!B) {
     for (const id of ["fresh", "dupe", "shiny"]) $("#s-" + id).value = S.set[id];
@@ -2896,6 +2987,7 @@ function renderTitle() {
   const items = MENU[S ? "save" : "fresh"].concat(slot === TEST_KEY ? [["back", "Back to my save"]] : []);
   $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
+  $("#t-prest").hidden = !(S && S.prestige); $("#t-prest").textContent = S && S.prestige ? "P" + S.prestige : ""; $("#t-prest").title = S && S.prestige ? "Prestige " + S.prestige : "";
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
     `<button type="button" data-go="${id}"${i === cur ? ' class="cur"' : ""}${id === panel ? ' aria-pressed="true"' : ""}>${label}${id === "mail" && unreadMail() ? ` <span class="bad">(${unreadMail()} new)</span>` : ""}</button>`).join("");
   $("#t-field").innerHTML = S && S.party.length ? leadField() : `<div class="fieldhead"><b>Three partners are waiting</b><span class="muted">pick one in New game</span></div><div class="t-stage"><span class="ground"></span><span class="trio">${[1, 4, 7].map(n => `<img class="spr" data-ref="48" src="${sprite(n)}" alt="${mon(n).name}">`).join("")}</span></div>`;
@@ -2903,6 +2995,7 @@ function renderTitle() {
   if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
   else if (panel === "load") card.innerHTML = `<h2>Load a save code</h2><p class="small muted">On your other device, open Settings and use "Show my save code", then paste the code here.</p><textarea id="t-code" aria-label="Save code" spellcheck="false"></textarea><div class="row"><button class="lbl" type="button" data-act="load">Load save</button></div><div class="small bad" id="t-msg" role="status"></div>`;
   else if (panel === "new") card.innerHTML = `<h2>Start a new game?</h2><p class="small">This erases your save${syncOn() ? " on this device and in your Bored account" : " on this device"}: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
+  else if (panel === "prestige" && canPrestige()) card.innerHTML = prestigeCard();
   else card.innerHTML = saveCard();
 }
 function leadField() {
@@ -2912,11 +3005,14 @@ function leadField() {
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
+    ...(S.prestige || S.beat ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "") +
-    `<p class="small muted" id="t-sync" role="status">${esc(syncText())}</p>`;
+    `<p class="small muted" id="t-sync" role="status">${esc(syncText())}</p>` +
+    (canPrestige() ? `<div class="row"><button class="lbl" type="button" data-act="prestige-ask">Prestige</button><span class="small muted">Start over for good: XP ×${PRESTIGE_XP}, shinies ×${nextShiny()}</span></div>`
+      : S.beat && !S.pick ? `<p class="small muted">Beat Prof Penguin again to prestige once more.</p>` : "");
 }
 function go(id) {
   if (id === "continue") return enter("battle");
@@ -2942,10 +3038,21 @@ $("#t-card").onclick = e => {
   const a = e.target.closest("[data-act]"); if (!a) return;
   if (a.dataset.act === "erase") eraseSave();
   else if (a.dataset.act === "keep") { panel = "save"; renderTitle(); }
+  else if (a.dataset.act === "prestige-ask") { panel = "prestige"; renderTitle(); }
+  else if (a.dataset.act === "prestige") prestige();
   else if (a.dataset.act === "load") { if (loadCode($("#t-code").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); } else $("#t-msg").textContent = BAD_CODE; }
 };
 $("#pickback").onclick = showTitle;
-$("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; B = null; enter("battle"); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
+// A new game, or the first partner of a new journey after a prestige (S.pick): the SP editions that came along join after it.
+$("#starters").onclick = e => {
+  const b = e.target.closest("[data-start]"); if (!b) return;
+  const n = +b.dataset.start, again = !!(S && S.pick);
+  if (!again) S = fresh();
+  if (!S.box[n]) S.box[n] = { xp: 125, shiny: false };
+  S.party = [n];
+  if (again) { delete S.pick; for (const k of Object.keys(S.box).map(Number)) if (k !== n && S.box[k].special && joinsParty()) joinParty(k); }
+  B = null; enter("battle"); toast(`${mon(n).name} is your partner. Tap the wild Pokémon to help it fight.`);
+};
 // ── Saves in your account. Signed in on Bored, the save also lives in your Bored account, so any device can carry on
 // where another left off. The game has no network and no credentials: it asks the hub's saves bridge
 // (window.__boredSaves), which only exists inside Bored's player. Standalone, or signed out, none of this runs and the
@@ -3138,11 +3245,16 @@ syncBoot();
 // score is the board's number: one point per Pokédex entry and one more for each one you have shiny.
 // tower is the Battle Tower board's: the highest floor cleared.
 // boss is today's daily boss: { date, won }, for the arcade's once-a-day reward.
+// score is the lifetime Pokédex (lifeDex, every species this save has ever had) plus the lifetime shinies, so a prestige
+// never lowers it. prestige is how many times this save has prestiged; ranked is the Classic board's order, prestige
+// first, then lifetime dex (lifeDex is at most 1025, so prestige × 2051 + lifeDex keeps prestige first). The hub
+// doesn't read ranked or lifeDex yet.
 window.__boredSnapshot = () => {
   const day = bossDay().date, boss = { date: day, won: !!(S && S.daily && S.daily.date === day && S.daily.won) };
-  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, badges: 0, tower: 0, boss: { date: day, won: false }, finished: false };
-  const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0;
-  return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, boss, finished: !!S };
+  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, lifeDex: 0, badges: 0, tower: 0, prestige: 0, ranked: 0, boss: { date: day, won: false }, finished: false };
+  if (S) recordLife();
+  const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0, prestige = S ? S.prestige || 0 : 0, life = S ? lifeDex() : 0;
+  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S };
 };
 </script>
 </body>

@@ -123,3 +123,77 @@ test('the Dex opens on a real region from the Training area', async t => {
   assert.ok(shown.sum.length > 0, 'the summary still renders');
   assert.deepEqual(errors, []);
 });
+
+// Prestige: after Prof Penguin, start over for XP ×2 and shinies ×2 a prestige (up to ×8). What stays and what resets
+// is exactly the confirm screen's list; shiny lines, SP editions and saved teams (as templates) carry over.
+test('prestige resets the journey, keeps what it promises, and pays its bonuses', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(() => {
+    S = fresh();
+    for (let r = 0; r < REGIONS.length; r++) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; S.champs[r] = 1; }
+    S.box[4] = { xp: 1e6, shiny: true }; S.box[5] = { xp: 1e6, shiny: true }; S.box[25] = { xp: 1e6, shiny: false };
+    S.box[395] = { xp: 1e6, shiny: false, special: 'prof-empoleon', look: 'special' };
+    S.party = [5, 25, 395]; S.money = 5e6; S.charm = 1; S.key = 1; S.stones[10034] = 1; S.won.origin = 1; S.protein = 20;
+    S.teams = [{ name: 'Old', party: [5, 25, 395], mega: null, gmax: 0 }]; S.tower = { best: 12, runs: 3 };
+    S.stats.wins = 500; S.ach.dex10 = 1; S.beat = '2026-11-20'; S.mail.read['update-2026-11-24a'] = 1;
+    save(); showTitle();
+  });
+  // The stats card offers it, and the confirm screen lists what resets and what stays.
+  assert.ok(await tab.evaluate(() => canPrestige()), 'a save that beat Prof Penguin can prestige');
+  await tab.click('[data-act="prestige-ask"]');
+  const card = await tab.$eval('#t-card', n => n.textContent);
+  for (const s of ['Resets', 'Stays', 'the Shiny Charm', 'Mega Stones', 'saved teams, as templates', 'your Battle Tower best', 'special editions (SP)']) assert.ok(card.includes(s), `the confirm screen lists ${s}`);
+  await tab.click('[data-act="prestige"]');
+  const after = await tab.evaluate(() => ({ pick: !document.querySelector('#pick').hidden, p: S.prestige, box: Object.keys(S.box), sp: S.box[395], cap: levelCap(), money: S.money, charm: !!S.charm,
+    stones: Object.keys(S.stones).length, won: Object.keys(S.won).length, badges: Object.keys(S.badges).length, tower: S.tower.best, wins: S.stats.wins, ach: !!S.ach.dex10, beat: S.beat,
+    teams: S.teams.length, lines: !!JSON.parse(localStorage.getItem('bored.poke-idle.shinylines.v1'))[4], life: lifeDex(), score: window.__boredSnapshot().score, read: !!S.mail.read['update-2026-11-24a'], again: canPrestige(), lab: finalOpen() }));
+  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special' }, cap: after.cap, money: 0, charm: false,
+    stones: 0, won: 0, badges: 0, tower: 12, wins: 500, ach: true, beat: '2026-11-20', teams: 1, lines: true, life: 4, score: 6, read: true, again: false, lab: false });
+  // A new starter, then the SP edition joins it; P1 shows on the HUD and the party header.
+  await tab.click('[data-start="1"]');
+  const start = await tab.evaluate(() => ({ party: S.party.slice(), pick: !!S.pick, hud: document.querySelector('#hudp').textContent, odds: shinyOdds() * 4096 }));
+  assert.deepEqual(start, { party: [1, 395], pick: false, hud: 'P1', odds: 2 });
+  // XP ×2: the same win gives twice the XP it would without a prestige.
+  const xp = await tab.evaluate(() => { const b = S.box[1]; b.xp = 1000; gainXp(10); const one = b.xp - 1000; S.prestige = 0; b.xp = 1000; gainXp(10); const zero = b.xp - 1000; S.prestige = 1; return { one, zero }; });
+  assert.equal(xp.one, xp.zero * 2);
+  // Shiny odds: ×2 a prestige, capped at ×8, and the Shiny Charm's ×3 on top.
+  assert.deepEqual(await tab.evaluate(() => [0, 1, 2, 3, 4].map(p => { S.prestige = p; const o = 1 / shinyOdds(); S.charm = 1; const c = shinyOdds() * 4096; S.charm = 0; return [o, c]; })),
+    [[4096, 3], [2048, 6], [1024, 12], [512, 24], [512, 24]]);
+  await tab.evaluate(() => { S.prestige = 1; });
+  // The first Charmander-line catch comes out shiny (the line was recorded), and the line rule follows.
+  const shiny = await tab.evaluate(() => { addMon(4, 5, false); return S.box[4].shiny; });
+  assert.equal(shiny, true);
+  // The old team is a template: owned members fill in, the rest show as faded slots.
+  const team = await tab.evaluate(() => { B = { kind: 'route' }; loadTeam(0); openTab('party'); return { party: S.party.slice(), ghosts: [...document.querySelectorAll('#party .ghost')].map(n => n.textContent) }; });
+  assert.deepEqual(team.party, [395]);
+  assert.equal(team.ghosts.length, 2);
+  assert.ok(team.ghosts[0].includes('Charmeleon') && team.ghosts[1].includes('Pikachu'));
+  // The board: prestige first, then lifetime dex; the score is the lifetime dex plus lifetime shinies, never lower.
+  assert.deepEqual(await tab.evaluate(() => { const s = window.__boredSnapshot(); return [s.prestige, s.lifeDex, s.ranked, s.score]; }), [1, 5, 2051 + 5, 7]);
+  // Beating Prof Penguin again in this run opens the next prestige.
+  assert.equal(await tab.evaluate(() => { S.pbeat = 1; return canPrestige(); }), true);
+  assert.deepEqual(errors, []);
+});
+
+// Shiny lines live in their own store, outside any save: a different save (or Story Mode) reads the same lines, a save's
+// shinies are merged in when it loads, and the test account never writes there.
+test('shiny lines are kept in a shared store outside the save', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const r = await tab.evaluate(() => {
+    const key = 'bored.poke-idle.shinylines.v1', store = () => JSON.parse(localStorage.getItem(key) || '{}');
+    localStorage.removeItem(key);
+    // A save that already has a shiny Dratini line: loading it merges the line in.
+    S = fresh(); S.box[148] = { xp: 1e6, shiny: true }; S.party = [148]; migrateSave();
+    const merged = !!store()[147] && !('shinyLines' in S);
+    // A brand-new save shares the store: its first Dratini comes out shiny, and so does the line after it.
+    S = fresh(); S.box[25] = { xp: 1e6, shiny: false }; S.party = [25]; save();
+    addMon(147, 5, false); const fresh1 = S.box[147].shiny;
+    // A line nobody had shiny stays normal.
+    addMon(129, 5, false); const plain = S.box[129].shiny;
+    // The test account (every line shiny) writes nothing.
+    const before = Object.keys(store()).length; useSlot(TEST_KEY, testAccount()); const after = Object.keys(store()).length; useSlot(KEY);
+    return { merged, fresh1, plain, testWrites: after - before };
+  });
+  assert.deepEqual(r, { merged: true, fresh1: true, plain: false, testWrites: 0 });
+  assert.deepEqual(errors, []);
+});
