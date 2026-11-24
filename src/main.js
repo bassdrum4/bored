@@ -1013,6 +1013,9 @@ onScoresPosted(result => {
     boards.some(board => board.rows.length > 0 || !result?.optimistic);
   if (rows?.length && foldable) {
     for (const board of boards) {
+      // The library memoizes its derived leaders by rows identity. Publish a
+      // new array (and row objects) when a score changes so it invalidates.
+      board.rows = board.rows.map(row => ({ ...row }));
       const own = new Map(board.rows.map(row =>
         [row.game + '|' + String(row.handle || '').toLowerCase(), row]));
       for (const { game, value } of rows) {

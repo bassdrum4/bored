@@ -85,7 +85,7 @@ async function restart() {
   await page.click('#restart');
 }
 async function filter(name) {
-  await page.click('[data-filter="' + name + '"]');
+  await page.$eval('[data-filter="' + name + '"]', button => button.click());
 }
 // The shared leaderboard resolves after first paint and pushes the library down
 // with it. Clicks are coordinate based, so let the page stop moving before
@@ -394,7 +394,8 @@ test('browser regressions', async t => {
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
     // Counts come from the catalog so adding a game does not have to touch this
     // file: the suite checks the wiring, not the catalogue's contents.
-    const catalog = await page.evaluate(() => ({
+    const catalog = await page.evaluate(async () => ({
+      featured: Object.entries((await import('./games/catalog.js')).FEATURED_UNTIL || {}).filter(([, until]) => Date.parse(until) > Date.now()).map(([slug]) => slug),
       total: ORDER.length,
       newest: FRESH_GAMES.length,
       fresh: FRESH_GAMES,
@@ -405,7 +406,9 @@ test('browser regressions', async t => {
     assert.equal(await text(page, '#count'), String(catalog.total));
     // Popular is the default, but Newest preserves catalog order on demand.
     assert.equal(await page.$eval('#sort', el => el.value), 'popular');
-    assert.deepEqual((await page.$eval('.card', els => els.map(el => el.dataset.slug))).slice(0, catalog.newest).sort(), catalog.fresh.slice().sort(), 'all NEW badges stay at the top of Popular');
+    const unfeatured = (await page.$eval('.card', els => els.map(el => el.dataset.slug))).filter(slug => !catalog.featured.includes(slug));
+    const fresh = catalog.fresh.filter(slug => !catalog.featured.includes(slug));
+    assert.deepEqual(unfeatured.slice(0, fresh.length).sort(), fresh.slice().sort(), 'NEW games stay at the top after explicitly featured games');
     await page.select('#sort', 'original');
     assert.ok(catalog.newest > 0 && catalog.newest <= 4, 'the NEW badge holds four games at most');
     assert.deepEqual(
@@ -1670,11 +1673,12 @@ test('browser regressions', async t => {
       assert.equal(boards.boards, boards.ids.length, 'every game is its own board');
       assert.equal(new Set(boards.ids).size, boards.ids.length, 'no board is listed twice');
       await page.click('#leaderboard-nav');
-      await page.waitForFunction(() => !document.querySelector('#leaderboard').hidden && !document.querySelector('#lb-note').textContent.includes('load when'));
+      await page.waitForFunction(() => !document.querySelector('#leaderboard').hidden && document.querySelector('#lb-note').textContent.includes('Players ranked across'));
       assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.ids.length + ' games'));
       await page.click('#home-nav');
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
+      if (!await page.$eval('#leaderboard', el => el.hidden)) await page.$eval('#home-nav', button => button.click());
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
     }
   });

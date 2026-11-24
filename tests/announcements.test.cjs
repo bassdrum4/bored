@@ -147,6 +147,9 @@ test('a signed-in player votes in a poll and answers an open-ended question', as
       return reply(200, body.p_choice ? { choice: body.p_choice } : { answer: body.p_answer });
     }
     if (url.includes('/rest/v1/rpc/announcement_results')) return reply(200, [{ choice: 'More of this', votes: 1 }]);
+    // Unrelated startup API reads must not simulate an infrastructure outage.
+    // A real outage opens the shared backend circuit and blocks poll writes.
+    if (new URL(url).hostname.endsWith('.supabase.co')) return reply(404, { message: 'Not part of the announcement fixture' });
     return req.abort();
   });
   await page.evaluateOnNewDocument(user => {
@@ -217,6 +220,7 @@ test('a guest votes in a poll without signing in, once per browser', async t => 
     if (url.includes('/rest/v1/rpc/announcement_results')) {
       return reply(200, [{ choice: 'More of this', votes: 3 }, { choice: 'Fewer games', votes: 1 }]);
     }
+    if (new URL(url).hostname.endsWith('.supabase.co')) return reply(404, { message: 'Not part of the announcement fixture' });
     return req.abort();
   });
   await page.goto(site.url, { waitUntil: 'domcontentloaded' });
