@@ -34,9 +34,18 @@ if [[ "$mode" == restore ]]; then
   fi
   exit 0
 fi
+archive_ref="refs/heads/krillion-archive-$date_et"
+# Keep immutable per-date refs for old dives. Pages still carries only 3 days.
+archive_old="$(timeout 25 git ls-remote origin "$archive_ref" | cut -f1)"
 if [[ -f "$data/$date_et/manifest.json" ]]; then
+  if [[ -z "$archive_old" ]]; then
+    timeout 75 git push origin "$old:$archive_ref"
+  fi
   echo "Already built and verified $date_et"
   exit 0
+fi
+if [[ -n "$archive_old" ]]; then
+  echo "Archive ref already exists without a matching rolling snapshot" >&2; exit 1
 fi
 fresh="$work/fresh"
 mkdir "$fresh"
@@ -62,6 +71,6 @@ export GIT_WORK_TREE="$data"
   git add -f --all -- .
   tree="$(git write-tree)"
   commit="$(git -c user.name=github-actions -c user.email=github-actions@github.com commit-tree "$tree" -m "Krillion static snapshot $date_et")"
-  timeout 75 git push --force-with-lease="$ref:$old" origin "$commit:$ref"
+  timeout 75 git push --atomic --force-with-lease="$ref:$old" origin "$commit:$ref" "$commit:$archive_ref"
 )
 echo "Verified and published generated snapshot for $date_et"
