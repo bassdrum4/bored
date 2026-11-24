@@ -2598,15 +2598,13 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   // Muted maroon, brown, olive, dusty cream, two purples, and the screen greens (only HP screens reach those).
   const PAL = ["070505", "140b0b", "24110f", "3a1a17", "55251f", "2a1d14", "45311f", "6b4a30",
                "2c2f1a", "464a28", "6a6c3c", "8f8a60", "bfb38c", "d8ccaa", "24152e", "4a2d5e", "2f9c4c", "8af0a0"];
-  // Item boxes, bottom side: a 2x2 block left of the charge box, one right of it (local x, z).
-  // Pokémon sprites and items are marked in the render target's alpha, so the post pass gives them a wider
-  // palette, lighter dither and a rim: Giratina 0.3 (cold purple rim), buddies 0.55 (warm rim), items and shells 0.8.
-  // Those materials use NoBlending: three.js forces alpha to 1 on an opaque material with normal blending.
-  const MASK = { giratina: 0.3, buddy: 0.55, item: 0.8 };
-  const WIDE = ["c8a848", "e0c870", "3a5a8a", "7090b8", "a84838", "d07858", "6a4a8a", "9a78b8",
-                "707070", "a8a8a0", "d0d0c8", "c08890", "c87838", "4a8a88", "1c2440", "303030"];
-  // Two colours only items may use, so Thunder Wave (yellow) and Trick Room (pink) never dither alike.
-  const ITEM_PAL = ["f0d040", "e8508a"];
+  // Everything goes through the room's palette, with one exception: the Thunder Wave and Trick Room discs
+  // are marked in the render target's alpha (TM_MARK; the room is 1), and only they may also use a bright
+  // yellow and a hot pink, so the two never dither alike. Their material uses NoBlending, because three.js
+  // writes alpha 1 for an opaque material with normal blending.
+  const TM_MARK = 0.95;
+  const TM_COLOR = { wave: "f0d040", trick: "e8508a" };
+  const ITEM_PAL = [TM_COLOR.wave, TM_COLOR.trick];
   const CAM = [0, 1.78, 4.15];
   // Giratina's height, worked out from my eye at CAM: at z -10 the line over the far buddy's head is y 1.36
   // and the top of the screen y 4.94, so a 3.3 plane centred at 3.15 sits between them and never covers a buddy.
@@ -2667,41 +2665,34 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     img.src = url;
     return cache[url] = t;
   }
-  // Items that could dither alike get a big shape of their own on top of the sprite: Thunder Wave a
-  // lightning bolt, Trick Room a box, Scope Lens a crosshair, Eject Button the eject mark.
-  const GLYPH = {
-    wave(g) {
-      g.beginPath(); [[36, 4], [16, 34], [30, 34], [24, 60], [48, 26], [34, 26], [40, 4]].forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath();
-      g.lineWidth = 4; g.strokeStyle = "#1a1208"; g.stroke(); g.fillStyle = "#f0d040"; g.fill();
-    },
-    trick(g) {
-      g.lineWidth = 9; g.strokeStyle = "#1a1208"; g.strokeRect(14, 14, 36, 36);
-      g.lineWidth = 5; g.strokeStyle = "#e8508a"; g.strokeRect(14, 14, 36, 36);
-    },
-    scope(g) {
-      g.strokeStyle = "#1a1208"; g.lineWidth = 5;
-      g.beginPath(); g.arc(32, 32, 17, 0, 7); g.moveTo(32, 6); g.lineTo(32, 58); g.moveTo(6, 32); g.lineTo(58, 32); g.stroke();
-      g.strokeStyle = "#d8ccaa"; g.lineWidth = 2;
-      g.beginPath(); g.arc(32, 32, 17, 0, 7); g.moveTo(32, 6); g.lineTo(32, 58); g.moveTo(6, 32); g.lineTo(58, 32); g.stroke();
-    },
-    eject(g) {
-      g.fillStyle = "#1a1208"; g.beginPath(); g.moveTo(32, 8); g.lineTo(56, 38); g.lineTo(8, 38); g.closePath(); g.fill(); g.fillRect(8, 44, 48, 12);
-      g.fillStyle = "#e05a3a"; g.beginPath(); g.moveTo(32, 14); g.lineTo(49, 35); g.lineTo(15, 35); g.closePath(); g.fill(); g.fillRect(12, 47, 40, 6);
-    }
-  };
+  // The items are the real sprites, as in single player. The two TM discs are recoloured, keeping each
+  // pixel's shading: Thunder Wave yellow, Trick Room pink. Grey and white pixels (the rim, the shine) stay.
   function itemTex(key) {
     const url = ITEM_DIR + ITEMS[key].art + ".png";
-    if (!GLYPH[key]) return imageTex(url);
-    if (cache["glyph:" + key]) return cache["glyph:" + key];
-    const c = document.createElement("canvas"); c.width = c.height = 64;
+    if (!TM_COLOR[key]) return imageTex(url);
+    if (cache["tm:" + key]) return cache["tm:" + key];
+    const hex = TM_COLOR[key], to = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const c = document.createElement("canvas"); c.width = c.height = 32;
     const t = crisp(new T.CanvasTexture(c)), g = c.getContext("2d");
-    const done = () => { GLYPH[key](g); t.dispose(); t.needsUpdate = true; };
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => { g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, 64, 64); done(); };
-    img.onerror = done;
+    img.onload = () => {
+      c.width = img.width; c.height = img.height;
+      g.drawImage(img, 0, 0);
+      const data = g.getImageData(0, 0, c.width, c.height), px = data.data;
+      for (let i = 0; i < px.length; i += 4) {
+        // Fully transparent or fully opaque, never in between, so no fringe reaches the dither.
+        px[i + 3] = px[i + 3] < 128 ? 0 : 255;
+        const r = px[i], gg = px[i + 1], b = px[i + 2], hi = Math.max(r, gg, b), lo = Math.min(r, gg, b);
+        if (!px[i + 3] || hi - lo < 40) continue;
+        const shade = Math.min(1.15, Math.max(0.35, (0.3 * r + 0.59 * gg + 0.11 * b) / 170));
+        for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, Math.round(to[k] * shade));
+      }
+      g.putImageData(data, 0, 0);
+      t.dispose(); t.needsUpdate = true;
+    };
     img.src = url;
-    return cache["glyph:" + key] = t;
+    return cache["tm:" + key] = t;
   }
   // Somebody with no buddy: a dark shape in the chair.
   const silhouette = () => paint(64, 64, g => {
@@ -2931,10 +2922,10 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       for (let k = 0; k < MP_BOXES; k++) {
         const [x, z] = SLOT(k);
         // Opaque, so the render target keeps the item mark in its alpha (blending would push it to 1).
-        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, blending: T.NoBlending, fog: true, transparent: false }));
-        const shadow = add(new T.PlaneGeometry(0.44, 0.24), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
+        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.5, fog: true, transparent: false }));
+        const shadow = add(new T.PlaneGeometry(0.36, 0.2), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
         shadow.rotation.x = -Math.PI / 2;
-        sprite.scale.set(0.54, 0.54, 1);
+        sprite.scale.set(0.44, 0.44, 1);
         sprite.position.set(x, 0.24, z);
         sprite.visible = shadow.visible = false;
         if (pos === "bottom") sprite.userData.pick = { kind: "item", box: k };
@@ -2948,10 +2939,10 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         box(0.9, 1.0, 0.08, chairMat, 0, 0.08, 0.38, chair);
         for (const x of [-0.4, 0.4]) box(0.06, 0.5, 0.06, chairMat, x, -0.7, -0.35, chair);
         // The buddy stands upright behind the charge box, feet below the rim, hinged at the feet so it can fall.
-        const size = 1.6;
+        const size = pos === "top" ? 1.75 : 1.6;
         const yaw = new T.Group(); yaw.position.set(0, -0.06, 2.95); yaw.rotation.y = facing(2.95); g.add(yaw);
         const fall = new T.Group(); yaw.add(fall);
-        const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, blending: T.NoBlending, side: T.DoubleSide }), 0, size / 2, 0, fall);
+        const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.5, side: T.DoubleSide }), 0, size / 2, 0, fall);
         buddy.userData.pick = { kind: "seat", pos };
         Object.assign(s, { buddy, buddyKey: "", buddyFall: fall, buddyYaw: yaw, buddySize: size });
         // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
@@ -2970,7 +2961,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     for (const key of MP_POOL) itemTex(key);
 
     // My buddy, peeking up from the bottom-left corner of my view.
-    myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, blending: T.NoBlending, color: 0xd8c8b0, fog: false }));
+    myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.5, color: 0xd8c8b0, fog: false }));
     myBuddy.position.set(-0.6, -0.32, -0.8);
     myBuddy.rotation.z = 0.12;
     cam.add(myBuddy);
@@ -3013,7 +3004,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
 
     // Giratina hosts from behind the far side, lit from below.
-    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, blending: T.NoBlending, side: T.DoubleSide, fog: false }), 0, 3.8, -10);
+    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.5, side: T.DoubleSide, fog: false }), 0, 3.8, -10);
     // Lit from below by the table's glow.
     const under = new T.PointLight(0x9a7aa8, 1.8, 7, 1); under.position.set(0, 1.0, -6.6); scene.add(under);
 
@@ -3034,48 +3025,33 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
       uniforms: { tScene: { value: rt.texture }, uPal: { value: PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
                   uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 }, uEdge: { value: 0 },
-                  uWide: { value: WIDE.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
                   uItem: { value: ITEM_PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) } },
       vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
       fragmentShader: [
-        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec3 uWide[16]; uniform vec3 uItem[2]; uniform vec2 uRes; uniform float uTime, uFlash, uHit, uEdge; varying vec2 vUv;",
-        "float kind(float a){ return a < 0.42 ? 1.0 : a < 0.67 ? 2.0 : a < 0.9 ? 3.0 : 0.0; }",
+        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec3 uItem[2]; uniform vec2 uRes; uniform float uTime, uFlash, uHit, uEdge; varying vec2 vUv;",
         "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
         "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
         "float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }",
         "void main(){",
         "  vec2 px = floor(vUv * uRes);",
         "  vec4 src = texture2D(tScene, vUv);",
-        "  vec3 c = src.rgb; float m = kind(src.a);",
-        // A rim around the Pokémon: cold purple for Giratina, warm for buddies.
-        "  if (m == 0.0) {",
-        "    vec2 o = 1.0 / uRes; float g = 0.0, b = 0.0;",
-        "    float n1 = kind(texture2D(tScene, vUv + vec2(o.x, 0.0)).a), n2 = kind(texture2D(tScene, vUv - vec2(o.x, 0.0)).a);",
-        "    float n3 = kind(texture2D(tScene, vUv + vec2(0.0, o.y)).a), n4 = kind(texture2D(tScene, vUv - vec2(0.0, o.y)).a);",
-        "    if (n1 == 1.0 || n2 == 1.0 || n3 == 1.0 || n4 == 1.0) c = mix(c, vec3(0.44, 0.38, 0.66), 0.8);",
-        "    else if (n1 == 2.0 || n2 == 2.0 || n3 == 2.0 || n4 == 2.0) c = mix(c, vec3(0.66, 0.5, 0.32), 0.6);",
-        "  }",
+        "  vec3 c = src.rgb; bool tm = src.a > 0.9 && src.a < 0.98;",
         "  c += uFlash * vec3(0.6, 0.5, 0.36);",
         "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
-        "  c *= mix(m > 0.0 ? 0.25 : 0.03, 1.0, smoothstep(0.72, 0.2, d));",
-        "  c += (hash(px + fract(uTime) * 97.0) - 0.5) * (m > 0.0 ? 0.02 : 0.045);",
+        "  c *= mix(0.03, 1.0, smoothstep(0.72, 0.2, d));",
+        "  c += (hash(px + fract(uTime) * 97.0) - 0.5) * 0.045;",
         "  c = mix(c, vec3(0.42, 0.12, 0.09), uHit * 0.5);",
         "  c = mix(c, vec3(0.36, 0.08, 0.06), uEdge * smoothstep(0.32, 0.7, d) * 0.85);",
-        "  c += (bayer(px) - 0.5) * (m > 0.0 ? 0.045 : 0.1);",
-        "  bool hp = m == 0.0 && c.g > 0.3 && c.g > c.r * 1.6 && c.g > c.b * 1.3;",
+        "  c += (bayer(px) - 0.5) * 0.1;",
+        "  bool hp = !tm && c.g > 0.3 && c.g > c.r * 1.6 && c.g > c.b * 1.3;",
         "  vec3 best = uPal[0]; float bd = 99.0;",
         "  for (int i = 0; i < 18; i++) {",
         "    bool use = hp ? (i < 3 || i > 15) : (i < 16);",
         "    vec3 e = (c - uPal[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
         "    if (use && dd < bd) { bd = dd; best = uPal[i]; }",
         "  }",
-        // Sprites, items and shells may also use the wider set.
-        "  if (m > 0.0) for (int i = 0; i < 16; i++) {",
-        "    vec3 e = (c - uWide[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
-        "    if (dd < bd) { bd = dd; best = uWide[i]; }",
-        "  }",
-        // Items (and shells) also get the bright yellow and hot pink.
-        "  if (m > 2.5) for (int i = 0; i < 2; i++) {",
+        // Only the Thunder Wave and Trick Room discs may also use the bright yellow and hot pink.
+        "  if (tm) for (int i = 0; i < 2; i++) {",
         "    vec3 e = (c - uItem[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
         "    if (dd < bd) { bd = dd; best = uItem[i]; }",
         "  }",
@@ -3119,7 +3095,11 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
           const fading = !key && it.using && now() - it.using < 0.6;
           it.key = key;
           if (!fading) it.using = 0;
-          if (key) { it.sprite.material.map = itemTex(key); it.sprite.material.opacity = MASK.item; it.sprite.material.needsUpdate = true; }
+          if (key) {
+            const m = it.sprite.material;
+            it.mark = TM_COLOR[key] ? TM_MARK : 1;
+            Object.assign(m, { map: itemTex(key), opacity: it.mark, blending: it.mark < 1 ? T.NoBlending : T.NormalBlending, needsUpdate: true });
+          }
         }
         it.sprite.visible = it.shadow.visible = !!key || !!it.using;
       }
@@ -3223,7 +3203,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     shells.clear();
     if (!SHELL_GEO.length) SHELL_GEO.push(new T.CylinderGeometry(0.05, 0.05, 0.17, 10), new T.CylinderGeometry(0.056, 0.056, 0.05, 10),
       new T.CylinderGeometry(0.062, 0.062, 0.012, 10), new T.CylinderGeometry(0.038, 0.05, 0.02, 10));
-    const mat = (color, glow = 0) => new T.MeshLambertMaterial({ color, emissive: glow, opacity: MASK.item, blending: T.NoBlending });
+    const mat = (color, glow = 0) => new T.MeshLambertMaterial({ color, emissive: glow });
     const brass = mat(0xd8b058), rim = mat(0xa88838);
     const list = [...Array(live).fill([0xb83a30, 0x7a2018, 0x5a1810]), ...Array(blank).fill([0x9a9a94, 0x5a5a56, 0x34342f])].map(([color, crimp, glow], k, all) => {
       const g = new T.Group();
@@ -3338,10 +3318,10 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const using = it.using ? Math.min(1, (now() - it.using) / 0.6) : 0;
         if (using >= 1 && !it.key) { it.using = 0; it.sprite.visible = it.shadow.visible = false; }
         it.sprite.position.y = 0.24 + it.lift * 0.09 + using * 0.5;
-        const scale = 0.54 * (1 + it.lift * 0.12 + using * 0.3);
+        const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
         it.sprite.scale.set(scale, scale, 1);
         it.sprite.material.color.setScalar(1 + it.lift * 0.35);
-        it.sprite.material.opacity = MASK.item * (1 - using);
+        it.sprite.material.opacity = (it.mark || 1) * (1 - using);
       }
       if (!s.buddy) continue;
       s.plate.material[2].color.setHex(hovered ? 0xffffff : M && M.phase === "turn" && M.turn === s.seat ? 0xd8ccaa : 0x8a8270);
