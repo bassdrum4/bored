@@ -263,7 +263,7 @@ async function cachedBook(date: string): Promise<StoredBook | null> {
 }
 
 async function latestBook(): Promise<StoredBook | null> {
-  const response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
+  const response = await sb('krillion_books?select=book&order=date.desc&limit=1');
   if (!response.ok) return null;
   const rows = await response.json();
   const value = rows?.[0]?.book;
