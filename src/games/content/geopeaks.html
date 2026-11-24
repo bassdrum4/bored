@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GeoPeaks</title>
+<!--
+  GeoPeaks — ski real mountains.
+
+  Everything you see is real terrain: the elevation comes from the open
+  Mapzen/AWS "Terrarium" terrain tiles (SRTM / GMTED / EU-DEM, public domain),
+  decoded in the browser; the coastlines on the globe come from Natural Earth
+  (public domain). The run itself is not authored by hand — at load the game
+  traces the fall line from the summit across the real heightfield, which is
+  why the descent, the grade and the gates differ mountain by mountain.
+
+  Network: needs the elevation tiles and the Natural Earth outlines, plus the
+  Three.js module from jsDelivr. Offline it says so instead of showing a blank
+  page. No keys, no accounts, nothing written anywhere.
+-->
+<style>
+  :root {
+    --paper: #f6f4ee;
+    --paper-dim: rgba(246, 244, 238, .86);
+    --ink: #171613;
+    --dim: #6d675b;
+    --hair: rgba(23, 22, 19, .18);
+    --accent: #c2410c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  html, body { height: 100%; overflow: hidden; background: #0b1622; color: var(--ink) }
+  body {
+    font: 13px/1.45 var(--sans);
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+  }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none }
+  .pane { position: fixed; background: var(--paper-dim); border: 1px solid var(--hair); border-radius: 3px }
+  button { font: inherit; color: inherit; background: none; border: 1px solid var(--hair); border-radius: 2px;
+           padding: 7px 11px; cursor: pointer; }
+  button:hover:enabled { border-color: var(--ink) }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  button[disabled] { color: var(--dim); cursor: default }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums }
+  .cap { font: 600 10px/1.3 var(--mono); letter-spacing: .14em; text-transform: uppercase }
+
+  /* ── the veil: loading, errors ─────────────────────────────────────────── */
+  #veil {
+    position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+    background: #eef1f3; padding: 24px;
+  }
+  #veil[hidden] { display: none }
+  #veil .box { width: min(360px, 100%); text-align: center }
+  #veil h1 { font: 600 13px/1.4 var(--mono); letter-spacing: .22em; text-transform: uppercase }
+  #veil p { margin-top: 10px; color: var(--dim); font-size: 12px; min-height: 2.4em }
+  #veil .bar { margin: 14px auto 0; width: 100%; height: 2px; background: rgba(23,22,19,.12); overflow: hidden }
+  #veil .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease }
+  #veil button { margin-top: 16px }
+
+  /* ── peak picker ───────────────────────────────────────────────────────── */
+  #picker { position: fixed; inset: 0; z-index: 10; pointer-events: none }
+  #picker[hidden] { display: none }
+  #picker .top {
+    position: absolute; top: 56px; left: 20px; max-width: 320px;
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  }
+  #picker .top h1 { font: 600 15px/1.1 var(--mono); letter-spacing: .18em; text-transform: uppercase }
+  #picker .top p { margin-top: 7px; font-size: 12px; color: #33475a; max-width: 30ch }
+  #peaks {
+    position: absolute; left: 20px; top: 128px; width: 214px; max-height: calc(100% - 194px);
+    overflow: auto; pointer-events: auto; padding: 4px;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  #peaks::-webkit-scrollbar { display: none }
+  #peaks button {
+    display: block; width: 100%; text-align: left; border: 0; border-left: 2px solid transparent;
+    border-radius: 0; padding: 5px 8px 5px 9px; background: none;
+  }
+  #peaks button:hover, #peaks button:focus-visible { background: rgba(23,22,19,.06); outline: none }
+  #peaks button[aria-current="true"] { border-left-color: var(--accent); background: rgba(23,22,19,.07) }
+  #peaks .n { display: block; font-size: 12px; font-weight: 600; letter-spacing: .01em }
+  #peaks .m { display: block; font: 10px/1.5 var(--mono); color: var(--dim); letter-spacing: .04em }
+  #peaks .today { color: var(--accent) }
+
+  #card {
+    position: absolute; right: 20px; bottom: 20px; width: 288px; padding: 14px 15px 15px;
+    pointer-events: auto;
+  }
+  #card h2 { font-size: 17px; line-height: 1.15; letter-spacing: -.01em }
+  #card .where { margin-top: 3px; font: 10px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim) }
+  #card .run { margin-top: 11px; font: 11px/1.4 var(--mono); letter-spacing: .06em; color: var(--accent) }
+  #card dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-top: 10px; font: 11px/1.7 var(--mono) }
+  #card dt { color: var(--dim) }
+  #card dd { text-align: right }
+  #card .go { margin-top: 13px; width: 100%; padding: 10px; border-color: var(--ink); background: var(--ink); color: var(--paper); font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase }
+  #card .go:hover { background: var(--accent); border-color: var(--accent); color: #fff }
+  #picker .foot { position: absolute; left: 20px; bottom: 14px; font: 10px/1.6 var(--mono); color: #3f5162; max-width: 240px }
+
+  /* ── run HUD ───────────────────────────────────────────────────────────── */
+  #hud { position: fixed; inset: 0; z-index: 12; pointer-events: none }
+  #hud[hidden] { display: none }
+  #hud .row { position: absolute; display: flex; gap: 10px; align-items: flex-end }
+  #hud .slab { background: var(--paper-dim); border: 1px solid var(--hair); border-radius: 3px; padding: 7px 10px 8px }
+  /* The hub draws its own logo in the top-left corner over the frame. */
+  html.framed #run-name, html.framed #time-box, html.framed #picker .top { top: 56px }
+  html.framed #picker .top { top: 58px }
+  #run-name { position: absolute; left: 16px; top: 16px; padding: 8px 11px 9px }
+  #run-name b { display: block; font: 600 12px/1.2 var(--sans); letter-spacing: .01em }
+  #run-name span { display: block; margin-top: 3px; font: 9px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim) }
+  #time-box { position: absolute; right: 16px; top: 16px; text-align: right; padding: 7px 11px 8px }
+  #time-box b { display: block; font: 600 20px/1.1 var(--mono); letter-spacing: .02em; font-variant-numeric: tabular-nums }
+  #time-box span { display: block; margin-top: 2px; font: 9px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim) }
+  #speed-box { position: absolute; left: 16px; bottom: 16px; padding: 7px 12px 9px; min-width: 132px }
+  #speed-box b { font: 600 27px/1 var(--mono); letter-spacing: -.02em; font-variant-numeric: tabular-nums }
+  #speed-box i { font: 10px/1 var(--mono); font-style: normal; color: var(--dim); margin-left: 4px; letter-spacing: .08em }
+  #speed-box .sub { margin-top: 5px; font: 10px/1.5 var(--mono); color: var(--dim); letter-spacing: .04em; display: flex; gap: 10px }
+  #speed-box .sub em { font-style: normal; color: var(--ink) }
+  #vbar { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 3px; height: min(46vh, 260px); background: rgba(23,22,19,.16); border-radius: 2px }
+  #vbar i { position: absolute; left: 0; bottom: 0; width: 100%; background: var(--accent); border-radius: 2px }
+  #vbar span { position: absolute; right: 10px; bottom: -4px; font: 9px/1 var(--mono); color: #26333f; letter-spacing: .06em; white-space: nowrap }
+  #map-wrap { position: absolute; right: 16px; bottom: 16px; padding: 5px }
+  #map { display: block; width: 116px; height: 116px; border-radius: 2px }
+  #gate { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); text-align: center }
+  #gate b { display: block; padding: 5px 12px 6px; font: 600 11px/1 var(--mono); letter-spacing: .16em }
+  #toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font: 600 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: #fff; background: rgba(23,22,19,.72); padding: 7px 12px; border-radius: 2px; opacity: 0; transition: opacity .25s ease }
+  #toast.on { opacity: 1 }
+
+  /* ── touch pad ─────────────────────────────────────────────────────────── */
+  #pad { position: absolute; left: 16px; right: 16px; bottom: 92px; display: none; gap: 8px; justify-content: flex-end; pointer-events: auto }
+  #pad button { width: 62px; height: 40px; background: var(--paper-dim); font: 600 9px/1 var(--mono); letter-spacing: .1em }
+  #pad button.on { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+  @media (pointer: coarse) { #pad { display: flex } #speed-box { bottom: 16px } }
+
+  /* ── overlays: ready, pause, results ───────────────────────────────────── */
+  .sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(9,20,31,.34); padding: 20px }
+  .sheet[hidden] { display: none }
+  .sheet .box { width: min(330px, 100%); padding: 18px 18px 16px; background: var(--paper); border: 1px solid var(--hair); border-radius: 3px }
+  .sheet h2 { font-size: 16px; line-height: 1.2 }
+  .sheet .k { margin-top: 4px; font: 10px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim) }
+  .sheet p { margin-top: 10px; font-size: 12px; color: #3d3a33 }
+  .sheet .keys { margin-top: 12px; font: 11px/1.9 var(--mono); color: var(--dim) }
+  .sheet .keys b { color: var(--ink); font-weight: 600 }
+  .sheet .actions { display: flex; gap: 8px; margin-top: 15px }
+  .sheet .actions button { flex: 1 }
+  .sheet .go { background: var(--ink); color: var(--paper); border-color: var(--ink); font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; padding: 11px }
+  .sheet .go:hover { background: var(--accent); border-color: var(--accent); color: #fff }
+  #result dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin-top: 13px; font: 12px/1.6 var(--mono) }
+  #result dt { color: var(--dim) }
+  #result dd { text-align: right; font-variant-numeric: tabular-nums }
+  #result .big { margin-top: 12px; font: 600 30px/1 var(--mono); letter-spacing: -.02em; color: var(--accent); font-variant-numeric: tabular-nums }
+  #result .big small { font: 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-left: 5px }
+  #result .note { margin-top: 8px; font: 11px/1.5 var(--mono); color: var(--dim); min-height: 1.5em }
+  #vig { position: fixed; inset: 0; z-index: 11; pointer-events: none; opacity: 0;
+         background: radial-gradient(ellipse at 50% 52%, transparent 42%, rgba(10,22,34,.5) 100%); transition: opacity .4s ease }
+  @media (max-width: 620px) {
+    #picker .top { top: 52px; left: 12px; max-width: 62% }
+    #picker .top h1 { font-size: 12px; letter-spacing: .2em }
+    #picker .top p { display: none }
+    #peaks { left: 10px; right: 10px; top: auto; bottom: 10px; width: auto; max-height: none;
+             display: flex; overflow-x: auto; overflow-y: hidden; padding: 4px; gap: 2px }
+    #peaks button { flex: 0 0 auto; width: 132px; border-left: 0; border-bottom: 2px solid transparent; padding: 5px 7px }
+    #peaks button[aria-current="true"] { border-bottom-color: var(--accent); border-left-color: transparent }
+    #card { right: 10px; left: 10px; bottom: 78px; width: auto; padding: 11px 12px 12px }
+    #card dl { grid-template-columns: 1fr auto 1fr auto; font-size: 10px }
+    #card h2 { font-size: 15px }
+    #picker .foot { display: none }
+    #run-name { top: 10px; left: 10px }
+    #time-box { top: 10px; right: 10px }
+    #time-box b { font-size: 15px }
+    #speed-box { left: 10px; bottom: 10px; min-width: 104px; padding: 6px 9px 7px }
+    #speed-box b { font-size: 21px }
+    #map-wrap { right: 10px; bottom: 10px; padding: 4px }
+    #map { width: 84px; height: 84px }
+    #vbar { height: 30vh; right: 10px }
+    #pad { bottom: 104px; left: 10px; right: 10px }
+    #gate { bottom: 118px }
+  }
+  @media (max-height: 430px) {
+    #card dl { display: none }
+    #card { padding: 9px 11px 10px }
+    #picker .top p { display: none }
+    #vbar { height: 80px }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="veil">
+  <div class="box">
+    <h1>GeoPeaks</h1>
+    <p id="veil-text">Finding the mountain…</p>
+    <div class="bar"><i id="veil-bar"></i></div>
+    <button id="veil-retry" type="button" hidden>Try again</button>
+  </div>
+</div>
+
+<section id="picker" hidden aria-label="Choose a peak">
+  <div class="top">
+    <h1>GeoPeaks</h1>
+    <p>Real summits, real elevation. Drag the globe, pick a mountain, ski it.</p>
+  </div>
+  <nav id="peaks" aria-label="Peaks"></nav>
+  <div id="card" class="pane">
+    <h2 id="card-name">—</h2>
+    <div class="where" id="card-where">—</div>
+    <div class="run" id="card-run">—</div>
+    <dl>
+      <dt>Summit</dt><dd id="card-alt">—</dd>
+      <dt>Vertical</dt><dd id="card-drop">—</dd>
+      <dt>Length</dt><dd id="card-len">—</dd>
+      <dt>Grade</dt><dd id="card-grade">—</dd>
+    </dl>
+    <button class="go" id="card-go" type="button">Drop in</button>
+  </div>
+  <p class="foot">Elevation: Mapzen / AWS open terrain tiles. Coastlines: Natural Earth. Runs are traced down the real fall line.</p>
+</section>
+
+<section id="hud" hidden aria-label="Run">
+  <div id="run-name" class="slab"><b id="hud-peak">—</b><span id="hud-sub">—</span></div>
+  <div id="time-box" class="slab"><b id="hud-time">0:00.0</b><span>descent</span></div>
+  <div id="speed-box" class="slab">
+    <b id="hud-speed">0</b><i>KM/H</i>
+    <div class="sub"><span><em id="hud-alt">0</em> m</span><span><em id="hud-slope">0</em>°</span></div>
+  </div>
+  <div id="vbar"><i id="hud-fill"></i><span id="hud-vert">0 m</span></div>
+  <div id="map-wrap" class="pane"><canvas id="map" width="232" height="232"></canvas></div>
+  <div id="gate"><b class="slab" id="hud-gate">GATE 1 / 9</b></div>
+  <div id="toast"></div>
+  <div id="pad">
+    <button type="button" data-key="tuck">TUCK</button>
+    <button type="button" data-key="brake">BRAKE</button>
+    <button type="button" data-key="jump">JUMP</button>
+  </div>
+</section>
+<div id="vig"></div>
+
+<section class="sheet" id="ready" hidden>
+  <div class="box">
+    <h2 id="ready-name">—</h2>
+    <div class="k" id="ready-where">—</div>
+    <p id="ready-note">You are standing on the summit. The line below you is the real fall line: nobody placed it.</p>
+    <div class="keys"><b>W</b> tuck · <b>S</b> brake · <b>A D</b> or <b>← →</b> steer · <b>Space</b> jump · <b>P</b> pause</div>
+    <div class="actions"><button class="go" id="ready-go" type="button">Drop in</button></div>
+  </div>
+</section>
+
+<section class="sheet" id="pause" hidden>
+  <div class="box">
+    <h2>Paused</h2>
+    <div class="k" id="pause-where">—</div>
+    <div class="actions">
+      <button id="pause-resume" type="button">Resume</button>
+      <button id="pause-restart" type="button">Restart</button>
+      <button id="pause-peaks" type="button">Peaks</button>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="result" hidden>
+  <div class="box">
+    <h2 id="result-name">—</h2>
+    <div class="k" id="result-where">—</div>
+    <div class="big"><span id="result-m">0</span><small>m descended</small></div>
+    <div class="note" id="result-note"></div>
+    <dl>
+      <dt>Time</dt><dd id="result-time">—</dd>
+      <dt>Top speed</dt><dd id="result-top">—</dd>
+      <dt>Distance</dt><dd id="result-dist">—</dd>
+      <dt>Average grade</dt><dd id="result-grade">—</dd>
+    </dl>
+    <div class="actions">
+      <button class="go" id="result-again" type="button">Ski again</button>
+      <button id="result-peaks" type="button">Peaks</button>
+    </div>
+  </div>
+</section>
+
+<script type="module">
+/* ═══════════════════════════════════════════════════════════════════════════
+   GeoPeaks
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const $ = sel => document.querySelector(sel);
+
+/* ── the hub's contract: one snapshot, always safe to call ─────────────────── */
+const snap = { finished: false, metres: 0 };
+window.__boredSnapshot = () => ({
+  slug: 'geopeaks',
+  metres: snap.finished ? Math.max(0, Math.round(snap.metres)) : 0,
+  finished: snap.finished === true
+});
+
+/* ── data ─────────────────────────────────────────────────────────────────── */
+const TILE_URL = (z, x, y) => 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/' + z + '/' + x + '/' + y + '.png';
+const LAND_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson';
+const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+
+// Real summits, with the fall line measured off the open elevation data:
+// `len` metres of line and the average `grade` in percent. `drop` is how much
+// vertical the run asks for; the game shortens it if the mountain runs out of
+// fall line first.
+const PEAKS = [
+  { id: 'chamonix', peak: 'Aiguille du Midi', run: 'Vallée Blanche', area: 'Chamonix', country: 'France', lat: 45.8788, lon: 6.8872, alt: 3706, drop: 740, len: 1250, grade: 59 },
+  { id: 'zermatt', peak: 'Matterhorn Glacier', run: 'Theodul', area: 'Zermatt', country: 'Switzerland', lat: 45.9722, lon: 7.6567, alt: 3712, drop: 805, len: 2660, grade: 30 },
+  { id: 'lagrave', peak: 'La Meije', run: 'Couloir descent', area: 'La Grave', country: 'France', lat: 45.0060, lon: 6.3000, alt: 3193, drop: 635, len: 1390, grade: 46 },
+  { id: 'engelberg', peak: 'Titlis', run: 'Glacier run', area: 'Engelberg', country: 'Switzerland', lat: 46.7710, lon: 8.4380, alt: 2847, drop: 700, len: 1760, grade: 40 },
+  { id: 'snowbird', peak: 'Hidden Peak', run: 'Highland Bowl', area: 'Snowbird', country: 'United States', lat: 40.5600, lon: -111.6460, alt: 3303, drop: 895, len: 3150, grade: 29 },
+  { id: 'alpedhuez', peak: 'Pic Blanc', run: 'Sarenne', area: 'Alpe d\u2019Huez', country: 'France', lat: 45.1300, lon: 6.1300, alt: 3184, drop: 1225, len: 3560, grade: 34 },
+  { id: 'lesarcs', peak: 'Aiguille Rouge', run: 'Aiguille Rouge', area: 'Les Arcs', country: 'France', lat: 45.5500, lon: 6.8300, alt: 2497, drop: 355, len: 2160, grade: 17 },
+  { id: 'stanton', peak: 'Valluga', run: 'Valluga north', area: 'St. Anton', country: 'Austria', lat: 47.1560, lon: 10.2110, alt: 2721, drop: 825, len: 2970, grade: 28 },
+  { id: 'cortina', peak: 'Tofana di Mezzo', run: 'Tofana schuss', area: 'Cortina', country: 'Italy', lat: 46.5470, lon: 12.0660, alt: 2904, drop: 1050, len: 2860, grade: 37 },
+  { id: 'kitzbuhel', peak: 'Hahnenkamm', run: 'Streif', area: 'Kitzb\u00fchel', country: 'Austria', lat: 47.4250, lon: 12.3660, alt: 1641, drop: 855, len: 3300, grade: 26 },
+  { id: 'whistler', peak: 'Whistler Peak', run: 'Peak to Creek', area: 'Whistler', country: 'Canada', lat: 50.0592, lon: -122.9570, alt: 2177, drop: 1485, len: 5130, grade: 29 },
+  { id: 'portillo', peak: 'Portillo', run: 'Roca Jack', area: 'Portillo', country: 'Chile', lat: -32.8347, lon: -70.1286, alt: 2865, drop: 285, len: 1630, grade: 18 }
+];
+
+const ZOOM = 13;
+const TILE_SPAN = 4;
+const TILE_PX = 256;
+const MESH_N = 512;
+
+/* ── small maths ──────────────────────────────────────────────────────────── */
+const PI = Math.PI;
+const rad = d => d * PI / 180;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const fract = x => x - Math.floor(x);
+function hash2(x, y) {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return fract(s);
+}
+
+// Smooth value noise: the forest patches have to be shapes, not squares.
+function vnoise(x, y, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const h = (a, b) => hash2(a + seed * 37.1, b + seed * 17.7);
+  return lerp(lerp(h(xi, yi), h(xi + 1, yi), u), lerp(h(xi, yi + 1), h(xi + 1, yi + 1), u), v);
+}
+
+function project(lat, lon, z) {
+  const n = Math.pow(2, z) * TILE_PX;
+  const s = Math.sin(rad(lat));
+  return {
+    x: (lon + 180) / 360 * n,
+    y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * PI)) * n
+  };
+}
+const metresPerPixel = lat => 156543.03392 * Math.cos(rad(lat)) / Math.pow(2, ZOOM);
+
+function offsetLatLon(lat, lon, distance, bearing) {
+  const R = 6371000, b = rad(bearing), d = distance / R;
+  const la1 = rad(lat), lo1 = rad(lon);
+  const la2 = Math.asin(Math.sin(la1) * Math.cos(d) + Math.cos(la1) * Math.sin(d) * Math.cos(b));
+  const lo2 = lo1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la1), Math.cos(d) - Math.sin(la1) * Math.sin(la2));
+  return { lat: la2 * 180 / PI, lon: lo2 * 180 / PI };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Terrain: open elevation tiles → a heightfield in local metres
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+class Terrain {
+  constructor(peak, heights, meta) {
+    this.peak = peak;
+    this.h = heights;
+    this.W = meta.W;
+    this.H = meta.H;
+    this.mpp = meta.mpp;
+    this.i0 = meta.i0;
+    this.j0 = meta.j0;
+    this.minX = -meta.i0 * meta.mpp;
+    this.maxX = (meta.W - 1 - meta.i0) * meta.mpp;
+    this.minZ = -meta.j0 * meta.mpp;
+    this.maxZ = (meta.H - 1 - meta.j0) * meta.mpp;
+  }
+  /** Ground height at local metres (bilinear, clamped at the edge). */
+  height(x, z) {
+    const W = this.W, H = this.H;
+    let fi = x / this.mpp + this.i0;
+    let fj = z / this.mpp + this.j0;
+    if (fi < 0) fi = 0; else if (fi > W - 1.001) fi = W - 1.001;
+    if (fj < 0) fj = 0; else if (fj > H - 1.001) fj = H - 1.001;
+    const i = fi | 0, j = fj | 0, u = fi - i, v = fj - j;
+    const a = this.h[j * W + i], b = this.h[j * W + i + 1];
+    const c = this.h[(j + 1) * W + i], d = this.h[(j + 1) * W + i + 1];
+    return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+  }
+  /** Unit surface normal at local metres. */
+  normal(x, z, out) {
+    const d = this.mpp * 1.2;
+    const hx = (this.height(x + d, z) - this.height(x - d, z)) / (2 * d);
+    const hz = (this.height(x, z + d) - this.height(x, z - d)) / (2 * d);
+    const len = Math.hypot(hx, 1, hz);
+    out.x = -hx / len; out.y = 1 / len; out.z = -hz / len;
+    return out;
+  }
+  inside(x, z) {
+    return x > this.minX + 200 && x < this.maxX - 200 && z > this.minZ + 200 && z < this.maxZ - 200;
+  }
+}
+
+async function decodeTile(url) {
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error('elevation tile ' + res.status);
+  const blob = await res.blob();
+  const canvas = document.createElement('canvas');
+  canvas.width = TILE_PX; canvas.height = TILE_PX;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (typeof createImageBitmap === 'function') {
+    const bitmap = await createImageBitmap(blob);
+    ctx.drawImage(bitmap, 0, 0);
+    if (bitmap.close) bitmap.close();
+  } else {
+    // Older Safari: no createImageBitmap. A blob URL keeps the canvas untainted.
+    const url2 = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url2; });
+      ctx.drawImage(img, 0, 0);
+    } finally { URL.revokeObjectURL(url2); }
+  }
+  return ctx.getImageData(0, 0, TILE_PX, TILE_PX).data;
+}
+
+async function loadTerrain(peak, onProgress) {
+  const p = project(peak.lat, peak.lon, ZOOM);
+  const tx0 = Math.round(p.x / TILE_PX) - TILE_SPAN / 2;
+  const ty0 = Math.round(p.y / TILE_PX) - TILE_SPAN / 2;
+  const W = TILE_SPAN * TILE_PX;
+  const heights = new Float32Array(W * W);
+
+  const jobs = [];
+  for (let ty = 0; ty < TILE_SPAN; ty++) {
+    for (let tx = 0; tx < TILE_SPAN; tx++) {
+      jobs.push((async () => {
+        const data = await decodeTile(TILE_URL(ZOOM, tx0 + tx, ty0 + ty));
+        const ox = tx * TILE_PX, oy = ty * TILE_PX;
+        for (let y = 0; y < TILE_PX; y++) {
+          let row = (oy + y) * W + ox;
+          let src = y * TILE_PX * 4;
+          for (let x = 0; x < TILE_PX; x++, row++, src += 4) {
+            // Terrarium encoding: metres = R*256 + G + B/256 - 32768
+            heights[row] = data[src] * 256 + data[src + 1] + data[src + 2] / 256 - 32768;
+          }
+        }
+      })());
+    }
+  }
+  // Gentle concurrency: sixteen requests at once is rude and slow on mobile.
+  const total = jobs.length;
+  let done = 0, cursor = 0;
+  await new Promise((resolve, reject) => {
+    const next = () => {
+      if (done === total) return resolve();
+      while (cursor < total && cursor - done < 5) {
+        const job = jobs[cursor++];
+        job.then(() => { done++; onProgress && onProgress(done, total); next(); }, reject);
+      }
+    };
+    next();
+  });
+
+  return new Terrain(peak, heights, {
+    W, H: W,
+    mpp: metresPerPixel(peak.lat),
+    i0: p.x - tx0 * TILE_PX,
+    j0: p.y - ty0 * TILE_PX
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   The run: traced down the real fall line, never authored by hand
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// Which way is downhill from the summit? A single sample 500 m out can land in
+// a hollow and point the run uphill, so walk 1.4 km along each bearing and take
+// the one that actually descends.
+function bestDescent(terrain, at) {
+  let best = { drop: -Infinity, bearing: 0 };
+  for (let b = 0; b < 360; b += 8) {
+    let h = terrain.height(at.x, at.z);
+    let drop = 0;
+    const dx = Math.sin(rad(b)) * 80, dz = Math.cos(rad(b)) * 80;
+    let x = at.x, z = at.z;
+    for (let s = 0; s < 18; s++) {
+      x += dx; z += dz;
+      const hh = terrain.height(x, z);
+      drop += h - hh;
+      h = hh;
+    }
+    // Prefer a ski line over the steepest face: anything past about 42° is a
+    // cliff, so it is scored down hard against a gentler glacier run.
+    const grade = drop / (18 * 80);
+    const score = drop - Math.max(0, grade - 0.42) * 3000;
+    if (score > best.drop) best = { drop: score, bearing: b };
+  }
+  return best.bearing;
+}
+
+function traceRun(terrain, peak) {
+  // Local metres are already centred on the summit, so the peak is the origin.
+  const x0 = 0, z0 = 0;
+  // Step off the very top: summits are knife edges more often than not.
+  const firstBearing = bestDescent(terrain, { x: x0, z: z0 });
+  let x = x0 + Math.sin(rad(firstBearing)) * 150;
+  let z = z0 + Math.cos(rad(firstBearing)) * 150;
+  let bearing = firstBearing;
+  const startH = terrain.height(x, z);
+  const points = [{ x, z, h: startH, d: 0 }];
+  const step = 22;
+  const headings = [-46, -34, -24, -15, -8, -3, 0, 3, 8, 15, 24, 34, 46];
+  let distance = 0, flat = 0, current = startH;
+  let lowestH = startH, lowestAt = 0;
+
+  while (distance < 12000) {
+    let best = null;
+    for (const dh of headings) {
+      const b = bearing + dh;
+      const nx = x + Math.sin(rad(b)) * step;
+      const nz = z + Math.cos(rad(b)) * step;
+      if (!terrain.inside(nx, nz)) continue;
+      const hh = terrain.height(nx, nz);
+      // A little penalty per degree of turn keeps the line ski-able instead of
+      // zig-zagging down every contour of the mountain.
+      const score = hh + Math.abs(dh) * 0.55;
+      if (!best || score < best.score) best = { score, hh, b, nx, nz };
+    }
+    if (!best) break;
+    const drop = current - best.hh;
+    if (drop < step * 0.055) flat++; else flat = 0;
+    x = best.nx; z = best.nz; bearing = best.b; current = best.hh;
+    distance += step;
+    points.push({ x, z, h: current, d: distance });
+    if (current < lowestH) { lowestH = current; lowestAt = points.length - 1; }
+    // A greedy walk will happily climb back out of a basin, and the run would
+    // then end uphill of its own valley. Cut the line at the furthest descent
+    // instead of wherever the walk happened to stop.
+    if (current > lowestH + 90) break;
+    // Benches and moraines happen; a run does not end because of one flat
+    // stretch, only because the mountain has genuinely run out.
+    if (flat > 50) break;
+  }
+  const route = points.slice(0, lowestAt + 1);
+  const drop = startH - lowestH;
+  const total = route.length ? route[route.length - 1].d : 0;
+  const avgGrade = total > 0 ? drop / total : 0;
+  return { points: route, drop, distance: total, startH, avgGrade, bearing: firstBearing, target: drop * 0.98 };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Renderer, sky, sun
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let THREE;
+let renderer, runScene, globeScene, camera, globeCamera;
+const sunDir = { x: 0, y: 0, z: 0 };
+const SUN_ALT = 27, SUN_AZ = 226;
+const FOG = 0xc9daea;
+
+function makeRenderer() {
+  renderer = new THREE.WebGLRenderer({ canvas: $('#gl'), antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.96;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.autoClear = false;
+}
+
+function buildSky(scene) {
+  const uniforms = {
+    uSun: { value: new THREE.Vector3(sunDir.x, sunDir.y, sunDir.z) },
+    uZenith: { value: new THREE.Color(0x214f80) },
+    uHorizon: { value: new THREE.Color(FOG) },
+    uSunCol: { value: new THREE.Color(0xfff1d6) }
+  };
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
+    side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 uSun; uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uSunCol;
+      varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        float up = clamp(d.y, 0.0, 1.0);
+        vec3 col = mix(uHorizon, uZenith, pow(up, 0.32));
+        float sd = max(dot(d, normalize(uSun)), 0.0);
+        col += uSunCol * pow(sd, 1400.0) * 9.0;
+        col += uSunCol * pow(sd, 22.0) * 0.20;
+        col += uSunCol * pow(sd, 3.0) * 0.05;
+        col = mix(col, uHorizon, smoothstep(0.12, -0.04, d.y));
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(9000, 32, 20), mat);
+  sky.frustumCulled = false;
+  sky.renderOrder = -10;
+  scene.add(sky);
+  return sky;
+}
+
+/* ── snow relief: a tiling normal map of drifted, wind-packed snow ───────── */
+function snowNormalMap() {
+  const s = 256;
+  const hgt = new Float32Array(s * s);
+  const noise = (x, y, seed) => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const h = (a, b) => fract(Math.sin(a * 127.1 + b * 311.7 + seed) * 43758.5453);
+    return lerp(lerp(h(xi, yi), h(xi + 1, yi), u), lerp(h(xi, yi + 1), h(xi + 1, yi + 1), u), v);
+  };
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      hgt[y * s + x] = 0.46 * noise(x / 34, y / 34, 1) + 0.32 * noise(x / 13, y / 13, 7) + 0.22 * noise(x / 4.6, y / 4.6, 13);
+    }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = s;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(s, s);
+  const strength = 2.4;
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const l = hgt[y * s + ((x + s - 1) % s)], r = hgt[y * s + ((x + 1) % s)];
+      const u = hgt[((y + s - 1) % s) * s + x], d = hgt[((y + 1) % s) * s + x];
+      const nx = (l - r) * strength, ny = (u - d) * strength;
+      const len = Math.hypot(nx, ny, 1);
+      const o = (y * s + x) * 4;
+      img.data[o] = (nx / len * 0.5 + 0.5) * 255;
+      img.data[o + 1] = (ny / len * 0.5 + 0.5) * 255;
+      img.data[o + 2] = (1 / len * 0.5 + 0.5) * 255;
+      img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+/* ── procedural snow grain, so the surface is not a plastic sheet ─────────── */
+function grainTexture() {
+  const s = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = s;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, s, s);
+  // wind-packed snow: fine grain, then longer drifts blown across the slope
+  for (let i = 0; i < 4200; i++) {
+    const x = Math.random() * s, y = Math.random() * s, r = 0.5 + Math.random() * 2.1;
+    const tone = 176 + Math.random() * 66;
+    ctx.fillStyle = 'rgba(' + Math.round(tone - 12) + ',' + Math.round(tone) + ',' + Math.min(255, Math.round(tone + 16)) + ',' + (0.10 + Math.random() * 0.26).toFixed(3) + ')';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Building one mountain: mesh, snow shading, long shadows, trees, gates
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const world = {
+  terrain: null, run: null, group: null, tracks: null, skis: null,
+  spray: null, snowfall: null, gates: [], finish: null, sky: null,
+  mapCanvas: null, mapRoute: null, shadowBias: 0
+};
+
+function buildTerrainMesh(terrain, run) {
+  const N = MESH_N;
+  const step = (terrain.W - 1) / (N - 1);
+  const mpp = terrain.mpp;
+  const count = N * N;
+  const pos = new Float32Array(count * 3);
+  const nrm = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  const col = new Float32Array(count * 3);
+  const n = { x: 0, y: 1, z: 0 };
+
+  // The sun's horizontal travel per metre of shade-march.
+  const sunH = Math.hypot(sunDir.x, sunDir.z) || 1;
+  const sx = sunDir.x / sunH, sz = sunDir.z / sunH;
+  const rise = Math.tan(Math.asin(clamp(sunDir.y, -1, 1)));
+
+  let k = 0;
+  for (let v = 0; v < N; v++) {
+    const j = v * step;
+    for (let u = 0; u < N; u++, k++) {
+      const i = u * step;
+      const x = (i - terrain.i0) * mpp;
+      const z = (j - terrain.j0) * mpp;
+      const h = terrain.height(x, z);
+      pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
+
+      terrain.normal(x, z, n);
+      nrm[k * 3] = n.x; nrm[k * 3 + 1] = n.y; nrm[k * 3 + 2] = n.z;
+
+      uv[k * 2] = x / 40; uv[k * 2 + 1] = z / 40;
+
+      // ── sun occlusion: march the heightfield toward the sun
+      let occ = 0;
+      if (h > 500) {
+        for (let s = 1; s <= 11; s++) {
+          const d = s * 52;
+          if (terrain.height(x + sx * d, z + sz * d) > h + rise * d + 2) occ++;
+        }
+      }
+      const shade = clamp(1 - occ * 0.06, 0.68, 1);
+
+      // ── albedo: snow, exposed rock, scree, forest
+      const steep = 1 - n.y;
+      const snow = 1 - sstep(0.30, 0.72, steep);
+      const alt = sstep(1250, 1900, h);
+      const glacier = sstep(3100, 3700, h) * (1 - sstep(0.18, 0.45, steep));
+      // Two scales of mottling: snow is never one flat tone, and the big
+      // patches are what give a slope its shape when the sun is low.
+      const patch = hash2(Math.floor(i / 11) * 0.71, Math.floor(j / 11) * 0.71);
+      const grit = hash2(i * 0.37, j * 0.37) * 0.05 - 0.025 + (patch - 0.5) * 0.10;
+      // scree poking through on the high, broken faces
+      const scree = sstep(0.16, 0.30, steep) * (1 - sstep(0.32, 0.44, steep)) * sstep(2350, 2750, h) * hash2(i * 1.7, j * 1.7) * 0.55;
+
+      let r = lerp(0.30, 0.94, snow);
+      let g = lerp(0.31, 0.95, snow);
+      let b = lerp(0.33, 0.99, snow);
+      r = lerp(r, 0.44, scree); g = lerp(g, 0.43, scree); b = lerp(b, 0.43, scree);
+      // Timber below the tree line, in patches. Distant conifers are a dark
+      // mass, not a pepper of individual trees, so most of the forest is paint.
+      const wood = (1 - sstep(1480, 1830, h)) * (1 - sstep(0.30, 0.56, steep)) *
+        sstep(0.44, 0.62, vnoise(i / 9, j / 9, 3));
+      r = lerp(r, 0.17, wood * 0.72); g = lerp(g, 0.24, wood * 0.72); b = lerp(b, 0.21, wood * 0.72);
+      // forested valley floor
+      r = lerp(r * 0.66, r, alt);
+      g = lerp(g * 0.74, g, alt);
+      b = lerp(b * 0.70, b, alt);
+      // glacier ice at altitude
+      r = lerp(r, r * 0.86, glacier);
+      g = lerp(g, g * 0.94, glacier);
+      b = lerp(b, b * 1.0, glacier);
+      // long shadows read cold, not black
+      r = (r + grit) * lerp(0.86, 1, shade) * lerp(1, 0.97, occ / 11);
+      g = (g + grit) * lerp(0.90, 1, shade) * lerp(1, 0.985, occ / 11);
+      b = (b + grit) * lerp(0.97, 1, shade);
+      col[k * 3] = clamp(r, 0, 1);
+      col[k * 3 + 1] = clamp(g, 0, 1);
+      col[k * 3 + 2] = clamp(b, 0, 1);
+    }
+  }
+
+  const index = new Uint32Array((N - 1) * (N - 1) * 6);
+  let o = 0;
+  for (let v = 0; v < N - 1; v++) {
+    for (let u = 0; u < N - 1; u++) {
+      const a = v * N + u, b = a + 1, c = a + N, d = c + 1;
+      index[o++] = a; index[o++] = c; index[o++] = b;
+      index[o++] = b; index[o++] = c; index[o++] = d;
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setIndex(new THREE.BufferAttribute(index, 1));
+  geo.computeBoundingSphere();
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    map: grainTexture(),
+    normalMap: snowNormalMap(),
+    normalScale: new THREE.Vector2(0.9, 0.9),
+    roughness: 0.8, metalness: 0.0
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
+function buildTrees(terrain, run) {
+  const geo = new THREE.ConeGeometry(1, 3.6, 5, 1);
+  geo.translate(0, 1.8, 0);
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: false });
+  const max = 6400;
+  const inst = new THREE.InstancedMesh(geo, mat, max);
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  const colour = new THREE.Color();
+  const n = { x: 0, y: 1, z: 0 };
+  const up = new THREE.Vector3(0, 1, 0);
+  const leanAxis = new THREE.Vector3();
+  const lean = new THREE.Quaternion();
+  let count = 0;
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+
+  // Real conifers only near the line: beyond about a kilometre they are a
+  // few pixels each, and the painted timber on the terrain does that job.
+  const reach = 900;
+  // A clear corridor down the whole line: a conifer in the lens is a green
+  // wall, not scenery. Grid the route so the test is a lookup, not a scan.
+  const CELL = 20, clear = new Set();
+  for (const rp of run.points) {
+    const gx = Math.round(rp.x / CELL), gz = Math.round(rp.z / CELL);
+    for (let ox = -2; ox <= 2; ox++) for (let oz = -2; oz <= 2; oz++) clear.add((gx + ox) + ',' + (gz + oz));
+  }
+
+  for (let guard = 0; guard < 160000 && count < max; guard++) {
+    const from = run.points[Math.floor(rnd() * run.points.length)];
+    const angle = rnd() * 6.2832;
+    const away = rnd() * reach;
+    const x = from.x + Math.sin(angle) * away;
+    const z = from.z + Math.cos(angle) * away;
+    if (!terrain.inside(x, z)) continue;
+    if (clear.has(Math.round(x / CELL) + ',' + Math.round(z / CELL))) continue;
+    const h = terrain.height(x, z);
+    if (h > 1980 || h < 520) continue;
+    terrain.normal(x, z, n);
+    if (1 - n.y > 0.52) continue;
+    // Forests grow in patches, not in a pepper of single trees: a coarse
+    // hash decides which parts of the slope are wooded at all.
+    if (hash2(Math.floor(x / 58), Math.floor(z / 58)) < 0.42) continue;
+    // then the tree line thins out with altitude
+    const density = sstep(2005, 1840, h) * 0.88 + 0.12;
+    if (rnd() > density) continue;
+    const height = 5 + rnd() * 8;
+    // Conifers are roughly 4:1, not 8:1: the thin version read as black spikes.
+    const width = height * (0.28 + rnd() * 0.13);
+    s.set(width, height * 0.40, width);
+    p.set(x, h - 0.4, z);
+    q.setFromAxisAngle(up, rnd() * 6.2832);
+    // A forest of plumb verticals reads as a diagram; give each one a lean.
+    leanAxis.set(Math.cos(rnd() * 6.2832), 0, Math.sin(rnd() * 6.2832));
+    lean.setFromAxisAngle(leanAxis, (rnd() - 0.5) * 0.11);
+    q.premultiply(lean);
+    m.compose(p, q, s);
+    inst.setMatrixAt(count, m);
+    const shade = 0.30 + rnd() * 0.26;
+    colour.setRGB(shade * 0.62, shade * 0.94, shade * 0.78);
+    inst.setColorAt(count, colour);
+    count++;
+  }
+  inst.count = count;
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  // An InstancedMesh's bounding sphere comes from its base geometry, which sits
+  // at the origin — left on, the whole forest vanishes the moment the summit
+  // leaves the frame.
+  inst.frustumCulled = false;
+  return inst;
+}
+
+function buildRouteMarks(terrain, run) {
+  const spacing = 15;
+  const count = Math.floor(run.distance / spacing);
+  const geo = new THREE.PlaneGeometry(4.5, 0.55);
+  geo.rotateX(-PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xe2541a, transparent: true, opacity: 0.72, depthWrite: false });
+  const inst = new THREE.InstancedMesh(geo, mat, Math.max(1, count));
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const n = { x: 0, y: 1, z: 0 };
+  const p = new THREE.Vector3();
+  const one = new THREE.Vector3(1, 1, 1);
+  let k = 0;
+  let next = spacing;
+  for (let i = 1; i < run.points.length && k < count; i++) {
+    const a = run.points[i - 1], b = run.points[i];
+    if (b.d < next) continue;
+    next += spacing;
+    const x = b.x, z = b.z;
+    terrain.normal(x, z, n);
+    q.setFromUnitVectors(up, new THREE.Vector3(n.x, n.y, n.z));
+    const yaw = Math.atan2(b.x - a.x, b.z - a.z);
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(up, yaw));
+    p.set(x, b.h + 0.12, z);
+    m.compose(p, q, one);
+    inst.setMatrixAt(k++, m);
+  }
+  inst.count = k;
+  inst.instanceMatrix.needsUpdate = true;
+  inst.frustumCulled = false;
+  inst.renderOrder = 1;
+  return inst;
+}
+
+// Boulders and rock bands near the line: nothing anchors speed and scale like
+// something solid going past.
+function buildBoulders(terrain, run) {
+  const geo = new THREE.IcosahedronGeometry(1, 0);
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const max = 300;
+  const inst = new THREE.InstancedMesh(geo, mat, max);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  const colour = new THREE.Color();
+  const n = { x: 0, y: 1, z: 0 };
+  const axis = new THREE.Vector3();
+  let seed = 918273;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  let count = 0;
+  for (let guard = 0; guard < 20000 && count < max; guard++) {
+    const point = run.points[Math.floor(rnd() * run.points.length)];
+    const side = rnd() < 0.5 ? -1 : 1;
+    const away = 7 + rnd() * rnd() * 90;
+    const x = point.x + side * away * Math.cos(rnd() * 6.2832);
+    const z = point.z + side * away * Math.sin(rnd() * 6.2832);
+    if (!terrain.inside(x, z)) continue;
+    terrain.normal(x, z, n);
+    if (1 - n.y > 0.62) continue;
+    const h = terrain.height(x, z);
+    const size = 0.3 + rnd() * rnd() * 1.3;
+    s.set(size * (1 + rnd() * 0.6), size * (0.55 + rnd() * 0.4), size);
+    p.set(x, h - size * 0.34, z);
+    axis.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
+    q.setFromAxisAngle(axis, rnd() * 6.2832);
+    m.compose(p, q, s);
+    inst.setMatrixAt(count, m);
+    const tone = 0.30 + rnd() * 0.16;
+    colour.setRGB(tone, tone * 1.02, tone * 1.10);
+    inst.setColorAt(count, colour);
+    count++;
+  }
+  inst.count = count;
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  inst.frustumCulled = false;
+  return inst;
+}
+
+function buildGates(terrain, run) {
+  const gates = [];
+  const poleGeo = new THREE.CylinderGeometry(0.14, 0.14, 2.1, 6);
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0xe4e9ee });
+  // Gates hang off the distance, not the drop: on a 40-degree face vertical
+  // spacing would put them a kilometre apart, which is no use as a target.
+  const finishH = run.startH - run.target;
+  // Spread the gates over the whole line instead of packing them into the top.
+  const gateCount = clamp(Math.round(run.distance / 320), 6, 14);
+  const spacing = run.distance / (gateCount + 1);
+  const positions = [];
+  let next = spacing;
+  for (const pt of run.points) {
+    if (pt.d < next || pt.h <= finishH + 8) continue;
+    next += spacing;
+    positions.push(pt);
+    if (positions.length >= gateCount) break;
+  }
+
+  let number = 0;
+  for (const point of positions) {
+    number++;
+    const group = new THREE.Group();
+    // A numbered panel on each side: a 7 cm pole is a single pixel at 150 m,
+    // which is no target at all.
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#e2541a'; ctx.fillRect(0, 0, 128, 96);
+    ctx.fillStyle = '#fff8f2';
+    ctx.font = '600 60px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(number), 64, 51);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const panelMat = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
+    for (const side of [-1, 1]) {
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.set(side * 9, 1.05, 0);
+      group.add(pole);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 1.3), panelMat);
+      panel.position.set(side * 9, 1.05, 0);
+      group.add(panel);
+    }
+    // Square the gate to the fall line and sit it on the ground. The panels are
+    // in the group's XY plane, so the group's +Z has to point down the run —
+    // adding a quarter turn here is what turned every gate edge-on.
+    const i = run.points.indexOf(point);
+    const prev = run.points[Math.max(0, i - 1)];
+    group.rotation.y = Math.atan2(point.x - prev.x, point.z - prev.z);
+    group.position.set(point.x, point.h, point.z);
+    gates.push(group);
+  }
+  return { gates, positions };
+}
+
+function buildFinish(terrain, run) {
+  let point = run.points[run.points.length - 1];
+  for (const pt of run.points) { if (pt.h <= run.startH - run.target) { point = pt; break; } }
+  const group = new THREE.Group();
+  const poleGeo = new THREE.CylinderGeometry(0.12, 0.12, 5.2, 8);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x1c2530 });
+  for (const side of [-1, 1]) {
+    const pole = new THREE.Mesh(poleGeo, mat);
+    pole.position.set(side * 7, 2.6, 0);
+    group.add(pole);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f6f4ee'; ctx.fillRect(0, 0, 512, 96);
+  ctx.fillStyle = '#171613';
+  ctx.fillRect(0, 0, 512, 4); ctx.fillRect(0, 92, 512, 4);
+  ctx.font = '600 44px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('FINISH', 256, 50);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const banner = new THREE.Mesh(new THREE.PlaneGeometry(14, 2.6), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
+  banner.position.set(0, 3.6, 0);
+  group.add(banner);
+  const i = run.points.indexOf(point);
+  const prev = run.points[Math.max(0, i - 1)];
+  group.rotation.y = Math.atan2(point.x - prev.x, point.z - prev.z);
+  group.position.set(point.x, point.h, point.z);
+  return { group, point };
+}
+
+/* ── ski tracks: a ribbon of two fresh grooves behind the player ──────────── */
+class Tracks {
+  constructor(scene) {
+    this.max = 340;
+    this.meshes = [];
+    for (let ski = 0; ski < 2; ski++) {
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(this.max * 2 * 3);
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const idx = new Uint16Array((this.max - 1) * 6);
+      let o = 0;
+      for (let i = 0; i < this.max - 1; i++) {
+        const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+        idx[o++] = a; idx[o++] = c; idx[o++] = b;
+        idx[o++] = b; idx[o++] = c; idx[o++] = d;
+      }
+      geo.setIndex(new THREE.BufferAttribute(idx, 1));
+      geo.setDrawRange(0, 0);
+      geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xa9c2dc, transparent: true, opacity: 0.55, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 2;
+      scene.add(mesh);
+      this.meshes.push(mesh);
+    }
+    this.points = 0;
+    this.last = null;
+  }
+  reset() {
+    this.points = 0;
+    this.last = null;
+    for (const mesh of this.meshes) mesh.geometry.setDrawRange(0, 0);
+  }
+  push(x, y, z, rx, rz, airborne) {
+    if (airborne) { this.last = null; return; }
+    if (this.last && Math.hypot(x - this.last.x, z - this.last.z) < 1.1) return;
+    if (this.points >= this.max) this.reset();
+    const width = 0.075;
+    for (let ski = 0; ski < 2; ski++) {
+      const side = ski === 0 ? -0.20 : 0.20;
+      const cx = x + rx * side, cz = z + rz * side;
+      const arr = this.meshes[ski].geometry.attributes.position.array;
+      const o = this.points * 6;
+      arr[o] = cx - rx * width; arr[o + 1] = y + 0.045; arr[o + 2] = cz - rz * width;
+      arr[o + 3] = cx + rx * width; arr[o + 4] = y + 0.045; arr[o + 5] = cz + rz * width;
+      this.meshes[ski].geometry.attributes.position.needsUpdate = true;
+      const n = this.points + 1;
+      this.meshes[ski].geometry.setDrawRange(0, Math.max(0, (n - 1) * 6));
+    }
+    this.last = { x, z };
+    this.points++;
+  }
+}
+
+/* ── particles: spray off the skis, and the falling snow ──────────────────── */
+function makePoints(count, size, opacity) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+  const mat = new THREE.PointsMaterial({
+    color: 0xffffff, size, sizeAttenuation: true, transparent: true, opacity,
+    depthWrite: false, fog: true
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  return pts;
+}
+
+class Spray {
+  constructor(scene) {
+    this.count = 420;
+    this.pts = makePoints(this.count, 0.34, 0.85);
+    this.pos = this.pts.geometry.attributes.position.array;
+    this.vel = new Float32Array(this.count * 3);
+    this.life = new Float32Array(this.count);
+    for (let i = 0; i < this.count; i++) this.pos[i * 3 + 1] = -9999;
+    scene.add(this.pts);
+    this.cursor = 0;
+  }
+  emit(x, y, z, vx, vz, power) {
+    for (let n = 0; n < power; n++) {
+      const i = this.cursor = (this.cursor + 1) % this.count;
+      this.pos[i * 3] = x + (Math.random() - 0.5) * 0.6;
+      this.pos[i * 3 + 1] = y + 0.12;
+      this.pos[i * 3 + 2] = z + (Math.random() - 0.5) * 0.6;
+      this.vel[i * 3] = vx * 0.16 + (Math.random() - 0.5) * 3.4;
+      this.vel[i * 3 + 1] = 1.6 + Math.random() * 3.2;
+      this.vel[i * 3 + 2] = vz * 0.16 + (Math.random() - 0.5) * 3.4;
+      this.life[i] = 0.55 + Math.random() * 0.45;
+    }
+  }
+  update(dt) {
+    for (let i = 0; i < this.count; i++) {
+      if (this.life[i] <= 0) continue;
+      this.life[i] -= dt;
+      if (this.life[i] <= 0) { this.pos[i * 3 + 1] = -9999; continue; }
+      this.vel[i * 3 + 1] -= 9.2 * dt;
+      this.pos[i * 3] += this.vel[i * 3] * dt;
+      this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt;
+      this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
+    }
+    this.pts.geometry.attributes.position.needsUpdate = true;
+  }
+  clear() {
+    for (let i = 0; i < this.count; i++) { this.life[i] = 0; this.pos[i * 3 + 1] = -9999; }
+    this.pts.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+class Snowfall {
+  constructor(scene) {
+    this.count = 1400;
+    this.pts = makePoints(this.count, 0.19, 0.62);
+    this.pos = this.pts.geometry.attributes.position.array;
+    this.span = 90;
+    for (let i = 0; i < this.count; i++) {
+      this.pos[i * 3] = (Math.random() - 0.5) * this.span;
+      this.pos[i * 3 + 1] = Math.random() * 46;
+      this.pos[i * 3 + 2] = (Math.random() - 0.5) * this.span;
+    }
+    this.pts.geometry.attributes.position.needsUpdate = true;
+    scene.add(this.pts);
+    this.t = 0;
+  }
+  update(dt, px, py, pz) {
+    this.t += dt;
+    for (let i = 0; i < this.count; i++) {
+      const o = i * 3;
+      this.pos[o + 1] -= dt * (1.1 + (i % 7) * 0.12);
+      this.pos[o] += Math.sin(this.t * 0.7 + i) * dt * 0.55;
+      this.pos[o + 2] += Math.cos(this.t * 0.5 + i * 0.7) * dt * 0.4;
+      if (this.pos[o + 1] < -8) this.pos[o + 1] += 46;
+      // wrap the flake cloud around the camera so it never runs out
+      if (this.pos[o] - px > this.span / 2) this.pos[o] -= this.span;
+      if (this.pos[o] - px < -this.span / 2) this.pos[o] += this.span;
+      if (this.pos[o + 2] - pz > this.span / 2) this.pos[o + 2] -= this.span;
+      if (this.pos[o + 2] - pz < -this.span / 2) this.pos[o + 2] += this.span;
+    }
+    this.pts.position.y = py - 4;
+    this.pts.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+/* ── first-person skis: just the tips, the way you actually see them ──────── */
+function buildSkis() {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color: 0x26303a });
+  const accent = new THREE.MeshLambertMaterial({ color: 0xc2410c });
+  for (const side of [-1, 1]) {
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.022, 0.78), mat);
+    shaft.position.set(side * 0.155, 0, -0.62);
+    shaft.rotation.x = 0.04;
+    group.add(shaft);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.02, 0.26), accent);
+    tip.position.set(side * 0.155, 0.035, -1.11);
+    tip.rotation.x = -0.5;
+    group.add(tip);
+  }
+  return group;
+}
+
+// The tips sit on the snow 2 m ahead, not on a fixed plate in front of the lens:
+// on a 40-degree face the ground drops away far faster than the camera's aim.
+let skiAnchor = null;
+function placeSkis() {
+  if (!world.skis || !world.terrain || !camera) return;
+  if (!skiAnchor) skiAnchor = new THREE.Vector3();
+  const pl = game.player;
+  const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
+  const reach = 2.05;
+  const gy = world.terrain.height(pl.x + fx * reach, pl.z + fz * reach);
+  skiAnchor.set(pl.x + fx * reach, gy + 0.05, pl.z + fz * reach);
+  camera.updateMatrixWorld(true);
+  camera.worldToLocal(skiAnchor);
+  world.skis.position.copy(skiAnchor);
+  world.skis.rotation.set(pl.air ? -0.16 : 0, 0, -pl.yawRate * 0.10);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   The globe picker
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const globe = {
+  group: null, pins: [], yaw: 0, pitch: 0, targetYaw: 0, targetPitch: 0,
+  drag: null, spin: 0, selected: 0, land: null, hoverX: 0, hoverY: 0
+};
+
+function latLonToVec3(lat, lon, r, out) {
+  const la = rad(lat), lo = rad(lon);
+  out.x = -Math.cos(la) * Math.cos(lo) * r;
+  out.y = Math.sin(la) * r;
+  out.z = Math.cos(la) * Math.sin(lo) * r;
+  return out;
+}
+
+async function loadLandTexture() {
+  const res = await fetch(LAND_URL, { mode: 'cors' });
+  if (!res.ok) throw new Error('land ' + res.status);
+  const geo = await res.json();
+  const W = 2048, H = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#ffffff';
+  const drawRing = ring => {
+    ctx.beginPath();
+    for (let i = 0; i < ring.length; i++) {
+      const lon = ring[i][0], lat = ring[i][1];
+      const x = (lon + 180) / 360 * W;
+      const y = (90 - lat) / 180 * H;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  for (const feature of geo.features || []) {
+    const g = feature.geometry;
+    if (!g) continue;
+    if (g.type === 'Polygon') {
+      g.coordinates.forEach((ring, i) => { if (i === 0) drawRing(ring); });
+    } else if (g.type === 'MultiPolygon') {
+      for (const poly of g.coordinates) poly.forEach((ring, i) => { if (i === 0) drawRing(ring); });
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+function buildGlobe(landTex) {
+  globeScene = new THREE.Scene();
+  // Paper, not space: the globe sits on the arcade's own backdrop, so the ink
+  // panels above it stay readable.
+  globeScene.background = new THREE.Color(0xe7edf2);
+  globeCamera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 40);
+
+  const uniforms = {
+    uLand: { value: landTex },
+    uSun: { value: new THREE.Vector3(sunDir.x, sunDir.y, sunDir.z) },
+    uOcean: { value: new THREE.Color(0x12324c) },
+    uLandCol: { value: new THREE.Color(0xe9e7de) },
+    uHatch: { value: new THREE.Color(0x9aa8b2) }
+  };
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: `
+      varying vec3 vN;
+      void main() {
+        vN = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D uLand; uniform vec3 uSun; uniform vec3 uOcean; uniform vec3 uLandCol; uniform vec3 uHatch;
+      varying vec3 vN;
+      float line(float v, float stepPx) {
+        float d = abs(fract(v / stepPx + 0.5) - 0.5) * stepPx;
+        return 1.0 - smoothstep(0.0, 0.02, d);
+      }
+      void main() {
+        vec3 n = normalize(vN);
+        float lon = atan(n.z, -n.x);
+        float lat = asin(clamp(n.y, -1.0, 1.0));
+        vec2 uv = vec2(lon / 6.2831853 + 0.5, lat / 3.14159265 + 0.5);
+        float land = texture2D(uLand, uv).r;
+        float m = smoothstep(0.35, 0.65, land);
+        vec3 col = mix(uOcean, uLandCol, m);
+        // a little relief on the land so it is not flat paper
+        col = mix(col, uHatch, m * 0.10);
+        float grid = max(line(lon * 57.29578, 15.0), line(lat * 57.29578, 15.0));
+        col = mix(col, col * 1.22 + 0.03, grid * (1.0 - m) * 0.55 + grid * m * 0.25);
+        float lit = 0.52 + 0.48 * max(dot(n, normalize(uSun)), 0.0);
+        col *= lit;
+        float rim = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 2.6);
+        col += vec3(0.06, 0.13, 0.22) * rim * 0.8;
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`
+  });
+  globe.group = new THREE.Group();
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), mat);
+  globe.group.add(sphere);
+  globeScene.add(globe.group);
+
+  // atmosphere
+  const atmo = globe.atmo = new THREE.Mesh(
+    new THREE.SphereGeometry(1.055, 48, 32),
+    new THREE.ShaderMaterial({
+      transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false, fog: false,
+      vertexShader: `varying vec3 vN; varying vec3 vP;
+        void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vP = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `varying vec3 vN; varying vec3 vP;
+        void         main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vP))), 3.0);
+          gl_FragColor = vec4(vec3(0.26, 0.48, 0.78) * f, f * 0.42); }`
+    })
+  );
+  globeScene.add(atmo);
+
+  // pins
+  const pinGeo = new THREE.SphereGeometry(0.018, 10, 8);
+  const v = new THREE.Vector3();
+  PEAKS.forEach((peak, i) => {
+    const pin = new THREE.Group();
+    const dot = new THREE.Mesh(pinGeo, new THREE.MeshBasicMaterial({ color: 0xc2410c }));
+    latLonToVec3(peak.lat, peak.lon, 1.006, v);
+    pin.position.set(v.x, v.y, v.z);
+    pin.add(dot);
+    pin.userData = { index: i, dot };
+    globe.group.add(pin);
+    globe.pins.push(pin);
+  });
+
+  fitGlobe();
+  setGlobeFocus(0, true);
+}
+
+// Sit the globe in the space the panels leave free: a little smaller than the
+// viewport, and lifted clear of the peak list on a phone.
+function fitGlobe() {
+  if (!globeCamera) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  globeCamera.aspect = w / h;
+  const focal = (h / 2) / Math.tan(rad(globeCamera.fov) / 2);
+  const radiusPx = Math.min(w, h) * (w < 700 ? 0.40 : 0.36);
+  const distance = Math.sqrt(1 + Math.pow(focal / radiusPx, 2)) * 1.02;
+  globeCamera.position.set(0, 0, distance);
+  globeCamera.updateProjectionMatrix();
+  const lift = w < 700 ? 0.46 : 0;
+  if (globe.group) globe.group.position.y = lift;
+  if (globe.atmo) globe.atmo.position.y = lift;
+}
+
+function setGlobeFocus(index, instant) {
+  globe.selected = index;
+  const peak = PEAKS[index];
+  globe.targetYaw = PI / 2 - rad(peak.lon);
+  globe.targetPitch = rad(peak.lat);
+  if (instant) { globe.yaw = globe.targetYaw; globe.pitch = globe.targetPitch; }
+  renderPeakList();
+  renderCard();
+  for (const pin of globe.pins) {
+    const active = pin.userData.index === index;
+    pin.userData.dot.material.color.setHex(active ? 0xff7a3c : 0xc2410c);
+    pin.scale.setScalar(active ? 1.7 : 1);
+  }
+}
+
+function renderPeakList() {
+  const nav = $('#peaks');
+  nav.innerHTML = '';
+  PEAKS.forEach((peak, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-current', i === globe.selected ? 'true' : 'false');
+    b.innerHTML = '<span class="n">' + peak.peak + '</span><span class="m">' + peak.area + ' · ' + peak.country +
+      (i === todayIndex() ? ' <span class="today">TODAY</span>' : '') + '</span>';
+    b.onclick = () => setGlobeFocus(i);
+    nav.appendChild(b);
+  });
+}
+
+function todayIndex() {
+  const seed = window.__boredSeed && Number.isFinite(window.__boredSeed.seed) ? window.__boredSeed.seed : 0;
+  return Math.abs(seed) % PEAKS.length;
+}
+
+function renderCard() {
+  const peak = PEAKS[globe.selected];
+  $('#card-name').textContent = peak.peak;
+  $('#card-where').textContent = peak.area + ' · ' + peak.country;
+  $('#card-run').textContent = 'Line: ' + peak.run;
+  $('#card-alt').textContent = peak.alt.toLocaleString('en-US') + ' m';
+  $('#card-drop').textContent = '−' + peak.drop.toLocaleString('en-US') + ' m';
+  $('#card-len').textContent = (peak.len / 1000).toFixed(1) + ' km';
+  $('#card-grade').textContent = Math.round(peak.grade) + '%';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Game state
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const game = {
+  mode: 'boot',          // boot | picker | loading | ready | run | pause | done | error
+  peak: null,
+  time: 0,
+  topSpeed: 0,
+  distance: 0,
+  vertical: 0,
+  gate: 0,
+  gatesTotal: 9,
+  best: 0,
+  player: { x: 0, z: 0, y: 0, heading: 0, speed: 0, vy: 0, air: false, yawRate: 0 },
+  shake: 0,
+  landedAt: 0,
+  idleTime: 0,
+  lastFrame: 0
+};
+
+const input = { left: false, right: false, stick: 0, tuck: false, brake: false, jump: false };
+
+function readBest() {
+  try {
+    const raw = localStorage.getItem('bored.geopeaks.best');
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch (err) { return 0; }
+}
+function writeBest(value) {
+  try { localStorage.setItem('bored.geopeaks.best', String(Math.round(value))); } catch (err) { /* private mode */ }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Starting a run
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function veil(text, fraction, retry) {
+  $('#veil-text').textContent = text;
+  $('#veil-bar').style.width = Math.round(clamp(fraction, 0, 1) * 100) + '%';
+  $('#veil-retry').hidden = !retry;
+}
+
+function disposeRun() {
+  if (!world.group) return;
+  // Tracks and spray live on the scene itself (they follow the player, not the
+  // mountain), so they are not inside world.group and have to go separately.
+  if (world.tracks) {
+    for (const mesh of world.tracks.meshes) {
+      runScene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+  }
+  if (world.spray) {
+    runScene.remove(world.spray.pts);
+    world.spray.pts.geometry.dispose();
+    world.spray.pts.material.dispose();
+  }
+  runScene.remove(world.group);
+  world.group.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach(m => { if (m.map && m.map.dispose) m.map.dispose(); m.dispose(); });
+    }
+  });
+  world.group = null;
+  world.tracks = null;
+  world.spray = null;
+  world.snowfall = null;
+  world.gates = [];
+  world.finish = null;
+  world.terrain = null;
+  world.run = null;
+}
+
+async function startPeak(index) {
+  const peak = PEAKS[index];
+  game.peak = peak;
+  game.mode = 'loading';
+  $('#picker').hidden = true;
+  $('#hud').hidden = true;
+  $('#ready').hidden = true;
+  $('#result').hidden = true;
+  $('#pause').hidden = true;
+  $('#veil').hidden = false;
+  veil('Reading elevation · ' + peak.peak, 0.02);
+
+  try {
+    const terrain = await loadTerrain(peak, (done, total) => {
+      if (total) veil('Reading elevation · ' + (done || 0) + ' of ' + total + ' tiles', (done || 0) / total * 0.55);
+      else veil('Reading elevation · ' + peak.peak, 0.55);
+    });
+    veil('Tracing the fall line…', 0.6);
+    await frame();
+    const run = traceRun(terrain, peak);
+    if (run.drop < 120) throw new Error('No line off this summit.');
+
+    veil('Shaping the mountain…', 0.66);
+    await frame();
+    disposeRun();
+    world.group = new THREE.Group();
+    runScene.add(world.group);
+    world.terrain = terrain;
+    world.run = run;
+
+    const mesh = buildTerrainMesh(terrain, run);
+    world.group.add(mesh);
+
+    veil('Planting the tree line…', 0.86);
+    await frame();
+    world.group.add(buildTrees(terrain, run));
+    world.group.add(buildBoulders(terrain, run));
+    world.group.add(buildRouteMarks(terrain, run));
+
+    const gateData = buildGates(terrain, run);
+    gateData.gates.forEach(g => world.group.add(g));
+    world.gates = gateData.positions;
+    game.gatesTotal = gateData.gates.length;
+
+    world.finish = buildFinish(terrain, run);
+    world.group.add(world.finish.group);
+
+    world.tracks = new Tracks(runScene);
+    world.spray = new Spray(runScene);
+    if (!world.snowfall) world.snowfall = new Snowfall(runScene);
+    if (!world.skis) {
+      world.skis = buildSkis();
+      camera.add(world.skis);
+    }
+
+    buildMap(terrain, run);
+    resetPlayer();
+    veil('Ready', 1);
+    $('#veil').hidden = true;
+    $('#hud').hidden = false;
+    showReady();
+  } catch (err) {
+    showError(err);
+  }
+}
+
+function showError(err) {
+  game.mode = 'error';
+  $('#veil').hidden = false;
+  const offline = !navigator.onLine || /tile|land|fetch|Failed/i.test(String(err && err.message));
+  veil(offline
+    ? 'Could not reach the elevation tiles. GeoPeaks reads real terrain from the open Mapzen / AWS tiles, so it needs a connection.'
+    : 'Could not build this mountain: ' + (err && err.message ? err.message : 'unknown error'), 0, true);
+}
+
+function frame() {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function resetPlayer() {
+  const run = world.run;
+  const p = run.points[0];
+  const next = run.points[Math.min(6, run.points.length - 1)];
+  const heading = Math.atan2(next.x - p.x, next.z - p.z);
+  Object.assign(game.player, {
+    x: p.x, z: p.z, y: p.h, heading, speed: 0, vy: 0, air: false, yawRate: 0
+  });
+  game.time = 0;
+  game.topSpeed = 0;
+  game.distance = 0;
+  game.vertical = 0;
+  game.gate = 0;
+  game.shake = 0;
+  game.idleTime = 0;
+  snap.finished = false;
+  snap.metres = 0;
+  if (world.tracks) world.tracks.reset();
+  if (world.spray) world.spray.clear();
+  camera.fov = 74;
+  camera.updateProjectionMatrix();
+}
+
+function showReady() {
+  game.mode = 'ready';
+  const peak = game.peak;
+  $('#ready-name').textContent = peak.peak;
+  $('#ready-where').textContent = peak.area + ' · ' + peak.country + ' · ' + Math.round(world.run.startH) + ' m';
+  $('#ready-go').textContent = 'Drop in';
+  $('#ready').hidden = false;
+  updateHud(true);
+}
+
+function dropIn() {
+  if (game.mode !== 'ready' && game.mode !== 'done') return;
+  $('#ready').hidden = true;
+  $('#result').hidden = true;
+  resetPlayer();
+  game.mode = 'run';
+  toast('Drop');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Physics and camera
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const PHYS = {
+  gravity: 9.81, gScale: 0.9, drag: 0.0022, drag3: 0.00004,
+  friction: 0.5, brake: 8.5, carve: 0.05, turn: 2.1, eye: 1.62, maxSpeed: 41
+};
+
+function stepPhysics(dt) {
+  const t = world.terrain;
+  const pl = game.player;
+
+  const steerInput = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.stick;
+  const steer = clamp(steerInput, -1, 1);
+
+  // ground under us
+  const groundHere = t.height(pl.x, pl.z);
+  const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
+  const rx = Math.cos(pl.heading), rz = -Math.sin(pl.heading);
+
+  if (!pl.air) {
+    // slope along the direction of travel
+    const ahead = t.height(pl.x + fx * 3.2, pl.z + fz * 3.2);
+    const slope = Math.atan2(groundHere - ahead, 3.2);   // + means downhill
+    const gravity = PHYS.gravity * Math.sin(clamp(slope, -0.9, 1.35)) * PHYS.gScale;
+    const drag = PHYS.drag * pl.speed * pl.speed + PHYS.drag3 * Math.pow(pl.speed, 3);
+    const friction = PHYS.friction * (input.tuck ? 0.78 : 1) + (input.brake ? PHYS.brake : 0);
+    let accel = gravity - drag - friction;
+    if (Math.abs(slope) < 0.02 && pl.speed < 1.2) accel = Math.max(accel, 0);
+    pl.speed = clamp(pl.speed + accel * dt, 0, PHYS.maxSpeed);
+
+    // turning
+    const turnRate = PHYS.turn / (1 + pl.speed / 21) * (input.tuck ? 0.86 : 1);
+    pl.yawRate = steer * turnRate;
+    pl.heading += pl.yawRate * dt;
+    // carving costs speed, and the edges bite harder at speed
+    pl.speed = Math.max(0, pl.speed - Math.abs(steer) * PHYS.carve * pl.speed * dt * 2.2);
+
+    // jump
+    if (input.jump && !pl.air) {
+      const speedBoost = pl.speed * 0.07;
+      pl.vy = 4.3 + speedBoost;
+      pl.air = true;
+      pl.y = groundHere + 0.2;
+      input.jump = false;
+    }
+  } else {
+    pl.vy -= PHYS.gravity * dt;
+    pl.y += pl.vy * dt;
+    pl.heading += steer * 0.55 * dt;
+    pl.speed = Math.max(0, pl.speed - 0.4 * dt);
+    // air drag
+    pl.speed = Math.max(0, pl.speed - PHYS.drag * pl.speed * pl.speed * dt);
+  }
+
+  const nx = pl.x + Math.sin(pl.heading) * pl.speed * dt;
+  const nz = pl.z + Math.cos(pl.heading) * pl.speed * dt;
+  if (t.inside(nx, nz)) { pl.x = nx; pl.z = nz; }
+  else pl.speed *= 0.5;
+
+  const ground = t.height(pl.x, pl.z);
+
+  if (pl.air) {
+    if (pl.y <= ground) {
+      const impact = pl.vy;
+      pl.y = ground;
+      pl.air = false;
+      pl.vy = 0;
+      if (impact < -9) {
+        pl.speed *= 0.86;
+        game.shake = Math.min(1, (-impact - 9) / 22);
+        if (world.spray) world.spray.emit(pl.x, ground, pl.z, 0, 0, 26);
+      } else if (impact < -4) {
+        game.shake = Math.max(game.shake, 0.18);
+        if (world.spray) world.spray.emit(pl.x, ground, pl.z, 0, 0, 10);
+      }
+    }
+  } else {
+    pl.y = ground;
+    // a hard surface that rises under us should throw us, not clip us
+    const rise = t.height(pl.x + fx * 1.4, pl.z + fz * 1.4) - ground;
+    if (rise > 0.65 && pl.speed > 6) {
+      pl.vy = Math.min(6, pl.speed * 0.18);
+      pl.air = true;
+      pl.speed *= 0.94;
+    }
+  }
+
+  // distance and vertical
+  game.distance += pl.speed * dt;
+  const targetVert = world.run.startH - ground;
+  if (targetVert > game.vertical) game.vertical = targetVert;
+  game.topSpeed = Math.max(game.topSpeed, pl.speed);
+  game.time += dt;
+
+  // tracks and spray
+  if (world.tracks) world.tracks.push(pl.x, ground, pl.z, rx, rz, pl.air);
+  if (world.spray && !pl.air) {
+    const carving = Math.abs(steer) > 0.25 || input.brake;
+    if (carving && pl.speed > 7 && Math.random() < 0.85) {
+      const power = input.brake ? 9 : 4;
+      world.spray.emit(pl.x + rx * 0.2, ground, pl.z + rz * 0.2, -rx * pl.speed, -rz * pl.speed, power);
+    } else if (pl.speed > 24 && Math.random() < 0.4) {
+      world.spray.emit(pl.x, ground, pl.z, 0, 0, 2);
+    }
+  }
+
+  // Gates are counted by how far you have dropped, not by touching a pole:
+  // straying wide of one must not lock every gate after it.
+  while (game.gate < world.gates.length) {
+    const g = world.gates[game.gate];
+    if (game.vertical >= world.run.startH - g.h - 6) {
+      game.gate++;
+      toast('Gate ' + game.gate + ' / ' + game.gatesTotal);
+    } else break;
+  }
+
+  // finish
+  if (game.vertical >= world.run.target) finishRun();
+
+  // stuck in a flat valley or standing still too long: the run is over
+  if (game.mode === 'run') {
+    if (pl.speed < 0.8) game.idleTime += dt; else game.idleTime = 0;
+    if (game.idleTime > 7 && game.vertical > 25) finishRun();
+  }
+}
+
+function finishRun() {
+  if (game.mode !== 'run') return;
+  game.mode = 'done';
+  const previousBest = game.best;
+  snap.metres = Math.round(game.vertical);
+  snap.finished = true;
+  if (snap.metres > game.best) { game.best = snap.metres; writeBest(game.best); }
+
+  const peak = game.peak;
+  $('#result-name').textContent = peak.peak;
+  $('#result-where').textContent = peak.run + ' · ' + peak.area;
+  $('#result-m').textContent = snap.metres.toLocaleString('en-US');
+  $('#result-time').textContent = clock(game.time);
+  $('#result-top').textContent = Math.round(game.topSpeed * 3.6) + ' km/h';
+  $('#result-dist').textContent = (game.distance / 1000).toFixed(2) + ' km';
+  const grade = game.distance > 40 ? game.vertical / game.distance * 100 : world.run.avgGrade * 100;
+  $('#result-grade').textContent = Math.round(grade) + '%';
+  const note = snap.metres > previousBest
+    ? (previousBest ? 'A new best, ' + (snap.metres - previousBest) + ' m further than before.' : 'Your first descent on record.')
+    : 'Best is ' + game.best.toLocaleString('en-US') + ' m.';
+  $('#result-note').textContent = note;
+  $('#result').hidden = false;
+}
+
+function updateCamera(dt) {
+  const pl = game.player;
+  const t = world.terrain;
+  const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
+
+  const eyeY = pl.y + PHYS.eye;
+  const aheadH = t.height(pl.x + fx * 14, pl.z + fz * 14);
+  let lookY = aheadH + PHYS.eye - 0.9;
+  const dip = clamp((lookY - eyeY) / 14, -0.62, 0.2);
+
+  const bob = pl.air ? 0 : Math.sin(game.distance * 0.9) * 0.012 * Math.min(1, pl.speed / 8);
+  camera.position.set(pl.x, eyeY + bob, pl.z);
+
+  game.shake = Math.max(0, game.shake - dt * 2.4);
+  if (game.shake > 0.001) {
+    camera.position.x += (Math.random() - 0.5) * game.shake * 0.22;
+    camera.position.y += (Math.random() - 0.5) * game.shake * 0.22;
+  }
+
+  const tx = pl.x + fx * 15;
+  const tz = pl.z + fz * 15;
+  const ty = eyeY + Math.tan(dip) * 15;
+  camera.up.set(0, 1, 0);
+  camera.lookAt(tx, ty, tz);
+  const roll = -pl.yawRate * 0.06 * clamp(pl.speed / 12, 0, 1);
+  camera.rotateZ(roll);
+
+  const fov = 74 + Math.min(15, pl.speed * 0.42);
+  if (Math.abs(camera.fov - fov) > 0.25) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+
+  placeSkis();
+
+  const vig = Math.min(0.85, Math.max(0, (pl.speed - 12) / 34));
+  $('#vig').style.opacity = String(vig);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HUD and minimap
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function clock(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds - m * 60;
+  return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+}
+
+function updateHud(force) {
+  const pl = game.player;
+  $('#hud-peak').textContent = game.peak ? game.peak.peak : '—';
+  $('#hud-sub').textContent = game.peak ? game.peak.area + ' · ' + game.peak.country : '—';
+  $('#hud-time').textContent = clock(game.time);
+  $('#hud-speed').textContent = String(Math.round(pl.speed * 3.6));
+  $('#hud-alt').textContent = String(Math.round(pl.y));
+  const t = world.terrain;
+  if (t) {
+    const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
+    const slope = Math.atan2(pl.y - t.height(pl.x + fx * 6, pl.z + fz * 6), 6) * 180 / PI;
+    $('#hud-slope').textContent = String(Math.round(Math.abs(slope)));
+  }
+  const frac = world.run ? clamp(game.vertical / world.run.target, 0, 1) : 0;
+  $('#hud-fill').style.height = (frac * 100).toFixed(1) + '%';
+  $('#hud-vert').textContent = Math.round(game.vertical) + ' m';
+  $('#hud-gate').textContent = 'Gate ' + Math.min(game.gate + 1, game.gatesTotal) + ' / ' + game.gatesTotal;
+  if (force) {
+    $('#hud-time').textContent = '0:00.0';
+  }
+}
+
+let lastHud = 0;
+function drawMap(dt) {
+  const canvas = $('#map');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  ctx.clearRect(0, 0, w, w);
+  if (world.mapCanvas) ctx.drawImage(world.mapCanvas, 0, 0, w, w);
+  if (!world.mapRoute) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(194,65,12,.85)';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  const route = world.mapRoute;
+  for (let i = 0; i < route.length; i += 2) {
+    const p = route[i];
+    if (i === 0) ctx.moveTo(p.x * w, p.y * w); else ctx.lineTo(p.x * w, p.y * w);
+  }
+  ctx.stroke();
+  // the skier
+  const pl = game.player;
+  const p = world.mapProject(pl.x, pl.z);
+  if (p) {
+    ctx.translate(p.x * w, p.y * w);
+    ctx.rotate(-pl.heading);
+    ctx.fillStyle = '#171613';
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.lineTo(4.2, 5); ctx.lineTo(0, 2.6); ctx.lineTo(-4.2, 5);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#f6f4ee'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function buildMap(terrain, run) {
+  const size = 232;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+
+  // frame the route with a margin, in local metres
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of run.points) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
+  }
+  const pad = 700;
+  minX -= pad; maxX += pad; minZ -= pad; maxZ += pad;
+  const spanX = maxX - minX, spanZ = maxZ - minZ;
+  const span = Math.max(spanX, spanZ);
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  minX = cx - span / 2; minZ = cz - span / 2;
+  const scale = span / size;
+
+  const sample = (px, py) => terrain.height(minX + px * scale, minZ + py * scale);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const h = sample(x, y);
+      const hx = sample(x + 1, y) - h;
+      const hy = sample(x, y + 1) - h;
+      // hillshade from the north-west, the cartographer's habit
+      let shade = clamp(0.62 - hx * 0.05 - hy * -0.05, 0.18, 1.25);
+      const contour = Math.floor(h / 100) !== Math.floor(sample(x + 1, y) / 100) ||
+                      Math.floor(h / 100) !== Math.floor(sample(x, y + 1) / 100);
+      let v = 214 * shade + 26;
+      if (contour) v -= 46;
+      const i = (y * size + x) * 4;
+      img.data[i] = clamp(v + 6, 0, 255);
+      img.data[i + 1] = clamp(v + 4, 0, 255);
+      img.data[i + 2] = clamp(v + 10, 0, 255);
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  world.mapCanvas = canvas;
+  world.mapProject = (x, z) => {
+    const px = (x - minX) / span, py = (z - minZ) / span;
+    if (px < 0 || px > 1 || py < 0 || py > 1) return null;
+    return { x: px, y: py };
+  };
+  world.mapRoute = run.points.map(p => world.mapProject(p.x, p.z)).filter(Boolean);
+}
+
+/* ── toast ────────────────────────────────────────────────────────────────── */
+let toastTimer = 0;
+function toast(text) {
+  const el = $('#toast');
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 1200);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Input
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function wireInput() {
+  const canvas = $('#gl');
+  window.addEventListener('keydown', event => {
+    const key = event.key;
+    if (key === 'ArrowLeft' || key === 'a' || key === 'A') { input.left = true; event.preventDefault(); }
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') { input.right = true; event.preventDefault(); }
+    else if (key === 'ArrowUp' || key === 'w' || key === 'W') { input.tuck = true; event.preventDefault(); }
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') { input.brake = true; event.preventDefault(); }
+    else if (key === ' ' || key === 'Spacebar') {
+      event.preventDefault();
+      if (game.mode === 'ready' || game.mode === 'done') dropIn();
+      else input.jump = true;
+    } else if (key === 'p' || key === 'P') {
+      togglePause();
+    } else if (key === 'r' || key === 'R') {
+      if (game.mode === 'run' || game.mode === 'pause' || game.mode === 'done') restartRun();
+    }
+  });
+  window.addEventListener('keyup', event => {
+    const key = event.key;
+    if (key === 'ArrowLeft' || key === 'a' || key === 'A') input.left = false;
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') input.right = false;
+    else if (key === 'ArrowUp' || key === 'w' || key === 'W') input.tuck = false;
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') input.brake = false;
+  });
+  window.addEventListener('blur', () => {
+    input.left = input.right = input.tuck = input.brake = false;
+    if (game.mode === 'run') togglePause(true);
+  });
+
+  // pointer steering: the side you hold is the way you lean
+  let pointerDown = false;
+  const steerFrom = event => {
+    const rect = canvas.getBoundingClientRect();
+    const t = (event.clientX - rect.left) / rect.width;
+    input.stick = clamp((t - 0.5) * 3.4, -1, 1);
+    if (Math.abs(input.stick) < 0.08) input.stick = 0;
+  };
+  canvas.addEventListener('pointerdown', event => {
+    if (game.mode === 'picker') { globe.drag = { x: event.clientX, y: event.clientY, moved: 0, id: event.pointerId }; return; }
+    if (game.mode !== 'run') return;
+    pointerDown = true;
+    canvas.setPointerCapture(event.pointerId);
+    steerFrom(event);
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (globe.drag && globe.drag.id === event.pointerId) {
+      const dx = event.clientX - globe.drag.x, dy = event.clientY - globe.drag.y;
+      globe.drag.moved += Math.abs(dx) + Math.abs(dy);
+      globe.yaw += dx * 0.011;
+      globe.pitch = clamp(globe.pitch + dy * 0.009, -1.15, 1.15);
+      globe.targetYaw = globe.yaw;
+      globe.targetPitch = globe.pitch;
+      globe.drag.x = event.clientX; globe.drag.y = event.clientY;
+      return;
+    }
+    if (pointerDown) steerFrom(event);
+  });
+  const release = event => {
+    pointerDown = false;
+    input.stick = 0;
+    if (globe.drag && globe.drag.id === event.pointerId) {
+      const moved = globe.drag.moved;
+      globe.drag = null;
+      if (moved < 6) pickPinAt(event.clientX, event.clientY);
+    }
+  };
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+
+  for (const button of document.querySelectorAll('#pad button')) {
+    const key = button.dataset.key;
+    const set = value => {
+      if (key === 'jump') { input.jump = value; if (value && game.mode === 'ready') dropIn(); }
+      else input[key] = value;
+      button.classList.toggle('on', value);
+    };
+    button.addEventListener('pointerdown', event => { event.preventDefault(); set(true); });
+    button.addEventListener('pointerup', () => set(false));
+    button.addEventListener('pointerleave', () => set(false));
+    button.addEventListener('pointercancel', () => set(false));
+  }
+
+  $('#card-go').onclick = () => startPeak(globe.selected);
+  $('#ready-go').onclick = dropIn;
+  $('#pause-resume').onclick = () => togglePause();
+  $('#pause-restart').onclick = () => { $('#pause').hidden = true; restartRun(); };
+  $('#pause-peaks').onclick = () => { $('#pause').hidden = true; showPicker(); };
+  $('#result-again').onclick = () => { $('#result').hidden = true; dropIn(); };
+  $('#result-peaks').onclick = () => { $('#result').hidden = true; showPicker(); };
+  $('#veil-retry').onclick = () => {
+    if (game.peak) startPeak(PEAKS.indexOf(game.peak));
+    else { $('#veil').hidden = true; showPicker(); }
+  };
+
+  window.addEventListener('resize', resize);
+}
+
+function pickPinAt(clientX, clientY) {
+  let best = -1, bestDistance = 26;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < globe.pins.length; i++) {
+    globe.pins[i].getWorldPosition(v);
+    // only pins on the hemisphere facing us can be clicked
+    if (v.z - globe.group.position.z < 0.2) continue;
+    v.project(globeCamera);
+    const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    if (v.z > 1) continue;
+    const d = Math.hypot(sx - clientX, sy - clientY);
+    if (d < bestDistance) { bestDistance = d; best = i; }
+  }
+  if (best >= 0) setGlobeFocus(best);
+}
+
+function togglePause(force) {
+  if (game.mode === 'run' || (force && game.mode === 'pause')) {
+    game.mode = 'pause';
+    $('#pause-where').textContent = game.peak ? game.peak.peak + ' · ' + Math.round(game.vertical) + ' m down' : '';
+    $('#pause').hidden = false;
+  } else if (game.mode === 'pause') {
+    game.mode = 'run';
+    $('#pause').hidden = true;
+  }
+}
+
+function restartRun() {
+  if (!world.run) return;
+  resetPlayer();
+  game.mode = 'run';
+  $('#ready').hidden = true;
+  $('#result').hidden = true;
+  $('#hud').hidden = false;
+}
+
+function showPicker() {
+  game.mode = 'picker';
+  $('#hud').hidden = true;
+  $('#ready').hidden = true;
+  $('#result').hidden = true;
+  $('#pause').hidden = true;
+  $('#veil').hidden = true;
+  $('#picker').hidden = false;
+  $('#vig').style.opacity = '0';
+  setGlobeFocus(globe.selected);
+}
+
+function resize() {
+  if (!renderer) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  if (camera) { camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  fitGlobe();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Loop
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, Math.max(0.0001, (now - (game.lastFrame || now)) / 1000));
+  game.lastFrame = now;
+
+  if (game.mode === 'picker' || game.mode === 'boot' || game.mode === 'loading') {
+    // ease the globe round to whichever peak is in focus
+    const ease = 1 - Math.pow(0.001, dt);
+    globe.yaw += (globe.targetYaw - globe.yaw) * ease;
+    globe.pitch += (globe.targetPitch - globe.pitch) * ease;
+    if (globe.group) {
+      if (!globe.scratch) {
+        globe.scratch = {
+          y: new THREE.Vector3(0, 1, 0), x: new THREE.Vector3(1, 0, 0),
+          qy: new THREE.Quaternion(), qx: new THREE.Quaternion(), pin: new THREE.Vector3()
+        };
+      }
+      const sc = globe.scratch;
+      // yaw first brings the peak onto the prime meridian, then pitch brings it
+      // to the equator: the two together put it dead centre, facing the camera.
+      sc.qy.setFromAxisAngle(sc.y, globe.yaw);
+      sc.qx.setFromAxisAngle(sc.x, globe.pitch);
+      globe.group.quaternion.copy(sc.qx).multiply(sc.qy);
+      // A pin just over the horizon would otherwise float off the limb.
+      for (const marker of globe.pins) {
+        sc.pin.copy(marker.position).applyQuaternion(globe.group.quaternion);
+        marker.visible = sc.pin.z > 0.14;
+      }
+    }
+    renderer.clear();
+    if (globeScene && globeCamera) renderer.render(globeScene, globeCamera);
+    return;
+  }
+
+  if (game.mode === 'run') {
+    stepPhysics(dt);
+    updateCamera(dt);
+  } else if (game.mode === 'ready' || game.mode === 'done') {
+    // gentle look-around on the summit
+    game.shake = Math.max(0, game.shake - dt);
+    updateCameraIdle(dt);
+  }
+
+  if (world.snowfall && world.terrain) world.snowfall.update(dt, camera.position.x, camera.position.y, camera.position.z);
+  if (world.spray) world.spray.update(dt);
+
+  const nowMs = performance.now();
+  if (nowMs - lastHud > 90) {
+    lastHud = nowMs;
+    updateHud();
+    drawMap(dt);
+  }
+
+  renderer.clear();
+  if (runScene && camera) {
+    if (world.sky) world.sky.position.copy(camera.position);
+    renderer.render(runScene, camera);
+  }
+}
+
+function updateCameraIdle(dt) {
+  const pl = game.player;
+  const t = world.terrain;
+  if (!t) return;
+  const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
+  const eyeY = t.height(pl.x, pl.z) + PHYS.eye;
+  camera.position.set(pl.x, eyeY, pl.z);
+  const ahead = t.height(pl.x + fx * 16, pl.z + fz * 16);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(pl.x + fx * 16, ahead + PHYS.eye - 0.4, pl.z + fz * 16);
+  placeSkis();
+  const fov = 76;
+  if (Math.abs(camera.fov - fov) > 0.3) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Boot
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function boot() {
+  game.best = readBest();
+  // Bored puts its logo in the top-left corner of the frame; keep the HUD clear.
+  try { if (window.parent && window.parent !== window) document.documentElement.classList.add('framed'); } catch (err) { /* cross-origin parent */ }
+  veil('Loading the 3D engine…', 0.05);
+
+  try {
+    THREE = await import(THREE_URL);
+  } catch (err) {
+    veil('GeoPeaks needs its 3D library and the open elevation tiles. Check the connection and try again.', 0, true);
+    game.mode = 'error';
+    return;
+  }
+
+  makeRenderer();
+
+  const alt = rad(SUN_ALT), az = rad(SUN_AZ);
+  sunDir.x = Math.cos(alt) * Math.sin(az);
+  sunDir.y = Math.sin(alt);
+  sunDir.z = Math.cos(alt) * Math.cos(az);
+
+  runScene = new THREE.Scene();
+  runScene.fog = new THREE.FogExp2(FOG, 0.00015);
+  runScene.background = new THREE.Color(FOG);
+  camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.4, 16000);
+  camera.position.set(0, 60, 0);
+  runScene.add(camera);
+  world.sky = buildSky(runScene);
+
+  const sun = new THREE.DirectionalLight(0xfff3e2, 2.15);
+  sun.position.set(sunDir.x * 100, sunDir.y * 100, sunDir.z * 100);
+  runScene.add(sun);
+  // Snow in shadow is still bright: it is lit by half the sky, which is why a
+  // shadowed slope never goes black in the mountains. Keep it low enough that
+  // the sun still sculpts the ridges.
+  const hemi = new THREE.HemisphereLight(0xcfe2f5, 0xeef4fa, 0.95);
+  runScene.add(hemi);
+
+  wireInput();
+
+  veil('Charting the globe…', 0.3);
+  let landTex = null;
+  try { landTex = await loadLandTexture(); }
+  catch (err) { landTex = null; }
+  buildGlobe(landTex);
+
+  veil('Ready', 1);
+  $('#veil').hidden = true;
+  $('#picker').hidden = false;
+  game.mode = 'picker';
+  setGlobeFocus(todayIndex(), true);
+  // A small read-only handle: handy for tests and for poking at a run from the
+  // console, and it holds nothing a player could not already see.
+  window.__geopeaks = { game, world, globe, PEAKS, snap, camera, globeCamera, THREE };
+  requestAnimationFrame(loop);
+}
+
+boot().catch(err => {
+  game.mode = 'error';
+  $('#veil').hidden = false;
+  veil('Something went wrong starting GeoPeaks. ' + (err && err.message ? err.message : ''), 0, true);
+});
+</script>
+</body>
+</html>

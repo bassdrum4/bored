@@ -97,6 +97,11 @@
     "better": "high",
     "max_value": 1000000
   },
+  "geopeaks": {
+    "label": "Vertical metres descended in one run",
+    "better": "high",
+    "max_value": 100000
+  },
   "gun-mayhem": {
     "label": "Matches won against CPU (endless mode)",
     "better": "high",
@@ -172,11 +177,6 @@
     "better": "high",
     "max_value": 2650
   },
-  "shotgun-roulette": {
-    "label": "Biggest profit from one won game",
-    "better": "high",
-    "max_value": 1000
-  },
   "poker": {
     "label": "Chips above the start stack",
     "better": "high",
@@ -213,6 +213,11 @@
     "label": "Files downloaded",
     "better": "high",
     "max_value": 999
+  },
+  "shotgun-roulette": {
+    "label": "Biggest profit from one won game",
+    "better": "high",
+    "max_value": 1000
   },
   "signal-tower": {
     "label": "Waves cleared in one run",
