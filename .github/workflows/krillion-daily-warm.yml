@@ -1,8 +1,9 @@
 name: Warm Krillion daily
 on:
   schedule:
-    # 12:17 AM Eastern in winter, 1:17 AM in summer.
-    - cron: '17 5 * * *'
+    # 12:45 AM Eastern in winter, 1:45 AM in summer: the reveal lands at 00:10 and
+    # the bank fills one prompt every couple of minutes after that.
+    - cron: '45 5 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,13 +22,13 @@ jobs:
         run: |
           set -euo pipefail
           expected="$(TZ=America/New_York date +%F)"
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4; do
             if curl -fsS --connect-timeout 8 --max-time 40 -H "apikey: $KRILLION_PUBLIC_KEY" "$KRILLION_URL" -o "$RUNNER_TEMP/krillion.json" &&
               jq -e --arg date "$expected" '.date == $date and .stale == false and (.prompts | length) == 7' "$RUNNER_TEMP/krillion.json" >/dev/null; then
               echo "Daily book cached for $expected"
               exit 0
             fi
-            if [ "$attempt" -lt 3 ]; then sleep 15; fi
+            if [ "$attempt" -lt 4 ]; then sleep 45; fi
           done
           echo "Daily book unavailable for $expected" >&2
           exit 1

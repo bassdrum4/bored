@@ -273,6 +273,19 @@ async function bankMissing(date: string) {
   return !(Array.isArray(rows) && rows.length);
 }
 
+// A day's bank fills one prompt at a time after its reveal lands, so the dive is
+// only offered once every prompt is scored; a half-filled day would reject
+// correct answers on the prompts still building.
+async function bankReady(date: string): Promise<boolean> {
+  try {
+    const response = await sb('rpc/krillion_bank_ready', { method: 'POST', body: JSON.stringify({ p_date: date }) });
+    if (!response.ok) return true;
+    return (await response.json()) === true;
+  } catch {
+    return true;
+  }
+}
+
 // The daily book is fetched and scored by Postgres: a big day's reveal is 33 MB
 // and 350k answers, which is more work than an Edge Function's CPU budget
 // allows. The function asks for a refresh and reads what is already stored.
@@ -510,7 +523,9 @@ Deno.serve(async (req: Request) => {
       if (path === '/' || path === '/today') {
         const date = etDate(receivedAt);
         const loaded = await loadBook(date);
-        if (loaded.stale || loaded.book.date !== date) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+        if (loaded.stale || loaded.book.date !== date || !(await bankReady(date))) {
+          throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+        }
         return reply(publicBook(loaded));
       }
       if (path === '/health') return reply({ ok: true, rounds: 7 });
@@ -581,7 +596,9 @@ Deno.serve(async (req: Request) => {
         }
       }
       const loaded = await loadBook(date);
-      if (loaded.stale || loaded.book.date !== date) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+      if (loaded.stale || loaded.book.date !== date || !(await bankReady(date))) {
+        throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+      }
       const run = await createRun('daily', loaded.book, [], requestedId ? String(requestedId) : undefined);
       return reply(stateFor(run, loaded.book));
     }

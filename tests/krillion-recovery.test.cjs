@@ -29,6 +29,8 @@ function harness({missingBook=false, failRead=0, failInsert=0}={}) {
     }
     if(path.endsWith('/rpc/krillion_clear_bank')){const body=JSON.parse(init.body);bank=bank.filter(row=>row.date!==body.p_date);return json(null);}
     if(path.endsWith('/rpc/krillion_refresh')){const body=JSON.parse(init.body);return json({date:body.p_date,status:'queued'});}
+    // These fixtures always carry a complete book, so every day is ready.
+    if(path.endsWith('/rpc/krillion_bank_ready'))return json(true);
     if(path.endsWith('/rpc/krillion_match_answer')){
       const body=JSON.parse(init.body);
       const key=String(body.p_input||'').trim().toLowerCase().replace(/^(the|a|an)\s+/,'').replace(/&/g,'and').replace(/[^a-z0-9]/g,'');
