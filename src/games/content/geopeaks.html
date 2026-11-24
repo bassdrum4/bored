@@ -241,7 +241,7 @@
   <div class="box">
     <h2 id="ready-name">—</h2>
     <div class="k" id="ready-where">—</div>
-    <p id="ready-note">You are standing on the summit. The line below you is the real fall line: nobody placed it.</p>
+    <p id="ready-note">You are standing on the summit. The line below you is the real fall line: nobody placed it. Tuck for speed, and let the edges bite when you carve — a hard turn scrubs speed, so plan two gates ahead.</p>
     <div class="keys"><b>W</b> tuck · <b>S</b> brake · <b>A D</b> or <b>← →</b> steer · <b>Space</b> jump · <b>P</b> pause</div>
     <div class="actions"><button class="go" id="ready-go" type="button">Drop in</button></div>
   </div>
@@ -270,6 +270,7 @@
       <dt>Top speed</dt><dd id="result-top">—</dd>
       <dt>Distance</dt><dd id="result-dist">—</dd>
       <dt>Average grade</dt><dd id="result-grade">—</dd>
+      <dt>Gates</dt><dd id="result-gates">—</dd>
     </dl>
     <div class="actions">
       <button class="go" id="result-again" type="button">Ski again</button>
@@ -329,6 +330,8 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const fract = x => x - Math.floor(x);
+// Signed shortest way round from a to b, in (-PI, PI].
+const wrapAngle = a => { a = (a + PI) % (2 * PI); return (a < 0 ? a + 2 * PI : a) - PI; };
 function hash2(x, y) {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return fract(s);
@@ -393,7 +396,9 @@ class Terrain {
   }
   /** Unit surface normal at local metres. */
   normal(x, z, out) {
-    const d = this.mpp * 1.2;
+    // Sampled tighter than the mesh spacing: a 16 m baseline flattened every
+    // roll and lip, and the lit snow read as one smooth sheet.
+    const d = this.mpp * 0.8;
     const hx = (this.height(x + d, z) - this.height(x - d, z)) / (2 * d);
     const hz = (this.height(x, z + d) - this.height(x, z - d)) / (2 * d);
     const len = Math.hypot(hx, 1, hz);
@@ -568,7 +573,7 @@ function makeRenderer() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.96;
+  renderer.toneMappingExposure = 0.9;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.autoClear = false;
 }
@@ -664,10 +669,12 @@ function grainTexture() {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, s, s);
   // wind-packed snow: fine grain, then longer drifts blown across the slope
-  for (let i = 0; i < 4200; i++) {
+  // Nearly white, barely there: a darker grain map tiled every few metres read
+  // as dirty blotches smeared across the snow at speed.
+  for (let i = 0; i < 3200; i++) {
     const x = Math.random() * s, y = Math.random() * s, r = 0.5 + Math.random() * 2.1;
-    const tone = 176 + Math.random() * 66;
-    ctx.fillStyle = 'rgba(' + Math.round(tone - 12) + ',' + Math.round(tone) + ',' + Math.min(255, Math.round(tone + 16)) + ',' + (0.10 + Math.random() * 0.26).toFixed(3) + ')';
+    const tone = 214 + Math.random() * 41;
+    ctx.fillStyle = 'rgba(' + Math.round(tone - 10) + ',' + Math.round(tone) + ',' + Math.min(255, Math.round(tone + 12)) + ',' + (0.05 + Math.random() * 0.11).toFixed(3) + ')';
     ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
   }
 
@@ -717,17 +724,21 @@ function buildTerrainMesh(terrain, run) {
       terrain.normal(x, z, n);
       nrm[k * 3] = n.x; nrm[k * 3 + 1] = n.y; nrm[k * 3 + 2] = n.z;
 
-      uv[k * 2] = x / 40; uv[k * 2 + 1] = z / 40;
+      // One tile per 13 m: at eye height, a 40 m tile made the near snow a
+      // blurry soup of dunes instead of wind-packed grain.
+      uv[k * 2] = x / 9; uv[k * 2 + 1] = z / 9;
 
       // ── sun occlusion: march the heightfield toward the sun
       let occ = 0;
-      if (h > 500) {
-        for (let s = 1; s <= 11; s++) {
-          const d = s * 52;
+      if (h > 300) {
+        for (let s = 1; s <= 14; s++) {
+          const d = s * 70;
           if (terrain.height(x + sx * d, z + sz * d) > h + rise * d + 2) occ++;
         }
       }
-      const shade = clamp(1 - occ * 0.06, 0.68, 1);
+      // A kilometre of shade-march instead of 570 m: ridges now throw shadows
+      // down the faces below them, which is most of what makes a mountain read.
+      const shade = clamp(1 - occ * 0.055, 0.42, 1);
 
       // ── albedo: snow, exposed rock, scree, forest
       const steep = 1 - n.y;
@@ -741,9 +752,9 @@ function buildTerrainMesh(terrain, run) {
       // scree poking through on the high, broken faces
       const scree = sstep(0.16, 0.30, steep) * (1 - sstep(0.32, 0.44, steep)) * sstep(2350, 2750, h) * hash2(i * 1.7, j * 1.7) * 0.55;
 
-      let r = lerp(0.30, 0.94, snow);
-      let g = lerp(0.31, 0.95, snow);
-      let b = lerp(0.33, 0.99, snow);
+      let r = lerp(0.28, 0.88, snow);
+      let g = lerp(0.29, 0.90, snow);
+      let b = lerp(0.32, 0.95, snow);
       r = lerp(r, 0.44, scree); g = lerp(g, 0.43, scree); b = lerp(b, 0.43, scree);
       // Timber below the tree line, in patches. Distant conifers are a dark
       // mass, not a pepper of individual trees, so most of the forest is paint.
@@ -790,7 +801,7 @@ function buildTerrainMesh(terrain, run) {
     vertexColors: true,
     map: grainTexture(),
     normalMap: snowNormalMap(),
-    normalScale: new THREE.Vector2(0.9, 0.9),
+    normalScale: new THREE.Vector2(0.3, 0.3),
     roughness: 0.8, metalness: 0.0
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -875,11 +886,11 @@ function buildTrees(terrain, run) {
 }
 
 function buildRouteMarks(terrain, run) {
-  const spacing = 15;
+  const spacing = 12;
   const count = Math.floor(run.distance / spacing);
-  const geo = new THREE.PlaneGeometry(4.5, 0.55);
+  const geo = new THREE.PlaneGeometry(8, 0.9);
   geo.rotateX(-PI / 2);
-  const mat = new THREE.MeshBasicMaterial({ color: 0xe2541a, transparent: true, opacity: 0.72, depthWrite: false });
+  const mat = new THREE.MeshBasicMaterial({ color: 0xe2541a, transparent: true, opacity: 0.8, depthWrite: false });
   const inst = new THREE.InstancedMesh(geo, mat, Math.max(1, count));
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const m = new THREE.Matrix4();
@@ -939,12 +950,12 @@ function buildBoulders(terrain, run) {
     const h = terrain.height(x, z);
     const size = 0.3 + rnd() * rnd() * 1.3;
     s.set(size * (1 + rnd() * 0.6), size * (0.55 + rnd() * 0.4), size);
-    p.set(x, h - size * 0.34, z);
+    p.set(x, h - size * 0.5, z);
     axis.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
     q.setFromAxisAngle(axis, rnd() * 6.2832);
     m.compose(p, q, s);
     inst.setMatrixAt(count, m);
-    const tone = 0.30 + rnd() * 0.16;
+    const tone = 0.24 + rnd() * 0.14;
     colour.setRGB(tone, tone * 1.02, tone * 1.10);
     inst.setColorAt(count, colour);
     count++;
@@ -958,8 +969,10 @@ function buildBoulders(terrain, run) {
 
 function buildGates(terrain, run) {
   const gates = [];
-  const poleGeo = new THREE.CylinderGeometry(0.14, 0.14, 2.1, 6);
-  const poleMat = new THREE.MeshLambertMaterial({ color: 0xe4e9ee });
+  // Tall enough to spot two hundred metres out, and orange so a 2 cm pole is
+  // not the only thing standing between you and the snow.
+  const poleGeo = new THREE.CylinderGeometry(0.19, 0.19, 3.3, 8);
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0xc2410c });
   // Gates hang off the distance, not the drop: on a 40-degree face vertical
   // spacing would put them a kilometre apart, which is no use as a target.
   const finishH = run.startH - run.target;
@@ -967,7 +980,9 @@ function buildGates(terrain, run) {
   const gateCount = clamp(Math.round(run.distance / 320), 6, 14);
   const spacing = run.distance / (gateCount + 1);
   const positions = [];
-  let next = spacing;
+  // The first gate lands inside the first half-minute instead of 300 m down
+  // the hill, so the run gives you a target straight away.
+  let next = Math.min(160, spacing * 0.55);
   for (const pt of run.points) {
     if (pt.d < next || pt.h <= finishH + 8) continue;
     next += spacing;
@@ -982,22 +997,22 @@ function buildGates(terrain, run) {
     // A numbered panel on each side: a 7 cm pole is a single pixel at 150 m,
     // which is no target at all.
     const canvas = document.createElement('canvas');
-    canvas.width = 128; canvas.height = 96;
+    canvas.width = 256; canvas.height = 192;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#e2541a'; ctx.fillRect(0, 0, 128, 96);
+    ctx.fillStyle = '#e2541a'; ctx.fillRect(0, 0, 256, 192);
     ctx.fillStyle = '#fff8f2';
-    ctx.font = '600 60px ui-monospace, Menlo, monospace';
+    ctx.font = '600 120px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(number), 64, 51);
+    ctx.fillText(String(number), 128, 102);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     const panelMat = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
     for (const side of [-1, 1]) {
       const pole = new THREE.Mesh(poleGeo, poleMat);
-      pole.position.set(side * 9, 1.05, 0);
+      pole.position.set(side * 9, 1.65, 0);
       group.add(pole);
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 1.3), panelMat);
-      panel.position.set(side * 9, 1.05, 0);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 2.05), panelMat);
+      panel.position.set(side * 9, 2.1, 0);
       group.add(panel);
     }
     // Square the gate to the fall line and sit it on the ground. The panels are
@@ -1103,6 +1118,24 @@ class Tracks {
 }
 
 /* ── particles: spray off the skis, and the falling snow ──────────────────── */
+// Square points read as snow-white pixels stuck to the lens; one soft dot sprite
+// makes snowfall and spray look like snow and spray.
+function softDotTexture() {
+  const s = 32;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = s;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,.82)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function makePoints(count, size, opacity) {
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(count * 3);
@@ -1110,7 +1143,7 @@ function makePoints(count, size, opacity) {
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
   const mat = new THREE.PointsMaterial({
     color: 0xffffff, size, sizeAttenuation: true, transparent: true, opacity,
-    depthWrite: false, fog: true
+    map: softDotTexture(), alphaTest: 0.02, depthWrite: false, fog: true
   });
   const pts = new THREE.Points(geo, mat);
   pts.frustumCulled = false;
@@ -1120,7 +1153,7 @@ function makePoints(count, size, opacity) {
 class Spray {
   constructor(scene) {
     this.count = 420;
-    this.pts = makePoints(this.count, 0.34, 0.85);
+    this.pts = makePoints(this.count, 0.22, 0.8);
     this.pos = this.pts.geometry.attributes.position.array;
     this.vel = new Float32Array(this.count * 3);
     this.life = new Float32Array(this.count);
@@ -1195,8 +1228,12 @@ class Snowfall {
 /* ── first-person skis: just the tips, the way you actually see them ──────── */
 function buildSkis() {
   const group = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: 0x26303a });
-  const accent = new THREE.MeshLambertMaterial({ color: 0xc2410c });
+  // Skis are 2 cm thick; at true scale they were a two-pixel line that no one
+  // could see. Slightly heroic, and in the accent colour, so the two orange
+  // lines leading down the hill are your feet.
+  group.scale.setScalar(2.2);
+  const mat = new THREE.MeshLambertMaterial({ color: 0xb23a0d });
+  const accent = new THREE.MeshLambertMaterial({ color: 0x1c2530 });
   for (const side of [-1, 1]) {
     const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.022, 0.78), mat);
     shaft.position.set(side * 0.155, 0, -0.62);
@@ -1218,13 +1255,17 @@ function placeSkis() {
   if (!skiAnchor) skiAnchor = new THREE.Vector3();
   const pl = game.player;
   const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
-  const reach = 2.05;
+  const reach = 2.8;
   const gy = world.terrain.height(pl.x + fx * reach, pl.z + fz * reach);
   skiAnchor.set(pl.x + fx * reach, gy + 0.05, pl.z + fz * reach);
   camera.updateMatrixWorld(true);
   camera.worldToLocal(skiAnchor);
   world.skis.position.copy(skiAnchor);
-  world.skis.rotation.set(pl.air ? -0.16 : 0, 0, -pl.yawRate * 0.10);
+  // Pitch the ski down the fall line: flat, the metre of ski past the anchor
+  // buried its own tips in a 20-degree slope.
+  const skiAhead = world.terrain.height(pl.x + fx * (reach + 2.2), pl.z + fz * (reach + 2.2));
+  const pitch = Math.atan2(gy - skiAhead, 2.2);
+  world.skis.rotation.set(pitch + (pl.air ? -0.16 : 0), 0, -pl.yawRate * 0.10);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1441,12 +1482,17 @@ const game = {
   distance: 0,
   vertical: 0,
   gate: 0,
+  cleared: 0,
+  missed: 0,
   gatesTotal: 9,
   best: 0,
-  player: { x: 0, z: 0, y: 0, heading: 0, speed: 0, vy: 0, air: false, yawRate: 0 },
+  player: { x: 0, z: 0, y: 0, heading: 0, dir: 0, speed: 0, vy: 0, air: false, yawRate: 0 },
   shake: 0,
   landedAt: 0,
   idleTime: 0,
+  lookY: null,
+  camX: null,
+  camZ: null,
   lastFrame: 0
 };
 
@@ -1592,20 +1638,25 @@ function resetPlayer() {
   const next = run.points[Math.min(6, run.points.length - 1)];
   const heading = Math.atan2(next.x - p.x, next.z - p.z);
   Object.assign(game.player, {
-    x: p.x, z: p.z, y: p.h, heading, speed: 0, vy: 0, air: false, yawRate: 0
+    x: p.x, z: p.z, y: p.h, heading, dir: heading, speed: 0, vy: 0, air: false, yawRate: 0
   });
   game.time = 0;
   game.topSpeed = 0;
   game.distance = 0;
   game.vertical = 0;
   game.gate = 0;
+  game.cleared = 0;
+  game.missed = 0;
   game.shake = 0;
   game.idleTime = 0;
+  game.lookY = null;
+  game.camX = null;
+  game.camZ = null;
   snap.finished = false;
   snap.metres = 0;
   if (world.tracks) world.tracks.reset();
   if (world.spray) world.spray.clear();
-  camera.fov = 74;
+  camera.fov = 70;
   camera.updateProjectionMatrix();
 }
 
@@ -1624,6 +1675,8 @@ function dropIn() {
   $('#ready').hidden = true;
   $('#result').hidden = true;
   resetPlayer();
+  // A push off the lip, so a gentle summit does not feel like standing still.
+  game.player.speed = 4;
   game.mode = 'run';
   toast('Drop');
 }
@@ -1633,8 +1686,10 @@ function dropIn() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const PHYS = {
-  gravity: 9.81, gScale: 0.9, drag: 0.0022, drag3: 0.00004,
-  friction: 0.5, brake: 8.5, carve: 0.05, turn: 2.1, eye: 1.62, maxSpeed: 41
+  gravity: 9.81, gScale: 1, drag: 0.0016, drag3: 0.000022,
+  friction: 0.3, brake: 8.5, carve: 0.015, turn: 2.0, eye: 2.4, maxSpeed: 46,
+  // How fast the direction of travel catches up with the skis (per second).
+  grip: 7
 };
 
 function stepPhysics(dt) {
@@ -1644,9 +1699,9 @@ function stepPhysics(dt) {
   const steerInput = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.stick;
   const steer = clamp(steerInput, -1, 1);
 
-  // ground under us
+  // ground under us, and the direction the skis are actually travelling
   const groundHere = t.height(pl.x, pl.z);
-  const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
+  const fx = Math.sin(pl.dir), fz = Math.cos(pl.dir);
   const rx = Math.cos(pl.heading), rz = -Math.sin(pl.heading);
 
   if (!pl.air) {
@@ -1660,17 +1715,21 @@ function stepPhysics(dt) {
     if (Math.abs(slope) < 0.02 && pl.speed < 1.2) accel = Math.max(accel, 0);
     pl.speed = clamp(pl.speed + accel * dt, 0, PHYS.maxSpeed);
 
-    // turning
-    const turnRate = PHYS.turn / (1 + pl.speed / 21) * (input.tuck ? 0.86 : 1);
+    // A right turn is a *decreasing* heading: with the camera looking down +Z
+    // its right is world -X, so adding the yaw here is what mirrored the keys.
+    const turnRate = PHYS.turn / (1 + pl.speed / 24) * (input.tuck ? 0.86 : 1);
     pl.yawRate = steer * turnRate;
-    pl.heading += pl.yawRate * dt;
-    // carving costs speed, and the edges bite harder at speed
-    pl.speed = Math.max(0, pl.speed - Math.abs(steer) * PHYS.carve * pl.speed * dt * 2.2);
+    pl.heading -= pl.yawRate * dt;
+    // The skis point where you turned them; your mass keeps going the old way
+    // until the edges bite. That lag is the carve: it draws the turn out on the
+    // snow and costs speed, instead of the old instant change of direction.
+    pl.dir += clamp(wrapAngle(pl.heading - pl.dir), -1.5, 1.5) * PHYS.grip * dt;
+    const slip = Math.abs(wrapAngle(pl.heading - pl.dir));
+    pl.speed = Math.max(0, pl.speed - (slip * 0.9 + Math.abs(steer) * PHYS.carve) * pl.speed * dt);
 
     // jump
-    if (input.jump && !pl.air) {
-      const speedBoost = pl.speed * 0.07;
-      pl.vy = 4.3 + speedBoost;
+    if (input.jump) {
+      pl.vy = 4.6 + pl.speed * 0.08;
       pl.air = true;
       pl.y = groundHere + 0.2;
       input.jump = false;
@@ -1678,14 +1737,15 @@ function stepPhysics(dt) {
   } else {
     pl.vy -= PHYS.gravity * dt;
     pl.y += pl.vy * dt;
-    pl.heading += steer * 0.55 * dt;
+    pl.heading -= steer * 0.55 * dt;
     pl.speed = Math.max(0, pl.speed - 0.4 * dt);
     // air drag
     pl.speed = Math.max(0, pl.speed - PHYS.drag * pl.speed * pl.speed * dt);
   }
 
-  const nx = pl.x + Math.sin(pl.heading) * pl.speed * dt;
-  const nz = pl.z + Math.cos(pl.heading) * pl.speed * dt;
+  const vx = Math.sin(pl.dir), vz = Math.cos(pl.dir);
+  const nx = pl.x + vx * pl.speed * dt;
+  const nz = pl.z + vz * pl.speed * dt;
   if (t.inside(nx, nz)) { pl.x = nx; pl.z = nz; }
   else pl.speed *= 0.5;
 
@@ -1709,7 +1769,7 @@ function stepPhysics(dt) {
   } else {
     pl.y = ground;
     // a hard surface that rises under us should throw us, not clip us
-    const rise = t.height(pl.x + fx * 1.4, pl.z + fz * 1.4) - ground;
+    const rise = t.height(pl.x + vx * 1.4, pl.z + vz * 1.4) - ground;
     if (rise > 0.65 && pl.speed > 6) {
       pl.vy = Math.min(6, pl.speed * 0.18);
       pl.air = true;
@@ -1730,20 +1790,33 @@ function stepPhysics(dt) {
     const carving = Math.abs(steer) > 0.25 || input.brake;
     if (carving && pl.speed > 7 && Math.random() < 0.85) {
       const power = input.brake ? 9 : 4;
-      world.spray.emit(pl.x + rx * 0.2, ground, pl.z + rz * 0.2, -rx * pl.speed, -rz * pl.speed, power);
+      // Thrown out behind the boots: emitted at the camera it was a white blob
+      // the size of the lens rather than spray.
+      world.spray.emit(pl.x - fx * 1.5 + rx * 0.5, ground, pl.z - fz * 1.5 + rz * 0.5, -rx * pl.speed, -rz * pl.speed, power);
     } else if (pl.speed > 24 && Math.random() < 0.4) {
-      world.spray.emit(pl.x, ground, pl.z, 0, 0, 2);
+      world.spray.emit(pl.x - fx * 1.5, ground, pl.z - fz * 1.5, 0, 0, 2);
     }
   }
 
-  // Gates are counted by how far you have dropped, not by touching a pole:
-  // straying wide of one must not lock every gate after it.
+  // A gate counts only when you actually ski through it, within 13 m of the
+  // two panels. Sailing past one is a miss, not a free pass — but it never
+  // locks the gates after it, so a bad line still finishes.
   while (game.gate < world.gates.length) {
     const g = world.gates[game.gate];
-    if (game.vertical >= world.run.startH - g.h - 6) {
+    const gap = Math.hypot(g.x - pl.x, g.z - pl.z);
+    if (gap < 13) {
       game.gate++;
+      game.cleared++;
       toast('Gate ' + game.gate + ' / ' + game.gatesTotal);
-    } else break;
+      continue;
+    }
+    if (game.distance > g.d + 55) {
+      game.gate++;
+      game.missed++;
+      toast('Missed gate ' + game.gate + ' / ' + game.gatesTotal);
+      continue;
+    }
+    break;
   }
 
   // finish
@@ -1773,6 +1846,8 @@ function finishRun() {
   $('#result-dist').textContent = (game.distance / 1000).toFixed(2) + ' km';
   const grade = game.distance > 40 ? game.vertical / game.distance * 100 : world.run.avgGrade * 100;
   $('#result-grade').textContent = Math.round(grade) + '%';
+  $('#result-gates').textContent = game.cleared + ' of ' + game.gatesTotal +
+    (game.missed ? ' · ' + game.missed + ' missed' : '');
   const note = snap.metres > previousBest
     ? (previousBest ? 'A new best, ' + (snap.metres - previousBest) + ' m further than before.' : 'Your first descent on record.')
     : 'Best is ' + game.best.toLocaleString('en-US') + ' m.';
@@ -1786,12 +1861,21 @@ function updateCamera(dt) {
   const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
 
   const eyeY = pl.y + PHYS.eye;
-  const aheadH = t.height(pl.x + fx * 14, pl.z + fz * 14);
-  let lookY = aheadH + PHYS.eye - 0.9;
-  const dip = clamp((lookY - eyeY) / 14, -0.62, 0.2);
+  // Look further ahead the faster you go: 18 m at a crawl, past 50 m at speed.
+  // A fixed 14 m aim put the whole screen on the snow two metres in front.
+  const reach = 18 + pl.speed * 0.85;
+  const targetLook = t.height(pl.x + fx * reach, pl.z + fz * reach) + PHYS.eye - 1.4;
+  // Smooth the aim height: raw terrain half a kilometre out is noisy, and
+  // following it directly made the camera nod over every drift.
+  game.lookY = game.lookY == null ? targetLook : lerp(game.lookY, targetLook, Math.min(1, dt * 5.5));
 
   const bob = pl.air ? 0 : Math.sin(game.distance * 0.9) * 0.012 * Math.min(1, pl.speed / 8);
-  camera.position.set(pl.x, eyeY + bob, pl.z);
+  // A little lag on the horizontal follow: the mountain slides past instead of
+  // being pinned to the lens, and a hard edge no longer jolts the whole frame.
+  const follow = Math.min(1, dt * 9);
+  game.camX = game.camX == null ? pl.x : lerp(game.camX, pl.x, follow);
+  game.camZ = game.camZ == null ? pl.z : lerp(game.camZ, pl.z, follow);
+  camera.position.set(game.camX, eyeY + bob, game.camZ);
 
   game.shake = Math.max(0, game.shake - dt * 2.4);
   if (game.shake > 0.001) {
@@ -1799,15 +1883,14 @@ function updateCamera(dt) {
     camera.position.y += (Math.random() - 0.5) * game.shake * 0.22;
   }
 
-  const tx = pl.x + fx * 15;
-  const tz = pl.z + fz * 15;
-  const ty = eyeY + Math.tan(dip) * 15;
   camera.up.set(0, 1, 0);
-  camera.lookAt(tx, ty, tz);
-  const roll = -pl.yawRate * 0.06 * clamp(pl.speed / 12, 0, 1);
+  camera.lookAt(pl.x + fx * reach, game.lookY, pl.z + fz * reach);
+  // Bank into the turn: positive yaw is a right-hand turn, which is a clockwise
+  // roll on screen, so the sign here is negative.
+  const roll = -pl.yawRate * 0.11 * clamp(pl.speed / 10, 0, 1);
   camera.rotateZ(roll);
 
-  const fov = 74 + Math.min(15, pl.speed * 0.42);
+  const fov = 70 + Math.min(14, pl.speed * 0.34);
   if (Math.abs(camera.fov - fov) > 0.25) {
     camera.fov = fov;
     camera.updateProjectionMatrix();
@@ -1845,7 +1928,10 @@ function updateHud(force) {
   const frac = world.run ? clamp(game.vertical / world.run.target, 0, 1) : 0;
   $('#hud-fill').style.height = (frac * 100).toFixed(1) + '%';
   $('#hud-vert').textContent = Math.round(game.vertical) + ' m';
-  $('#hud-gate').textContent = 'Gate ' + Math.min(game.gate + 1, game.gatesTotal) + ' / ' + game.gatesTotal;
+  const nextGate = world.gates && world.gates[game.gate];
+  const toGate = nextGate ? Math.max(1, Math.round(Math.hypot(nextGate.x - pl.x, nextGate.z - pl.z))) : null;
+  $('#hud-gate').textContent = 'Gate ' + Math.min(game.gate + 1, game.gatesTotal) + ' / ' + game.gatesTotal +
+    (toGate == null ? '' : ' · ' + toGate + ' m');
   if (force) {
     $('#hud-time').textContent = '0:00.0';
   }
@@ -2174,9 +2260,9 @@ function updateCameraIdle(dt) {
   const fx = Math.sin(pl.heading), fz = Math.cos(pl.heading);
   const eyeY = t.height(pl.x, pl.z) + PHYS.eye;
   camera.position.set(pl.x, eyeY, pl.z);
-  const ahead = t.height(pl.x + fx * 16, pl.z + fz * 16);
+  const ahead = t.height(pl.x + fx * 26, pl.z + fz * 26);
   camera.up.set(0, 1, 0);
-  camera.lookAt(pl.x + fx * 16, ahead + PHYS.eye - 0.4, pl.z + fz * 16);
+  camera.lookAt(pl.x + fx * 26, ahead + PHYS.eye - 1, pl.z + fz * 26);
   placeSkis();
   const fov = 76;
   if (Math.abs(camera.fov - fov) > 0.3) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -2208,20 +2294,20 @@ async function boot() {
   sunDir.z = Math.cos(alt) * Math.cos(az);
 
   runScene = new THREE.Scene();
-  runScene.fog = new THREE.FogExp2(FOG, 0.00015);
+  runScene.fog = new THREE.FogExp2(FOG, 0.00011);
   runScene.background = new THREE.Color(FOG);
   camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.4, 16000);
   camera.position.set(0, 60, 0);
   runScene.add(camera);
   world.sky = buildSky(runScene);
 
-  const sun = new THREE.DirectionalLight(0xfff3e2, 2.15);
+  const sun = new THREE.DirectionalLight(0xfff3e2, 2.3);
   sun.position.set(sunDir.x * 100, sunDir.y * 100, sunDir.z * 100);
   runScene.add(sun);
   // Snow in shadow is still bright: it is lit by half the sky, which is why a
   // shadowed slope never goes black in the mountains. Keep it low enough that
   // the sun still sculpts the ridges.
-  const hemi = new THREE.HemisphereLight(0xcfe2f5, 0xeef4fa, 0.95);
+  const hemi = new THREE.HemisphereLight(0xcfe2f5, 0xeef4fa, 0.88);
   runScene.add(hemi);
 
   wireInput();

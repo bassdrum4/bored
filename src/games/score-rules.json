@@ -97,11 +97,6 @@
     "better": "high",
     "max_value": 1000000
   },
-  "geopeaks": {
-    "label": "Vertical metres descended in one run",
-    "better": "high",
-    "max_value": 100000
-  },
   "gun-mayhem": {
     "label": "Matches won against CPU (endless mode)",
     "better": "high",

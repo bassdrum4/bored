@@ -128,7 +128,6 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
-  highScore("geopeaks", "GeoPeaks", "vertical metres", { metric: "metres", when: snapshot => snapshot.finished === true }),
   highScore("ballistic-chickens", "Ballistic Chickens", "m", { metric: "meters", when: snapshot => snapshot.finished === true }),
   // Biggest single-game profit (chips won minus the bet) from a real game that
   // was won, either mode. The game is sandboxed, so src/hub/roulette.js posts it
