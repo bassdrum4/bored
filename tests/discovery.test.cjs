@@ -30,6 +30,7 @@ test('discovery keeps its controls and fits small screens', async t => {
   });
   await page.setViewport({ width: 1366, height: 900 });
   await page.goto(site.url);
+  await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
   await page.waitForFunction(() => document.querySelectorAll('#grid .card').length === ORDER.length);
 
   await t.test('every game has useful metadata; every offline preview is in the file', async () => {
@@ -39,8 +40,17 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(game.meta.inputs.every(input => ['Keyboard', 'Mouse', 'Touch'].includes(input)), game.slug);
       if (!game.online) assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.(?:webp|svg)$'), game.slug + ' has a preview asset');
     }
-    await page.$$eval('#grid img', images => images.forEach(image => image.loading = 'eager'));
-    await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));
+    // The hub deliberately withholds preview src until an IntersectionObserver
+    // sees the card. Verify every actual asset, then exercise the lazy path.
+    const previewResponses = await page.$eval('#grid img', async images => Promise.all(images.map(async image => {
+      const src = image.dataset.previewSrc || image.getAttribute('src');
+      const response = await fetch(src);
+      return { src, ok: response.ok };
+    })));
+    assert.ok(previewResponses.every(row => row.ok), JSON.stringify(previewResponses.filter(row=>!row.ok)));
+    await page.$eval('#grid img:last-of-type', image => image.scrollIntoView({block:'center'}));
+    await page.waitForFunction(() => {const image=document.querySelector('#grid img:last-of-type');return image.complete && image.naturalWidth>0;});
+    await page.evaluate(() => window.scrollTo(0,0));
     // The entry document is hand-written markup: it carries no games and no
     // inlined script, so a game is downloaded only when its card is opened.
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), true);
@@ -139,6 +149,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.evaluate(() => closeGame());
     assert.equal(await page.evaluate(() => document.activeElement.closest('#recent-list')?.id), 'recent-list', 'focus follows a favorite when it becomes recent');
     await page.reload();
+    await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     assert.equal(await page.$$eval('#recent-list [data-slug="memory"]', nodes => nodes.length), 1);
     assert.match(await page.$eval('#recent-list', node => node.textContent), /Favorite/);
     // Five games played, four slots: the oldest drops off the shelf.
@@ -200,6 +211,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     // and it survives a reload along with the other appearance settings.
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
     await page.reload();
+    await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     await page.waitForSelector('#settings:not([hidden])');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
@@ -343,6 +355,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     return request.abort();
   });
   await page.goto(site.url);
+  await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
   // Click each field before typing: a dialog that opens while the page is still
@@ -420,6 +433,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.waitForFunction(() => document.querySelector('#player').hidden === true);
 
   await page.reload();
+    await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('tester'));
   assert.equal(posted.length, 1, 'restoring the account does not repost an equal best');
   await page.click('#feedback-open');
