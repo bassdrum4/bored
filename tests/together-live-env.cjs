@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
 const {randomUUID}=require('node:crypto');
 const fs=require('node:fs');
 const path=require('node:path');
-const {database,as,ids,enroll,consent}=require('./together-db.cjs');
+const {database,as,ids,enroll,consent,togetherMigrationFiles}=require('./together-db.cjs');
 const url=process.env.BT_TEST_DATABASE_URL;
 const [A,B,C,D,E,F,ANON]=ids;
 
@@ -41,7 +41,7 @@ async function nativeEnv() {
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     create table public.profiles(id uuid primary key references auth.users(id),handle text);`);
   await admin.query(fs.readFileSync(path.join(__dirname,'../scripts/bored-together.sql'),'utf8'));
-  for(const file of fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>f.endsWith('.sql') && !f.includes('engagement_and_retention_analytics') && !f.includes('bored_analytics_funnels_rollups')).sort()) await admin.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
+  for(const file of togetherMigrationFiles(path.join(__dirname,'../supabase/migrations'))) await admin.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
   const handles=['WackyPenguin','BananaWizard','QuietOwl','NeverJoined','FourthPlayer','FifthPlayer','Anonymous'];
   for(let i=0;i<ids.length;i++) {
     await admin.query('insert into auth.users(id,email,is_anonymous) values($1,$2,$3)',[ids[i],`live${i}@example.test`,i===6]);

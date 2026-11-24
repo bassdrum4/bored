@@ -161,7 +161,7 @@ test('a signed-in player votes in a poll and answers an open-ended question', as
   await page.click('#announcement-toggle');
   await page.waitForSelector('#announcement-dialog[open]');
 
-  await page.click('#announcement-list .announcement-option');
+  await page.$eval('#announcement-list .announcement-option', button => button.click());
   await page.waitForFunction(() => document.getElementById('announcement-status').textContent === 'Vote recorded.');
   assert.equal(voted.p_announcement, 'poll-1');
   assert.equal(voted.p_choice, 'More of this');
@@ -232,7 +232,7 @@ test('a guest votes in a poll without signing in, once per browser', async t => 
     { text: 'Fewer games', disabled: false }
   ]);
 
-  await page.click('#announcement-banner .announcement-option');
+  await page.$eval('#announcement-banner .announcement-option', button => button.click());
   await page.waitForFunction(() => document.getElementById('announcement-status').textContent === 'Vote recorded.');
   assert.equal(voted.p_announcement, 'poll-guest');
   assert.equal(voted.p_choice, 'More of this');

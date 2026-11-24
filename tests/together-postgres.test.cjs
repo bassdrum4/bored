@@ -6,7 +6,7 @@ const {randomUUID}=require('node:crypto');
 const fs=require('node:fs');
 const path=require('node:path');
 const {Client}=require('pg');
-const {ids,consent}=require('./together-db.cjs');
+const {ids,consent,togetherMigrationFiles}=require('./together-db.cjs');
 const url=process.env.BT_TEST_DATABASE_URL;
 
 test('native PostgreSQL: competing moves, queues, crossed requests and leave races', {skip:!url},async t=>{
@@ -21,7 +21,7 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     create table public.profiles(id uuid primary key references auth.users(id),handle text);`);
   await admin.query(fs.readFileSync(path.join(__dirname,'../scripts/bored-together.sql'),'utf8'));
-  for(const file of fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>f.endsWith('.sql') && !f.includes('engagement_and_retention_analytics') && !f.includes('bored_analytics_funnels_rollups')).sort())await admin.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
+  for(const file of togetherMigrationFiles(path.join(__dirname,'../supabase/migrations')))await admin.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
   for(let i=0;i<ids.length;i++){
     await admin.query('insert into auth.users(id,email) values($1,$2)',[ids[i],`native${i}@example.test`]);
     await admin.query('insert into public.profiles values($1,$2)',[ids[i],`Native${i}`]);
