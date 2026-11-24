@@ -2,16 +2,22 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 904,
+  "count": 910,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"34f72055","date":"2026-11-24","author":"bassdrum4","subject":"Read Supabase gateway pages as outages, not JSON"},
+  {"sha":"3abfdb76","date":"2026-11-24","author":"bassdrum4","subject":"Let guests vote in announcement polls"},
+  {"sha":"68dddeec","date":"2026-11-24","author":"Codebuff","subject":"Record that GeoPeaks shipped without the browser suite"},
+  {"sha":"f76f4449","date":"2026-11-24","author":"Codebuff","subject":"Add GeoPeaks: ski twelve real summits traced from open elevation data"},
   {"sha":"4d74ac63","date":"2026-11-24","author":"bassdrum4","subject":"Record that main's CI was already red before the banner work"},
   {"sha":"67a95eed","date":"2026-11-24","author":"bassdrum4","subject":"Hold the announcement banner until the boot screen clears"},
+  {"sha":"f2639803","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP: items, buddies and Giratina keep their real colours"},
   {"sha":"f6393cb2","date":"2026-11-24","author":"bassdrum4","subject":"Answer announcements in the banner instead of opening it"},
+  {"sha":"6eb13419","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette: one item grid per seat, Giratina clear of buddies, reload turn rule"},
   {"sha":"c844aad1","date":"2026-11-24","author":"Daniel Lowe","subject":"Keep loading screens up for two seconds and harden Roulette startup"},
   {"sha":"81ac19a6","date":"2026-11-24","author":"Daniel Lowe","subject":"Unify Bored loading screens with Bo and paper styling"},
   {"sha":"bf30960f","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Krillion daily timeouts and recover interrupted dives","pr":315},

@@ -12,6 +12,41 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
   const guestKey = 'bored.announcements.guestReads';
   const stored = readStored(guestKey, []);
   const guestReads = new Set(Array.isArray(stored) ? stored : []);
+  // A poll vote needs something durable to count it once. A guest has no
+  // account, so this browser keeps a random id, plus the choices it already
+  // sent so the card shows its own vote again after a reload.
+  const guestIdKey = 'bored.announcements.guestId';
+  const guestVoteKey = 'bored.announcements.guestVotes';
+  const GUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function guestId() {
+    const saved = readStored(guestIdKey, '');
+    if (typeof saved === 'string' && GUEST_ID.test(saved)) return saved;
+    const c = globalThis.crypto;
+    let id;
+    if (c?.randomUUID) id = c.randomUUID();
+    else {
+      const bytes = new Uint8Array(16);
+      if (c?.getRandomValues) c.getRandomValues(bytes);
+      else for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+      id = hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' +
+        hex.slice(16, 20) + '-' + hex.slice(20);
+    }
+    writeStored(guestIdKey, id);
+    return id;
+  }
+  function guestVotes() {
+    const saved = readStored(guestVoteKey, {});
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  }
+  function rememberGuestVote(id, choice) {
+    const saved = guestVotes();
+    if (choice) saved[id] = choice;
+    else delete saved[id];
+    writeStored(guestVoteKey, saved);
+  }
   let entries = [], accountReads = new Set(), generation = 0, refreshedAt = 0;
   const seenBannerImpressions = new Set();
   // announcement id -> { choice } or { answer }. One row per account, so this
@@ -55,7 +90,8 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
   }
 
   // Poll choices and written answers sit in the card itself, in the banner and
-  // in the dialog, so answering never needs the "Read more" detour.
+  // in the dialog, so answering never needs the "Read more" detour. Anyone can
+  // vote in a poll; a written answer still needs an account.
   function responseForm(item) {
     if (answerKind(item) === 'message') return null;
     const form = make('form', undefined, 'announcement-response');
@@ -64,33 +100,15 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     status.setAttribute('role', 'status');
     const mine = myResponses.get(item.id);
 
-    if (!identity) {
-      if (answerKind(item) === 'poll') {
-        const list = pollList(item, null);
-        for (const button of list.querySelectorAll('button')) button.disabled = true;
-        form.append(list);
-      }
-      form.append(make('p', answerKind(item) === 'poll'
-        ? 'Sign in to vote in this poll.'
-        : 'Sign in to answer this question.', 'announcement-response-hint'));
+    if (answerKind(item) === 'poll') {
+      form.append(wirePoll(item, pollList(item, mine), status));
+      if (mine) form.append(pollTally(item, mine));
+      form.append(status);
       return form;
     }
 
-    if (answerKind(item) === 'poll') {
-      const list = pollList(item, mine);
-      const buttons = [...list.querySelectorAll('button')];
-      for (const button of buttons) {
-        button.onclick = async () => {
-          if (button.disabled) return;
-          for (const other of buttons) other.disabled = true;
-          if (!(await respond(item, { choice: button.textContent }, status))) {
-            for (const other of buttons) other.disabled = false;
-          }
-        };
-      }
-      form.append(list);
-      if (mine) form.append(pollTally(item, mine));
-      form.append(status);
+    if (!identity) {
+      form.append(make('p', 'Sign in to answer this question.', 'announcement-response-hint'));
       return form;
     }
 
@@ -115,6 +133,19 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
       void respond(item, { answer: text }, status).then(ok => { if (!ok) send.disabled = false; });
     };
     return form;
+  }
+  function wirePoll(item, list, status) {
+    const buttons = [...list.querySelectorAll('button')];
+    for (const button of buttons) {
+      button.onclick = async () => {
+        if (button.disabled) return;
+        for (const other of buttons) other.disabled = true;
+        if (!(await respond(item, { choice: button.textContent }, status))) {
+          for (const other of buttons) other.disabled = false;
+        }
+      };
+    }
+    return list;
   }
 
   function card(item, banner = false) {
@@ -229,7 +260,6 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
   // chose what, and open-ended answers stay between the player and the admins.
   async function loadTally(id) {
     const who = current();
-    if (!who) return;
     try {
       const rows = await request('/rest/v1/rpc/announcement_results', {
         method: 'POST', body: { p_announcement: id }
@@ -242,26 +272,32 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
 
   async function respond(item, payload, status) {
     const who = current();
-    if (!who) {
+    // A guest's poll vote carries this browser's id; a written answer needs an
+    // account, so it never gets one.
+    const guest = who || !payload.choice ? null : guestId();
+    if (!who && !guest) {
       status.textContent = 'Sign in to answer.';
       return false;
     }
     status.textContent = 'Sending…';
     try {
-      if (!(await freshSession()) || current() !== who) throw Error('Session changed.');
+      if (who && (!(await freshSession()) || current() !== who)) throw Error('Session changed.');
       const result = await request('/rest/v1/rpc/respond_to_announcement', {
         method: 'POST',
         body: {
           p_announcement: item.id,
           p_choice: payload.choice || null,
-          p_answer: payload.answer || null
+          p_answer: payload.answer || null,
+          p_guest: guest
         }
       });
       if (current() !== who) return false;
+      const choice = result?.choice || payload.choice || null;
       myResponses.set(item.id, {
-        choice: result?.choice || payload.choice || null,
+        choice,
         answer: result?.answer || payload.answer || null
       });
+      if (guest) rememberGuestVote(item.id, choice);
       if (payload.choice) await loadTally(item.id);
       await acknowledge(item);
       render();
@@ -292,8 +328,12 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
       entries = messages || [];
       accountReads = new Set(receipts.map(r => r.announcement_id));
       myResponses.clear();
-      for (const row of answers || []) {
-        if (row?.announcement_id) myResponses.set(row.announcement_id, { choice: row.choice, answer: row.answer });
+      if (who) {
+        for (const row of answers || []) {
+          if (row?.announcement_id) myResponses.set(row.announcement_id, { choice: row.choice, answer: row.answer });
+        }
+      } else {
+        for (const [id, choice] of Object.entries(guestVotes())) myResponses.set(id, { choice });
       }
       $('announcement-status').textContent = '';
       render();

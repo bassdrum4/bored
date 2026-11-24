@@ -10,6 +10,36 @@ to the Supabase project.
 
 ---
 
+## 2026-11-24 — "Move not confirmed. Unexpected token '<'" in 8-ball
+
+**Symptom** — a Bored Together pool match showed the game's error bar with
+`Move not confirmed. Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
+and buttons `Retry save` / `Reload saved game`. The same outage also hit the hub
+as `521`/`520`/`522` answers on `bt_rpc`, `auth/v1/user`, `player_state`,
+`score_rules` and `play_events` (a two-minute burst at 18:39-18:42 UTC), which
+read as "super laggy".
+
+**Cause** — Supabase's Cloudflare gateway answered with an HTML error page while
+the origin was down. `api()` in `supabase/functions/together-pool/index.ts`
+unconditionally `await response.json()`ed that page, so Deno raised the parse
+error, the handler returned it as a `422` message, and `gameBridge.error()` printed
+it verbatim. `request()` in `src/hub/backend.js` had the same blind `JSON.parse`
+on a `2xx`/error body.
+
+**Fix** — the function reads the body as text and reports a non-JSON page as a
+`503` ("Pool is temporarily unavailable"), `request()` keeps a non-JSON or `5xx`
+answer a `transient` error with a readable sentence, and the Together player
+retries a transient (or unparsed) save twice with its already-saved `request_id`,
+so the move lands instead of asking the player to shoot again. The function
+source is fixed in the repo but still has to be deployed
+(`supabase functions deploy together-pool`); the client ships with Pages.
+
+**Rule for next time** — never `response.json()` a Supabase REST/Edge response.
+A `<!DOCTYPE` body is a gateway outage: treat it as retryable, keep the move's
+`request_id`, and only ever show the player a sentence they can act on.
+
+---
+
 ## 2026-11-24 — CI red since the two-second boot screen: the banner sat under it
 
 **Symptom** — `Check Bored` failed in `tests/announcements.test.cjs`:
@@ -49,6 +79,36 @@ favorites` dies on `page.$eval('.card', els => els.map(...))` — `$eval` hands
 the callback one element, so the list assertions need `$$eval` — and most of
 the Poké Gacha, discovery and `bored.test.cjs` browser tests go with it.
 Someone has to work through that list; it is not a single shared cause.
+
+---
+
+## 2026-11-24 — GeoPeaks: the browser suite was never run
+
+**Symptom** — `npm test` cannot start in a cloud workspace: `CHROME_PATH` is
+empty and `~/.cache/puppeteer` holds no browser, so `puppeteer.launch` throws
+before a single assertion. GeoPeaks (`f76f444`, `src/games/content/geopeaks.html`)
+was added and pushed on top of that, so `tests/bored.test.cjs`,
+`tests/discovery.test.cjs` and `tests/visual.test.cjs` have not seen it.
+
+**What was checked instead** — `npm run games:check` prints
+`Game contract OK: 70 entries, 68 local, 60 scored, 40 daily, 2 online.`; the
+module script passes `node --check`; the hub fetches
+`games/previews/geopeaks.webp` for the card; and the game was played in the
+chat's cloud browser (globe picker, all twelve traced descents, gates, finish,
+pause and result sheets, no page errors). That is evidence the page runs, not
+evidence the repo's suite accepts it.
+
+**Rule for next time** — Set up B2–B4 before touching a game, or say outright
+that the suite did not run. `npx puppeteer browsers install chrome` on its own is
+not enough in this image: the shared libraries and the Fontconfig file from B2
+and B3 are still missing, and without them the renderer dies at `page.goto`.
+
+**Also** — `Check Bored` is already red on this base commit (see the entry
+above), so a failing run for GeoPeaks is not automatically its fault; compare
+the failing test names against that list first. And the preview hostname is new
+each time the workspace is recreated — the dev server needs the current
+`PREVIEW_HOSTS` value, and that cloud browser renders in software at roughly a
+quarter speed, so it is good for judging pixels and useless for judging timing.
 
 ---
 

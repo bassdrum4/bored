@@ -60,7 +60,14 @@ function gameBridge(context, channel, engineURL) {
       document.getElementById('together-error')?.remove();
       const box = document.createElement('div'); box.id = 'together-error'; box.setAttribute('role', 'alert');
       box.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;z-index:9999;background:#fff9ed;color:#191713;border:1px solid #b3261e;padding:14px;font:14px/1.5 system-ui';
-      const text = document.createElement('p'); text.textContent = 'Move not confirmed. ' + error.message;
+      // Only a sentence a player can act on. A gateway page that failed to parse
+      // is a busy server, not news, and it is never shown as the reason.
+      const raw = String(error?.message || error || '');
+      const busy = error?.transient || !raw || /unexpected token|not valid json|<!doctype|failed to fetch|network ?error/i.test(raw);
+      const text = document.createElement('p');
+      text.textContent = 'Move not confirmed. ' + (busy
+        ? 'The server did not answer. Your move is still saved \u2014 press Retry save.'
+        : raw);
       box.append(text);
       for (const [label, action] of [['Retry save', retry], ['Reload saved game', () => parent.postMessage({ type: 'bored:together-reload', channel }, '*')]]) {
         const b = document.createElement('button'); b.textContent = label;
@@ -88,6 +95,14 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
   // leaving the game's promise unanswered.
   let queued = null;
   const identity = () => !disposed && hasIdentity() && getSession()?.user?.id === owner;
+  // The game repeats whatever reason it is given, so a gateway page that did not
+  // parse is turned into a sentence instead of "Unexpected token '<' ...".
+  const reason = error => {
+    const raw = String(error?.message || error || 'Your move was not saved.');
+    return error?.transient || /unexpected token|not valid json|<!doctype/i.test(raw)
+      ? 'The server did not answer. Your move is still saved \u2014 try again in a moment.'
+      : raw;
+  };
   // The newest saved move, when the launch read carried the move log: it lets a
   // game show what the other side did as the turn comes back, instead of only
   // its result. Only the opponent's own move is offered.
@@ -115,7 +130,7 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
       reply({ context: context(current) });
       close();
     } catch (error) {
-      reply({ error: error.message });
+      reply({ error: reason(error) });
     } finally {
       saving = false;
       drain();
@@ -159,7 +174,7 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
       if (!snap || snap.finished !== true || runValue() === null) return;
       sendRun().catch(error => {
         retryAt = Date.now() + 5000;
-        notify?.('Your run is finished but not sent. ' + error.message);
+        notify?.('Your run is finished but not sent. ' + reason(error));
       });
     }, 600);
   }
@@ -220,7 +235,7 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
         current = next; confirmed = true;
         frame.contentWindow.postMessage({ type: 'bored:together-result', channel, id: request.id, context: context(current) }, '*');
       } catch (error) {
-        if (identity()) frame.contentWindow.postMessage({ type: 'bored:together-result', channel, id: request.id, error: error.message }, '*');
+        if (identity()) frame.contentWindow.postMessage({ type: 'bored:together-result', channel, id: request.id, error: reason(error) }, '*');
       } finally { saving = false; drain(); }
     },
     dispose() { disposed = true; stop(); onExit(); }

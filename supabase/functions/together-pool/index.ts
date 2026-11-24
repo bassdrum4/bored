@@ -6,10 +6,18 @@ async function api(path: string, token: string, key: string, body?: unknown) {
   const response = await fetch(url + path, { method: body === undefined ? 'GET' : 'POST',
     headers: { Authorization: token, apikey: key, 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body) });
-  const data = await response.json();
-  if (!response.ok) {
-    const error = new Error(data.message || data.msg || 'Pool request failed.') as Error & {status:number};
-    error.status = response.status; throw error;
+  // The gateway in front of the database answers a blip with a Cloudflare HTML
+  // page (520-527). Parsing that as JSON only sent
+  // "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON" to the player, so
+  // a body that is not JSON is reported as the temporary outage it is.
+  const text = await response.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!response.ok || data === null) {
+    const message = data && (data.message || data.msg) || 'Pool is temporarily unavailable. Please try again.';
+    const error = new Error(message) as Error & {status:number};
+    error.status = response.ok ? 503 : response.status;
+    throw error;
   }
   return data;
 }
