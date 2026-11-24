@@ -4,7 +4,7 @@ import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { readStored, writeStored } from './store.js';
 import { backendReady, request, ANON_TOKEN } from './backend.js';
-import { popularityRanks, sortPopularGames, isNewGame, isFeatured } from './popularity.js';
+import { popularityRanks, sortPopularGames, isNewGame, isFeatured, popularityCacheDay } from './popularity.js';
 import { addMedal } from './invites.js';
 
 export function createLibraryView({ state, openGame, saveLibrary, track = () => {} }) {
@@ -19,14 +19,10 @@ const searchInput = $('#q');
 const gameGrid = $('#grid');
 
 // Popularity is a public, aggregated seven-day ranking — never raw analytics.
-// Cache one ranking per Detroit day so library visits do not repeatedly query
-// the database or rearrange the cards as a visitor browses.
-const POPULARITY_CACHE_KEY = 'bored.popularity.v2';
-const detroitDay = () => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
-}).format(new Date());
+// Cache one ranking per server snapshot day, not per local midnight.
+const POPULARITY_CACHE_KEY = 'bored.popularity.v3';
 const cachedPopularity = readStored(POPULARITY_CACHE_KEY, null);
-let popularRankings = cachedPopularity?.day === detroitDay()
+let popularRankings = cachedPopularity?.day === popularityCacheDay()
   ? popularityRanks(cachedPopularity.rows) : new Map();
 
 async function loadPopularity() {
@@ -34,12 +30,13 @@ async function loadPopularity() {
   try {
     // A SECURITY DEFINER RPC returns only game names and aggregate ranks.
     // It cannot expose player identifiers or the protected analytics table.
+    const snapshotDay = popularityCacheDay();
     const rows = await request('/rest/v1/rpc/bored_popular_games', {
       method: 'POST', body: {}, token: ANON_TOKEN
     });
     if (!Array.isArray(rows)) return;
     popularRankings = popularityRanks(rows);
-    writeStored(POPULARITY_CACHE_KEY, { day: detroitDay(), rows });
+    writeStored(POPULARITY_CACHE_KEY, { day: snapshotDay, rows });
     // Preserve focus: never shuffle a card out from under a keyboard user.
     if (popularRankings.size && $('#sort').value === 'popular' &&
         !document.activeElement?.closest('#grid')) renderLibrary();

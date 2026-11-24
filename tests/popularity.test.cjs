@@ -51,8 +51,26 @@ test('Crossword editorial spotlight expires at Detroit midnight November 25', as
   const ranks = new Map([['clicker', 1], ['crossword', 99]]);
   const active = Date.parse('2026-11-24T23:59:00-05:00');
   assert.equal(isFeatured('crossword', featuredUntil, active), true);
-  assert.deepEqual(sortPopularGames(games(), ranks, { launches, featuredUntil, now: active }).map(x => x[0]), ['crossword', 'clicker', 'new']);
+  assert.deepEqual(sortPopularGames(games(), ranks, { launches, featuredUntil, now: active }).map(x => x[0]), ['crossword', 'new', 'clicker']);
   const expired = Date.parse('2026-11-25T00:00:00-05:00');
   assert.equal(isFeatured('crossword', featuredUntil, expired), false);
   assert.deepEqual(sortPopularGames(games(), ranks, { launches, featuredUntil, now: expired }).map(x => x[0]), ['clicker', 'crossword', 'new']);
+});
+
+test('new games remain boosted until Detroit midnight, including daylight saving time', async () => {
+  const { isNewGame } = await import('../src/hub/popularity.js');
+  for (const [launch, before, after] of [
+    ['2026-11-21', '2026-11-24T04:59:59Z', '2026-11-24T05:00:00Z'],
+    ['2026-07-21', '2026-07-24T03:59:59Z', '2026-07-24T04:00:00Z']
+  ]) {
+    assert.equal(isNewGame('fresh', {fresh: launch}, Date.parse(before)), true);
+    assert.equal(isNewGame('fresh', {fresh: launch}, Date.parse(after)), false);
+  }
+  assert.equal(isNewGame('future', {future: '2026-11-25'}, Date.parse('2026-11-24T12:00:00Z')), false);
+});
+
+test('popularity cache rolls over at the server snapshot cutoff, not midnight', async () => {
+  const { popularityCacheDay } = await import('../src/hub/popularity.js');
+  assert.equal(popularityCacheDay(Date.parse('2026-11-24T07:06:59Z')), '2026-11-23');
+  assert.equal(popularityCacheDay(Date.parse('2026-11-24T07:07:00Z')), '2026-11-24');
 });

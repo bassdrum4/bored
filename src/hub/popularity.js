@@ -14,6 +14,19 @@ export function isFeatured(slug, featuredUntil, now = Date.now()) {
   return Number.isFinite(expiry) && now < expiry;
 }
 const DAY = 86400000;
+const detroitCalendar = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
+});
+function detroitCalendarTime(now) {
+  const parts = Object.fromEntries(detroitCalendar.formatToParts(now).map(({type, value}) => [type, value]));
+  return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+}
+
+// The server's daily snapshot is refreshed at 07:07 UTC. Before that
+// cutoff, the previous snapshot is still the current one.
+export function popularityCacheDay(now = Date.now()) {
+  return new Date(now - (7 * 60 + 7) * 60000).toISOString().slice(0, 10);
+}
 
 export function popularityRanks(rows) {
   const ranks = new Map();
@@ -38,7 +51,8 @@ export function launchTime(slug, launches) {
 /** True while a game is still inside its post-launch boost window. */
 export function isNewGame(slug, launches, now = Date.now(), days = NEW_GAME_BOOST_DAYS) {
   const at = launchTime(slug, launches);
-  return at > 0 && now - at < days * DAY;
+  const age = detroitCalendarTime(now) - at;
+  return at > 0 && age >= 0 && age < days * DAY;
 }
 
 /**
