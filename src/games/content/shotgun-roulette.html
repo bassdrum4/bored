@@ -2603,7 +2603,8 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   // yellow and a hot pink, so the two never dither alike. Their material uses NoBlending, because three.js
   // writes alpha 1 for an opaque material with normal blending.
   const TM_MARK = 0.95;
-  const TM_COLOR = { wave: "f0d040", trick: "e8508a" };
+  // Muted to sit with the palette, about as dark as the cream table lines: an old-brass ochre and a dusty rose.
+  const TM_COLOR = { wave: "b09a50", trick: "b0848c" };
   const ITEM_PAL = [TM_COLOR.wave, TM_COLOR.trick];
   const CAM = [0, 1.78, 4.15];
   // Giratina's height, worked out from my eye at CAM: at z -10 the line over the far buddy's head is y 1.36
@@ -2616,7 +2617,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   const SLOT_SIZE = 0.56;
   let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
   let redSpot, gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
-  const spots = [], sides = {}, cache = {};
+  const spots = [], lamps = [], sides = {}, cache = {};
   const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0, atMe: 0, atMeGoal: 0 };
   const tweens = [];
   let seed = 11;
@@ -2892,6 +2893,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     const gunSpot = new T.SpotLight(0xffe2b8, 2.4, 7, 0.24, 0.45, 1);
     gunSpot.position.set(0, 3.6, 0.5); gunSpot.target.position.set(0, 0.2, 0);
     scene.add(gunSpot, gunSpot.target);
+    lamps.push(gunSpot);
     // A dim red spotlight finds whoever is being pointed at.
     redSpot = new T.SpotLight(0xb03020, 0, 9, 0.26, 0.5, 1);
     redSpot.position.set(0, 3.8, 0);
@@ -2977,6 +2979,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       add(new T.CircleGeometry(0.24, 8), new T.MeshBasicMaterial({ color: 0xd8ccaa }), 0, 0, 0.2, lamp);
       box(0.04, 3, 0.04, darkMetal, x, 4.2, z);
       spots.push({ light, base: 2.2, next: 2 + rnd() * 5, until: 0 });
+      lamps.push(light);
     }
     const cableMat = lam({ color: 0x15100e });
     for (let k = 0; k < 6; k++) {
@@ -3022,6 +3025,9 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     scene.add(dust);
 
     // The post pass: palette, Bayer dither, vignette, grain, flashes.
+    // Where each item spot is in the room, for its share of the spotlights (items are unlit sprites).
+    scene.updateMatrixWorld(true);
+    for (const pos of Object.keys(DIR)) for (const it of sides[pos].items) it.world = it.sprite.getWorldPosition(new T.Vector3());
     post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
       uniforms: { tScene: { value: rt.texture }, uPal: { value: PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
                   uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 }, uEdge: { value: 0 },
@@ -3256,6 +3262,28 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   R3.blank = async () => { anim.recoil = 0.45; await wait(420); R3.endShot(); };
   R3.endShot = () => { anim.atMeGoal = 0; anim.aim = null; anim.liftGoal = 0; anim.yawGoal = 0; anim.pitchGoal = 0; };
 
+  // How much spotlight reaches a point: each lamp's cone (with its penumbra) and distance falloff, the same
+  // terms three.js lights the room with, over a dim ambient. Items are sprites, which three.js doesn't light,
+  // so their colour is scaled by this instead; the lamps' flicker comes through too.
+  let toLamp = null, lampDir = null;   // made on first use: Three.js loads after this block runs
+  function lightAt(p) {
+    if (!p) return 1;
+    if (!toLamp) { toLamp = new T.Vector3(); lampDir = new T.Vector3(); }
+    let sum = 0;
+    for (const lamp of lamps) {
+      toLamp.subVectors(p, lamp.position);
+      const d = toLamp.length();
+      lampDir.subVectors(lamp.target.position, lamp.position).normalize();
+      const cosA = toLamp.normalize().dot(lampDir);
+      const outer = Math.cos(lamp.angle), inner = Math.cos(lamp.angle * (1 - lamp.penumbra));
+      const k = Math.min(1, Math.max(0, (cosA - outer) / (inner - outer)));
+      const cone = k * k * (3 - 2 * k);
+      const fall = Math.pow(Math.max(0, 1 - d / lamp.distance), lamp.decay);
+      sum += cone * fall * lamp.intensity / 2.2;
+    }
+    return Math.min(1.05, 0.32 + sum * 1.1);
+  }
+
   /* Every frame. */
   const ease = (from, to, k) => from + (to - from) * Math.min(1, k);
   function frame(ms) {
@@ -3320,7 +3348,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         it.sprite.position.y = 0.24 + it.lift * 0.09 + using * 0.5;
         const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
         it.sprite.scale.set(scale, scale, 1);
-        it.sprite.material.color.setScalar(1 + it.lift * 0.35);
+        it.sprite.material.color.setScalar(lightAt(it.world) * (1 + it.lift * 0.35));
         it.sprite.material.opacity = (it.mark || 1) * (1 - using);
       }
       if (!s.buddy) continue;
