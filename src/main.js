@@ -35,7 +35,7 @@ import { createLivePlayer } from './hub/together-live.js';
 import { createLobbyBridge } from './hub/together-lobby.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
-import { createAnalytics, ANALYTICS_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
+import { createAnalytics, ANALYTICS_BRIDGE, ANALYTICS_FRAME_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
 import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -217,7 +217,7 @@ const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, sco
 window.addEventListener('bored:together-telemetry', event => analytics.track(event.detail?.kind, event.detail));
 const enjoyment = createEnjoymentUI({ analytics });
 createGameFinder({ openGame, track: (kind, details) => analytics.track(kind, details) });
-gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXTERNS[activeSlug]); });
+gameFrame.addEventListener('load', () => { if (activeSlug && !SANDBOXED_GAMES.includes(activeSlug)) analytics.ready(!!EXTERNS[activeSlug]); });
 
 function restartGame() {
   if (!activeSlug) return;
@@ -427,8 +427,8 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // which need same-origin storage it does not have.
       gameFrame.srcdoc = injectHead(html, adminPreview
         ? '<script>window.__boredPreviewAuthorized=true;</' + 'script>' + head
-        : sandboxed ? head
-        : resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
+        : sandboxed ? ANALYTICS_FRAME_BRIDGE + head
+        : resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + ANALYTICS_FRAME_BRIDGE + head + gameFill);
       const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player'
@@ -1255,6 +1255,16 @@ addEventListener('message', event => {
           step: event.data.step, action: event.data.action
         });
       }
+      break;
+    case 'bored:telemetry-ready':
+      // srcdoc's injected bridge confirms that the real game document loaded,
+      // even if its snapshot API is absent or its origin is opaque.
+      if (!Object.hasOwn(ADMIN_PREVIEWS, activeSlug)) analytics.ready(false, true);
+      break;
+    case 'bored:telemetry-input':
+      // An opaque-origin game cannot be inspected through contentDocument.
+      // Accept input only from the active, explicitly sandboxed game frame.
+      if (SANDBOXED_GAMES.includes(activeSlug)) analytics.frameInput();
       break;
     case 'bored:runtime-error': analytics.event('error', runtimeErrorMetadata(event.data)); break;
     case 'bored:restart': restartGame(); break;

@@ -184,13 +184,24 @@ async function sb(path: string, init: RequestInit = {}) {
   headers.set('apikey', SERVICE_KEY);
   headers.set('Authorization', 'Bearer ' + SERVICE_KEY);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  return fetch(SUPABASE_URL + '/rest/v1/' + path, { ...init, headers });
+  // Bound each database hop. Only reads and explicitly idempotent writes retry.
+  const safe = !init.method || init.method === 'GET' || path.startsWith('krillion_books?on_conflict=date') || path === 'krillion_runs?on_conflict=id';
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, { ...init, headers, signal: AbortSignal.timeout(4_000) });
+      if (!safe || attempt || ![429, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(response.status)) return response;
+      await response.body?.cancel().catch(() => {});
+    } catch (error) {
+      if (!safe || attempt) throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300));
+  }
 }
 
 async function cachedBook(date: string): Promise<Book | null> {
   const query = 'krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1';
   const response = await sb(query);
-  if (!response.ok) return null;
+  if (!response.ok) throw new HttpError('The puzzle cache is temporarily unavailable.', 503);
   const rows = await response.json();
   const value = rows?.[0]?.book;
   if (!value) return null;
@@ -250,8 +261,8 @@ function validateReference(today: any, reveal: any, date: string): Book {
 async function fetchReference(date: string): Promise<Book> {
   const headers = { 'User-Agent': USER_AGENT };
   const [todayResponse, revealResponse] = await Promise.all([
-    fetch(REFERENCE + '/api/today', { signal: AbortSignal.timeout(20_000), headers }),
-    fetch(REFERENCE + '/api/reveal?date=' + encodeURIComponent(date), { signal: AbortSignal.timeout(20_000), headers })
+    fetch(REFERENCE + '/api/today', { signal: AbortSignal.timeout(5_000), headers }),
+    fetch(REFERENCE + '/api/reveal?date=' + encodeURIComponent(date), { signal: AbortSignal.timeout(5_000), headers })
   ]);
   if (!todayResponse.ok || !revealResponse.ok) throw new Error('Reference service unavailable.');
   return validateReference(await todayResponse.json(), await revealResponse.json(), date);
@@ -273,10 +284,8 @@ async function loadBook(date: string): Promise<Loaded> {
     } else {
       try {
         const fresh = await fetchReference(date);
-        try { await storeBook(fresh); }
-        catch (error) {
-          console.warn('Krillion cache write unavailable:', error instanceof Error ? error.message : String(error));
-        }
+        // Never start a ranked run against a book that was not durably saved.
+        await storeBook(fresh);
         loaded = { book: fresh, stale: false };
       } catch (error) {
         const latest = await latestBook();
@@ -311,10 +320,16 @@ async function bookForRun(run: Run): Promise<Book> {
   const picked = Array.isArray(run.prompts)
     ? run.prompts.filter(entry => entry && typeof entry.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(entry.date)))
     : [];
-  if (picked.length !== 7) return (await loadBook(run.date)).book;
+  if (picked.length !== 7) {
+    const loaded = await loadBook(run.date);
+    if (loaded.stale || loaded.book.date !== run.date) throw new HttpError('The dive book is temporarily unavailable.', 503);
+    return loaded.book;
+  }
   const books = new Map<string, Book>();
   await Promise.all([...new Set(picked.map(entry => entry.date))].map(async date => {
-    books.set(date, (await loadBook(date)).book);
+    const loaded = await loadBook(date);
+    if (loaded.stale || loaded.book.date !== date) throw new HttpError('The archive book is temporarily unavailable.', 503);
+    books.set(date, loaded.book);
   }));
   return {
     date: run.date,
@@ -381,14 +396,14 @@ function dailyBoard(run: Run, scores: { id: string; score: number }[]) {
 async function readRun(id: string): Promise<Run | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id || '')) return null;
   const response = await sb('krillion_runs?id=eq.' + encodeURIComponent(id) + '&select=' + RUN_COLUMNS + '&limit=1');
-  if (!response.ok) return null;
+  if (!response.ok) throw new HttpError('The dive state is temporarily unavailable.', 503);
   const rows = await response.json();
   return (rows?.[0] || null) as Run | null;
 }
 
-async function createRun(mode: string, book: Book, prompts: PickedPrompt[] = []): Promise<Run> {
+async function createRun(mode: string, book: Book, prompts: PickedPrompt[] = [], id = crypto.randomUUID()): Promise<Run> {
   const row = {
-    id: crypto.randomUUID(),
+    id,
     date: book.date,
     mode,
     round: 0,
@@ -399,14 +414,17 @@ async function createRun(mode: string, book: Book, prompts: PickedPrompt[] = [])
     hint_used: false,
     prompts
   };
-  const response = await sb('krillion_runs', {
+  const response = await sb('krillion_runs?on_conflict=id', {
     method: 'POST',
-    headers: { Prefer: 'return=representation' },
+    headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
     body: JSON.stringify(row)
   });
   if (!response.ok) throw new HttpError('The dive could not start. Try again shortly.', 503);
   const rows = await response.json();
-  return rows[0] as Run;
+  // A lost response can be retried with the same ID without creating another dive.
+  const run = rows?.[0] || await readRun(id);
+  if (!run || run.mode !== mode || run.date !== book.date) throw new HttpError('Dive could not be recovered.', 409);
+  return run as Run;
 }
 
 async function updateRun(id: string, patch: Record<string, unknown>): Promise<Run> {
@@ -443,6 +461,7 @@ function stateFor(run: Run, book: Book) {
 const runPath = (url: URL) => (url.pathname.replace(/^.*\/krillion/, '').replace(/^\/api/, '') || '/').replace(/\/+$/, '') || '/';
 
 Deno.serve(async (req: Request) => {
+  const receivedAt = Date.now();
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   try {
     const url = new URL(req.url);
@@ -450,7 +469,10 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === 'GET') {
       if (path === '/' || path === '/today') {
-        return reply(publicBook(await loadBook(etDate())));
+        const date = etDate(receivedAt);
+        const loaded = await loadBook(date);
+        if (loaded.stale || loaded.book.date !== date) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+        return reply(publicBook(loaded));
       }
       if (path === '/health') return reply({ ok: true, rounds: 7 });
       if (path === '/party/rooms') return reply({ rooms: [], seats: [] });
@@ -506,8 +528,19 @@ Deno.serve(async (req: Request) => {
         const run = await createRun('practice', { date: etDate(), dayNumber: 0, source: 'Archive dive', title: ARCHIVE_TITLE, prompts: [] }, prompts);
         return reply(stateFor(run, await bookForRun(run)));
       }
-      const loaded = await loadBook(etDate());
-      const run = await createRun('daily', loaded.book);
+      const date = etDate(receivedAt);
+      const requestedId = body.runId;
+      if (requestedId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(requestedId))) throw new HttpError('Invalid dive ID.', 400);
+      if (requestedId) {
+        const existing = await readRun(String(requestedId));
+        if (existing) {
+          if (existing.mode !== 'daily' || existing.date !== date) throw new HttpError('This dive belongs to another day.', 409);
+          return reply(stateFor(existing, await bookForRun(existing)));
+        }
+      }
+      const loaded = await loadBook(date);
+      if (loaded.stale || loaded.book.date !== date) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+      const run = await createRun('daily', loaded.book, [], requestedId ? String(requestedId) : undefined);
       return reply(stateFor(run, loaded.book));
     }
 
@@ -521,8 +554,10 @@ Deno.serve(async (req: Request) => {
         return reply({ state: stateFor(run, book), alreadyScored: true });
       }
       const windowStart = Number(run.round_start);
-      const late = Date.now() > windowStart + ROUND_MS;
-      const timely = !late || (body.timeout === true && Date.now() <= windowStart + ROUND_MS + 1_500);
+      // Time spent inside this function (including database reads) must not
+      // count against the player. Keep a small, server-measured network grace.
+      const late = receivedAt > windowStart + ROUND_MS;
+      const timely = receivedAt <= windowStart + ROUND_MS + 1_500;
       const raw = String(body.answer ?? '').trim().slice(0, 256);
       const prompt = book.prompts[round];
       const match = raw && timely ? matchAnswer(raw, prompt.answers) : null;
@@ -542,12 +577,22 @@ Deno.serve(async (req: Request) => {
         promptText: prompt.text
       };
       const results = [...run.results.filter(entry => entry.round !== round), result].sort((a, b) => a.round - b.round);
-      const updated = await updateRun(run.id, {
-        round: round + 1,
-        round_start: null,
-        completed: round + 1 >= book.prompts.length,
-        results
+      // An earlier request might have committed after the browser timed out.
+      // Conditional scoring prevents a late retry from overwriting that result.
+      const response = await sb('krillion_runs?id=eq.' + encodeURIComponent(run.id) + '&round=eq.' + round + '&completed=eq.false', {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ round: round + 1, round_start: null, completed: round + 1 >= book.prompts.length, results })
       });
+      if (!response.ok) throw new HttpError('The answer could not be saved. Retry this round.', 503);
+      const rows = await response.json();
+      if (!rows?.[0]) {
+        const current = await readRun(run.id);
+        if (!current) throw new HttpError('Dive not found.', 404);
+        return reply({ state: stateFor(current, book), alreadyScored: true });
+      }
+      const updated = rows[0] as Run;
+      if (updated.completed) dailyCache = null;
       return reply({ result, state: stateFor(updated, book) });
     }
 

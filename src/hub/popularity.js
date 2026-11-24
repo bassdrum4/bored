@@ -4,8 +4,8 @@
 // Popular ranks the last seven days of plays, so a game nobody has opened yet
 // has no rank at all and used to be pushed under every ranked game — where it
 // stayed, because nobody could see it to play it. A launch inside the boost
-// window is lifted above the ranked games until it has had a few days to earn
-// a rank of its own.
+// window can be lifted above ranked games. The hub instead passes its explicit
+// NEW-badge list, keeping all four new arrivals together until the next release.
 
 export const NEW_GAME_BOOST_DAYS = 3;
 
@@ -14,6 +14,19 @@ export function isFeatured(slug, featuredUntil, now = Date.now()) {
   return Number.isFinite(expiry) && now < expiry;
 }
 const DAY = 86400000;
+const detroitCalendar = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
+});
+function detroitCalendarTime(now) {
+  const parts = Object.fromEntries(detroitCalendar.formatToParts(now).map(({type, value}) => [type, value]));
+  return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+}
+
+// Check the cached public snapshot at most once a day, after 07:07 UTC.
+// Its ranking changes only on Monday; daily checks allow recovery from a failed refresh.
+export function popularityCacheDay(now = Date.now()) {
+  return new Date(now - (7 * 60 + 7) * 60000).toISOString().slice(0, 10);
+}
 
 export function popularityRanks(rows) {
   const ranks = new Map();
@@ -38,20 +51,26 @@ export function launchTime(slug, launches) {
 /** True while a game is still inside its post-launch boost window. */
 export function isNewGame(slug, launches, now = Date.now(), days = NEW_GAME_BOOST_DAYS) {
   const at = launchTime(slug, launches);
-  return at > 0 && now - at < days * DAY;
+  const age = detroitCalendarTime(now) - at;
+  return at > 0 && age >= 0 && age < days * DAY;
 }
 
 /**
- * Popular order: boosted launches first (newest launch first), then ranked games
+ * Popular order: editorial pins, then NEW-badged games in catalog release order,
+ * then ranked games (or date-based boosts when no explicit fresh list is supplied). Ranked games
  * by rank, then everything without a rank in catalog order. With no rankings and
  * no launches in their window the list is returned untouched, which is the
  * offline fallback the library relies on.
  */
 export function sortPopularGames(games, ranks, options = {}) {
-  const { launches, featuredUntil, now = Date.now(), days = NEW_GAME_BOOST_DAYS } = options;
+  const { launches, freshGames, featuredUntil, now = Date.now(), days = NEW_GAME_BOOST_DAYS } = options;
   const boost = new Map();
-  for (const [slug] of games) {
-    if (isNewGame(slug, launches, now, days)) boost.set(slug, launchTime(slug, launches));
+  if (Array.isArray(freshGames)) {
+    freshGames.forEach((slug, index) => boost.set(slug, freshGames.length - index));
+  } else {
+    for (const [slug] of games) {
+      if (isNewGame(slug, launches, now, days)) boost.set(slug, launchTime(slug, launches));
+    }
   }
   const featured = new Set(games.filter(([slug]) => isFeatured(slug, featuredUntil, now)).map(([slug]) => slug));
   if (!ranks?.size && !boost.size && !featured.size) return games;

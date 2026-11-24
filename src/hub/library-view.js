@@ -1,10 +1,10 @@
-import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, LAUNCHED, FEATURED_UNTIL, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
+import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, FEATURED_UNTIL, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
 import { DISCOVERY, PREVIEWS, inCollection } from '../games/discovery.js';
 import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { readStored, writeStored } from './store.js';
 import { backendReady, request, ANON_TOKEN } from './backend.js';
-import { popularityRanks, sortPopularGames, isNewGame, isFeatured } from './popularity.js';
+import { popularityRanks, sortPopularGames, isFeatured, popularityCacheDay } from './popularity.js';
 import { addMedal } from './invites.js';
 
 export function createLibraryView({ state, openGame, saveLibrary, track = () => {} }) {
@@ -19,33 +19,37 @@ const searchInput = $('#q');
 const gameGrid = $('#grid');
 
 // Popularity is a public, aggregated seven-day ranking — never raw analytics.
-// Cache one ranking per Detroit day so library visits do not repeatedly query
-// the database or rearrange the cards as a visitor browses.
-const POPULARITY_CACHE_KEY = 'bored.popularity.v2';
-const detroitDay = () => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
-}).format(new Date());
+// The database only recalculates on Mondays. Keep the last known ranks on
+// screen while checking the cheap snapshot daily, including on failed requests.
+const POPULARITY_CACHE_KEY = 'bored.popularity.v3';
 const cachedPopularity = readStored(POPULARITY_CACHE_KEY, null);
-let popularRankings = cachedPopularity?.day === detroitDay()
-  ? popularityRanks(cachedPopularity.rows) : new Map();
+let popularRankings = popularityRanks(cachedPopularity?.rows);
+let popularityCheckedDay = cachedPopularity?.day;
 
 async function loadPopularity() {
-  if (popularRankings.size || !backendReady()) return;
+  if ((popularRankings.size && popularityCheckedDay === popularityCacheDay()) || !backendReady()) return;
   try {
     // A SECURITY DEFINER RPC returns only game names and aggregate ranks.
     // It cannot expose player identifiers or the protected analytics table.
+    const snapshotDay = popularityCacheDay();
     const rows = await request('/rest/v1/rpc/bored_popular_games', {
       method: 'POST', body: {}, token: ANON_TOKEN
     });
     if (!Array.isArray(rows)) return;
-    popularRankings = popularityRanks(rows);
-    writeStored(POPULARITY_CACHE_KEY, { day: detroitDay(), rows });
+    const nextRanks = popularityRanks(rows);
+    if (!nextRanks.size) return;
+    const changed = nextRanks.size !== popularRankings.size ||
+      [...nextRanks].some(([slug, rank]) => popularRankings.get(slug) !== rank);
+    popularRankings = nextRanks;
+    popularityCheckedDay = snapshotDay;
+    writeStored(POPULARITY_CACHE_KEY, { day: snapshotDay, rows });
+    if (!changed) return;
     // Preserve focus: never shuffle a card out from under a keyboard user.
     if (popularRankings.size && $('#sort').value === 'popular' &&
         !document.activeElement?.closest('#grid')) renderLibrary();
     if (popularRankings.size && !document.activeElement?.closest('#recent')) renderRecent();
   } catch {
-    // Offline or RPC not deployed yet: Popular falls back to catalog-newest.
+    // Keep the last known order. With no cached ranks, use catalog-newest.
   }
 }
 
@@ -243,12 +247,11 @@ function renderRecent() {
   const hasHistory = state.recentGames.length > 0 || state.favorites.size > 0;
   // New visitors get four playable starting points rather than an empty history shelf.
   // Rankings are aggregated, never individual player histories. Offline has a fixed fallback.
-  // A launch still inside its boost window belongs here even before it has a
-  // rank, otherwise a new game is never offered and never earns one.
+  // Every NEW-badged launch belongs here even before it has a rank.
   const popular = sortPopularGames(
     ORDER.filter(([slug]) => !EXTERNS[slug] &&
-      (popularRankings.has(slug) || isNewGame(slug, LAUNCHED) || isFeatured(slug, FEATURED_UNTIL))),
-    popularRankings, { launches: LAUNCHED, featuredUntil: FEATURED_UNTIL }
+      (popularRankings.has(slug) || FRESH_GAMES.includes(slug) || isFeatured(slug, FEATURED_UNTIL))),
+    popularRankings, { freshGames: FRESH_GAMES, featuredUntil: FEATURED_UNTIL }
   ).slice(0, SHELF_LIMIT).map(([slug]) => slug);
   const starterGames = [...new Set([...popular, 'clicker', 'block-blast', 'quickdraw', '2048'])].slice(0, SHELF_LIMIT);
   const shown = hasHistory
@@ -261,7 +264,7 @@ function renderRecent() {
       ? (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
         ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
         : 'Favorite')
-      : (isNewGame(slug, LAUNCHED) ? 'Just added' : popularRankings.has(slug) ? 'Popular right now' : 'Easy to jump into'))));
+      : (FRESH_GAMES.includes(slug) ? 'Just added' : popularRankings.has(slug) ? 'Popular right now' : 'Easy to jump into'))));
   watchImpressions([...$('#recent-list').querySelectorAll('.shelf-play')], 'recent');
   $('#favorites-all').hidden = !state.favorites.size;
   $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
@@ -270,7 +273,7 @@ function renderRecent() {
 }
 
 // All Games sorts independently of the welcome/history shelf; Popular uses the
-// same cached daily rankings and falls back to catalog order when offline.
+// same weekly rankings; retain the last known order when offline.
 
 function renderLibrary() {
   const filter = searchInput.value.trim().toLowerCase();
@@ -289,7 +292,7 @@ function renderLibrary() {
   });
   const sortMode = $('#sort').value;
   if (sortMode === 'az') state.visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
-  else if (sortMode === 'popular') sortPopularGames(state.visibleGames, popularRankings, { launches: LAUNCHED, featuredUntil: FEATURED_UNTIL });
+  else if (sortMode === 'popular') sortPopularGames(state.visibleGames, popularRankings, { freshGames: FRESH_GAMES, featuredUntil: FEATURED_UNTIL });
 
   for (const [slug, name] of state.visibleGames) {
     const row = element('div', 'row');

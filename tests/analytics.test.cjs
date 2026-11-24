@@ -47,6 +47,29 @@ test('game runtime diagnostics retain type and source coordinates without privat
   });
 });
 
+test('frame telemetry bridge reports only readiness and trusted input, including opaque-origin frames', async () => {
+  const { ANALYTICS_FRAME_BRIDGE } = await import('../src/hub/analytics.js');
+  const messages = [], handlers = {};
+  const document = {
+    readyState: 'loading',
+    addEventListener: (type, callback) => { handlers[type] = callback; }
+  };
+  assert.ok(ANALYTICS_FRAME_BRIDGE.startsWith('<script>'));
+  vm.runInNewContext(ANALYTICS_FRAME_BRIDGE.slice(8, -9), {
+    document, parent: { postMessage: message => messages.push(message) }
+  });
+  assert.deepEqual(messages, [], 'frame must not report loaded before DOM content is ready');
+  handlers.DOMContentLoaded();
+  handlers.pointerdown({ isTrusted: true, clientX: 42, target: { value: 'private' } });
+  handlers.keydown({ isTrusted: true, key: 'private text' });
+  handlers.touchstart({ isTrusted: false });
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [
+    { type: 'bored:telemetry-ready' },
+    { type: 'bored:telemetry-input' },
+    { type: 'bored:telemetry-input' }
+  ]);
+});
+
 test('scoped game analytics readers are omitted only from the games they can read', async () => {
   const { isSuppressedGame, filterGameReaderTelemetry } = await import('../src/hub/analytics-access.js');
   const games = ['ashcrown','pokedoku','poke-idle','poke-gacha'];

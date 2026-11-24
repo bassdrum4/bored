@@ -2,13 +2,19 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 890,
-  "newest": "2026-11-23",
+  "count": 896,
+  "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"bf30960","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Krillion daily timeouts and recover interrupted dives","pr":315},
+  {"sha":"d49b4a2","date":"2026-11-24","author":"Daniel Lowe","subject":"Keep all four NEW releases together at the top of Popular"},
+  {"sha":"eb358d0","date":"2026-11-24","author":"Daniel Lowe","subject":"Keep popularity ordering stable during the week"},
+  {"sha":"2fd653d","date":"2026-11-24","author":"Codebuff","subject":"Document past failures and their fixes for the next agent"},
+  {"sha":"54722d9","date":"2026-11-23","author":"Daniel Lowe","subject":"Fix Detroit launch boost expiry and daily popularity cache rollover"},
+  {"sha":"685ca3e","date":"2026-11-23","author":"Daniel Lowe","subject":"Fix missing active-time telemetry in sandboxed and late-ready games","pr":312},
   {"sha":"01ce711","date":"2026-11-23","author":"Codebuff","subject":"Add the missing announcements base schema to the migrations"},
   {"sha":"a4d9e7d","date":"2026-11-23","author":"Codebuff","subject":"Let announcements ask: polls and open-ended questions"},
   {"sha":"d270a59","date":"2026-11-23","author":"Claude","subject":"Beginner's Package, claimable tokens, cheaper Collector pulls, Set as buddy"},

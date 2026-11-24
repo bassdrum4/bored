@@ -390,6 +390,7 @@ test('browser regressions', async t => {
     assert.equal(await text(page, '#count'), String(catalog.total));
     // Popular is the default, but Newest preserves catalog order on demand.
     assert.equal(await page.$eval('#sort', el => el.value), 'popular');
+    assert.deepEqual((await page.$eval('.card', els => els.map(el => el.dataset.slug))).slice(0, catalog.newest).sort(), catalog.fresh.slice().sort(), 'all NEW badges stay at the top of Popular');
     await page.select('#sort', 'original');
     assert.ok(catalog.newest > 0 && catalog.newest <= 4, 'the NEW badge holds four games at most');
     assert.deepEqual(
