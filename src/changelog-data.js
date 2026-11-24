@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 936,
+  "count": 937,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6f5c7206","date":"2026-11-24","author":"Daniel Lowe","subject":"Build daily Krillion answers once on GitHub and verify scores from static shards","pr":331},
   {"sha":"09425def","date":"2026-11-24","author":"Daniel Lowe","subject":"Retire redundant Bored analytics and preserve historical playtime","pr":327},
   {"sha":"1cae0934","date":"2026-11-24","author":"Daniel Lowe","subject":"Prevent cascading backend outages and bound scheduled database work","pr":326},
   {"sha":"03649500","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Air Hockey corner stalls, Ticket to Ride draws, and Overpass time","pr":325},
