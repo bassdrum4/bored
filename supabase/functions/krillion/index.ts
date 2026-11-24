@@ -399,6 +399,15 @@ async function loadBook(date: string): Promise<Loaded> {
   const job = (async (): Promise<Loaded> => {
     const snapshot = await staticBook(date);
     if (snapshot) {
+      // This small marker lets nightly cron skip the expensive SQL answer bank.
+      // A failed marker is harmless: the legacy scheduled fallback still runs.
+      try {
+        const noted=await sb('krillion_static_days?on_conflict=date',{
+          method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},
+          body:JSON.stringify([{date}])
+        });
+        await noted.body?.cancel().catch(()=>{});
+      } catch {}
       const loaded = { book: snapshot, stale: false };
       books.set(date, {loaded,until:Date.now()+60*60_000});
       if (books.size>20) books.delete(books.keys().next().value!);
