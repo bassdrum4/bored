@@ -444,6 +444,7 @@ test('browser regressions', async t => {
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);
     await page.reload();
+    await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     await settleBoard();
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);
@@ -593,6 +594,7 @@ test('browser regressions', async t => {
     const settle = () => new Promise(resolve => setTimeout(resolve, 400));
     await page.evaluate(() => openGame('ashcrown'));
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#title-menu .fe-item'), { polling: 50 });
+    await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
     let frame = await (await page.$('#frame')).contentFrame();
     assert.equal(await page.$eval('#hint', el => el.textContent),
       'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen');
@@ -623,6 +625,7 @@ test('browser regressions', async t => {
     // In a game, Esc deselects and then opens the Menu, which has Back to Bored after What's new.
     await page.evaluate(() => openGame('ashcrown'));
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#title-menu .fe-item'), { polling: 50 });
+    await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
     frame = await (await page.$('#frame')).contentFrame();
     await frame.click('#btn-new');
     await frame.waitForFunction(() => !document.querySelector('#pane-setup').hidden);
@@ -1666,7 +1669,10 @@ test('browser regressions', async t => {
       }));
       assert.equal(boards.boards, boards.ids.length, 'every game is its own board');
       assert.equal(new Set(boards.ids).size, boards.ids.length, 'no board is listed twice');
+      await page.click('#leaderboard-nav');
+      await page.waitForFunction(() => !document.querySelector('#leaderboard').hidden && !document.querySelector('#lb-note').textContent.includes('load when'));
       assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.ids.length + ' games'));
+      await page.click('#home-nav');
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
@@ -1721,6 +1727,7 @@ test('browser regressions', async t => {
     if (await page.$eval('#player', el => !el.hidden)) await close();
     await page.click('#daily-play');
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelectorAll('.memory-card').length === 16);
+    await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
     const frame = await (await page.$('#frame')).contentFrame();
     assert.equal(await page.evaluate(() => readDaily(currentDaily)), null);
     for (let i = 1; i <= 8; i++) {
@@ -1739,6 +1746,7 @@ test('browser regressions', async t => {
     await page.click('#daily-share');
     assert.match(await page.evaluate(() => window.copied), /Bored Daily/);
     await page.reload();
+    await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     await page.evaluate(day => { window.originalDailyDate = dailyDate; dailyDate = () => day; renderDaily(); }, date);
     assert.match(await text(page, '#daily-status'), /Automatically verified/);
     await page.click('#daily-play');
@@ -1893,6 +1901,7 @@ test('browser regressions', async t => {
       Math.random = () => 0;
     });
     await restricted.goto(url);
+    await restricted.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     assert.equal(await restricted.$$eval('.card', els => els.length), await page.evaluate(() => ORDER.length));
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await restricted.evaluate(id => openGame(id), slug);
@@ -1903,6 +1912,7 @@ test('browser regressions', async t => {
     await restricted.evaluate(day => { dailyDate = () => day; renderDaily(); }, dateFor('memory'));
     await restricted.click('#daily-play');
     await restricted.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function');
+    await restricted.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
     const daily = await (await restricted.$('#frame')).contentFrame();
     for (let i = 1; i <= 8; i++) {
       await daily.click('.memory-card:nth-child(' + i + ')');
