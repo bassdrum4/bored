@@ -49,7 +49,7 @@ const TIERS: Record<string, { score: number; name: string }> = {
 
 type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
 type Prompt = { id: string; text: string; answers: Answer[] };
-type Book = { date: string; prompts: Prompt[] };
+type Book = { date: string; staticAnswers?: boolean; prompts: Prompt[] };
 type MeterSeg = { tier: string; amt: number };
 type Player = { token: string; seat: number; name: string; lives: number; meter: number; segs?: MeterSeg[]; out: boolean; delta: number };
 type UsedAnswer = { round: number; player: string; rawAnswer: string; normalized: string; points: number };
@@ -154,6 +154,65 @@ function matchAnswer(input: string, answers: Answer[]): Answer | null {
   return null;
 }
 
+const STATIC_BASE = 'https://bassdrum4.github.io/bored/krillion-data/';
+async function staticJson(path: string, gzip = false) {
+  for (const base of [STATIC_BASE, 'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/']) {
+    try {
+      const res = await fetch(base + path, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok || !res.body) continue;
+      return gzip ? await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json() : await res.json();
+    } catch { /* Pages may lag the generated branch. */ }
+  }
+  throw new HttpError('The static answer file is temporarily unavailable.', 503);
+}
+async function staticBook(date: string): Promise<Book | null> {
+  try {
+    const b=await staticJson(date+'/manifest.json');
+    if(b?.date!==date||b.staticAnswers!==true||b.prompts?.length!==7||!b.prompts.every((p:any)=>typeof p.id==='string'&&typeof p.text==='string'))return null;
+    return {date,staticAnswers:true,prompts:b.prompts.map((p:any)=>({id:p.id,text:p.text,answers:[]}))};
+  } catch {return null;}
+}
+function staticBucket(key: string) {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  return (h >>> 0) % 128;
+}
+function plausibleSpelling(input: string, candidate: string) {
+  if (candidate.length >= 4 && input.startsWith(candidate) && input.length-candidate.length <= 16) return true;
+  const limit = input.length < 4 ? 0 : input.length < 8 ? 1 : 2;
+  if (!limit || Math.abs(input.length-candidate.length)>limit) return false;
+  let row=Array.from({length:candidate.length+1},(_,i)=>i);
+  for(let i=1;i<=input.length;i++){
+    const next=[i];
+    for(let j=1;j<=candidate.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(input[i-1]===candidate[j-1]?0:1));
+    if(Math.min(...next)>limit)return false;
+    row=next;
+  }
+  return row[candidate.length]<=limit;
+}
+async function matchStatic(book: Book, round: number, raw: string, suggestion: unknown): Promise<Answer | null> {
+  const key=bare(raw);
+  if(!key||key.length>256)return null;
+  const candidates=[key];
+  if(key.length>4&&key.endsWith('s'))candidates.push(key.slice(0,-1));
+  const n=numberValue(key);
+  if(Number.isInteger(n))candidates.push('#'+n);
+  const suggested=typeof suggestion==='string'&&/^[a-z0-9]{1,256}$/.test(suggestion)?suggestion:'';
+  if(suggested&&plausibleSpelling(key,suggested)&&!candidates.includes(suggested))candidates.push(suggested);
+  // A single round's hash buckets are small enough for an Edge isolate.
+  const shards=new Map<number,any>();
+  for(const candidate of candidates){
+    const bucket=staticBucket(candidate);
+    if(!shards.has(bucket))shards.set(bucket,await staticJson(book.date+'/'+round+'/'+bucket+'.json.gz',true));
+    const shard=shards.get(bucket);
+    if(!Object.hasOwn(shard,candidate))continue;
+    const hit=shard[candidate];
+    if(!Array.isArray(hit)||typeof hit[0]!=='string'||!Object.hasOwn(TIERS,hit[1]))throw new HttpError('The answer file is invalid.',503);
+    return {answer:hit[0],tier:hit[1],...(typeof hit[2]==='string'?{quip:hit[2]}:{}),correction:hit[3]===true||candidate!==key};
+  }
+  return null;
+}
+
 class HttpError extends Error {
   status: number;
   constructor(message: string, status = 400) {
@@ -209,6 +268,8 @@ async function loadBook(): Promise<Book> {
   if (bookCache?.requestedDate === date && Date.now() - bookCache.at < ttl) return bookCache.book;
   if (pendingBook?.requestedDate === date) return pendingBook.job;
   const job = (async (): Promise<Book> => {
+    const staticDay=await staticBook(date);
+    if(staticDay){bookCache={requestedDate:date,at:Date.now(),book:staticDay};return staticDay;}
     let response = await sb('krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1');
     let rows = response.ok ? await response.json() : [];
     if (!rows?.[0]?.book) {
@@ -414,7 +475,7 @@ async function snapshot(room: Room, state: PartyState, token: string, book: Book
     lives: state.lives,
     minTurn: state.minTurn,
     revision: state.revision,
-    prompt: { text: prompt.text, number: prompt.number, total: prompt.total },
+    prompt: { text: prompt.text, number: prompt.number, total: prompt.total, ...(book.staticAnswers ? {staticDate:book.date,staticRound:prompt.number-1} : {}) },
     round: state.round,
     heartMeter: state.meterTarget || HEART_METER,
     maxLives: MAX_LIVES,
@@ -578,7 +639,15 @@ async function answerParty(body: Record<string, any>, token: string) {
   const key = bare(answer);
   if (!key) throw new HttpError('Name something first.', 400);
   const prompt = promptFor(state, book);
-  const match = matchAnswer(answer, prompt.answers);
+  let match: Answer | null;
+  if(book.staticAnswers) match=await matchStatic(book,prompt.number-1,answer,body.candidate);
+  else if(prompt.answers?.length) match=matchAnswer(answer,prompt.answers);
+  else {
+    const res=await sb('rpc/krillion_match_answer',{method:'POST',body:JSON.stringify({p_date:book.date,p_prompt:prompt.id,p_input:answer})});
+    if(!res.ok)throw new HttpError('The answer bank is temporarily unavailable.',503);
+    const hit=await res.json();
+    match=hit&&typeof hit.answer==='string'&&Object.hasOwn(TIERS,hit.tier)?hit:null;
+  }
   if (!match) throw new HttpError(`“${answer}” is not in the answer book. Try another.`, 400);
   const normalized = bare(match.answer);
   const used = state.used.filter(entry => entry.round === state.round);
