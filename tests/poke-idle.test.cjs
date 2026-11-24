@@ -156,7 +156,7 @@ test('prestige resets the journey, keeps what it promises, and pays its bonuses'
   const after = await tab.evaluate(() => ({ pick: !document.querySelector('#pick').hidden, p: S.prestige, box: Object.keys(S.box), sp: S.box[395], cap: levelCap(), money: S.money, charm: !!S.charm,
     stones: Object.keys(S.stones).length, won: Object.keys(S.won).length, badges: Object.keys(S.badges).length, tower: S.tower.best, wins: S.stats.wins, ach: !!S.ach.dex10, beat: S.beat,
     teams: S.teams.length, lines: !!JSON.parse(localStorage.getItem('bored.poke-idle.shinylines.v1'))[4], life: lifeDex(), score: window.__boredSnapshot().score, read: !!S.mail.read['update-2026-11-24a'], again: canPrestige(), lab: finalOpen() }));
-  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special' }, cap: after.cap, money: 0, charm: false,
+  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special', peak: after.cap }, cap: after.cap, money: 0, charm: false,
     stones: 0, won: 0, badges: 0, tower: 12, wins: 500, ach: true, beat: '2026-11-20', teams: 1, lines: true, life: 4, score: 6, read: true, again: false, lab: false });
   // A new starter, then the SP edition joins it; P1 shows on the HUD and the party header.
   await tab.click('[data-start="1"]');
@@ -306,5 +306,98 @@ test('the Hall of Fame, switched on: after the Lab, a little harder than Prof Pe
     { won: true, sp: 'hof-hydrapple', look: 'special', tier: 2, stats: [106, 90, 140, 150, 110, 54, 650], types: 'Grass/Dragon', wiki: true, mail: true });
   // Prof Penguin's phase 2, for comparison: his reference team needs FINAL_USE.
   assert.ok(await tab.evaluate(() => FINAL_USE < HOF_USE));
+  assert.deepEqual(errors, []);
+});
+
+// ── Story Mode (framework). A Classic save as main wrote it before Story existed.
+const OLD_SAVE = { v: 1, money: 500, box: { 4: { xp: 1000, shiny: false }, 16: { xp: 300, shiny: true } }, party: [4, 16], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: { '0-0': 1 }, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: 'route', r: 0, k: 1 }, set: { fresh: 'auto', dupe: 'none', shiny: 'best', auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, last: Date.now() };
+
+test('an old Classic save stays Classic: same odds, same XP, same snapshot, no Story tab', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(old => {
+    localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot();
+    const xp0 = S.box[16].xp; gainXp(100);
+    enter('battle');
+    return { story: isStory(), mode: S.mode, odds: shinyOdds() * 4096, xp: S.box[16].xp - xp0, tab: document.querySelector('#tabs [data-tab=story]').hidden, snap: __boredSnapshot(), prestigeRule: canPrestige.toString().includes('isStory') };
+  }, OLD_SAVE);
+  assert.equal(got.story, false);
+  assert.equal(got.mode, undefined, 'an old save is not given a mode');
+  assert.equal(got.odds, 1);
+  assert.equal(got.xp, 200, 'the catch-up bonus still applies in Classic (Lv 6 behind Lv 10)');
+  assert.equal(got.tab, true);
+  assert.deepEqual([got.snap.score, got.snap.lifeDex, got.snap.caught, got.snap.finished, got.snap.story], [3, 2, 2, true, null]);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Mode: its own save, the opening scenes, ×2 XP and shinies, no prestige, and a Classic board that never moves', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(old => { localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot(); go('new'); }, OLD_SAVE);
+  assert.equal(await tab.evaluate(() => document.querySelectorAll('#t-card [data-act=mode]').length), 2, 'New game asks Classic or Story');
+  await tab.click('#t-card [data-act=mode][data-k="bored.poke-idle.story"]');
+  const pick = await tab.evaluate(() => ({ screen, slot, scene: !$('#scene').hidden && sceneNow.id, classic: !!readSlot(KEY) }));
+  assert.deepEqual(pick, { screen: 'pick', slot: 'bored.poke-idle.story', scene: 'open-1', classic: true });
+  await tab.click('#scene [data-scene=skip]');
+  await tab.click('[data-start="7"]');
+  const story = await tab.evaluate(() => ({ mode: S.mode, scene: sceneNow && sceneNow.id, odds: shinyOdds() * 4096, charm: (S.charm = 1, shinyOdds() * 4096), prestige: (S.beat = '2026-11-24', S.pbeat = 1, canPrestige()), tab: !$('#tabs [data-tab=story]').hidden, from: S.box[7].from }));
+  assert.deepEqual(story, { mode: 'story', scene: 'open-2', odds: 2, charm: 6, prestige: false, tab: true, from: 0 });
+  await tab.evaluate(() => { S.charm = 0; delete S.beat; delete S.pbeat; });
+  await tab.click('#scene [data-scene=next]'); await tab.click('#scene [data-scene=next]');
+  const book = await tab.evaluate(() => ({ seen: S.story.seen, tab, text: $('#t-story').textContent, rereads: [...document.querySelectorAll('#t-story [data-reread]')].map(b => b.dataset.reread) }));
+  assert.deepEqual(book.seen, { 'open-1': 1, 'open-2': 1 }, 'a skipped scene counts as seen');
+  assert.equal(book.tab, 'story');
+  assert.ok(book.text.includes('Write down everything, especially the things that seem small.'));
+  assert.deepEqual(book.rereads, ['open-1', 'open-2']);
+  await tab.click('#t-story [data-reread="open-2"]');
+  assert.equal(await tab.evaluate(() => sceneNow.id), 'open-2', 'a scene can be read again');
+  await tab.click('#scene [data-scene=skip]');
+  // XP: ×2, no catch-up; below its peak a Pokémon gets ×2 more, but only back up to its peak.
+  const xp = await tab.evaluate(() => {
+    S.box = { 7: { xp: 27, shiny: false, peak: 7 }, 1: { xp: 27, shiny: false } }; S.party = [7, 1];
+    const tile = remembers(7) && (openTab('party'), !!document.querySelector('#party [data-n="7"] .peak'));
+    gainXp(100); return { remembered: S.box[7].xp, plain: S.box[1].xp, tile, after: remembers(7) };
+  });
+  assert.deepEqual(xp, { remembered: 343 + 42, plain: 27 + 200, tile: true, after: false });
+  // The Classic board doesn't move while Story is open; Story's progress rides along.
+  const snap = await tab.evaluate(() => { save(); return __boredSnapshot(); });
+  assert.deepEqual([snap.score, snap.lifeDex, snap.caught, snap.finished], [3, 2, 2, true]);
+  assert.deepEqual(snap.story, { year: 1, chapter: 0, regionsLiberated: 0, lifeDex: 2 });
+  // Switching back: the Classic save is just as it was, and the Story save waits.
+  await tab.evaluate(() => { showTitle(); go('switch'); });
+  const back = await tab.evaluate(() => ({ slot, mode: S.mode || null, money: S.money, box: Object.keys(S.box), story: readSlot(STORY_KEY).mode, menu: [...document.querySelectorAll('#menu [data-go]')].map(b => b.textContent) }));
+  assert.deepEqual(back, { slot: 'bored.poke-idle.save', mode: null, money: 500, box: ['4', '16'], story: 'story', menu: back.menu });
+  assert.ok(back.menu.includes('Switch to Story'));
+  assert.deepEqual(errors, []);
+});
+
+test('Story chapters: rows after the Champion that wait for what they need, scenes before and after, clues, and tracking', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25];
+    SCENES['t-pre'] = { year: 1, r: 0, title: 'Before', lines: [['Prof Penguin', 'One.']] };
+    SCENES['t-post'] = { year: 1, r: 0, title: 'After', lines: [['', 'Two.']] };
+    CLUES.t = { title: 'A clue', text: 'Something small.' };
+    for (const c of [{ id: 't-1', r: 0, type: 'scene', name: 'Test one', pre: 't-pre', post: 't-post', clue: 't', liberates: true }, { id: 't-2', r: 0, type: 'scene', name: 'Test two', after: ['t-1'] }]) { CHAPTERS.push(c); CHAPTER[c.id] = c; }
+    viewR = 0; enter('battle');
+    const rows = () => [...document.querySelectorAll('#locs .loc')].map(b => ({ text: b.textContent, open: !b.disabled }));
+    const before = rows().filter(x => x.text.startsWith('Test'));
+    const champAt = rows().findIndex(x => /^Champion Blue/.test(x.text)), oneAt = rows().findIndex(x => x.text.startsWith('Test one'));
+    S.champs[0] = 1; renderLocs();
+    startLoc({ kind: 'chapter', r: 0, x: 't-1' });
+    const pre = sceneNow && sceneNow.id; endScene();
+    const post = sceneNow && sceneNow.id; endScene();
+    const after = rows().filter(x => x.text.startsWith('Test'));
+    // Bond comes from a win in the active party only.
+    S.box[26] = { xp: 1e6 }; startLoc({ kind: 'route', r: 0, k: 0 }); defeat();
+    return { before, after, order: oneAt === champAt + 1, pre, post, ch: S.story.ch, clue: S.story.clues, snap: storyProgress(S), bond: [S.box[25].bond, S.box[26].bond], peak: S.box[25].peak };
+  });
+  assert.deepEqual(got.before.map(x => [x.text, x.open]), [['Test oneafter Blue', false], ['Test twoafter Test one', false]]);
+  assert.equal(got.order, true, 'chapters come right after the Champion');
+  assert.deepEqual([got.pre, got.post], ['t-pre', 't-post']);
+  assert.deepEqual(got.ch, { 't-1': 1 });
+  assert.deepEqual(got.clue, { t: 1 });
+  assert.deepEqual(got.after.map(x => [x.text, x.open]), [['Test onedone', true], ['Test twostory', true]]);
+  assert.deepEqual(got.snap, { year: 1, chapter: 1, regionsLiberated: 1, lifeDex: 2 });
+  assert.deepEqual(got.bond, [1, null], 'only the party member that fought bonds');
+  assert.equal(got.peak, 100);
   assert.deepEqual(errors, []);
 });

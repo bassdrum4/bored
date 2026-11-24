@@ -212,6 +212,17 @@
   .tip { position: relative; margin-top: 8px; padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink); display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55 }
   .tip .who { position: absolute; top: -9px; left: 12px; padding: 0 6px; background: var(--paper); font-size: 12px; font-weight: 700; line-height: 16px }
   .tip p { max-width: 68ch }
+  /* Story scenes use Prof Penguin's text box, over whichever screen is open. */
+  .scene { margin: 0 0 12px }
+  .scene .count { margin-left: auto }
+  .modes { display: grid; gap: 8px }
+  .modes button { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
+  .modes button span { font-size: 12px; color: var(--dim) }
+  .mon .peak { position: absolute; bottom: 2px; right: 3px; font-size: 9px; color: var(--xp); font-weight: 700 }
+  .st-group { margin: 6px 0 12px } .st-group h4 { margin: 8px 0 4px; font-size: 12px; color: var(--dim) }
+  .st-scenes { display: flex; flex-wrap: wrap; gap: 6px }
+  .clues { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) }
+  .clue { border: 1px solid var(--ink); border-radius: 4px; padding: 10px 12px; font-size: 13px } .clue b { display: block; margin-bottom: 4px }
   .syncask { margin: 0 0 12px }
   .syncask h2 { margin: 0; font-size: 14px }
   .sync-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px }
@@ -322,6 +333,7 @@
 <body>
 <main>
   <div class="tip syncask" id="syncask" role="alertdialog" aria-labelledby="syncask-h" hidden></div>
+  <div class="tip scene" id="scene" role="dialog" aria-live="polite" hidden></div>
   <section id="title" hidden>
     <div class="head"><h1 id="sign">Poké Idle</h1><b class="ptag" id="t-prest" hidden></b><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
     <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
@@ -357,6 +369,7 @@
       <button data-tab="wiki" type="button">Wiki</button>
       <button data-tab="mail" type="button">Mail<b id="mailn"></b></button>
       <button data-tab="ach" type="button">Achievements</button>
+      <button data-tab="story" type="button" hidden>Story</button>
     </div>
     <div class="tip" id="tip" role="status" hidden></div>
     <div class="credits" id="credits" role="dialog" aria-modal="true" aria-labelledby="credits-h" hidden></div>
@@ -419,6 +432,7 @@
       </div>
     </section>
 
+    <section id="t-story" class="box" hidden></section>
     <section id="t-ach" class="box" hidden>
       <div class="small" id="achsum"></div>
       <div id="achlist"></div>
@@ -582,7 +596,7 @@ const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUN
 // Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
 const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 5.3, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
 // Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it, and each prestige doubles it up to ×8 (see Prestige).
-const shinyOdds = () => (S.charm ? 3 : 1) * prestigeShiny() / 4096;
+const shinyOdds = () => (S.charm ? 3 : 1) * (isStory() ? STORY_SHINY : prestigeShiny()) / 4096;
 const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
@@ -694,16 +708,20 @@ const proteinPrice = n => Math.round(300 * Math.pow(1.5, n));
 const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 
 // ── Save
-// The real save, and a separate slot for the test account (below). Which slot is open is remembered.
-const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
-let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
+// The real save (Classic), Story Mode's own save, and a separate slot for the test account (below). Which slot is
+// open is remembered in SLOT_KEY: "real", "story" or "test". Only the Classic save goes to the Bored account (sync,
+// below, reads KEY itself), and the leaderboard always reports Classic (see __boredSnapshot).
+const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", STORY_KEY = "bored.poke-idle.story", SLOT_KEY = "bored.poke-idle.slot";
+const SLOT_NAME = { [KEY]: "real", [TEST_KEY]: "test", [STORY_KEY]: "story" };
+let slot = (() => { try { const v = localStorage.getItem(SLOT_KEY); return v === "test" ? TEST_KEY : v === "story" ? STORY_KEY : KEY; } catch { return KEY; } })();
+const setSlotPref = k => { try { localStorage.setItem(SLOT_KEY, SLOT_NAME[k]); } catch {} };
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
 const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, prestige: 0, lifeDex: {}, lifeShiny: {}, last: Date.now() });
 let S = readSlot(slot);
 // Your save in your Bored account (see "Saves in your account" further down). openAt is the save's time as this page
 // found it, before anything here touched it.
 const SYNC = { acct: null, state: "start", row: null, busy: false, again: false, tries: 0, retryAt: 0, lastPush: 0, hidden: false, ask: null, hideAsk: false, blocked: 0, error: false, openAt: (readSlot(KEY) || {}).last || 0 };
-const save = () => { if (syncHold()) return; shineLines(); S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
+const save = () => { if (syncHold()) return; shineLines(); notePeaks(); S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
 // ── Party power
 const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
@@ -1094,6 +1112,7 @@ const badge = (r, k) => !!S.badges[r + "-" + k];
 const kills = (r, k) => S.kills[r + "-" + k] || 0;
 function unlocked(loc) {
   const { kind, r, k } = loc;
+  if (kind === "chapter") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
   if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
   if (kind === "hof") return HOF_READY && labBeaten();
@@ -1121,6 +1140,7 @@ function locName(loc) {
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
   if (loc.kind === "dungeon") return loc.x ? TRIP[loc.x].place : `${R.name} dungeon`;
+  if (loc.kind === "chapter") return CHAPTER[loc.x] ? CHAPTER[loc.x].name : "Story";
   if (loc.kind === "summit") return "Mt. Silver";
   if (loc.kind === "darkest") return "Energy Plant";
   if (loc.kind === "tower") return "Battle Tower";
@@ -1321,7 +1341,7 @@ const PRESTIGE_KEEP = ["ach", "mail", "stats", "beat", "teams", "set", "tut", "d
 const prestigeShiny = (p = S.prestige || 0) => Math.min(PRESTIGE_SHINY_MAX, 2 ** p);
 const prestigeXp = () => S.prestige ? PRESTIGE_XP : 1;
 const nextShiny = () => prestigeShiny((S.prestige || 0) + 1);
-const canPrestige = () => !!(S && !S.pick && (S.pbeat || (S.beat && !S.prestige)));
+const canPrestige = () => !!(S && !isStory() && !S.pick && (S.pbeat || (S.beat && !S.prestige)));
 const PRESTIGE_RESETS = ["your Box and party", "money", "balls, items, Linking Cords and Protein", "badges and Champions", "dungeons and side quests", "rival fights", ...(HOF_READY ? ["the Hall of Fame"] : []), "dungeon tickets",
   "Mega Stones, Max Soup and Gigantamax forms", "the Shiny Charm", "region progress: routes, Zygarde Cells, Wishing Pieces and Plates", "Prof Penguin's Lab: beat him again to prestige again"];
 const PRESTIGE_STAYS = ["achievements", "Mail", "your Battle Tower best", "stats counters (wins, taps, evolutions)", "the day you beat the game", "saved teams, as templates: loading one fills in the members you have",
@@ -1395,6 +1415,7 @@ function hofWin() {
   toast(first ? `You beat ${RIVAL_NAME} in the Hall of Fame! +$${fmt(prize)}. Mega Hydrapple is yours.` : `Hall of Fame rematch won. +$${fmt(prize)}.`);
 }
 function startLoc(loc) {
+  if (loc.kind === "chapter") return runChapter(CHAPTER[loc.x]);
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
@@ -1476,6 +1497,8 @@ function hit(dmg) {
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
   S.money += f.reward; S.stats.wins++;
+  // Bond: a win in the active party (only here, live; a saved team or the Box doesn't count).
+  for (const n of S.party) if (S.box[n]) S.box[n].bond = 1;
   gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5) * (B.kind === "route" && B.r === TRAIN_R ? TRAIN_XP : 1)));
   if (B.kind === "route" && B.r !== TRAIN_R) S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
@@ -1687,7 +1710,7 @@ function backToRoute() {
 }
 function addMon(num, L, shiny, vid) {
   const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num), again = !had && !shiny && !lineWasShiny && lineRecorded(num);
-  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again };
+  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again, from: B && REGIONS[B.r] ? B.r : S.loc.r };
   else if (shiny) shineOne(had);
   shineLines();
   const newForm = v ? unlockVar(num, vid, !had) : false;
@@ -1696,7 +1719,7 @@ function addMon(num, L, shiny, vid) {
   if (!had) msgs.push(`${(v || mon(num)).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
   else if (newForm) msgs.push(`${v.name}! It joins as a form of your ${mon(num).name}: pick it in its detail in Party & Box.`);
   // The shiny toast comes once per line: a second shiny of a line that already shines says nothing new.
-  if (again) msgs.push(`${(v || mon(num)).name} came out shiny: you had its line shiny before you prestiged.${familyOf(num).length > 1 ? " The whole line shines again." : ""}`);
+  if (again) msgs.push(`${(v || mon(num)).name} came out shiny: you had its line shiny ${isStory() ? "in another save" : "before you prestiged"}.${familyOf(num).length > 1 ? " The whole line shines again." : ""}`);
   if (shiny && !lineWasShiny) msgs.push(`A shiny ${(v || mon(num)).name}!${familyOf(num).length > 1 ? " Its whole evolution line is shiny for you now." : ""} Party & Box can switch the look back.`);
   if (msgs.length) toast(msgs.join(" "));
   // Cosmog is a gift the first time you catch Solgaleo or Lunala; Cosmoem comes from evolving it.
@@ -1753,12 +1776,30 @@ function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSM
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
 function gainXp(xp) {
   xp *= prestigeXp();
+  if (isStory()) return storyXp(xp * STORY_XP);
   const top = Math.pow(levelCap(), 3), lead = Math.min(top, Math.max(0, ...S.party.map(n => S.box[n].xp))), leadL = Math.max(0, ...S.party.map(n => level(n)));
   for (const n of S.party.slice()) {
     const b = S.box[n], before = level(n), mult = Math.min(CATCH_MAX, Math.pow(2, Math.max(0, leadL - before) / CATCH_UP));
     if (b.xp < top) b.xp = Math.min(top, b.xp + Math.max(xp, Math.min(xp * mult, lead + xp - b.xp)));
     if (level(n) > before) autoEvolve(n);
   }
+}
+// Story Mode has no catch-up bonus. Instead, "It remembers you": a Pokémon below the highest level it ever reached
+// (b.peak) gets ×REMEMBER XP until it's back there, then the usual Story rate. Rare in Year 1; it's for the years after.
+function storyXp(xp) {
+  const top = Math.pow(levelCap(), 3);
+  for (const n of S.party.slice()) {
+    const b = S.box[n], before = level(n);
+    if (b.xp < top) b.xp = Math.min(top, rememberXp(b, xp));
+    notePeak(b);
+    if (level(n) > before) autoEvolve(n);
+  }
+}
+function rememberXp(b, xp) {
+  const peakXp = Math.pow(b.peak || 0, 3);
+  if (b.xp >= peakXp) return b.xp + xp;
+  const fast = b.xp + xp * REMEMBER;
+  return fast <= peakXp ? fast : peakXp + (fast - peakXp) / REMEMBER;
 }
 // A new badge can lift a Pokémon that was already sitting at the cap over its evolution level.
 function liftCap() { for (const n of S.party.slice()) autoEvolve(n); }
@@ -1791,8 +1832,8 @@ function evolve(n, e, quiet) {
   // Shinies go by line (shineLines): the evolution is shiny if its line is, and wears the look the one it came from
   // had picked (a shiny set back to Normal stays Normal).
   const had = S.box[t];
-  if (had) had.xp = Math.max(had.xp, S.box[n].xp);
-  else S.box[t] = { xp: S.box[n].xp, shiny: lineShiny(n), ...(S.box[n].shiny && lookKind(n) === "normal" ? { look: "normal" } : {}) };
+  if (had) { had.xp = Math.max(had.xp, S.box[n].xp); carryTrack(S.box[n], had); }
+  else { S.box[t] = { xp: S.box[n].xp, shiny: lineShiny(n), ...(S.box[n].shiny && lookKind(n) === "normal" ? { look: "normal" } : {}) }; carryTrack(S.box[n], S.box[t]); }
   shineLines();
   if (form) unlockVar(t, form.vid, true);
   const slot = S.party.indexOf(n);
@@ -1876,7 +1917,7 @@ const TIPS = [
 ];
 let tipNow = null;
 function tutor() {
-  if (!S || !S.tut || S.tut.off || screen !== "game" || tipNow) return;
+  if (!S || !S.tut || S.tut.off || screen !== "game" || tipNow || sceneNow) return;
   const t = TIPS.find(x => !S.tut.seen[x.id] && x.when());
   if (!t) return;
   tipNow = t;
@@ -1889,7 +1930,8 @@ function hideTip() { tipNow = null; $("#tip").hidden = true; }
 let tab = "battle", dexR = 0, viewR = 0, detail = null;
 function renderAll() { renderTop(); renderLocs(); renderMinis(); if (tab === "party") renderParty(); if (tab === "dex") renderDex(); if (tab === "shop") renderShop(); }
 function renderTop() {
-  $("#top h1").textContent = S && S.test ? "Poké Idle (test)" : "Poké Idle";
+  $("#top h1").textContent = S && S.test ? "Poké Idle (test)" : isStory() ? "Poké Idle: Story" : "Poké Idle";
+  $('#tabs [data-tab="story"]').hidden = !isStory();
   $("#mailn").textContent = unreadMail() || "";
   $("#hudp").hidden = !S.prestige; $("#hudp").textContent = S.prestige ? "P" + S.prestige : ""; $("#hudp").title = S.prestige ? "Prestige " + S.prestige : "";
   $("#dexn").textContent = Object.keys(S.box).length;
@@ -1918,6 +1960,7 @@ function renderLocs() {
       if (k === 1) { const t4 = dungeonT4(r); items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${dungeonPhase(r) === 4 ? `Legends ${t4.filter(ownsFoe).length}/${t4.length}` : "Tier 3"} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] }); }
     }
     items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
+    if (isStory()) items.push(...chapterRows(r));
     if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
     if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
     for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, types: unlocked({ kind: "dungeon", r, x: T.id }) ? denFoe(r, T.id).types : null, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
@@ -1940,7 +1983,7 @@ function monTile(n, opts = {}) {
   const eLabel = e == null ? "" : dm > .95 && dm < 1.05 ? ({ 0: "0x", .25: "¼x", .5: "½x" })[te] || te + "x" : (e >= 10 ? Math.round(e) : Math.round(e * 10) / 10) + "x";
   const eTitle = e == null ? "" : `${te}x type; ${ph ? "Attack vs Defense" : "Sp. Atk vs Sp. Def"} ×${dm.toFixed(2)}`;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span>${remembers(n) ? `<span class="peak" title="It remembers you: ×${REMEMBER} XP back to Lv ${S.box[n].peak}">❄${S.box[n].peak}</span>` : ""}<span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -2063,7 +2106,7 @@ function renderDetail() {
   const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   const now = statsAt(st, level(detail)), bRaw = bulkOf(fighter(detail)), bNow = Math.round(bulkNow(detail)), bFull = Math.round(bulkFor(fighter(detail)));
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)}${remembers(detail) ? ` <span class="small" title="It remembers you: ×${REMEMBER} XP until it's back to Lv ${S.box[detail].peak}">❄ was Lv ${S.box[detail].peak}</span>` : ""} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small">Lv ${level(detail)}: HP <b>${now.hp}</b> · Atk <b>${now.atk}</b> · Def <b>${now.def}</b> · SpA <b>${now.spa}</b> · SpD <b>${now.spd}</b> · Spe <b>${now.spe}</b> · Total <b>${now.bst}</b></div>` +
     `<div class="small muted">Base stats: HP ${st.hp} · Atk ${st.atk} · Def ${st.def} · SpA ${st.spa} · SpD ${st.spd} · Spe ${st.spe} · Total ${st.bst}</div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
@@ -2418,7 +2461,8 @@ const arcadeDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/De
 // A letter with beat: true arrives when you beat Prof Penguin.
 // One with rival: true arrives when you first beat Sssssssnakes there (S.mail.got).
 // One with hof: true waits for HOF_READY.
-const delivered = m => !(m.hof && !HOF_READY) && ((m.beat ? !!S.beat : !m.day && !m.rival) || !!S.mail.got[m.id]);
+// A Story save skips Classic's update notes (update- letters with no gift); a letter with story: true is for both.
+const delivered = m => !(m.hof && !HOF_READY) && !(isStory() && /^update-/.test(m.id) && !m.story && !m.gift) && ((m.beat ? !!S.beat : !m.day && !m.rival) || !!S.mail.got[m.id]);
 function deliverMail(today = arcadeDay()) {
   if (!S) return;
   const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
@@ -2735,7 +2779,7 @@ $("#wiki-text").addEventListener("scroll", () => {
 });
 
 // ── Events
-function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail", "ach"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex" && REGIONS[S.loc.r]) dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); if (t === "ach") renderAch(); renderAll(); refitSprites(); }
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail", "ach", "story"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex" && REGIONS[S.loc.r]) dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); if (t === "ach") renderAch(); if (t === "story") renderStory(); renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#throwbox").onclick = e => { const b = e.target.closest("[data-throw]"); if (b) manualThrow(b.dataset.throw); };
@@ -2934,7 +2978,12 @@ for (const id of ["fresh", "dupe", "shiny"]) {
 $("#export").onclick = () => { save(); $("#savecode").value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $("#savecode").select(); $("#setmsg").textContent = "Copy this code and keep it somewhere safe."; };
 const BAD_CODE = 'That code didn\'t load. Paste the whole code from "Show my save code".';
 function loadCode(text) {
-  try { const s = JSON.parse(decodeURIComponent(escape(atob(String(text).trim())))); if (!s || s.v !== 1 || !s.box) return false; S = s; save(); return true; }
+  try {
+    const s = JSON.parse(decodeURIComponent(escape(atob(String(text).trim())))); if (!s || s.v !== 1 || !s.box) return false;
+    const k = s.mode === "story" ? STORY_KEY : slot === STORY_KEY ? KEY : slot;
+    if (k !== slot) { if (S) save(); slot = k; setSlotPref(k); }
+    S = s; save(); return true;
+  }
   catch { return false; }
 }
 $("#import").onclick = () => {
@@ -2994,6 +3043,132 @@ function migrateSave() {
   S.prestige = S.prestige || 0; recordLife();
 }
 
+// ── Story Mode. A Story save is an ordinary save with mode: "story" and a story block (freshStory). It has its own
+// slot (STORY_KEY), never prestiges, gets ×STORY_XP XP and ×STORY_SHINY shinies (the Shiny Charm's ×3 on top), and shares
+// the shiny lines with Classic (SHINY_KEY). Everything Story-only checks isStory(), so a Classic save plays as before.
+// Each region has an ordered list of chapters (CHAPTERS, filled in by the year's content) that show as rows right after
+// its Champion. A chapter has a type (scene, admin, legend, rival, pick, finale), what it waits for (after: "champ" or
+// other chapter ids) and scenes before and after (pre, post). S.story.ch keeps the ones you've finished.
+const STORY_XP = 2, STORY_SHINY = 2, REMEMBER = 2;
+const YEARS = { 1: "The Long Freeze" };
+const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
+  [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
+const isStory = () => !!(S && S.mode === "story");
+const otherSlot = () => slot === KEY ? STORY_KEY : slot === STORY_KEY ? KEY : null;
+const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, epilogue: 0 });
+let newFor = null, pickFrom = null;
+// New game in a mode: that slot is emptied and the starter screen opens for it. Back to title goes back to the save
+// you came from.
+function newGame(k) {
+  if (S) save();
+  pickFrom = slot; newFor = null;
+  slot = k; setSlotPref(k);
+  try { localStorage.removeItem(k); } catch {}
+  S = null; B = null; showPick();
+}
+function startStory() { S.mode = "story"; S.story = freshStory(); for (const id of preSeen.splice(0)) S.story.seen[id] = 1; }
+// Tracking from day one, in both modes, for the years to come: from (the region a Pokémon was caught in), bond (it won
+// a battle in the active party) and peak (the highest level it ever reached).
+const notePeak = b => { const L = lvlOf(b.xp); if (!(b.peak >= L)) b.peak = L; };
+function notePeaks() { if (S && S.box) for (const b of Object.values(S.box)) notePeak(b); }
+function carryTrack(a, b) { if (a.bond) b.bond = 1; if (a.from != null && b.from == null) b.from = a.from; if (a.peak > (b.peak || 0)) b.peak = a.peak; }
+const remembers = n => isStory() && !!S.box[n] && S.box[n].peak > lvlOf(S.box[n].xp);
+
+// Scenes, in Prof Penguin's text box: lines of [who, text]. Each has a year and a region (-1 for the prologue) for the
+// Story tab, where every scene you've seen (or skipped) can be read again.
+const SCENES = {
+  "open-1": { year: 1, r: -1, title: "Snow in Kanto", lines: [
+    ["", "Snow is falling on Kanto, three weeks early."],
+    ["", "Prof Penguin's lab is freezing. He stands over a map covered in pins, top hat and all."],
+    ["Prof Penguin", "Every legend in the world is asleep, and every one of them is waking up early. And every time one wakes, the world gets colder. I need eyes in the field."],
+    ["Prof Penguin", "Pick a partner. Any of these three will do."]] },
+  "open-2": { year: 1, r: -1, title: "The notebook", lines: [
+    ["", "Prof Penguin hands you a notebook. The cover is already a little frosty."],
+    ["Prof Penguin", "Write down everything, especially the things that seem small."]] }
+};
+const CLUES = {};
+const CHAPTERS = [];
+const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
+// How each type of chapter plays once its opening scene is done. A type with no entry here is a scene chapter.
+const CHAPTER_RUN = {};
+const chDone = id => !!(S && S.story && S.story.ch[id]);
+const chaptersDone = () => CHAPTERS.filter(c => chDone(c.id)).length;
+const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open());
+function chapterRows(r) {
+  return CHAPTERS.filter(c => c.r === r).map(c => {
+    const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
+    return { kind: "chapter", r, x: c.id, done: chDone(c.id),
+      note: chDone(c.id) ? c.doneNote || "done" : !wait ? (c.note ? c.note() : "story") : wait === "champ" ? `after ${REGIONS[r].champ}` : `after ${CHAPTER[wait].name}` };
+  });
+}
+function runChapter(c) {
+  if (!c || !(chapterOpen(c) || chDone(c.id))) return;
+  if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
+  const go = CHAPTER_RUN[c.type];
+  playScene(c.pre, () => go ? go(c) : finishChapter(c));
+}
+function finishChapter(c) {
+  const first = !chDone(c.id);
+  S.story.ch[c.id] = 1;
+  if (first) { if (c.clue) S.story.clues[c.clue] = 1; if (c.won) c.won(); }
+  save(); renderAll();
+  playScene(c.post);
+}
+// Story's leaderboard progress (for the Story board the hub doesn't have yet): year, chapters done, regions
+// liberated (a chapter with liberates: true closes its region), and the Story lifetime dex, which never goes down.
+function storyProgress(st) {
+  if (!st || st.mode !== "story" || !st.story) return null;
+  const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
+  return { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
+    lifeDex: new Set([...keys(st.lifeDex), ...keys(st.box)]).size };
+}
+
+// The scene box. playScene(id, then): then runs once it's closed, skipped or not. A scene you've already seen plays
+// again from the Story tab the same way and changes nothing. Seen before the save exists (the opening): kept in preSeen.
+let sceneNow = null;
+const preSeen = [];
+function playScene(id, then) {
+  const sc = id && SCENES[id];
+  if (!sc) { if (then) then(); return; }
+  hideTip();
+  if (sceneNow) markSeen(sceneNow.id);
+  sceneNow = { id, i: 0, then };
+  renderScene();
+}
+function renderScene() {
+  const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], last = sceneNow.i === sc.lines.length - 1;
+  $("#scene").innerHTML = (who ? `<span class="who">${esc(who)}</span>` : "") + `<p>${esc(text)}</p><div class="row"><button class="skip" type="button" data-scene="skip">Skip</button><span class="muted small count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next">${last ? "Close" : "Next"}</button></div>`;
+  $("#scene").hidden = false;
+  $("#scene [data-scene=next]").focus({ preventScroll: true });
+}
+function endScene() {
+  const s = sceneNow; if (!s) return;
+  sceneNow = null; $("#scene").hidden = true;
+  markSeen(s.id);
+  if (tab === "story" && screen === "game") renderStory();
+  if (s.then) s.then();
+  tutor();
+}
+function markSeen(id) { if (S && S.story) { if (!S.story.seen[id]) { S.story.seen[id] = 1; save(); } } else if (!preSeen.includes(id)) preSeen.push(id); }
+$("#scene").onclick = e => {
+  const b = e.target.closest("[data-scene]"); if (!b || !sceneNow) return;
+  if (b.dataset.scene === "skip" || sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
+  else { sceneNow.i++; renderScene(); }
+};
+
+// The Story tab: the notebook, every scene seen so far by year and region, and the clue cards.
+function renderStory() {
+  if (!isStory()) return;
+  const st = S.story, seen = Object.keys(SCENES).filter(id => st.seen[id]), groups = {};
+  for (const id of seen) { const sc = SCENES[id], g = sc.year + ":" + sc.r; (groups[g] = groups[g] || { year: sc.year, r: sc.r, ids: [] }).ids.push(id); }
+  const order = Object.values(groups).sort((a, b) => a.year - b.year || a.r - b.r);
+  const clues = Object.keys(CLUES).filter(k => st.clues[k]);
+  $("#t-story").innerHTML = `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
+    <h2>Story so far</h2>${order.length ? order.map(g => `<div class="st-group"><h4>Year ${g.year}: ${esc(YEARS[g.year] || "")} · ${g.r < 0 ? "Prologue" : esc(REGIONS[g.r].name)}</h4><div class="st-scenes">${g.ids.map(id => `<button class="lbl" type="button" data-reread="${id}">${esc(SCENES[id].title)}</button>`).join("")}</div></div>`).join("") : '<p class="small muted">Nothing yet.</p>'}
+    <h2>Clues</h2>${clues.length ? `<div class="clues">${clues.map(k => `<div class="clue"><b>${esc(CLUES[k].title)}</b>${esc(CLUES[k].text)}</div>`).join("")}</div>` : '<p class="small muted">No clues yet. Keep your eyes open.</p>'}`;
+}
+$("#t-story").onclick = e => { const b = e.target.closest("[data-reread]"); if (b) playScene(b.dataset.reread); };
+
 // ── Screens: title (the landing page), pick (a new save's starter), game.
 let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
 function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; refitSprites(); }
@@ -3007,7 +3182,8 @@ function boot() {
 function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
 function showPick() {
   show("pick");
-  $("#pickline").textContent = S && S.pick ? `Prestige ${S.prestige}: a new journey. XP ×${PRESTIGE_XP} for good, shinies ×${prestigeShiny()}${S.charm ? "" : " (×" + 3 * prestigeShiny() + " once you win the Shiny Charm again)"}.` : "Poké Idle. Your party fights on its own; you just help.";
+  if (slot === STORY_KEY && !S) playScene("open-1");
+  $("#pickline").textContent = S && S.pick ? `Prestige ${S.prestige}: a new journey. XP ×${PRESTIGE_XP} for good, shinies ×${prestigeShiny()}${S.charm ? "" : " (×" + 3 * prestigeShiny() + " once you win the Shiny Charm again)"}.` : slot === STORY_KEY ? `Story Mode, Year 1: ${YEARS[1]}.` : "Poké Idle. Your party fights on its own; you just help.";
   $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img class="spr" data-ref="42" src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
 }
 function enter(t) {
@@ -3066,7 +3242,7 @@ function testAccount() {
 }
 function useSlot(k, account) {
   if (S) save();
-  slot = k; try { localStorage.setItem(SLOT_KEY, k === TEST_KEY ? "test" : "real"); } catch {}
+  slot = k; setSlotPref(k);
   S = account || readSlot(k);
   if (S) save();
   $("#testdoor").hidden = true; boot();
@@ -3086,8 +3262,8 @@ $("#testdoor").onsubmit = e => {
   else $("#testmsg").textContent = "That's not it.";
 };
 function renderTitle() {
-  const items = MENU[S ? "save" : "fresh"].concat(slot === TEST_KEY ? [["back", "Back to my save"]] : []);
-  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : "Your party fights on its own; you just help.";
+  const other = otherSlot(), items = MENU[S ? "save" : "fresh"].concat(slot === TEST_KEY ? [["back", "Back to my save"]] : other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []);
+  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
   $("#t-prest").hidden = !(S && S.prestige); $("#t-prest").textContent = S && S.prestige ? "P" + S.prestige : ""; $("#t-prest").title = S && S.prestige ? "Prestige " + S.prestige : "";
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
@@ -3096,7 +3272,10 @@ function renderTitle() {
   const card = $("#t-card");
   if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
   else if (panel === "load") card.innerHTML = `<h2>Load a save code</h2><p class="small muted">On your other device, open Settings and use "Show my save code", then paste the code here.</p><textarea id="t-code" aria-label="Save code" spellcheck="false"></textarea><div class="row"><button class="lbl" type="button" data-act="load">Load save</button></div><div class="small bad" id="t-msg" role="status"></div>`;
-  else if (panel === "new") card.innerHTML = `<h2>Start a new game?</h2><p class="small">This erases your save${syncOn() ? " on this device and in your Bored account" : " on this device"}: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
+  else if (panel === "new") card.innerHTML = `<h2>New game</h2><p class="small">Pick a mode. Each has its own save, and starting one never touches the other. You switch between them here.</p><div class="modes">${MODES.map(([k, name, line]) => `<button type="button" data-act="mode" data-k="${k}"><b>${name}${readSlot(k) ? ' <span class="bad">(erases your ' + name + ' save)</span>' : ""}</b><span>${line}</span></button>`).join("")}</div>`;
+  else if (panel === "erase" && newFor) card.innerHTML = newFor === KEY
+    ? `<h2>Start a new game?</h2><p class="small">This erases your save${syncOn() ? " on this device and in your Bored account" : " on this device"}: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`
+    : `<h2>Start Story Mode over?</h2><p class="small">This erases your Story save on this device: its Box, badges, chapters and notebook. Your Classic save and your shiny lines stay. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase Story save and start over</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
   else if (panel === "prestige" && canPrestige()) card.innerHTML = prestigeCard();
   else card.innerHTML = saveCard();
 }
@@ -3107,20 +3286,21 @@ function leadField() {
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
-    ...(S.prestige || S.beat ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
+    ...(isStory() ? [["Story", `Year ${S.story.year}: ${YEARS[S.story.year]}, ${chaptersDone()} of ${CHAPTERS.length} chapters`], ["Story dex", `${lifeDex()} ever caught`]] : []),
+    ...(!isStory() && (S.prestige || S.beat) ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "") +
     `<p class="small muted" id="t-sync" role="status">${esc(syncText())}</p>` +
     (canPrestige() ? `<div class="row"><button class="lbl" type="button" data-act="prestige-ask">Prestige</button><span class="small muted">Start over for good: XP ×${PRESTIGE_XP}, shinies ×${nextShiny()}</span></div>`
-      : S.beat && !S.pick ? `<p class="small muted">Beat Prof Penguin again to prestige once more.</p>` : "");
+      : S.beat && !S.pick && !isStory() ? `<p class="small muted">Beat Prof Penguin again to prestige once more.</p>` : "");
 }
 function go(id) {
   if (id === "continue") return enter("battle");
   if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail" || id === "ach") return enter(id);
   if (id === "back") return useSlot(KEY);
-  if (id === "new" && !S) return showPick();
+  if (id === "switch" && otherSlot()) return useSlot(otherSlot());
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
   panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();
   if (panel === "load") $("#t-code").focus();
@@ -3138,22 +3318,24 @@ document.addEventListener("keydown", e => {
 });
 $("#t-card").onclick = e => {
   const a = e.target.closest("[data-act]"); if (!a) return;
-  if (a.dataset.act === "erase") eraseSave();
+  if (a.dataset.act === "mode") { const k = a.dataset.k; if (readSlot(k)) { newFor = k; panel = "erase"; renderTitle(); } else newGame(k); }
+  else if (a.dataset.act === "erase") newGame(newFor || slot);
   else if (a.dataset.act === "keep") { panel = "save"; renderTitle(); }
   else if (a.dataset.act === "prestige-ask") { panel = "prestige"; renderTitle(); }
   else if (a.dataset.act === "prestige") prestige();
   else if (a.dataset.act === "load") { if (loadCode($("#t-code").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); } else $("#t-msg").textContent = BAD_CODE; }
 };
-$("#pickback").onclick = showTitle;
+$("#pickback").onclick = () => { if (!S && pickFrom && pickFrom !== slot) { slot = pickFrom; setSlotPref(slot); S = readSlot(slot); boot(); return; } showTitle(); };
 // A new game, or the first partner of a new journey after a prestige (S.pick): the SP editions that came along join after it.
 $("#starters").onclick = e => {
   const b = e.target.closest("[data-start]"); if (!b) return;
   const n = +b.dataset.start, again = !!(S && S.pick);
-  if (!again) S = fresh();
-  if (!S.box[n]) S.box[n] = { xp: 125, shiny: false };
+  if (!again) { S = fresh(); if (slot === STORY_KEY) startStory(); }
+  if (!S.box[n]) S.box[n] = { xp: 125, shiny: false, from: 0 };
   S.party = [n];
   if (again) { delete S.pick; for (const k of Object.keys(S.box).map(Number)) if (k !== n && S.box[k].special && joinsParty()) joinParty(k); }
   B = null; enter("battle"); toast(`${mon(n).name} is your partner. Tap the wild Pokémon to help it fight.`);
+  if (isStory() && !again) playScene("open-2", () => openTab("story"));
 };
 // ── Saves in your account. Signed in on Bored, the save also lives in your Bored account, so any device can carry on
 // where another left off. The game has no network and no credentials: it asks the hub's saves bridge
@@ -3200,6 +3382,7 @@ function syncText() {
   if (SYNC.state === "start") return "Checking your Bored account…";
   if (!SYNC.acct) return "Sign in to Bored and your save follows you to any device.";
   if (slot === TEST_KEY) return "The test account stays on this device; your own save is in your Bored account.";
+  if (slot === STORY_KEY) return "Story Mode stays on this device for now. Your Classic save is the one in your Bored account.";
   if (SYNC.ask) return "Two different saves: pick the one to keep.";
   if (syncTheirs(localSave() && localSave().s)) return "This save belongs to another Bored account on this browser, so it stays on this device.";
   if (SYNC.error) return "Couldn't reach your Bored account. Trying again.";
@@ -3351,13 +3534,24 @@ syncBoot();
 // never lowers it. prestige is how many times this save has prestiged; ranked is the Classic board's order, prestige
 // first, then lifetime dex (lifeDex is at most 1025, so prestige × 2051 + lifeDex keeps prestige first). The hub
 // doesn't read ranked or lifeDex yet.
+// Story Mode never moves the Classic board: while it's open the snapshot reports the Classic save from storage, and
+// Story's own progress rides along in story ({ year, chapter, regionsLiberated, lifeDex }) for the Story board to come.
 window.__boredSnapshot = () => {
+  if (slot === STORY_KEY) return classicSnapshot(readSlot(KEY), S);
   const day = bossDay().date, boss = { date: day, won: !!(S && S.daily && S.daily.date === day && S.daily.won) };
   if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, lifeDex: 0, badges: 0, tower: 0, prestige: 0, ranked: 0, boss: { date: day, won: false }, finished: false };
   if (S) recordLife();
   const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0, prestige = S ? S.prestige || 0 : 0, life = S ? lifeDex() : 0;
-  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S };
+  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S, story: storyProgress(readSlot(STORY_KEY)) };
 };
+function classicSnapshot(c, st) {
+  const day = bossDay().date, boss = { date: day, won: !!(c && c.daily && c.daily.date === day && c.daily.won) };
+  const keys = o => Object.keys(o || {}), box = c ? c.box : {};
+  const life = c ? new Set([...keys(c.lifeDex), ...keys(box)]).size : 0;
+  const lifeSh = c ? new Set([...keys(c.lifeShiny), ...keys(box).filter(k => box[k].shiny)]).size : 0, prestige = c ? c.prestige || 0 : 0;
+  return { slug: 'poke-idle', caught: keys(box).length, shinies: Object.values(box).filter(b => b.shiny).length, score: life + lifeSh, lifeDex: life, badges: c ? keys(c.badges).length : 0,
+    tower: c && c.tower ? c.tower.best || 0 : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!c, story: storyProgress(st) };
+}
 </script>
 </body>
 </html>
