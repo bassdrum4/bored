@@ -57,6 +57,7 @@ test('game finder stays optional and plays through the existing hub', async t =>
   });
   await page.setViewport({ width: 1280, height: 850 });
   await page.goto(site.url);
+  await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
   await page.waitForFunction(() => document.querySelectorAll('#grid .card').length > 25);
 
   assert.ok(await page.evaluate(() =>
