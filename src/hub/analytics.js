@@ -127,12 +127,28 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   const canRecord = () => enabled && production && !staffBrowser;
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
   let visitor = canRecord() ? getVisitorId() : null;
-  let detach = () => {}, lastFlush = now(), flushTimer = null;
+  let detach = () => {}, lastFlush = now(), flushTimer = null, flushAt = 0;
   let checkedAccount = null, adminCheck = null, scopedReader = null;
-  const scheduleFlush = () => {
-    if (flushTimer) return;
-    flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 3000);
+  // One row is an expensive thing to write. The insert dirties its heap page
+  // and a page in each index behind it, and after every checkpoint each of
+  // those pages is written out again in full as an 8 KB page image in the
+  // write-ahead log. A single-row request therefore costs tens of kilobytes of
+  // disk writes for a few hundred bytes of data, while a request carrying
+  // twenty events costs nearly the same pages. So events that arrive close
+  // together wait for each other instead of each buying its own request.
+  // Nothing is dropped: the queue is only ever delayed, a page that is closing
+  // still flushes at once, and the keepalive flush covers the exit.
+  const FLUSH_WINDOW = 8000, FLUSH_SOON = 1500;
+  const scheduleFlush = (delay = FLUSH_WINDOW) => {
+    const at = Date.now() + delay;
+    // A shorter request (a finished run, an error) may pull an earlier
+    // deadline forward, never the other way round.
+    if (flushTimer && flushAt <= at) return;
+    clearTimeout(flushTimer);
+    flushAt = at;
+    flushTimer = setTimeout(() => { flushTimer = null; flushAt = 0; void flush(); }, delay);
   };
+  const flushSoon = () => scheduleFlush(FLUSH_SOON);
   const owner = () => getSession()?.user?.id || null;
   const suppressGame = game => scopedReader !== null && scopedReader.id === owner() &&
     isSuppressedGame('game-reader', game, scopedReader.games);
@@ -289,18 +305,24 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     finally {
       busy = false;
       // Events queued while a request was in flight (including close/pagehide)
-      // should follow it immediately, not wait for the next 30-second checkpoint.
-      if (delivered && enabled && pending.length) queueMicrotask(() => void flush(keepalive));
+      // should join the next request rather than wait for the 60-second
+      // checkpoint. A keepalive flush is the page leaving, so it cannot wait.
+      if (delivered && enabled && pending.length) {
+        if (keepalive) queueMicrotask(() => void flush(true));
+        else flushSoon();
+      }
     }
   }
   function end(reason = 'close') {
     if (!run) return null;
     emit('end', { reason });
+    // The run is over, but the page is not: let the closing event ride with
+    // whatever the player does next instead of paying for its own request.
     const summary = { game: run.game, active_ms: Math.floor(run.totalActive), interacted: !!run.interacted,
       finished: !!run.everFinished, external: !!run.context.external };
     run = null;
     detach(); detach = () => {};
-    void flush();
+    flushSoon();
     return summary;
   }
   function start(game, context = {}) {
@@ -352,17 +374,20 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
         emit('checkpoint', { round_finished: true });
         track('game_result', { game: run.game, surface: 'game',
           result: state?.won || state?.solved ? 'win' : 'finished' });
-        void flush();
+        flushSoon();
       }
       if (run) run.finished = finished;
     }
     if (run && !run.ready && !run.context.external) ready();
     if (now() - lastFlush >= 60000) {
       if (run?.ready) emit('checkpoint');
-      lastFlush = now(); void flush();
+      lastFlush = now(); flushSoon();
     }
   }, 1000);
-  const visibility = () => { sample(); emit('checkpoint'); void flush(true); };
+  // Hidden is not gone: pagehide follows when a tab really closes, and that
+  // path flushes at once with keepalive. Switching tabs therefore records its
+  // checkpoint without buying a request of its own.
+  const visibility = () => { sample(); emit('checkpoint'); flushSoon(); };
   let suspended = null;
   const leave = () => { suspended = run && { game: run.game, context: run.context }; emit('end', { reason: 'page_exit' }); run = null; detach(); void flush(true); };
   const resume = event => { if (event.persisted && suspended) { start(suspended.game, suspended.context); ready(!!suspended.context.external); suspended = null; } };
@@ -415,12 +440,12 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;
       // Safe error classification, never stack traces or raw error text.
       if (kind === 'error') details = { ...details, phase: run?.ready ? 'playing' : 'loading' };
-      emit(kind, details); void flush();
+      emit(kind, details); flushSoon();
     },
     enabled: () => canRecord(),
     runtimeEligible: () => production && !staffBrowser,
     setEnabled(value) {
-      if (!value) { run = null; pending = []; clearTimeout(flushTimer); flushTimer = null; detach(); visitor = null; removeStored(VISITOR_KEY); }
+      if (!value) { run = null; pending = []; clearTimeout(flushTimer); flushTimer = null; flushAt = 0; detach(); visitor = null; removeStored(VISITOR_KEY); }
       enabled = !!value; writeStored(ANALYTICS_PREFERENCE, enabled);
       if (canRecord() && !visitor) { visitor = getVisitorId(); track('visit'); }
     },
