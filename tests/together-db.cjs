@@ -8,7 +8,7 @@ const ids = Array.from({length:7},(_,i)=>`00000000-0000-4000-8000-00000000000${i
 // These fixtures build only the multiplayer schema, not unrelated analytics,
  // cloud saves, cron, or storage-maintenance infrastructure.
 function togetherMigrationFiles(dir) {
-  const unrelated = /engagement_and_retention_analytics|bored_analytics_funnels_rollups|low_io_storage_tuning|drop_unused_telemetry_indexes|product_events_retention|prune_analytics_events|krillion_verified_static_cleanup/;
+  const unrelated = /engagement_and_retention_analytics|bored_analytics_funnels_rollups|low_io_storage_tuning|drop_unused_telemetry_indexes|product_events_retention|prune_analytics_events|bound_maintenance_jobs|krillion_static_days|krillion_verified_static_cleanup/;
   return fs.readdirSync(dir).filter(f=>f.endsWith('.sql') && !unrelated.test(f)).sort();
 }
 // Production SQL, real PostgreSQL WASM execution, isolated auth fixtures. Nothing

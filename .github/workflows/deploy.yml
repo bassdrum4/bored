@@ -46,6 +46,7 @@ jobs:
     permissions:
       contents: read
       pages: write
+      actions: read
       id-token: write
     environment:
       name: github-pages
@@ -71,5 +72,19 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: src
+      # Artifact metadata can lag behind a successful upload. Pages' deploy
+      # action fails immediately if the artifact is not yet listed by the API.
+      - name: Wait for Pages artifact registration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..12}; do
+            if count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=github-pages" --jq '[.artifacts[] | select(.name == "github-pages" and .expired == false)] | length') && [ "$count" = 1 ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Pages artifact did not become visible after upload"
+          exit 1
       - id: deployment
         uses: actions/deploy-pages@v4
