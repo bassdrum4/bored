@@ -298,7 +298,7 @@
               transform-style: preserve-3d; background: #545a3e; border: 10px solid #3a2a24; outline: 14px solid #1b1715;
               box-shadow: inset 0 0 70px #000c, 0 30px 0 #120e0d; pointer-events: auto }
   .mp-felt { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
-  .mp-zone { position: absolute; width: 300px; height: 96px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 6px;
+  .mp-zone { position: absolute; width: 300px; height: 96px; display: grid; grid-template-columns: repeat(2, 66px); grid-template-rows: repeat(2, 1fr); justify-content: center; gap: 6px;
              transform-style: preserve-3d }
   .mp-zone[data-pos="bottom"] { left: 150px; top: 500px }
   .mp-zone[data-pos="top"] { left: 150px; top: 4px; transform: rotate(180deg) }
@@ -1766,6 +1766,11 @@ try { mpLive = window.__boredLive || null; } catch {}
 try { mpLobby = window.__boredLobby || null; } catch {}
 // The host's settings, in the room config's `map` text field (the only free text the live rooms keep):
 // "r1-h3-t20" = 1 round, 3 HP, a 20-second turn timer; h "e" = escalating 2/3/4 HP by round.
+// Multiplayer hands are 4 boxes (2x2); single player keeps 8.
+const MP_BOXES = 4;
+const mpBoxes = () => Array(MP_BOXES).fill(null);
+// Items a load: 2 each, or 1 each while 3 or more are still in.
+const mpDealCount = m => mpLiving(m).length >= 3 ? 1 : 2;
 const MP_SETTINGS = { rounds: [1, 3], hp: [2, 3, 4, "e"], timer: [15, 20, 30] };
 const MP_DEFAULT = { rounds: 1, hp: 3, timer: 20 };
 function mpParseSettings(code) {
@@ -1805,14 +1810,14 @@ const mpLog = (m, text, kind = "", seat = null) => m.ev.push({ t: "log", text, k
 function mpGame(seats, seed, settings) {
   const n = seats.length;
   return { n, seed: Number(seed) || 1, cfg: settings || mpParseSettings(""), dir: 1, names: seats.map((s, i) => String(s.handle || "Player " + (i + 1)).slice(0, 40)),
-    p: seats.map(() => ({ hp: 0, max: 0, items: emptyBoxes(), band: false, para: false, waveBan: -1, turns: 0, knows: null, out: false, left: false })),
+    p: seats.map(() => ({ hp: 0, max: 0, items: mpBoxes(), band: false, para: false, waveBan: -1, turns: 0, knows: null, out: false, left: false })),
     wins: Array(n).fill(0), round: 0, loads: 0, shells: [], loaded: [0, 0], turn: 0, turnNo: 0, phase: "load", resume: false, winner: null, ev: [] };
 }
 function mpRound(m) {
   m.round++;
   m.dir = 1;
   const hp = m.cfg.hp === "e" ? RULES.hp[Math.min(m.round, 3) - 1] : m.cfg.hp;
-  for (const s of m.p) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveBan: -1, knows: null, out: s.left });
+  for (const s of m.p) Object.assign(s, { hp, max: hp, items: mpBoxes(), band: false, para: false, waveBan: -1, knows: null, out: s.left });
   // The first turn moves one seat clockwise each round.
   let first = (m.round - 1) % m.n;
   if (!mpUp(m, first)) first = mpNext(m, first);
@@ -1846,16 +1851,18 @@ function mpLoad(m, a) {
   for (const s of m.p) s.knows = null;
   mpLog(m, "Loaded " + live + " live / " + (m.shells.length - live) + " blank. The shells go in shuffled.", "status");
   m.ev.push({ t: "load", live, blank: m.shells.length - live });
+  // One short line a player: "You: Choice Band, Potion." A full side loses the rest, on the same line.
+  const count = mpDealCount(m);
   m.p.forEach((s, i) => {
     if (!mpUp(m, i)) return;
     const got = [], lost = [];
-    for (const key of (Array.isArray(a.items[i]) ? a.items[i] : []).slice(0, 2)) {
-      if (!MP_POOL.includes(key)) continue;
+    for (const key of (Array.isArray(a.items[i]) ? a.items[i] : []).slice(0, count)) {
+      if (!MP_POOL.includes(key) || (key === "wave" && s.items.includes("wave"))) continue;
       const box = s.items.indexOf(null);
       if (box < 0) lost.push(ITEMS[key].name); else { s.items[box] = key; got.push(ITEMS[key].name); }
     }
-    if (got.length) mpLog(m, mpSays(i, "get ", "gets ") + got.join(" and ") + ".");
-    if (lost.length) mpLog(m, (i === mpMe ? "Your" : m.names[i] + "'s") + " side is full, " + lost.join(" and ") + (lost.length > 1 ? " are" : " is") + " lost.");
+    if (got.length || lost.length) mpLog(m, (i === mpMe ? "You" : m.names[i]) + ": " + got.join(", ") +
+      (lost.length ? (got.length ? "; " : "") + lost.join(", ") + " lost, side full" : "") + ".");
   });
   m.phase = "turn";
   // An Eject Button that emptied the gun mid-turn: the same player carries on.
@@ -1865,7 +1872,7 @@ const mpMine = (m, seat, a) => m.phase === "turn" && seat === m.turn && a.turn =
 const mpWaveOk = (m, i) => m.p[i].turns > m.p[i].waveBan;
 const mpWaveTargets = (m, i) => mpLiving(m).filter(t => t !== i && !m.p[t].para);
 function mpItem(m, seat, a) {
-  if (!mpMine(m, seat, a) || !(a.box >= 0 && a.box < 8)) return;
+  if (!mpMine(m, seat, a) || !(a.box >= 0 && a.box < m.p[seat].items.length)) return;
   const me = m.p[seat], key = me.items[a.box];
   switch (key) {
     case "potion":
@@ -1999,16 +2006,13 @@ function mpApply(m, action) {
 }
 // Multiplayer draws from the same items plus the Remote, which only turns up with 3 or more still in.
 const MP_POOL = [...POOL, "remote"];
+// A player holds at most one Choice Band and one Thunder Wave: a second one is rerolled.
 function mpPickItem(hand, remote) {
-  const keys = MP_POOL.filter(key => key !== "remote" || remote), weight = key => key === "remote" ? 0.6 : POOL_WEIGHT[key];
-  const draw = exclude => {
-    const list = keys.filter(key => key !== exclude);
-    let roll = Math.random() * list.reduce((sum, key) => sum + weight(key), 0);
-    for (const key of list) { roll -= weight(key); if (roll < 0) return key; }
-    return list[list.length - 1];
-  };
-  const key = draw(null);
-  return key === "band" && hand.includes("band") ? draw("band") : key;
+  const keys = MP_POOL.filter(key => (key !== "remote" || remote) && !((key === "band" || key === "wave") && hand.includes(key)));
+  const weight = key => key === "remote" ? 0.6 : POOL_WEIGHT[key];
+  let roll = Math.random() * keys.reduce((sum, key) => sum + weight(key), 0);
+  for (const key of keys) { roll -= weight(key); if (roll < 0) return key; }
+  return keys[keys.length - 1];
 }
 // Multiplayer loads run hotter than single player: 1/2 to 2/3 of the shells are live (at least one blank).
 function mpRollLoad() {
@@ -2016,7 +2020,7 @@ function mpRollLoad() {
   const low = Math.ceil(total / 2), high = Math.max(low, Math.min(total - 1, Math.floor(total * 2 / 3)));
   return { total, live: rand(low, high) };
 }
-// The host's screen rolls each load: the shells, and two items for every seat still in.
+// The host's screen rolls each load: the shells, and the items for every seat still in.
 function mpCompose(m) {
   const { total, live } = mpRollLoad();
   const remote = mpLiving(m).length >= 3;
@@ -2024,7 +2028,7 @@ function mpCompose(m) {
   const items = m.p.map((s, i) => {
     if (!mpUp(m, i)) return [];
     const hand = s.items.filter(Boolean), out = [];
-    for (let k = 0; k < 2; k++) { const key = mpPickItem(hand, remote); hand.push(key); out.push(key); }
+    for (let k = 0; k < mpDealCount(m); k++) { const key = mpPickItem(hand, remote); hand.push(key); out.push(key); }
     return out;
   });
   return { round: m.round, n: m.loads + 1, shells, items };
@@ -2195,7 +2199,7 @@ function mpDrawSlots(i) {
   if (v.zone.dataset.sig === sig) return;
   v.zone.dataset.sig = sig;
   v.zone.replaceChildren();
-  for (let box = 0; box < 8; box++) {
+  for (let box = 0; box < s.items.length; box++) {
     const slot = el("div", "mp-slot"), key = s.items[box];
     v.zone.appendChild(slot);
     if (!key) continue;
@@ -2478,22 +2482,22 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   // Item boxes, bottom side: a 2x2 block left of the charge box, one right of it (local x, z).
   // Pokémon sprites and items are marked in the render target's alpha, so the post pass gives them a wider
   // palette, lighter dither and a rim: Giratina 0.3 (cold purple rim), buddies 0.55 (warm rim), items and shells 0.8.
+  // Those materials use NoBlending: three.js forces alpha to 1 on an opaque material with normal blending.
   const MASK = { giratina: 0.3, buddy: 0.55, item: 0.8 };
   const WIDE = ["c8a848", "e0c870", "3a5a8a", "7090b8", "a84838", "d07858", "6a4a8a", "9a78b8",
                 "707070", "a8a8a0", "d0d0c8", "c08890", "c87838", "4a8a88", "1c2440", "303030"];
+  // Two colours only items may use, so Thunder Wave (yellow) and Trick Room (pink) never dither alike.
+  const ITEM_PAL = ["f0d040", "e8508a"];
   const CAM = [0, 1.78, 4.15];
-  // Items, buddies and Giratina are drawn on their own layer at twice the room's resolution, after the room's
-  // palette and dither, so they keep the sprites' real colours (the room's palette made Thunder Wave and Trick
-  // Room look alike). The room's depth is drawn first, so the table and rim still hide what they should.
-  const SHARP = 1, BUDDY_TINT = 0xd8d0c8;
   // Giratina's height, worked out from my eye at CAM: at z -10 the line over the far buddy's head is y 1.36
   // and the top of the screen y 4.94, so a 3.3 plane centred at 3.15 sits between them and never covers a buddy.
   const GIRATINA_Y = 3.3;
   // Item boxes: one 4x2 grid per seat, centred in front of that player in the seat's own frame (local x, z;
   // +z is toward the player). Boxes 0-3 are the row nearest the player, 4-7 the row toward the turntable.
   // Each seat's grid stays inside its own quarter of the table, so no two seats ever share a spot.
-  const SLOT = k => [[-0.84, -0.28, 0.28, 0.84][k % 4], [1.86, 1.34][Math.floor(k / 4)]];
-  let T = null, renderer, rt, rtPost, rtSharp, depthOnly, composite, compositeScene, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
+  const SLOT = k => [[-0.31, 0.31][k % 2], [1.92, 1.36][Math.floor(k / 2)]];
+  const SLOT_SIZE = 0.56;
+  let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
   let redSpot, gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
   const spots = [], sides = {}, cache = {};
   const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0, atMe: 0, atMeGoal: 0 };
@@ -2544,6 +2548,42 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     img.src = url;
     return cache[url] = t;
   }
+  // Items that could dither alike get a big shape of their own on top of the sprite: Thunder Wave a
+  // lightning bolt, Trick Room a box, Scope Lens a crosshair, Eject Button the eject mark.
+  const GLYPH = {
+    wave(g) {
+      g.beginPath(); [[36, 4], [16, 34], [30, 34], [24, 60], [48, 26], [34, 26], [40, 4]].forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath();
+      g.lineWidth = 4; g.strokeStyle = "#1a1208"; g.stroke(); g.fillStyle = "#f0d040"; g.fill();
+    },
+    trick(g) {
+      g.lineWidth = 9; g.strokeStyle = "#1a1208"; g.strokeRect(14, 14, 36, 36);
+      g.lineWidth = 5; g.strokeStyle = "#e8508a"; g.strokeRect(14, 14, 36, 36);
+    },
+    scope(g) {
+      g.strokeStyle = "#1a1208"; g.lineWidth = 5;
+      g.beginPath(); g.arc(32, 32, 17, 0, 7); g.moveTo(32, 6); g.lineTo(32, 58); g.moveTo(6, 32); g.lineTo(58, 32); g.stroke();
+      g.strokeStyle = "#d8ccaa"; g.lineWidth = 2;
+      g.beginPath(); g.arc(32, 32, 17, 0, 7); g.moveTo(32, 6); g.lineTo(32, 58); g.moveTo(6, 32); g.lineTo(58, 32); g.stroke();
+    },
+    eject(g) {
+      g.fillStyle = "#1a1208"; g.beginPath(); g.moveTo(32, 8); g.lineTo(56, 38); g.lineTo(8, 38); g.closePath(); g.fill(); g.fillRect(8, 44, 48, 12);
+      g.fillStyle = "#e05a3a"; g.beginPath(); g.moveTo(32, 14); g.lineTo(49, 35); g.lineTo(15, 35); g.closePath(); g.fill(); g.fillRect(12, 47, 40, 6);
+    }
+  };
+  function itemTex(key) {
+    const url = ITEM_DIR + ITEMS[key].art + ".png";
+    if (!GLYPH[key]) return imageTex(url);
+    if (cache["glyph:" + key]) return cache["glyph:" + key];
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const t = crisp(new T.CanvasTexture(c)), g = c.getContext("2d");
+    const done = () => { GLYPH[key](g); t.dispose(); t.needsUpdate = true; };
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, 64, 64); done(); };
+    img.onerror = done;
+    img.src = url;
+    return cache["glyph:" + key] = t;
+  }
   // Somebody with no buddy: a dark shape in the chair.
   const silhouette = () => paint(64, 64, g => {
     g.fillStyle = "#4a4a48";
@@ -2579,14 +2619,13 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       for (const pos of ["bottom", "left", "top", "right"]) {
         g.save(); g.translate(C, C); g.rotate(-ROT[pos]);
         line(0.86 * U, 0.86 * U, 2.1 * U, 2.1 * U);
-        line(-1.16 * U, 1.08 * U, -1.16 * U, 2.14 * U); line(1.16 * U, 1.08 * U, 1.16 * U, 2.14 * U);
         g.lineWidth = 2;
-        for (let k = 0; k < 8; k++) {
-          const [x, z] = SLOT(k);
-          g.globalAlpha = 0.4 + rnd() * 0.3;
-          g.strokeRect((x - 0.23) * U, (z - 0.23) * U, 0.46 * U, 0.46 * U);
+        for (let k = 0; k < MP_BOXES; k++) {
+          const [x, z] = SLOT(k), h = SLOT_SIZE / 2;
+          g.globalAlpha = 0.5 + rnd() * 0.25;
+          g.strokeRect((x - h) * U, (z - h) * U, SLOT_SIZE * U, SLOT_SIZE * U);
         }
-        g.globalAlpha = 0.5; g.strokeRect(-1.12 * U, 1.07 * U, 2.24 * U, 1.06 * U);
+        g.globalAlpha = 0.5; g.strokeRect(-0.7 * U, 1.0 * U, 1.4 * U, 1.22 * U);
         g.globalAlpha = 0.45; g.fillStyle = "#d8ccaa"; g.font = "bold 11px monospace"; g.textAlign = "center";
         g.font = "bold 8px monospace";
         g.fillText("STAY IN", -1.62 * U, 1.9 * U); g.fillText("YOUR ZONE", -1.62 * U, 2.02 * U);
@@ -2770,13 +2809,13 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       s.housing = housing;
       for (const m of [body, housing, screen]) m.userData.pick = { kind: "seat", pos };
       s.items = [];
-      for (let k = 0; k < 8; k++) {
+      for (let k = 0; k < MP_BOXES; k++) {
         const [x, z] = SLOT(k);
-        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, fog: false }));
-        sprite.layers.set(SHARP);
-        const shadow = add(new T.PlaneGeometry(0.36, 0.2), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
+        // Opaque, so the render target keeps the item mark in its alpha (blending would push it to 1).
+        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, blending: T.NoBlending, fog: true, transparent: false }));
+        const shadow = add(new T.PlaneGeometry(0.44, 0.24), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
         shadow.rotation.x = -Math.PI / 2;
-        sprite.scale.set(0.44, 0.44, 1);
+        sprite.scale.set(0.54, 0.54, 1);
         sprite.position.set(x, 0.24, z);
         sprite.visible = shadow.visible = false;
         if (pos === "bottom") sprite.userData.pick = { kind: "item", box: k };
@@ -2793,8 +2832,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const size = 1.6;
         const yaw = new T.Group(); yaw.position.set(0, -0.06, 2.95); yaw.rotation.y = facing(2.95); g.add(yaw);
         const fall = new T.Group(); yaw.add(fall);
-        const buddy = add(new T.PlaneGeometry(size, size), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, side: T.DoubleSide, fog: false, color: BUDDY_TINT }), 0, size / 2, 0, fall);
-        buddy.layers.set(SHARP);
+        const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, blending: T.NoBlending, side: T.DoubleSide }), 0, size / 2, 0, fall);
         buddy.userData.pick = { kind: "seat", pos };
         Object.assign(s, { buddy, buddyKey: "", buddyFall: fall, buddyYaw: yaw, buddySize: size });
         // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
@@ -2810,11 +2848,10 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
     pickables.push(...gunParts);
     // Every item sprite is fetched up front, so a new item never pops in late.
-    for (const key of POOL) imageTex(ITEM_DIR + ITEMS[key].art + ".png");
+    for (const key of MP_POOL) itemTex(key);
 
     // My buddy, peeking up from the bottom-left corner of my view.
-    myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, color: 0xd8c8b0, fog: false }));
-    myBuddy.layers.set(SHARP);
+    myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, blending: T.NoBlending, color: 0xd8c8b0, fog: false }));
     myBuddy.position.set(-0.6, -0.32, -0.8);
     myBuddy.rotation.z = 0.12;
     cam.add(myBuddy);
@@ -2857,8 +2894,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
 
     // Giratina hosts from behind the far side, lit from below.
-    giratina = add(new T.PlaneGeometry(3.3, 3.3), new T.MeshBasicMaterial({ map: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false, color: 0xa89cb0 }), 0, 3.8, -10);
-    giratina.layers.set(SHARP);
+    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, blending: T.NoBlending, side: T.DoubleSide, fog: false }), 0, 3.8, -10);
     // Lit from below by the table's glow.
     const under = new T.PointLight(0x9a7aa8, 1.8, 7, 1); under.position.set(0, 1.0, -6.6); scene.add(under);
 
@@ -2879,10 +2915,11 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
       uniforms: { tScene: { value: rt.texture }, uPal: { value: PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
                   uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 }, uEdge: { value: 0 },
-                  uWide: { value: WIDE.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) } },
+                  uWide: { value: WIDE.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
+                  uItem: { value: ITEM_PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) } },
       vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
       fragmentShader: [
-        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec3 uWide[16]; uniform vec2 uRes; uniform float uTime, uFlash, uHit, uEdge; varying vec2 vUv;",
+        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec3 uWide[16]; uniform vec3 uItem[2]; uniform vec2 uRes; uniform float uTime, uFlash, uHit, uEdge; varying vec2 vUv;",
         "float kind(float a){ return a < 0.42 ? 1.0 : a < 0.67 ? 2.0 : a < 0.9 ? 3.0 : 0.0; }",
         "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
         "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
@@ -2891,6 +2928,14 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         "  vec2 px = floor(vUv * uRes);",
         "  vec4 src = texture2D(tScene, vUv);",
         "  vec3 c = src.rgb; float m = kind(src.a);",
+        // A rim around the Pokémon: cold purple for Giratina, warm for buddies.
+        "  if (m == 0.0) {",
+        "    vec2 o = 1.0 / uRes; float g = 0.0, b = 0.0;",
+        "    float n1 = kind(texture2D(tScene, vUv + vec2(o.x, 0.0)).a), n2 = kind(texture2D(tScene, vUv - vec2(o.x, 0.0)).a);",
+        "    float n3 = kind(texture2D(tScene, vUv + vec2(0.0, o.y)).a), n4 = kind(texture2D(tScene, vUv - vec2(0.0, o.y)).a);",
+        "    if (n1 == 1.0 || n2 == 1.0 || n3 == 1.0 || n4 == 1.0) c = mix(c, vec3(0.44, 0.38, 0.66), 0.8);",
+        "    else if (n1 == 2.0 || n2 == 2.0 || n3 == 2.0 || n4 == 2.0) c = mix(c, vec3(0.66, 0.5, 0.32), 0.6);",
+        "  }",
         "  c += uFlash * vec3(0.6, 0.5, 0.36);",
         "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
         "  c *= mix(m > 0.0 ? 0.25 : 0.03, 1.0, smoothstep(0.72, 0.2, d));",
@@ -2910,51 +2955,17 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         "    vec3 e = (c - uWide[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
         "    if (dd < bd) { bd = dd; best = uWide[i]; }",
         "  }",
+        // Items (and shells) also get the bright yellow and hot pink.
+        "  if (m > 2.5) for (int i = 0; i < 2; i++) {",
+        "    vec3 e = (c - uItem[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
+        "    if (dd < bd) { bd = dd; best = uItem[i]; }",
+        "  }",
         "  gl_FragColor = vec4(best, 1.0);",
         "}"
       ].join("\n"),
       depthTest: false, depthWrite: false
     }));
     post.frustumCulled = false;
-    // Pass 2, at twice the resolution: the dithered room (scaled up, nearest) with the sharp layer on top.
-    const sharpGLSL = [
-        // The sharp layer, at twice the room's resolution, in its own colours: vignette, flashes and a light
-        // two-tone dither so it sits in the room, but no palette. A rim where it meets the room:
-        // cold purple round Giratina, warm round buddies.
-        "  vec2 hi = uRes * 2.0, hp2 = floor(vUv * hi);",
-        "  vec4 o = texture2D(tSharp, vUv);",
-        "  if (o.a > 0.1) {",
-        "    vec3 sc = o.rgb * mix(0.35, 1.0, smoothstep(0.78, 0.25, d));",
-        "    sc += uFlash * vec3(0.45, 0.38, 0.27);",
-        "    sc = mix(sc, vec3(0.42, 0.12, 0.09), uHit * 0.4);",
-        "    sc = mix(sc, vec3(0.36, 0.08, 0.06), uEdge * smoothstep(0.32, 0.7, d) * 0.7);",
-        "    sc *= bayer(hp2) > 0.5 ? 0.9 : 1.0;",
-        "    best = sc;",
-        "  } else {",
-        "    vec2 q = 1.0 / hi;",
-        "    float n1 = texture2D(tSharp, vUv + vec2(q.x, 0.0)).a, n2 = texture2D(tSharp, vUv - vec2(q.x, 0.0)).a;",
-        "    float n3 = texture2D(tSharp, vUv + vec2(0.0, q.y)).a, n4 = texture2D(tSharp, vUv - vec2(0.0, q.y)).a;",
-        "    float near = max(max(n1, n2), max(n3, n4));",
-        "    float lo = min(min(n1 > 0.1 ? n1 : 1.0, n2 > 0.1 ? n2 : 1.0), min(n3 > 0.1 ? n3 : 1.0, n4 > 0.1 ? n4 : 1.0));",
-        "    if (near > 0.1 && lo < 0.42) best = mix(best, vec3(0.44, 0.38, 0.66), 0.85);",
-        "    else if (near > 0.1 && lo < 0.67) best = mix(best, vec3(0.66, 0.5, 0.32), 0.6);",
-        "  }"
-    ].join("\n");
-    composite = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
-      uniforms: { tRoom: { value: rtPost.texture }, tSharp: { value: rtSharp.texture }, uRes: post.material.uniforms.uRes,
-                  uFlash: post.material.uniforms.uFlash, uHit: post.material.uniforms.uHit, uEdge: post.material.uniforms.uEdge },
-      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-      fragmentShader: [
-        "uniform sampler2D tRoom, tSharp; uniform vec2 uRes; uniform float uFlash, uHit, uEdge; varying vec2 vUv;",
-        "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
-        "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
-        "void main(){",
-        "  vec3 best = texture2D(tRoom, vUv).rgb;",
-        "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
-      ].join("\n") + "\n" + sharpGLSL + "\n  gl_FragColor = vec4(best, 1.0);\n}",
-      depthTest: false, depthWrite: false
-    }));
-    composite.frustumCulled = false;
   }
   let postScene, postCam;
 
@@ -2982,14 +2993,14 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     for (const pos of Object.keys(DIR)) {
       const s = sides[pos], seat = at[pos] === undefined ? null : at[pos], p = seat === null ? null : M.p[seat];
       s.seat = seat;
-      for (let k = 0; k < 8; k++) {
+      for (let k = 0; k < MP_BOXES; k++) {
         const it = s.items[k], key = p ? p.items[k] : null;
         if (it.key !== key) {
           // A used item lifts and fades out where it was, so it stays drawn for that.
           const fading = !key && it.using && now() - it.using < 0.6;
           it.key = key;
           if (!fading) it.using = 0;
-          if (key) { it.sprite.material.map = imageTex(ITEM_DIR + ITEMS[key].art + ".png"); it.sprite.material.opacity = MASK.item; it.sprite.material.needsUpdate = true; }
+          if (key) { it.sprite.material.map = itemTex(key); it.sprite.material.opacity = MASK.item; it.sprite.material.needsUpdate = true; }
         }
         it.sprite.visible = it.shadow.visible = !!key || !!it.using;
       }
@@ -3010,7 +3021,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const url = p ? buddyURL(name) : "";
         if (s.buddyKey !== url + "|" + name) {
           s.buddyKey = url + "|" + name;
-          s.buddy.material.map = url ? imageTex(url, silhouette) : imageTex("", silhouette);
+          s.buddy.material.map = s.buddy.material.emissiveMap = url ? imageTex(url, silhouette) : imageTex("", silhouette);
           s.buddy.material.needsUpdate = true;
         }
         s.out = !!(p && p.out);
@@ -3093,7 +3104,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     shells.clear();
     if (!SHELL_GEO.length) SHELL_GEO.push(new T.CylinderGeometry(0.05, 0.05, 0.17, 10), new T.CylinderGeometry(0.056, 0.056, 0.05, 10),
       new T.CylinderGeometry(0.062, 0.062, 0.012, 10), new T.CylinderGeometry(0.038, 0.05, 0.02, 10));
-    const mat = (color, glow = 0) => new T.MeshLambertMaterial({ color, emissive: glow, opacity: MASK.item });
+    const mat = (color, glow = 0) => new T.MeshLambertMaterial({ color, emissive: glow, opacity: MASK.item, blending: T.NoBlending });
     const brass = mat(0xd8b058), rim = mat(0xa88838);
     const list = [...Array(live).fill([0xb83a30, 0x7a2018, 0x5a1810]), ...Array(blank).fill([0x9a9a94, 0x5a5a56, 0x34342f])].map(([color, crimp, glow], k, all) => {
       const g = new T.Group();
@@ -3208,7 +3219,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const using = it.using ? Math.min(1, (now() - it.using) / 0.6) : 0;
         if (using >= 1 && !it.key) { it.using = 0; it.sprite.visible = it.shadow.visible = false; }
         it.sprite.position.y = 0.24 + it.lift * 0.09 + using * 0.5;
-        const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
+        const scale = 0.54 * (1 + it.lift * 0.12 + using * 0.3);
         it.sprite.scale.set(scale, scale, 1);
         it.sprite.material.color.setScalar(1 + it.lift * 0.35);
         it.sprite.material.opacity = MASK.item * (1 - using);
@@ -3222,7 +3233,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       s.buddyFall.position.x = flinching ? (Math.random() - 0.5) * 0.1 : 0;
       b.position.y = s.buddySize / 2 + Math.sin(t * 2 + k * 1.7) * 0.03 * (1 - s.faint);
       if (flinching) b.material.color.setRGB(1.4, 0.45, 0.4);
-      else b.material.color.setHex(BUDDY_TINT).multiplyScalar(hovered ? 1.2 : 1 - s.faint * 0.65);
+      else b.material.color.setScalar(hovered ? 1.35 : 1 - s.faint * 0.7);
       k++;
     }
     myBuddy.position.y = -0.32 + Math.sin(t * 1.7) * 0.01;
@@ -3246,29 +3257,10 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     anim.hit = Math.max(0, anim.hit - dt * 2.5);
     if (anim.flash > 0) anim.flash--;
     if (anim.muzzle > 0) anim.muzzle--;
-    cam.layers.set(0);
     renderer.setRenderTarget(rt);
     renderer.render(scene, cam);
-    // The sharp layer: the room's depth only (no colour), then the sprites against it.
-    const bg = scene.background;
-    scene.background = null; scene.overrideMaterial = depthOnly; dust.visible = false;
-    for (const f of fogs) f.mesh.visible = false;
-    renderer.setRenderTarget(rtSharp);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear();
-    renderer.autoClear = false;
-    renderer.render(scene, cam);
-    scene.overrideMaterial = null;
-    cam.layers.set(SHARP);
-    renderer.render(scene, cam);
-    renderer.autoClear = true;
-    cam.layers.set(0);
-    scene.background = bg; dust.visible = true;
-    for (const f of fogs) f.mesh.visible = true;
-    renderer.setRenderTarget(rtPost);
-    renderer.render(postScene, postCam);
     renderer.setRenderTarget(null);
-    renderer.render(compositeScene, postCam);
+    renderer.render(postScene, postCam);
   }
 
   R3.start = async () => {
@@ -3278,17 +3270,12 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       const canvas = $("#mp-3d");
       renderer = new T.WebGLRenderer({ canvas, antialias: false, powerPreference: "low-power" });
       renderer.setPixelRatio(1);
-      renderer.setSize(W * 2, H * 2, false);
+      renderer.setSize(W, H, false);
       rt = new T.WebGLRenderTarget(W, H, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
-      rtSharp = new T.WebGLRenderTarget(W * 2, H * 2, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
-      rtPost = new T.WebGLRenderTarget(W, H, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, depthBuffer: false });
-      depthOnly = new T.MeshBasicMaterial({ colorWrite: false });
       build();
       postScene = new T.Scene(); postScene.add(post);
-      compositeScene = new T.Scene(); compositeScene.add(composite);
       postCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
       caster = ray(); mouse = new T.Vector2();
-      caster.layers.enableAll();
       canvas.addEventListener("pointermove", onMove);
       canvas.addEventListener("pointerleave", () => { mouseIn = false; hover = null; $("#tip").hidden = true; canvas.style.cursor = "default"; });
       canvas.addEventListener("pointerdown", onDown);
