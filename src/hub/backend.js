@@ -113,18 +113,20 @@ export function isTransientError(error) {
 }
 
 // One circuit per hub, shared by all REST/auth callers. Do not replay writes:
- // callers retain their own queues and decide when a failed operation is safe to retry.
+// callers retain their own queues and decide when a failed operation is safe to retry.
 let outageFailures = 0, lastOutageFailure = 0, outageUntil = 0, outageDelay = 0;
-let outageGeneration = 0, outageProbe = false;
+let outageGeneration = 0, outageProbe = 0;
 function outageTicket() {
   if (!outageUntil) return { generation: outageGeneration, probe: false };
-  if (Date.now() < outageUntil || outageProbe) {
+  if (Date.now() < outageUntil || Date.now() < outageProbe) {
     const error = busyError({ status: 503 });
     error.code = 'BORED_BACKEND_COOLDOWN';
     error.retryAfter = Math.max(0, outageUntil - Date.now());
     throw error;
   }
-  outageProbe = true;
+  // A hung probe cannot leave the hub permanently half-open.
+  if (outageProbe) outageGeneration++;
+  outageProbe = Date.now() + 15000;
   return { generation: outageGeneration, probe: true };
 }
 function settleOutage(ticket, failed) {
@@ -133,7 +135,7 @@ function settleOutage(ticket, failed) {
   if (!failed) {
     outageFailures = 0;
     if (ticket.probe) {
-      outageUntil = 0; outageDelay = 0; outageProbe = false;
+      outageUntil = 0; outageDelay = 0; outageProbe = 0;
       outageGeneration++;
     }
     return;
@@ -144,7 +146,7 @@ function settleOutage(ticket, failed) {
   if (!ticket.probe && outageFailures < 2) return;
   outageDelay = Math.min(60000, outageDelay ? outageDelay * 2 : 5000);
   outageUntil = now + outageDelay + Math.floor(Math.random() * 1000);
-  outageProbe = false;
+  outageProbe = 0;
   outageGeneration++;
 }
 
@@ -157,10 +159,10 @@ export async function request(path, { method = 'GET', body, prefer, token, keepa
   let res;
   try {
     res = await fetch(API_URL.replace(/\/+$/, '') + path, {
-    method,
-    headers,
-    keepalive,
-    body: body === undefined ? undefined : JSON.stringify(body)
+      method,
+      headers,
+      keepalive,
+      body: body === undefined ? undefined : JSON.stringify(body)
     });
   } catch (cause) {
     settleOutage(ticket, true);
