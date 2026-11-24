@@ -676,7 +676,7 @@ function offerClaim(claim, returnTo) {
   $('#claim-heading').textContent = 'You scored ' + formatScore(claim.value, spec) + ' in ' + spec.name + '.';
   // Bo is pleased with a new personal best, and startled when it beats the posted leader.
   // The board may not have loaded yet, in which case there is no leader to beat.
-  const leader = boardLeaders(uiState.lbCache.get('overall')?.rows || []).get(claim.slug);
+  const leader = boardLeaders(uiState.lbCache.get('top')?.rows || []).get(claim.slug);
   const beatsLeader = leader && (spec.lower ? claim.value < leader.value : claim.value > leader.value);
   setBo($('#claim-bo'), beatsLeader ? 'surprised' : 'pleased');
   const dialog = $('#claim-dialog');
@@ -1002,24 +1002,26 @@ function syncSavedDailyResults() {
 }
 
 onScoresPosted(result => {
-  const cached = lbCache.get('overall');
   const handle = getHandle();
   const rows = result?.rows;
-  // A best is folded into the cached board the moment it is set locally, then
-  // again with the value the server accepted. With no cached board there is
-  // nothing to fold into, and an optimistic value is not a reason to spend a
-  // whole leaderboard read; the ordinary load (or the confirmed sync) does it.
-  const foldable = cached && !cached.error && handle && hasIdentity() &&
-    (cached.rows.length > 0 || !result?.optimistic);
+  // A best is folded into whichever boards are already cached: the hub keeps the
+  // top three of each game ('top'), the page keeps every row ('overall'). With
+  // neither cached there is nothing to fold into, and an optimistic value is not
+  // a reason to spend a board read; the ordinary load (or confirmed sync) does it.
+  const boards = ['top', 'overall'].map(key => lbCache.get(key)).filter(board => board && !board.error);
+  const foldable = handle && hasIdentity() &&
+    boards.some(board => board.rows.length > 0 || !result?.optimistic);
   if (rows?.length && foldable) {
-    const own = new Map(cached.rows.map(row =>
-      [row.game + '|' + String(row.handle || '').toLowerCase(), row]));
-    for (const { game, value } of rows) {
-      const row = own.get(game + '|' + handle.toLowerCase());
-      if (row) row.value = value;
-      else cached.rows.push({ game, handle, value });
+    for (const board of boards) {
+      const own = new Map(board.rows.map(row =>
+        [row.game + '|' + String(row.handle || '').toLowerCase(), row]));
+      for (const { game, value } of rows) {
+        const row = own.get(game + '|' + handle.toLowerCase());
+        if (row) row.value = value;
+        else board.rows.push({ game, handle, value });
+      }
+      board.at = Date.now();
     }
-    cached.at = Date.now();
     renderAccount();
     renderLeaderboard();
     // The library cards carry the same board's leader, so they move with it.
@@ -1441,7 +1443,8 @@ initVoice();
 
 const navigation = createHubNavigation({
   togetherUI,
-  onLeaderboard: () => loadLeaderboard(true),
+  // The page itself, so it takes the whole board rather than the top of it.
+  onLeaderboard: () => loadLeaderboard(true, true),
   // Opening Settings is the nudge's destination: land on the invite code once.
   onSettings: () => { void renderInvites(); leadToInviteCode(); }
 });

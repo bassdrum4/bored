@@ -355,7 +355,7 @@ test('browser regressions', async t => {
     try {
       assert.equal(await page.$eval('#getaway-loading', el => el.hidden), false);
       await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
-      assert.ok(await page.evaluate(start => performance.now() - start >= 1950, started), 'loader stays up for two seconds');
+      assert.ok(await page.evaluate(start => performance.now() - start < 1500, started), 'the loader covers the open instead of a fixed two-second pause');
       const rouletteFrame = await (await page.$('#frame')).contentFrame();
       await rouletteFrame.waitForFunction(() => typeof window.__boredSnapshot === 'function' && !document.querySelector('#lobby').hidden);
       assert.equal(await rouletteFrame.evaluate(() => getComputedStyle(document.body).visibility), 'visible');

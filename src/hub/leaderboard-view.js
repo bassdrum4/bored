@@ -107,16 +107,21 @@ function renderLeaderboard() {
   const all = cached?.rows || [];
   const rows = accountStandings(all);
   const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
-  $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
-    (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores. ' + rankPoints(1) +
-    ' points for a first place, 1 for fifth. Tap a name for their games.';
+  // The whole board is only read when the page opens, so until it lands the note
+  // must not claim a count of players it has not seen.
+  $('#lb-note').textContent = !cached
+    ? (lbLoading ? 'Ranking every board…' : 'Rankings load when you open the board.')
+    : 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
+      (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores. ' + rankPoints(1) +
+      ' points for a first place, 1 for fifth. Tap a name for their games.';
 
   if (cached?.error) {
     empty.hidden = false;
     empty.textContent = 'Could not load rankings: ' + cached.error;
   } else if (!rows.length) {
     empty.hidden = false;
-    empty.textContent = cached ? 'Nobody is on the board yet. Embarrassing. Be first.' : 'Loading rankings…';
+    empty.textContent = cached ? 'Nobody is on the board yet. Embarrassing. Be first.'
+      : lbLoading ? 'Loading rankings…' : 'Rankings load when you open the board.';
   } else {
     empty.hidden = true;
   }
@@ -312,46 +317,79 @@ async function loadCareerDetails() {
   try { await careerLoading; } finally { careerLoading = null; }
 }
 
-async function loadLeaderboard(force = false) {
+// A full read is in flight only when the board is actually open; the hub's own
+// top-of-each-board read must not make the page claim it is loading.
+let lbLoading = false;
+function boardPageOpen() {
+  const page = $('#leaderboard');
+  return Boolean(page) && !page.hidden;
+}
+
+// Every row, paged. PostgREST projects commonly cap individual responses at
+// 1,000 records, so one request misses players.
+async function readWholeBoard() {
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    const query = new URLSearchParams({
+      select: 'game,handle,value',
+      order: 'game.asc,handle.asc',
+      limit: String(pageSize),
+      offset: String(offset)
+    });
+    const page = await request('/rest/v1/leaderboard?' + query, { token: ANON_TOKEN });
+    if (!Array.isArray(page)) throw new Error('Invalid leaderboard response.');
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
+  }
+  return rows;
+}
+
+// The three best of every board, in one small read (public.leaderboard_top).
+// This is all a library card prints, so the hub never asks for the whole board.
+async function readTopBoards() {
+  const rows = await request('/rest/v1/leaderboard_top?select=game,handle,value', { token: ANON_TOKEN });
+  if (!Array.isArray(rows)) throw new Error('Invalid leaderboard response.');
+  return rows;
+}
+
+// `full` is the Leaderboard page, where accounts are ranked across every board.
+// Anywhere else the hub keeps only the top three of each game.
+async function loadLeaderboard(force = false, full = false) {
   if (!backendReady()) { renderLeaderboard(); return; }
   await loadMedals();
-  const key = 'overall';
+  const everyone = full || boardPageOpen();
+  const key = everyone ? 'overall' : 'top';
   const cached = state.lbCache.get(key);
   if (!force && cached && Date.now() - cached.at < 30000) {
-    await loadStreaks(false);
-    renderLeaderboard();
+    if (everyone) { await loadStreaks(false); renderLeaderboard(); }
     return;
   }
-  if (!cached || force) {
+  if (everyone) {
+    lbLoading = true;
     const empty = $('#lb-empty');
-    if (!$('#lb-list').children.length) { empty.hidden = false; empty.textContent = 'Loading rankings…'; }
+    if (!$('#lb-list').children.length) {
+      empty.hidden = false; empty.textContent = 'Loading rankings…';
+      $('#lb-note').textContent = 'Ranking every board…';
+    }
   }
   try {
-    // Read the shared leaderboard in pages. PostgREST projects commonly cap
-    // individual responses at 1,000 records, so one request misses players.
-    const rows = [];
-    const pageSize = 1000;
-    for (let offset = 0; offset < 50000; offset += pageSize) {
-      const query = new URLSearchParams({
-        select: 'game,handle,value',
-        order: 'game.asc,handle.asc',
-        limit: String(pageSize),
-        offset: String(offset)
-      });
-      const page = await request('/rest/v1/leaderboard?' + query, { token: ANON_TOKEN });
-      if (!Array.isArray(page)) throw new Error('Invalid leaderboard response.');
-      rows.push(...page);
-      if (page.length < pageSize) break;
-      if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
-    }
+    const rows = everyone ? await readWholeBoard() : await readTopBoards();
     state.lbCache.set(key, { rows, at: Date.now() });
   } catch (err) {
     state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
+  } finally {
+    lbLoading = false;
   }
-  await loadStreaks(force);
-  await loadBuddies(force);
+  // Streaks and buddies are decoration on the page; the hub's three-per-board
+  // read does not need either request.
+  if (everyone) {
+    await loadStreaks(force);
+    await loadBuddies(force);
+  }
   renderLeaderboard();
-  // The library cards read the same rows, so they redraw once they land.
+  // The library cards read the top of each board, so they redraw once it lands.
   onBoard();
 }
 

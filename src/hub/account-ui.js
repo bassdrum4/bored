@@ -231,7 +231,8 @@ async function consumeAuthRedirect() {
 }
 
 function initAccount() {
-  $('#lb-refresh').onclick = () => loadLeaderboard(true);
+  // The refresh button lives on the board, so it asks for every row.
+  $('#lb-refresh').onclick = () => loadLeaderboard(true, true);
   $('#claim-signin').onclick = () => startClaimAuth('signin');
   $('#claim-signup').onclick = () => startClaimAuth('signup');
   $('#claim-cancel').onclick = () => closeClaimDialog();

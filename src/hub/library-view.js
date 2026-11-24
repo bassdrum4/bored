@@ -190,7 +190,8 @@ let topThrees = new Map();
 // The byline and its tooltip read the same rows the leaderboard fetched, and
 // the per-game top list is derived once per fetch rather than per card.
 function boardData(slug) {
-  const rows = state.lbCache.get('overall')?.rows || [];
+  // The hub reads only the top three of each board; the page reads the rest.
+  const rows = state.lbCache.get('top')?.rows || [];
   if (rows !== leaderRows) {
     leaderRows = rows;
     leaders = boardLeaders(rows);

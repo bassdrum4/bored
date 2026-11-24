@@ -327,6 +327,11 @@ test('account UI and score sync still work through the redesigned hub (mock back
       const board = [...rows.map(row => ({ ...row, handle: 'tester' })), { game: 'lights-out', handle: 'rival', value: 9 }];
       return reply(board.filter(row => !url.searchParams.get('game') || url.searchParams.get('game') === 'eq.' + row.game));
     }
+    // The hub reads the top three of each game for its card bylines; the whole
+    // board is only read when the Leaderboard page opens.
+    if (url.pathname === '/rest/v1/leaderboard_top') {
+      return reply([...rows.map(row => ({ ...row, handle: 'tester' })), { game: 'lights-out', handle: 'rival', value: 9 }]);
+    }
     if (url.pathname === '/rest/v1/daily_leaderboard') return reply([]);
     if (url.pathname === '/rest/v1/buddy_board') return reply([]);
     if (url.pathname === '/rest/v1/feedback_entries' && method === 'POST') {
@@ -358,6 +363,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
     captureHighScore();
     closeGame();
   });
+  // The full board is a page read now, so open it before waiting for its rows.
+  await page.click('#leaderboard-nav');
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('tester'));
   assert.equal(posted.length, 1, 'score is posted once');
   assert.equal(posted[0].game, 'lights-out');
@@ -375,7 +382,6 @@ test('account UI and score sync still work through the redesigned hub (mock back
   // with the other player's best and the verdict underneath, plus a way to go
   // and beat it.
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
-  await page.click('#leaderboard-nav');
   // The card byline names the board leader, and a game with no board has none.
   await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best')?.textContent.includes('rival'));
   assert.equal(await page.$eval('#grid [data-slug="lights-out"] .card-best', el => el.textContent), 'Best 9 boards · rival');
