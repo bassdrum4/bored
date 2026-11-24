@@ -7,7 +7,9 @@ async function load(date,round) {
     current=key;
     const task=(async()=>{
       const url=new URL('../../../krillion-data/'+key+'/answers.json.gz',import.meta.url);
-      for(const source of [url,'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/'+key+'/answers.json.gz']){
+      const raw='https://raw.githubusercontent.com/bassdrum4/bored/';
+      const archive=raw+'krillion-archive-'+date+'/'+key+'/answers.json.gz';
+      for(const source of [url,raw+'krillion-data/'+key+'/answers.json.gz',archive]){
         try{
           const res=await fetch(source,{signal:AbortSignal.timeout(20000)});
           if(!res.ok||!res.body)continue;
