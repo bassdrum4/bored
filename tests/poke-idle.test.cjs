@@ -9,7 +9,8 @@ const { serve } = require('./serve.cjs');
 const root = path.resolve(__dirname, '..');
 
 // The game on its own, with the seed the hub would inject (window.__boredSeed) for `date`.
-async function openIdle(t, date) {
+// opts.hof serves the page with HOF_READY switched on, the way the Hall of Fame is tested before it ships.
+async function openIdle(t, date, opts = {}) {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const { seedNumber } = await import(path.join(root, 'src/daily.js'));
@@ -20,7 +21,15 @@ async function openIdle(t, date) {
   const errors = [];
   tab.on('pageerror', error => errors.push(error.message));
   await tab.setRequestInterception(true);
-  tab.on('request', request => request.url().startsWith(site.origin) ? request.continue() : request.abort());
+  tab.on('request', request => {
+    if (!request.url().startsWith(site.origin)) return request.abort();
+    if (opts.hof && /poke-idle\.html/.test(request.url())) {
+      const html = fs.readFileSync(path.join(root, 'src/games/content/poke-idle.html'), 'utf8');
+      assert.ok(html.includes('const HOF_READY = false;'), 'the page ships with the Hall of Fame held back');
+      return request.respond({ status: 200, contentType: 'text/html; charset=utf-8', body: html.replace('const HOF_READY = false;', 'const HOF_READY = true;') });
+    }
+    request.continue();
+  });
   const seed = { date, seed: seedNumber(date), code: 'test' };
   await tab.evaluateOnNewDocument(s => { window.__boredSeed = s; }, seed);
   await tab.goto(site.origin + '/games/content/poke-idle.html');
@@ -234,5 +243,68 @@ test('rival Sssssssnakes: listed after the Champion, set by the Champion\'s rule
     const again = await tab.evaluate(r => { const m = S.balls.master; startLoc({ kind: 'rival', r }); B.idx = B.queue.length - 1; B.foe.hp = 1; hit(10); const paid = S.money; next(); return [S.balls.master - m, S.money - paid === rewardFor(champLevel(r) + CAP_OVER, r * 4 + 3, RIVAL_REMATCH)]; }, x.r);
     assert.deepEqual(again, [0, true]);
   }
+  assert.deepEqual(errors, []);
+});
+
+// The Hall of Fame is built but held back: with HOF_READY false (as it ships), nothing of it shows anywhere.
+test('the Hall of Fame stays hidden while HOF_READY is false', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const seen = await tab.evaluate(() => {
+    S = fresh(); S.box[25] = { xp: 1e9 }; S.party = [25]; S.beat = '2026-11-20'; S.pbeat = 1;
+    for (let r = 0; r < REGIONS.length; r++) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; S.champs[r] = 1; }
+    save(); enter('battle');
+    const rows = [];
+    for (let r = 0; r <= TRAIN_R; r++) { viewR = r; renderLocs(); rows.push(...[...document.querySelectorAll('#locs [data-loc]')].map(b => JSON.parse(b.dataset.loc).kind)); }
+    const wiki = wikiSections().map(x => x.title + x.html).join(' ') + wikiEntry(1019) + wikiTiers();
+    const mail = inbox().map(m => m.title + m.body).join(' ');
+    openTab('wiki'); const wikiText = document.querySelector('#t-wiki').textContent;
+    return { hofRows: rows.filter(k => k === 'hof').length, sp: HOF_SP in SPECIALS, unlocked: unlocked({ kind: 'hof', r: HOF_R }), tier: tierOf({ ...mon(1019), key: 'hof' }),
+      wiki: /Hall of Fame|Mega Hydrapple/.test(wiki + wikiText), mail: /Hall of Fame|Mega Hydrapple/.test(mail), resets: PRESTIGE_RESETS.some(x => /Hall of Fame/.test(x)) };
+  });
+  assert.deepEqual(seen, { hofRows: 0, sp: false, unlocked: false, tier: 5, wiki: false, mail: false, resets: false });
+  assert.deepEqual(errors, []);
+});
+
+test('the Hall of Fame, switched on: after the Lab, a little harder than Prof Penguin\'s phase 2, and the SP Mega Hydrapple', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24', { hof: true });
+  const setup = () => tab.evaluate(() => {
+    S = fresh(); S.box[25] = { xp: 1e9 }; S.party = [25];
+    for (let r = 0; r < REGIONS.length; r++) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; S.champs[r] = 1; }
+    save(); enter('battle'); viewR = 0; renderLocs();
+  });
+  await setup();
+  const rows = () => tab.evaluate(() => [...document.querySelectorAll('#locs [data-loc]')].map(b => ({ kind: JSON.parse(b.dataset.loc).kind, open: !b.disabled, text: b.textContent })));
+  let list = await rows();
+  const lab = list.findIndex(x => x.kind === 'final');
+  assert.equal(list[lab + 1].kind, 'hof', 'right after Prof Penguin\'s Lab');
+  assert.equal(list[lab + 1].open, false, 'locked until Prof Penguin is beaten');
+  await tab.evaluate(() => { S.beat = '2026-11-20'; S.pbeat = 1; renderLocs(); });
+  list = await rows();
+  assert.ok(list[lab + 1].open && list[lab + 1].text.startsWith('Hall of Fame') && list[lab + 1].text.includes('Sssssssnakes, first graduate'));
+  const fight = await tab.evaluate(() => {
+    // Prof Penguin's phase 2 method: the best six of every tier, matchups 1×, a quarter of the Protein.
+    const use = () => { const cap = areaCap(), hit = (m, f) => refHit(m, cap, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) * clockRate(f) }));
+      const P = refPick([...refPool(...refArea(B.r, 3), cap, 0), ETERNAMAX_FOE], foes, hit);
+      return foes.reduce((s, { f, hp }) => s + hp * B.tune / (P.reduce((d, m) => d + hit(m, f), 0) * bossBoost()), 0) / (B.bossTime * refDef(P)); };
+    // A team built on its weaknesses from the same pool: matchups counted.
+    const counter = () => { const cap = areaCap(), hit = (m, f) => refHit(m, cap, f) * bestEff(m, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) }));
+      const P = refPick([...refPool(...refArea(B.r, 3), cap, 0), ETERNAMAX_FOE], foes, hit);
+      return foes.reduce((s, { f, hp }) => s + hp * B.tune / (P.reduce((d, m) => d + hit(m, f), 0) * bossBoost()), 0) / (B.bossTime * refDef(P)); };
+    startLoc({ kind: 'hof', r: HOF_R });
+    const out = { team: B.queue.map(f => f.name), L: B.L, cap: levelCap(), clock: B.bossTime, use: use(), counter: counter(), said: document.querySelector('#log').textContent };
+    B.idx = B.queue.length - 1; B.foe.hp = 1; hit(10); next();
+    const b = S.box[1019], sp = SPECIALS[HOF_SP];
+    return { ...out, won: hofWon(), sp: b && b.special, look: lookKind(1019), tier: tierOf(fighter(1019)), stats: [sp.hp, sp.atk, sp.def, sp.spa, sp.spd, sp.spe, sp.bst], types: sp.types.join('/'),
+      wiki: wikiSections().some(x => x.id === 'hof'), mail: inbox().some(m => m.id === 'update-hall-of-fame') };
+  });
+  assert.deepEqual(fight.team, ['Serperior', 'Arbok', 'Gigantamax Sandaconda', 'Milotic', 'Zygarde 50% Forme', 'Mega Hydrapple']);
+  assert.equal(fight.L, fight.cap);
+  assert.ok(fight.said.startsWith('Sssssssnakes, first graduate'));
+  assert.ok(Math.abs(fight.use - 1.42) < 0.01, `the reference team needs HOF_USE of the clock (${fight.use.toFixed(3)})`);
+  assert.ok(fight.counter >= 0.95 && fight.counter <= 1, `a team built on its weaknesses, with a quarter of the Protein, needs 95-100% of the clock (${fight.counter.toFixed(3)})`);
+  assert.deepEqual({ won: fight.won, sp: fight.sp, look: fight.look, tier: fight.tier, stats: fight.stats, types: fight.types, wiki: fight.wiki, mail: fight.mail },
+    { won: true, sp: 'hof-hydrapple', look: 'special', tier: 2, stats: [106, 90, 140, 150, 110, 54, 650], types: 'Grass/Dragon', wiki: true, mail: true });
+  // Prof Penguin's phase 2, for comparison: his reference team needs FINAL_USE.
+  assert.ok(await tab.evaluate(() => FINAL_USE < HOF_USE));
   assert.deepEqual(errors, []);
 });
