@@ -8,7 +8,7 @@ const { gzipSync } = require('node:zlib');
 const source = stripTypeScriptTypes(readFileSync('supabase/functions/krillion/index.ts', 'utf8'));
 const date = '2026-11-24';
 const book = { date, dayNumber: 1, source: 'test', prompts: Array.from({length:7}, (_,i)=>({id:String(i),text:'Name a planet '+i,answers:[{answer:'Mercury',tier:'schooler'}]})) };
-function harness({missingBook=false, failRead=0, failInsert=0, staticSnapshot=null}={}) {
+function harness({missingBook=false, failRead=0, failInsert=0, staticSnapshot=null, pagesMissing=false}={}) {
   let handler, now=Date.parse(date+'T12:00:00Z'), reads=0, inserts=0, upstream=0;
   const rows=new Map();
   let bank=[];
@@ -17,8 +17,8 @@ function harness({missingBook=false, failRead=0, failInsert=0, staticSnapshot=nu
   const fetch=async(input,init={})=>{
     const url=new URL(input), path=url.pathname, method=init.method||'GET', q=url.searchParams;
     if(url.hostname==='krillion.io'){upstream++;return json(book);}
-    if(url.hostname==='bassdrum4.github.io'){
-      if(!staticSnapshot)return json({},404);
+    if(url.hostname==='bassdrum4.github.io'||url.hostname==='raw.githubusercontent.com'){
+      if(!staticSnapshot||(pagesMissing&&url.hostname==='bassdrum4.github.io'))return json({},404);
       if(path.endsWith('/manifest.json'))return json(staticSnapshot.manifest);
       const hit=path.match(/\/(\d)\/(\d+)\.json\.gz$/);
       if(hit)return new Response(gzipSync(JSON.stringify(staticSnapshot.rounds[Number(hit[1])].shards[Number(hit[2])])));
@@ -122,7 +122,7 @@ test('static snapshots use local matching and verify every score against static 
   assert.equal(match('random nonsense'),null);
   assert.equal(compiled.shards[bucket('quickplanet')].quickplanet[0],'Mercury');
   const manifest={...book,staticAnswers:true,prompts:book.prompts.map(({id,text})=>({id,text}))};
-  const h=harness({staticSnapshot:{manifest,rounds:Array(7).fill(compiled)}});
+  const h=harness({staticSnapshot:{manifest,rounds:Array(7).fill(compiled)},pagesMissing:true});
   const runId=randomUUID();
   const start=await h.call('start',{runId});
   assert.equal(start.status,200);
