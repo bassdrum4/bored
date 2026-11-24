@@ -458,7 +458,8 @@ test('the player: the bridge is put in the document once, and only the right sen
 
 test('only a live game can be opened live', async () => {
   const { createLivePlayer, TOGETHER_LIVE, LIVE_DEFAULTS } = await hub();
-  assert.deepEqual(Object.keys(TOGETHER_LIVE), ['ashcrown']);
+  assert.deepEqual(Object.keys(TOGETHER_LIVE), ['ashcrown', 'shotgun-roulette']);
+  assert.deepEqual(TOGETHER_LIVE['shotgun-roulette'], { min: 2, max: 4 });
   assert.throws(() => createLivePlayer({ game: { id: 'x', game: 'chess' }, owner: OWNER, frame: {}, close() {}, onExit() {}, reload() {}, notify() {} }), /not available live/);
   assert.equal(LIVE_DEFAULTS.timer, 0);
   assert.equal(LIVE_DEFAULTS.unjoined, 'cpu');

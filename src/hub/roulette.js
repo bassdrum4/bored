@@ -117,6 +117,16 @@ export async function submitRouletteScore(mode, coinsWon, bestStreak) {
 
 /** Top 10 players for a mode, by net chips won. */
 export async function rouletteBoard(mode) {
+  // Multiplayer: total game wins (and games played) from finished live rooms with 2+ players
+  // (shotgun_roulette_mp_top, sql/shotgun_roulette_multiplayer.sql). No tokens.
+  if (mode === 'multiplayer') {
+    const rows = await request('/rest/v1/rpc/shotgun_roulette_mp_top', { method: 'POST', token: ANON_TOKEN, body: {} });
+    return (Array.isArray(rows) ? rows : []).slice(0, 10).map(row => ({
+      handle: String(row.handle || '').slice(0, 40),
+      wins: Math.max(0, Math.trunc(Number(row.wins)) || 0),
+      games: Math.max(0, Math.trunc(Number(row.games)) || 0)
+    }));
+  }
   if (!Object.hasOwn(ROULETTE.pays, mode)) return [];
   const rows = await request('/rest/v1/rpc/shotgun_roulette_top', { method: 'POST', token: ANON_TOKEN, body: { p_mode: mode } });
   return (Array.isArray(rows) ? rows : []).slice(0, 10).map(row => ({
@@ -209,6 +219,26 @@ export function createRouletteBridge({ onChange = () => {}, claims = null, log =
           .then(result => { if (!result.ok) log('Shotgun Roulette: score not posted (' + result.reason + ').'); })
           .catch(error => log('Shotgun Roulette: score not posted.', error.message));
         return { ok: !reason, reason, payout, profit, capped, streak: streak.current, best: streak.best, ...status() };
+      }
+
+      // The buddies of the players at a multiplayer table, by display name, from the public
+      // buddy board. The sandboxed table can't read it itself. Unknown names have no buddy.
+      case 'buddies': {
+        const names = (Array.isArray(data.handles) ? data.handles : []).filter(h => typeof h === 'string' && h.length <= 40).slice(0, 4);
+        if (!names.length) return { ok: true, buddies: {} };
+        try {
+          const list = names.map(h => '"' + h.replace(/["\\]/g, '') + '"').join(',');
+          const rows = await request('/rest/v1/buddy_board?select=handle,species,shiny&handle=in.(' + encodeURIComponent(list) + ')', { token: ANON_TOKEN });
+          const buddies = {};
+          for (const row of Array.isArray(rows) ? rows : []) {
+            const species = Math.trunc(Number(row.species));
+            if (names.includes(row.handle) && species >= 1 && species <= 1025) buddies[row.handle] = { species, shiny: row.shiny === true };
+          }
+          return { ok: true, buddies };
+        } catch (error) {
+          log('Shotgun Roulette: buddies unavailable.', error.message);
+          return { ok: true, buddies: {} };
+        }
       }
 
       case 'board':

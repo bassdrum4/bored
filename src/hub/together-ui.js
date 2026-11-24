@@ -1,6 +1,6 @@
 import { hasIdentity, getSession, ensureProfile } from './backend.js';
 import { togetherRPC, inviteRPC, liveRPC, CONSENT_VERSION } from './together-api.js';
-import { TOGETHER_GAMES } from '../games/catalog.js';
+import { TOGETHER_GAMES, ORDER } from '../games/catalog.js';
 import { PREVIEWS } from '../games/discovery.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
 import { TOGETHER_LIVE, LIVE_DEFAULTS } from './together-live.js';
@@ -49,7 +49,8 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   }
   const inviteDialog = $('#invite-dialog');
   const resultDialog = $('#result-dialog');
-  const name = game => TOGETHER_GAMES[game]?.name || game;
+  // A live-only game (Shotgun Roulette) isn't a turn-based Together game: its catalog name stands in.
+  const name = game => TOGETHER_GAMES[game]?.name || ORDER.find(([id]) => id === game)?.[1] || game;
   // A retired game stays readable in the database but is no longer a row here.
   const offered = m => Boolean(TOGETHER_ADAPTERS[m.game]);
   const mySeat = g => (g?.seats || []).find(s => s.seat === g.me);

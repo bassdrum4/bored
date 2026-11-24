@@ -248,7 +248,134 @@
   .iv-medal-3 { --iv-medal: #e3b845; --iv-medal-rim: #9a6f14 }
   .empty { margin-top: 10px; color: var(--dim); font-size: 14px }
 
+  /* ── Multiplayer: the room panel, the room lobby, and the square table ── */
+  .islands:has(#mp-open:not([hidden])) { grid-template-columns: repeat(4, 1fr) }
+  .mp-open { margin-top: 72px }
+  .mp-panel { position: absolute; left: 76px; top: 250px; width: 720px; z-index: 5; padding: 18px 22px; border: 1px solid var(--gold); border-radius: 3px; background: #0b0709f7 }
+  .mp-panel[hidden], .mp[hidden], .mp-tablewrap[hidden], .mp-room[hidden] { display: none }
+  .mp-panel h2 { margin: 0 0 6px }
+  .mp-note { color: var(--dim); font-size: 15px; margin-bottom: 12px }
+  .mp-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+  .mp-btn { padding: 8px 14px; border: 1px solid var(--ink); border-radius: 3px; background: none; color: var(--ink); cursor: pointer; font-size: 15px }
+  .mp-btn.primary { background: var(--ink); color: #120c0c }
+  .mp-btn.quiet { border-color: #ffffff33; color: var(--dim) }
+  .mp-btn:disabled { opacity: .45; cursor: default }
+  .mp-join { color: var(--dim); font-size: 15px }
+  .mp-join input { width: 9ch; margin-left: 6px; padding: 6px 8px; border: 1px solid #3a2758; border-radius: 3px; background: #1d1230; color: var(--gold);
+                   font: 600 15px var(--mono); text-transform: uppercase; letter-spacing: .1em }
+  .mp-rooms { margin: 12px 0; display: grid; gap: 6px }
+  .mp-rooms button { text-align: left }
+  .mp { position: absolute; inset: 0 }
+  body.live .room, body.live .meter, body.live #hud, body.live .lobby { display: none }
+  .mp-room { position: absolute; inset: 0; display: grid; place-items: center; background: #060409cc }
+  .mp-lobby { width: 560px; padding: 22px 26px; border: 1px solid var(--gold); border-radius: 3px; background: #0b0709f2 }
+  .mp-lobby h2 { font: 400 30px/1.2 var(--display); margin-bottom: 4px }
+  .mp-code-line { color: var(--dim); margin-bottom: 14px }
+  .mp-code-line b { font: 600 22px var(--mono); color: var(--gold); letter-spacing: .14em; margin-left: 6px }
+  .mp-seats { list-style: none; display: grid; gap: 8px; margin-bottom: 12px }
+  .mp-seats li { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid #3a2758; border-radius: 3px; min-height: 64px }
+  .mp-seats li.empty { border-style: dashed; color: var(--dim) }
+  .mp-seats .state { font-size: 14px; color: var(--dim) }
+  .mp-seats .state.ready { color: #8dffa4 }
+  .mp-seats .state.host { color: var(--gold) }
+  .mp-buddy { width: 56px; height: 56px; display: grid; place-items: center }
+  .mp-buddy img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain }
+  .mp-buddy .none { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #3a2758; display: grid; place-items: center; color: var(--dim); font: 600 16px var(--mono) }
+
+  .mp-tablewrap { position: absolute; inset: 0 }
+  .mp-persp { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 6%; pointer-events: none }
+  .mp-table { position: absolute; left: 330px; top: 80px; width: 620px; height: 620px; transform-origin: 50% 100%; transform: rotateX(52deg);
+              transform-style: preserve-3d; background: #545a3e; border: 10px solid #3a2a24; outline: 14px solid #1b1715;
+              box-shadow: inset 0 0 70px #000c, 0 30px 0 #120e0d; pointer-events: auto }
+  .mp-felt { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+  .mp-zone { position: absolute; width: 300px; height: 96px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 6px;
+             transform-style: preserve-3d }
+  .mp-zone[data-pos="bottom"] { left: 150px; top: 500px }
+  .mp-zone[data-pos="top"] { left: 150px; top: 4px; transform: rotate(180deg) }
+  .mp-zone[data-pos="left"] { left: -98px; top: 252px; transform: rotate(90deg) }
+  .mp-zone[data-pos="right"] { left: 398px; top: 252px; transform: rotate(-90deg) }
+  .mp-zone.vacant { visibility: hidden }
+  .mp-ring { position: absolute; left: 157px; top: 157px; width: 276px; height: 276px; border-radius: 50%; background: #6a6a50;
+             border: 3px solid #2d2f27; box-shadow: 0 14px 0 #2a2b22, 0 18px 14px #000a; transform: translateZ(4px) }
+  .mp-ring::before { content: ""; position: absolute; inset: 46px; border-radius: 50%; background: #4e5039; border: 3px solid #2d2f27;
+                     box-shadow: inset 0 8px 0 #2a2b22 }
+  .mp-ring i { position: absolute; left: 50%; top: 50%; width: 7px; height: 4px; margin: -2px 0 0 -3px; background: #cfe8d0; box-shadow: 0 0 6px #8dffa4 }
+  .mp-hp { position: absolute; width: 132px; height: 40px; padding: 5px 8px; background: #101a12; border: 3px solid #2a2622;
+           box-shadow: inset 0 0 0 1px #22402a, 0 4px 0 #191513; display: flex; gap: 5px; align-items: center; justify-content: center; transform: translateZ(2px) }
+  .mp-hp .bolt { width: 15px; height: 25px }
+  .mp-hp[data-pos="bottom"] { left: 234px; top: 476px }
+  .mp-hp[data-pos="top"] { left: 234px; top: 84px; transform: translateZ(2px) rotate(180deg) }
+  .mp-hp[data-pos="left"] { left: 48px; top: 280px; transform: translateZ(2px) rotate(90deg) }
+  .mp-hp[data-pos="right"] { left: 420px; top: 280px; transform: translateZ(2px) rotate(-90deg) }
+  .mp-hp.vacant { visibility: hidden }
+  .mp-slot { border: 2px solid #cfc6a8cc; display: grid; place-items: center; transform-style: preserve-3d }
+  .mp-slot .item { width: 46px; height: 46px }
+  .mp-slot .item img { width: 46px; height: 46px }
+  .mp-gun { position: absolute; left: 273px; top: 184px; width: 54px; height: 232px; transform-origin: 50% 50%; transition: transform .55s cubic-bezier(.3,.7,.3,1);
+            transform-style: preserve-3d; z-index: 2 }
+  .mp-gun svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 8px 5px #000a) }
+  .mp-gun.lift svg { filter: drop-shadow(0 16px 10px #000c) brightness(1.15) }
+  .mp-gun .flash { top: -50px; width: 120px; height: 120px; margin-left: -60px }
+  .mp-shells { position: absolute; left: 140px; top: 272px; width: 320px; display: flex; justify-content: center; gap: 8px; pointer-events: none; transform: translateZ(2px) }
+  .mp-shells .shell { position: relative; width: 18px; height: 56px }
+  .mp-shells .shell.gone { opacity: 0; transform: translateY(80px) scale(.5); transition: transform .3s ease-in, opacity .3s }
+
+  .mp-plate { position: absolute; width: 250px; padding: 8px 10px; display: grid; grid-template-columns: 64px 1fr; gap: 2px 10px; align-items: center;
+              border: 1px solid #3a2758; border-radius: 3px; background: #0b0709e6; transition: border-color .2s, box-shadow .2s }
+  .mp-plate[data-pos="bottom"] { left: 60px; top: 596px }
+  .mp-plate[data-pos="top"] { left: 150px; top: 226px }
+  .mp-plate[data-pos="left"] { left: 24px; top: 400px }
+  .mp-plate[data-pos="right"] { left: 1006px; top: 400px }
+  .mp-plate.vacant { display: none }
+  .mp-plate .who { font: 400 18px/1.2 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .mp-plate .flags { grid-column: 2; font-size: 12px; color: var(--gold); min-height: 1.2em }
+  .mp-plate .bolts { grid-column: 2; padding: 3px 6px; background: #0c1a10; border: 1px solid #22402a; display: flex; gap: 3px; width: max-content }
+  .mp-plate .bolt { width: 11px; height: 18px }
+  .mp-plate .mp-buddy { grid-row: span 2; animation: bob 3.2s ease-in-out infinite }
+  .mp-plate.turn { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) }
+  .mp-plate.target { cursor: pointer; border-color: #e0564b; box-shadow: 0 0 0 2px #e0564b88 }
+  .mp-plate.target:hover { background: #2a0e10f2 }
+  .mp-plate.out { opacity: .55 }
+  .mp-plate.out .mp-buddy { animation: none; transform: rotate(90deg) translateY(10px); filter: grayscale(1) brightness(.6) }
+  .mp-plate.flinch .mp-buddy img { animation: flinch .5s ease-out }
+  @keyframes flinch { 0% { filter: brightness(5) saturate(0) } 30% { transform: translateX(-8px) rotate(-8deg) } 60% { transform: translateX(6px) rotate(5deg) } 100% { transform: none } }
+  .mp-hud { position: absolute; right: 22px; top: 18px; display: flex; gap: 14px; align-items: center; color: var(--dim); font-size: 15px }
+  .mp-timer { font: 600 18px var(--mono); color: var(--ink); min-width: 3ch; text-align: right }
+  .mp-timer.low { color: #e0564b }
+  .mp-say { bottom: 8px; width: 520px; margin-left: -260px; font-size: 16px }
+  .mp-choices { left: auto; right: 24px; bottom: 24px; transform: none; width: 250px; flex-direction: column; gap: 8px }
+  .mp-choices .choice { font-size: 17px; padding: 9px 14px }
+  .mp-log { top: 64px }
+  /* Giratina hosts from above the far edge and doesn't play. */
+  body.live .dealer { left: auto; right: 34px; top: 92px; width: 190px; height: 190px; margin: 0 }
+  body.live .haze, body.live .rig { opacity: .55 }
+  body.live .dark, body.live .redflash { z-index: 8 }
+  .mp-wins { color: var(--dim) }
+  /* The 3D room: the canvas is 480x270, scaled up without smoothing. Words sit on dim terminal readouts. */
+  .mp-3d { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; display: block; image-rendering: pixelated; image-rendering: crisp-edges }
+  .mp-3d[hidden], .mp-status:empty { display: none }
+  body.r3 .scene, body.r3 .mp-persp, body.r3 .mp-plate, body.r3 .mp-choices { display: none }
+  body.r3 .mp-hud { top: 14px; right: 16px; display: grid; grid-template-columns: auto auto auto; gap: 4px 14px; align-items: center; padding: 6px 10px;
+                    background: #040604ee; border: 1px solid #1d3a24; font: 12px/1.4 var(--mono); color: #5f9c6c; text-transform: uppercase }
+  body.r3 .mp-hud .plain { padding: 0; border: 0; border-radius: 0; background: none; font: 12px var(--mono); color: #5f9c6c; text-transform: uppercase }
+  body.r3 .mp-hud .plain:hover { color: #8af0a0 }
+  body.r3 .mp-timer { font: 12px var(--mono); color: #8af0a0; min-width: 0 }
+  body.r3 .mp-timer.low { color: #d0705f }
+  .mp-status { display: none }
+  body.r3 .mp-status { display: block; grid-column: 1 / -1; color: #4f8a5c; border-top: 1px solid #1d3a24; padding-top: 4px }
+  .mp-status .row { display: grid; grid-template-columns: 1.2ch 13ch 6ch auto; gap: 0 6px; white-space: nowrap }
+  .mp-status .hp { color: #8af0a0; letter-spacing: .08em }
+  .mp-status s { color: #3a5a42; text-decoration-color: #d0705f }
+  body.r3 .mp-log { top: 14px; left: 16px; width: 330px; height: 124px; padding: 6px 8px; border: 1px solid #1d3a24; border-radius: 0;
+                    background: #040604; font: 11px/1.45 var(--mono); overflow: hidden }
+  body.r3 .mp-log p { color: #4f8a5c; font-family: var(--mono) }
+  body.r3 .mp-log p.round, body.r3 .mp-log p.status, body.r3 .mp-log p.secret { color: #8af0a0 }
+  body.r3 .mp-log p.live { color: #d0705f }
+  body.r3 .mp-log p.you { color: #a7d8b0 }
+  body.r3 .mp-say { bottom: 12px; width: 640px; margin-left: -320px; padding: 3px 10px; background: #040604cc; font: 12px/1.5 var(--mono); font-style: normal; color: #bfb38c }
+
   @media (prefers-reduced-motion: reduce) {
+    .mp-plate .mp-buddy { animation: none }
     .dealer, .dealer img, .cone, .gun.ready { animation: none }
     .scene.shaking { animation: none }
   }
@@ -383,6 +510,22 @@
               <label><input type="radio" name="test-mode" value="hard"> Hard</label>
             </div>
           </div>
+          <button class="island mp-open" type="button" id="mp-open" hidden>
+            <span class="name">Multiplayer</span><span class="level">2–4 players, live</span><span class="pays">No tokens. Just for fun.</span>
+          </button>
+        </div>
+        <!-- Multiplayer rooms, through Bored Together (the arcade's lobby bridge). -->
+        <div class="mp-panel" id="mp-panel" hidden>
+          <h2>Multiplayer</h2>
+          <p class="mp-note" id="mp-note">Play live with 2 to 4 people. Same rules as Normal, no Giratina buffs, no tokens.</p>
+          <div class="mp-actions" id="mp-actions">
+            <button class="island-test-start mp-btn" id="mp-create" type="button">Create a room</button>
+            <label class="mp-join">Room code <input id="mp-code" maxlength="8" autocomplete="off" spellcheck="false"></label>
+            <button class="mp-btn" id="mp-join" type="button">Join</button>
+            <button class="mp-btn quiet" id="mp-together" type="button" hidden>Open Bored Together</button>
+          </div>
+          <div class="mp-rooms" id="mp-rooms"></div>
+          <button class="mp-btn quiet" id="mp-close" type="button">Close</button>
         </div>
         <p class="lobby-note" id="lobby-note" role="status"></p>
       </section>
@@ -392,11 +535,85 @@
       <div class="tabs" role="tablist" aria-label="Leaderboard mode">
         <button class="tab" type="button" role="tab" id="tab-normal" aria-controls="board-normal" aria-selected="true">Normal</button>
         <button class="tab" type="button" role="tab" id="tab-hard" aria-controls="board-hard" aria-selected="false">Hard</button>
+        <button class="tab" type="button" role="tab" id="tab-multiplayer" aria-controls="board-multiplayer" aria-selected="false">Multiplayer</button>
       </div>
       <div id="board-normal" role="tabpanel" aria-labelledby="tab-normal"></div>
       <div id="board-hard" role="tabpanel" aria-labelledby="tab-hard" hidden></div>
+      <div id="board-multiplayer" role="tabpanel" aria-labelledby="tab-multiplayer" hidden></div>
       <p class="empty" id="board-empty">No runs yet. The first survivor goes here.</p>
     </section>
+  </div>
+
+  <!-- Multiplayer (live mode only): the room lobby, then the square table. -->
+  <div class="mp" id="mp" hidden>
+    <div class="mp-room" id="mp-room-wrap">
+      <div class="mp-lobby" id="mp-lobby">
+        <h2>Multiplayer room</h2>
+        <p class="mp-code-line" id="mp-code-line"></p>
+        <ol class="mp-seats" id="mp-seats-list"></ol>
+        <p class="mp-note" id="mp-lobby-note" role="status"></p>
+        <div class="mp-actions">
+          <button class="mp-btn primary" id="mp-ready" type="button">Ready</button>
+          <button class="mp-btn primary" id="mp-start" type="button" hidden>Start</button>
+          <button class="mp-btn quiet" id="mp-newcode" type="button" hidden>New code</button>
+          <button class="mp-btn quiet" id="mp-leave-lobby" type="button">Leave room</button>
+        </div>
+      </div>
+    </div>
+    <div class="mp-tablewrap" id="mp-tablewrap" hidden>
+      <canvas class="mp-3d" id="mp-3d" width="480" height="270" hidden></canvas>
+      <div class="mp-persp">
+        <div class="mp-table" id="mp-table">
+          <svg class="mp-felt" viewBox="0 0 600 600" aria-hidden="true">
+            <g fill="none" stroke="#d9cfb0" stroke-width="2" opacity=".6">
+              <rect x="10" y="10" width="580" height="580"/>
+              <path d="M10 10 L 190 190 M590 10 L 410 190 M10 590 L 190 410 M590 590 L 410 410"/>
+              <path d="M140 10 V 140 H 10 M460 10 V 140 H 590 M140 590 V 460 H 10 M460 590 V 460 H 590"/>
+              <circle cx="300" cy="300" r="190" stroke-dasharray="4 9"/>
+            </g>
+          </svg>
+          <div class="mp-ring" aria-hidden="true"><i style="transform:rotate(0deg) translateY(-128px)"></i><i style="transform:rotate(45deg) translateY(-128px)"></i><i style="transform:rotate(90deg) translateY(-128px)"></i><i style="transform:rotate(135deg) translateY(-128px)"></i><i style="transform:rotate(180deg) translateY(-128px)"></i><i style="transform:rotate(225deg) translateY(-128px)"></i><i style="transform:rotate(270deg) translateY(-128px)"></i><i style="transform:rotate(315deg) translateY(-128px)"></i></div>
+          <div class="mp-hp" data-pos="bottom"></div>
+          <div class="mp-hp" data-pos="left"></div>
+          <div class="mp-hp" data-pos="top"></div>
+          <div class="mp-hp" data-pos="right"></div>
+          <div class="mp-zone" data-pos="bottom"></div>
+          <div class="mp-zone" data-pos="left"></div>
+          <div class="mp-zone" data-pos="top"></div>
+          <div class="mp-zone" data-pos="right"></div>
+          <div class="mp-shells" id="mp-shells"></div>
+          <div class="mp-gun" id="mp-gun">
+            <span class="flash" id="mp-flash"></span>
+            <svg viewBox="0 0 84 360" aria-hidden="true">
+              <rect x="34" y="0" width="16" height="190" rx="3" fill="#3b3531"/>
+              <rect x="37" y="0" width="5" height="190" fill="#57504a"/>
+              <rect x="28" y="120" width="28" height="58" rx="5" fill="#5a3826"/>
+              <rect x="26" y="186" width="32" height="70" rx="4" fill="#2e2a27"/>
+              <path d="M28 254 L 56 254 L 66 352 Q 42 364 18 352 Z" fill="#5f3b28"/>
+              <path d="M30 262 L 54 262 L 60 340 Q 42 348 24 340 Z" fill="#6e4630"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="mp-plate" data-pos="bottom"></div>
+      <div class="mp-plate" data-pos="left"></div>
+      <div class="mp-plate" data-pos="top"></div>
+      <div class="mp-plate" data-pos="right"></div>
+      <div class="mp-hud">
+        <span class="mp-round" id="mp-round"></span>
+        <span class="mp-timer" id="mp-timer"></span>
+        <button class="plain" id="mp-leave" type="button">Leave game</button>
+        <div class="mp-status" id="mp-status"></div>
+      </div>
+      <p class="say mp-say" id="mp-say" role="status" aria-live="polite"></p>
+      <div class="choices mp-choices" id="mp-choices" hidden></div>
+      <div class="log mp-log" id="mp-log" role="log" aria-label="What happened"></div>
+      <div class="result" id="mp-result" hidden>
+        <h2 id="mp-result-title"></h2>
+        <p id="mp-result-text"></p>
+        <div class="again"><button class="choice primary" id="mp-result-close" type="button">Back to the table menu</button></div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="tip" id="tip" hidden></div>
@@ -1444,16 +1661,21 @@ $("#back").onclick = () => parent.postMessage({ type: "bored:close" }, "*");
 $("#to-gacha").onclick = () => parent.postMessage({ type: "bored:open-game", slug: "poke-gacha" }, "*");
 
 /* ── Leaderboard ──────────────────────────────────────────────────────── */
-const boards = { normal: [], hard: [] };
+const boards = { normal: [], hard: [], multiplayer: [] };
 let boardMode = "normal";
 function drawBoard(mode) {
-  const panel = $("#board-" + mode), rows = boards[mode];
+  const panel = $("#board-" + mode), rows = boards[mode], mp = mode === "multiplayer";
   const table = el("table", "board");
-  table.innerHTML = '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net tokens</th><th class="n">Best streak</th></tr></thead>';
+  // Multiplayer ranks total game wins, then games played (no tokens involved).
+  table.innerHTML = mp
+    ? '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Wins</th><th class="n">Games</th></tr></thead>'
+    : '<thead><tr><th class="rank">#</th><th>Player</th><th class="n">Net tokens</th><th class="n">Best streak</th></tr></thead>';
   const body = document.createElement("tbody");
   for (let rank = 1; rank <= 10; rank++) {
     const row = body.insertRow(), entry = rows[rank - 1];
-    const cells = entry ? [rank, String(entry.handle || "unnamed"), Number(entry.coins_won || 0).toLocaleString("en-US"), String(entry.best_streak || 0)] : [rank, "—", "—", "—"];
+    const cells = !entry ? [rank, "—", "—", "—"]
+      : mp ? [rank, String(entry.handle || "unnamed"), String(entry.wins || 0), String(entry.games || 0)]
+      : [rank, String(entry.handle || "unnamed"), Number(entry.coins_won || 0).toLocaleString("en-US"), String(entry.best_streak || 0)];
     cells.forEach((text, k) => {
       const cell = row.insertCell();
       if (k === 1 && entry) {
@@ -1482,13 +1704,1545 @@ for (const tab of tabs) tab.onclick = () => {
     other.setAttribute("aria-selected", String(on));
     document.getElementById(other.getAttribute("aria-controls")).hidden = !on;
   }
-  boardMode = tab.id === "tab-hard" ? "hard" : "normal";
+  boardMode = tab.id.replace("tab-", "");
   $("#board-empty").hidden = boards[boardMode].length > 0;
 };
-drawBoard("normal");
-drawBoard("hard");
-loadBoard("normal");
-loadBoard("hard");
+for (const mode of ["normal", "hard", "multiplayer"]) { drawBoard(mode); loadBoard(mode); }
+
+/* ── Multiplayer: 2 to 4 players at one table, live, through Bored Together ──
+   The hub's live bridge (window.__boredLive, src/hub/together-live.js) gives the
+   room's lobby and one ordered log of actions. Every screen replays the same log
+   through the same rules, so every screen holds the same game:
+     load   {round, n, shells, items}  the shells and each seat's two items, rolled
+                                       by the host's screen (the lowest seat still at
+                                       the table); another screen steps in if it's late
+     item   {turn, box, target}        the turn's player uses an item (target: Thunder Wave)
+     shoot  {turn, target}             the turn's player fires at a seat (their own included)
+     expire {turn}                     30 seconds ran out: the turn's player shoots themself
+     leave  {}                         the sender is out for good
+   An action for a turn that is already over is ignored, so a late timer or a
+   second load never counts twice. Normal rules, no Giratina: first to 2 rounds,
+   2/3/4 HP, 2 items a load, clockwise turns, a blank at yourself keeps the turn.
+   The paralysis roll comes from the room's seed and the turn number, so every
+   screen rolls the same. Outside a live room, window.__boredLobby (the lobby
+   bridge) opens rooms: create one, join by code, or answer an invitation. */
+let mpLive = null, mpLobby = null;
+try { mpLive = window.__boredLive || null; } catch {}
+try { mpLobby = window.__boredLobby || null; } catch {}
+const MP_TURN_MS = 30000;
+const MP_POS = { 2: ["bottom", "top"], 3: ["bottom", "left", "top"], 4: ["bottom", "left", "top", "right"] };
+const MP_ANGLE = { top: 0, right: 90, bottom: 180, left: 270 };
+const MP_ROOM = { unjoined: "drop", cpus: 0, timer: 0, mode: "ffa" };
+let M = null, mpMe = 0, mpRoom = null, mpIsHost = false, mpSeq = 0, mpBusy = false, mpSending = false, mpPick = null;
+let mpFinished = false, mpGunAt = 180, mpClock = { key: "" }, mpLoadClock = { key: "" }, mpExit = false;
+const mpQueue = [], mpOnline = {}, buddyOf = {}, mpView = [];
+
+// A fixed 0-1 number per (seed, turn): every screen gets the same paralysis roll.
+function mpRoll(seed, turn) {
+  let a = (Number(seed) ^ Math.imul(turn, 0x9E3779B1)) | 0;
+  a = a + 0x6D2B79F5 | 0;
+  let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+
+/* The rules. Pure state changes; each pushes what happened to m.ev for the screen. */
+const mpUp = (m, i) => !m.p[i].out && !m.p[i].left;
+const mpLiving = m => m.p.map((_, i) => i).filter(i => mpUp(m, i));
+const mpNext = (m, i) => { for (let k = 1; k <= m.n; k++) { const j = (i + k) % m.n; if (mpUp(m, j)) return j; } return i; };
+const mpName = i => i === mpMe ? "You" : M ? M.names[i] : "Player";
+const mpSays = (i, you, they) => mpName(i) + " " + (i === mpMe ? you : they);
+const mpLog = (m, text, kind = "", seat = null) => m.ev.push({ t: "log", text, kind, seat });
+function mpGame(seats, seed) {
+  const n = seats.length;
+  return { n, seed: Number(seed) || 1, names: seats.map((s, i) => String(s.handle || "Player " + (i + 1)).slice(0, 40)),
+    p: seats.map(() => ({ hp: 0, max: 0, items: emptyBoxes(), band: false, para: false, waveBan: -1, turns: 0, knows: null, out: false, left: false })),
+    wins: Array(n).fill(0), round: 0, loads: 0, shells: [], loaded: [0, 0], turn: 0, turnNo: 0, phase: "load", resume: false, winner: null, ev: [] };
+}
+function mpRound(m) {
+  m.round++;
+  const hp = RULES.hp[Math.min(m.round, 3) - 1];
+  for (const s of m.p) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveBan: -1, knows: null, out: s.left });
+  // The first turn moves one seat clockwise each round.
+  let first = (m.round - 1) % m.n;
+  if (!mpUp(m, first)) first = mpNext(m, first);
+  Object.assign(m, { turn: first, shells: [], phase: "load", resume: false });
+  mpLog(m, "Round " + m.round + ". " + hp + " HP each. " + mpSays(first, "go first.", "goes first."), "round");
+  m.ev.push({ t: "round-start" });
+}
+function mpStartTurn(m) {
+  for (let guard = 0; guard < 16; guard++) {
+    m.turnNo++;
+    const s = m.p[m.turn];
+    s.turns++;
+    if (!s.para) break;
+    // Paralysis lasts one turn and stops it only half the time.
+    s.para = false;
+    const stuck = mpRoll(m.seed, m.turnNo) < PARALYSIS;
+    mpLog(m, stuck ? mpSays(m.turn, "are paralyzed! You can't move!", "is paralyzed! They can't move!")
+                   : mpSays(m.turn, "are paralyzed... but you moved anyway!", "is paralyzed... but moved anyway!"), "status");
+    if (!stuck) break;
+    m.turn = mpNext(m, m.turn);
+  }
+  m.ev.push({ t: "turn" });
+}
+const mpShellsOk = list => Array.isArray(list) && list.length >= 3 && list.length <= 8 && list.every(x => x === 0 || x === 1) && list.includes(0) && list.includes(1);
+function mpLoad(m, a) {
+  if (m.phase !== "load" || a.round !== m.round || a.n !== m.loads + 1 || !mpShellsOk(a.shells) || !Array.isArray(a.items)) return;
+  m.loads++;
+  m.shells = a.shells.map(Boolean);
+  const live = m.shells.filter(Boolean).length;
+  m.loaded = [live, m.shells.length - live];
+  for (const s of m.p) s.knows = null;
+  mpLog(m, "Loaded " + live + " live / " + (m.shells.length - live) + " blank. The shells go in shuffled.", "status");
+  m.ev.push({ t: "load", live, blank: m.shells.length - live });
+  m.p.forEach((s, i) => {
+    if (!mpUp(m, i)) return;
+    const got = [], lost = [];
+    for (const key of (Array.isArray(a.items[i]) ? a.items[i] : []).slice(0, 2)) {
+      if (!POOL.includes(key)) continue;
+      const box = s.items.indexOf(null);
+      if (box < 0) lost.push(ITEMS[key].name); else { s.items[box] = key; got.push(ITEMS[key].name); }
+    }
+    if (got.length) mpLog(m, mpSays(i, "get ", "gets ") + got.join(" and ") + ".");
+    if (lost.length) mpLog(m, (i === mpMe ? "Your" : m.names[i] + "'s") + " side is full, " + lost.join(" and ") + (lost.length > 1 ? " are" : " is") + " lost.");
+  });
+  m.phase = "turn";
+  // An Eject Button that emptied the gun mid-turn: the same player carries on.
+  if (m.resume) { m.resume = false; m.ev.push({ t: "turn" }); } else mpStartTurn(m);
+}
+const mpMine = (m, seat, a) => m.phase === "turn" && seat === m.turn && a.turn === m.turnNo && mpUp(m, seat);
+const mpWaveOk = (m, i) => m.p[i].turns > m.p[i].waveBan;
+const mpWaveTargets = (m, i) => mpLiving(m).filter(t => t !== i && !m.p[t].para);
+function mpItem(m, seat, a) {
+  if (!mpMine(m, seat, a) || !(a.box >= 0 && a.box < 8)) return;
+  const me = m.p[seat], key = me.items[a.box];
+  switch (key) {
+    case "potion":
+      if (me.hp >= me.max) return;
+      me.hp++;
+      mpLog(m, mpSays(seat, "used a Potion. +1 HP.", "used a Potion. +1 HP."), "you", seat);
+      break;
+    case "scope":
+      me.knows = m.shells[0];
+      // Only the player who looked sees what it was.
+      mpLog(m, seat === mpMe ? "Scope Lens: the shell in the chamber is " + (m.shells[0] ? "live." : "blank.") : m.names[seat] + " used Scope Lens and peered into the chamber.", seat === mpMe ? "secret" : "", seat);
+      break;
+    case "eject": {
+      const shell = m.shells.shift();
+      for (const s of m.p) s.knows = null;
+      mpLog(m, mpName(seat) + " used an Eject Button. Out pops a " + (shell ? "live" : "blank") + " shell.", "you", seat);
+      break;
+    }
+    case "band":
+      if (me.band) return;
+      me.band = true;
+      mpLog(m, mpSays(seat, "put on a Choice Band. Your next live shot does 2 damage.", "put on a Choice Band. Their next live shot does 2 damage."), "you", seat);
+      break;
+    case "wave": {
+      const t = a.target;
+      if (!mpWaveOk(m, seat) || !mpWaveTargets(m, seat).includes(t)) return;
+      m.p[t].para = true;
+      me.waveBan = me.turns + 1;
+      mpLog(m, mpName(seat) + " used Thunder Wave! " + mpSays(t, "are paralyzed! You may be unable to move!", "is paralyzed! They may be unable to move!"), "status", seat);
+      break;
+    }
+    case "trick":
+      m.shells[0] = !m.shells[0];
+      for (const s of m.p) if (s.knows !== null) s.knows = !s.knows;
+      mpLog(m, mpName(seat) + " used Trick Room. The shell in the chamber flips.", "you", seat);
+      break;
+    default: return;
+  }
+  m.ev.unshift({ t: "item", seat, box: a.box, key });
+  me.items[a.box] = null;
+  if (!m.shells.length) { mpLog(m, "The gun is empty."); Object.assign(m, { phase: "load", resume: true }); }
+}
+function mpShoot(m, seat, target) {
+  const me = m.p[seat], them = m.p[target], self = seat === target;
+  const dmg = me.band ? 2 : 1, banded = me.band;
+  me.band = false;
+  const live = m.shells.shift();
+  for (const s of m.p) s.knows = null;
+  mpLog(m, self ? mpSays(seat, "point the gun at yourself...", "points the gun at themself...") : mpSays(seat, "aim at ", "aims at ") + (target === mpMe ? "you" : m.names[target]) + "...", seat === mpMe ? "you" : "");
+  m.ev.push({ t: "aim", seat, target });
+  if (live) {
+    them.hp = Math.max(0, them.hp - dmg);
+    m.ev.push({ t: "bang", target, hp: them.hp });
+    mpLog(m, "*BANG* Live! " + mpSays(target, "lose ", "loses ") + dmg + " HP" + (banded ? " (Choice Band)." : "."), "live");
+  } else {
+    m.ev.push({ t: "click" });
+    mpLog(m, "*click* Blank." + (banded ? " The Choice Band is wasted." : ""));
+  }
+  if (them.hp <= 0) { them.out = true; mpLog(m, mpSays(target, "fainted. You're out this round.", "fainted and is out this round."), "round"); }
+  const standing = mpLiving(m);
+  if (standing.length <= 1) return mpRoundEnd(m, standing[0]);
+  m.turn = !m.shells.length || !(self && !live) ? mpNext(m, seat) : seat;
+  if (!m.shells.length) {
+    mpLog(m, "That was the last shell. " + mpSays(m.turn, "go", "goes") + " first on the new load.");
+    Object.assign(m, { phase: "load", resume: false });
+  } else {
+    if (m.turn === seat) mpLog(m, mpSays(seat, "keep the turn.", "keeps the turn."));
+    mpStartTurn(m);
+  }
+}
+function mpRoundEnd(m, winner) {
+  if (winner === undefined) winner = m.turn;
+  m.wins[winner]++;
+  mpLog(m, mpSays(winner, "take round " + m.round + ".", "takes round " + m.round + "."), "round");
+  m.ev.push({ t: "round", winner, round: m.round });
+  const left = m.p.map((_, i) => i).filter(i => !m.p[i].left);
+  if (m.wins[winner] >= 2 || left.length <= 1) return mpOver(m, m.wins[winner] >= 2 ? winner : left[0]);
+  mpRound(m);
+}
+function mpOver(m, winner) {
+  Object.assign(m, { phase: "over", winner });
+  mpLog(m, mpSays(winner, "win the table!", "wins the table!"), "round");
+  m.ev.push({ t: "over", winner });
+}
+function mpLeave(m, seat) {
+  const s = m.p[seat];
+  if (!s || s.left || m.phase === "over") return;
+  const wasUp = mpUp(m, seat);
+  Object.assign(s, { left: true, out: true });
+  mpLog(m, mpSays(seat, "left the table.", "left the table."), "status");
+  const left = m.p.map((_, i) => i).filter(i => !m.p[i].left);
+  if (left.length <= 1) return mpOver(m, left[0] === undefined ? seat : left[0]);
+  const standing = mpLiving(m);
+  if (wasUp && standing.length <= 1) return mpRoundEnd(m, standing[0]);
+  if (m.turn === seat) {
+    m.turn = mpNext(m, seat);
+    if (m.phase === "turn") mpStartTurn(m); else m.resume = false;
+  }
+}
+function mpApply(m, action) {
+  m.ev = [];
+  const seat = action.seat, a = action.args || {};
+  if (m.phase === "over" || !(seat >= 0 && seat < m.n)) return m.ev;
+  switch (action.type) {
+    case "load": if (!m.p[seat].left) mpLoad(m, a); break;
+    case "item": mpItem(m, seat, a); break;
+    case "shoot": if (mpMine(m, seat, a) && a.target >= 0 && a.target < m.n && mpUp(m, a.target)) mpShoot(m, seat, a.target); break;
+    case "expire":
+      if (m.phase === "turn" && a.turn === m.turnNo) {
+        mpLog(m, mpSays(m.turn, "ran out of time. The gun goes off at you.", "ran out of time. The gun turns on them."), "status");
+        mpShoot(m, m.turn, m.turn);
+      }
+      break;
+    case "leave": mpLeave(m, seat); break;
+  }
+  return m.ev;
+}
+// The host's screen rolls each load: the shells, and two items for every seat still in.
+function mpCompose(m) {
+  const { total, live } = rollLoad();
+  const shells = shuffle(Array.from({ length: total }, (_, k) => k < live ? 1 : 0));
+  const items = m.p.map((s, i) => {
+    if (!mpUp(m, i)) return [];
+    const hand = s.items.filter(Boolean), out = [];
+    for (let k = 0; k < 2; k++) { const key = pickItem(hand); hand.push(key); out.push(key); }
+    return out;
+  });
+  return { round: m.round, n: m.loads + 1, shells, items };
+}
+const mpHostSeat = m => m.p.findIndex(s => !s.left);
+
+/* The screen. */
+const mpPos = i => MP_POS[M.n][(i - mpMe + M.n) % M.n];
+const mpCanAct = () => !!M && M.phase === "turn" && M.turn === mpMe && mpUp(M, mpMe) && !mpBusy && !mpSending && mpQueue.length === 0;
+function mpSay(text) { $("#mp-say").textContent = text; }
+function mpWrite(e) {
+  const box = $("#mp-log");
+  box.appendChild(el("p", e.kind, e.text));
+  while (box.childElementCount > 80) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+  mpSay(e.text);
+}
+function buddyNode(handle) {
+  const box = el("span", "mp-buddy"), b = buddyOf[handle];
+  if (b) {
+    const img = el("img");
+    img.src = SPRITE_DIR + (b.shiny ? "shiny/" : "") + b.species + ".png";
+    img.alt = "";
+    box.appendChild(img);
+  } else box.appendChild(el("span", "none", String(handle || "?").slice(0, 1).toUpperCase()));
+  return box;
+}
+async function loadBuddies(handles, redraw) {
+  const want = [...new Set(handles.filter(h => typeof h === "string" && h && !(h in buddyOf)))].slice(0, 4);
+  if (!want.length) return;
+  for (const h of want) buddyOf[h] = null;
+  const reply = await ask("buddies", { handles: want }, 5000);
+  if (reply && reply.ok && reply.buddies) Object.assign(buddyOf, reply.buddies);
+  redraw();
+}
+function mpSetGun(deg) {
+  const delta = ((deg - mpGunAt) % 360 + 540) % 360 - 180;
+  mpGunAt += delta;
+  $("#mp-gun").style.transform = "translateZ(14px) rotate(" + mpGunAt + "deg)";
+}
+
+/* Live: the room's lobby. */
+function mpShow(which) {
+  $("#mp").hidden = false;
+  $("#mp-room-wrap").hidden = which !== "lobby";
+  $("#mp-tablewrap").hidden = which !== "table";
+}
+function mpLobbyNote(text) { $("#mp-lobby-note").textContent = text; }
+function drawRoom(room) {
+  mpRoom = room;
+  mpShow("lobby");
+  const seats = (room.seats || []).filter(s => s.state !== "left").sort((a, b) => a.seat - b.seat);
+  const mine = seats.find(s => s.seat === room.me) || {};
+  const host = mine.user && mine.user === room.host || mpIsHost;
+  $("#mp-code-line").replaceChildren();
+  if (room.code) $("#mp-code-line").append("Room code", el("b", "", room.code), " Friends join with this code from the Multiplayer button.");
+  else $("#mp-code-line").textContent = "This room has no code right now.";
+  const list = $("#mp-seats-list");
+  list.replaceChildren();
+  const cap = Math.max(2, Math.min(4, Number(room.capacity) || 4));
+  for (let k = 0; k < cap; k++) {
+    const s = seats[k], li = el("li", s ? "" : "empty");
+    if (!s) { li.append(el("span", "mp-buddy"), el("span", "", "Empty seat"), el("span", "state", "")); list.appendChild(li); continue; }
+    const isHost = s.user === room.host;
+    const state = isHost ? "Host" : s.state === "ready" ? "Ready" : s.state === "invited" ? "Invited" : "Not ready";
+    li.append(buddyNode(s.handle), el("span", "", String(s.handle || "Player") + (s.seat === room.me ? " (you)" : "")),
+      el("span", "state" + (isHost ? " host" : s.state === "ready" ? " ready" : ""), state));
+    list.appendChild(li);
+  }
+  loadBuddies(seats.map(s => s.handle), () => { if (mpRoom === room && !M) drawRoom(room); });
+  const joined = seats.filter(s => s.state === "joined" || s.state === "ready");
+  const waiting = joined.filter(s => s.user !== room.host && s.state !== "ready");
+  $("#mp-ready").hidden = host;
+  $("#mp-ready").textContent = mine.state === "ready" ? "Not ready" : "Ready";
+  $("#mp-start").hidden = !host;
+  $("#mp-newcode").hidden = !host;
+  $("#mp-start").disabled = joined.length < 2 || waiting.length > 0;
+  $("#mp-leave-lobby").textContent = host ? "Close room" : "Leave room";
+  if (!$("#mp-lobby-note").dataset.held) mpLobbyNote(host
+    ? joined.length < 2 ? "Waiting for a friend to join. Two to four players."
+      : waiting.length ? "Waiting for everyone to be ready." : "Everyone is ready. Start when you like."
+    : mine.state === "ready" ? "Ready. The host starts the game." : "Press Ready when you are.");
+}
+async function mpRoomCall(op, payload) {
+  for (const b of document.querySelectorAll("#mp-lobby button")) b.disabled = true;
+  try {
+    const room = await mpLive.call(op, payload);
+    if (room && room.status === "active") return mpHello();
+    if (room) drawRoom(room);
+  } catch (error) {
+    mpLobbyNote(error.message || "That didn't go through.");
+    if (mpRoom) { const note = $("#mp-lobby-note"); note.dataset.held = "1"; setTimeout(() => { delete note.dataset.held; }, 4000); }
+  }
+  for (const b of document.querySelectorAll("#mp-lobby button")) b.disabled = false;
+  if (mpRoom && mpRoom.status === "lobby") drawRoom(mpRoom);
+}
+$("#mp-ready").onclick = () => {
+  const mine = ((mpRoom && mpRoom.seats) || []).find(s => s.seat === mpRoom.me) || {};
+  mpRoomCall("lobby", { ready: mine.state !== "ready" });
+};
+$("#mp-start").onclick = () => mpRoomCall("start");
+$("#mp-newcode").onclick = () => mpRoomCall("new-code");
+$("#mp-leave-lobby").onclick = async () => {
+  try { await mpLive.call("leave"); } catch {}
+  mpLive.call("exit").catch(() => {});
+};
+
+/* Live: the table. */
+function mpBuildTable() {
+  mpShow("table");
+  $("#mp-log").replaceChildren();
+  mpView.length = 0;
+  for (const zone of document.querySelectorAll(".mp-zone")) { zone.classList.add("vacant"); zone.replaceChildren(); zone.dataset.sig = ""; }
+  for (const plate of document.querySelectorAll(".mp-plate")) { plate.classList.add("vacant"); plate.replaceChildren(); plate.onclick = null; }
+  for (const hp of document.querySelectorAll(".mp-hp")) { hp.classList.add("vacant"); hp.replaceChildren(); }
+  for (let i = 0; i < M.n; i++) {
+    const pos = mpPos(i), zone = document.querySelector('.mp-zone[data-pos="' + pos + '"]'), plate = document.querySelector('.mp-plate[data-pos="' + pos + '"]');
+    zone.classList.remove("vacant");
+    plate.classList.remove("vacant");
+    const who = el("span", "who", M.names[i]), flags = el("span", "flags"), bolts = document.querySelector('.mp-hp[data-pos="' + pos + '"]');
+    bolts.classList.remove("vacant");
+    plate.append(buddyNode(M.names[i]), who, flags);
+    plate.onclick = () => mpPlateClick(i);
+    mpView[i] = { zone, plate, flags, bolts, prev: null };
+  }
+  loadBuddies(M.names, () => {
+    if (!M) return;
+    for (let i = 0; i < M.n; i++) mpView[i].plate.firstChild.replaceWith(buddyNode(M.names[i]));
+  });
+  $("#mp-gun").style.transition = "none";
+  mpSetGun(MP_ANGLE[mpPos(M.turn)] + 180);
+  void $("#mp-gun").offsetWidth;
+  $("#mp-gun").style.transition = "";
+}
+function mpDrawSlots(i) {
+  const v = mpView[i], s = M.p[i], mine = i === mpMe, open = mine && mpCanAct();
+  const sig = s.items.join() + "|" + open + "|" + (mine ? [s.hp >= s.max, s.band, mpWaveOk(M, i) && mpWaveTargets(M, i).length > 0, mpPick ? mpPick.box : -1].join() : "");
+  if (v.zone.dataset.sig === sig) return;
+  v.zone.dataset.sig = sig;
+  v.zone.replaceChildren();
+  for (let box = 0; box < 8; box++) {
+    const slot = el("div", "mp-slot"), key = s.items[box];
+    v.zone.appendChild(slot);
+    if (!key) continue;
+    const item = el("button", "item");
+    item.type = "button";
+    const art = el("img");
+    art.src = ITEM_DIR + ITEMS[key].art + ".png";
+    art.alt = ITEMS[key].name;
+    item.appendChild(art);
+    item.dataset.box = box;
+    item.setAttribute("aria-label", ITEMS[key].name + ". " + ITEMS[key].tip);
+    if (mine) {
+      item.disabled = !open || (key === "potion" && s.hp >= s.max) || (key === "band" && s.band) ||
+        (key === "wave" && !(mpWaveOk(M, i) && mpWaveTargets(M, i).length));
+      item.onclick = () => mpUseItem(box);
+    } else item.tabIndex = -1;
+    item.onmouseenter = event => showTip(key, event);
+    item.onmousemove = event => moveTip(event);
+    item.onmouseleave = () => { $("#tip").hidden = true; };
+    slot.appendChild(item);
+  }
+}
+function mpDrawBolts(i, hp) {
+  const v = mpView[i], s = M.p[i];
+  const before = v.prev === null ? hp : v.prev;
+  v.bolts.innerHTML = BOLT.repeat(s.max);
+  v.bolts.setAttribute("aria-label", hp + " of " + s.max + " HP");
+  [...v.bolts.children].forEach((bolt, k) => { if (k >= hp) bolt.classList.add(k < before ? "breaking" : "dead"); });
+  v.prev = hp;
+}
+function mpRender() {
+  if (!M || !mpView.length) return;
+  const act = mpCanAct();
+  if (!act) mpPick = null;
+  const waveTo = mpPick ? mpWaveTargets(M, mpMe) : [];
+  for (let i = 0; i < M.n; i++) {
+    const s = M.p[i], v = mpView[i];
+    mpDrawSlots(i);
+    if (v.prev !== s.hp || v.bolts.childElementCount !== s.max) mpDrawBolts(i, s.hp);
+    const flags = [i === mpMe && "you", M.wins[i] && "rounds won " + M.wins[i], s.left ? "left" : s.out && "out", s.para && "paralyzed", s.band && "Choice Band on",
+      mpOnline[i] === false && !s.left && "away"].filter(Boolean);
+    v.flags.textContent = flags.join(", ");
+    v.plate.classList.toggle("turn", M.phase === "turn" && M.turn === i);
+    v.plate.classList.toggle("out", s.out);
+    v.plate.classList.toggle("target", act && (mpPick ? waveTo.includes(i) : mpUp(M, i)));
+  }
+  $("#mp-round").textContent = M.phase === "over" ? "Game over" : "Round " + M.round + ". First to 2.";
+  if (R3.ok) return mpRender3D(act);
+  const choices = $("#mp-choices");
+  choices.replaceChildren();
+  choices.hidden = !act;
+  if (act) {
+    const button = (text, cls, fn) => { const b = el("button", "choice" + (cls ? " " + cls : ""), text); b.type = "button"; b.onclick = fn; choices.appendChild(b); };
+    if (mpPick) {
+      for (const t of waveTo) button("Paralyze " + M.names[t], "primary", () => mpPlateClick(t));
+      button("Cancel", "quiet", () => { mpPick = null; mpRender(); });
+    } else {
+      for (const t of mpLiving(M)) if (t !== mpMe) button("Shoot " + M.names[t], "primary", () => mpPlateClick(t));
+      button("Shoot yourself", "", () => mpPlateClick(mpMe));
+    }
+  }
+  // The gun's grip faces whoever holds it.
+  if (M.phase === "turn" && !mpBusy) mpSetGun(MP_ANGLE[mpPos(M.turn)] + 180);
+  if (!mpBusy && M.phase === "turn") {
+    const you = M.p[mpMe], known = you.knows;
+    mpSay(act ? (mpPick ? "Who gets the Thunder Wave?" : "Your turn. Use items, then shoot someone: click their side." + (known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.")))
+      : M.turn === mpMe ? "Sending..." : M.names[M.turn] + "'s turn.");
+  }
+}
+// The 3D table: the room draws itself every frame; this hands it the state and writes the words.
+function mpRender3D(act) {
+  $("#mp-choices").hidden = true;
+  R3.sync();
+  // One row a player: turn marker, name (struck through when out), HP as bolts, rounds won, status.
+  $("#mp-status").replaceChildren(...M.names.map((name, i) => {
+    const s = M.p[i], row = el("div", "row");
+    const flags = [s.left ? "LEFT" : s.out && "OUT", s.para && "PARA", s.band && "BAND", mpOnline[i] === false && !s.left && "AWAY"].filter(Boolean);
+    row.append(el("span", "mark", M.phase === "turn" && M.turn === i ? ">" : ""),
+      el(s.out ? "s" : "span", "name", (i === mpMe ? "YOU" : name).slice(0, 12).toUpperCase()),
+      el("span", "hp", "ϟ".repeat(s.out ? 0 : s.hp) + "·".repeat(Math.max(0, s.max - (s.out ? 0 : s.hp)))),
+      el("span", "won", "W" + M.wins[i] + (flags.length ? " " + flags.join(" ") : "")));
+    return row;
+  }));
+  if (!mpBusy && M.phase === "turn") {
+    const known = M.p[mpMe].knows;
+    const seen = known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.");
+    mpSay(act ? (mpPick ? "Click who gets the Thunder Wave. Right-click or Esc cancels."
+        : R3.holding ? "Click someone to shoot them, or your own charge box to shoot yourself. Right-click puts it down." + seen
+        : "Your turn. Use your items, then click the gun." + seen)
+      : M.turn === mpMe ? "..." : M.names[M.turn] + " has the gun.");
+  }
+}
+async function mpSend(type, args) {
+  mpSending = true;
+  mpPick = null;
+  $("#tip").hidden = true;
+  mpRender();
+  const safety = setTimeout(() => { mpSending = false; mpRender(); }, 9000);
+  try { await mpLive.call("send", { type, args }); }
+  catch (error) { clearTimeout(safety); mpSending = false; mpSay("That didn't go through: " + (error.message || "try again.")); mpRender(); }
+}
+function mpUseItem(box) {
+  if (!mpCanAct()) return;
+  const key = M.p[mpMe].items[box];
+  if (key === "wave") {
+    const targets = mpWaveTargets(M, mpMe);
+    if (targets.length === 1) return mpSend("item", { turn: M.turnNo, box, target: targets[0] });
+    mpPick = { box };
+    return mpRender();
+  }
+  mpSend("item", { turn: M.turnNo, box });
+}
+function mpPlateClick(i) {
+  if (!mpCanAct() || !mpUp(M, i)) return;
+  if (mpPick) {
+    if (mpWaveTargets(M, mpMe).includes(i)) mpSend("item", { turn: M.turnNo, box: mpPick.box, target: i });
+    return;
+  }
+  mpSend("shoot", { turn: M.turnNo, target: i });
+}
+
+// Plays what one action did. `fast` (catching up on a log) only writes the log.
+async function mpAnimate(events, fast) {
+  for (const e of events) {
+    if (e.t === "log") { mpWrite(e); continue; }
+    if (fast) continue;
+    if (R3.ok) {
+      if (e.t === "load") await R3.load(e.live, e.blank);
+      else if (e.t === "item") await R3.useItem(e.seat, e.box);
+      else if (e.t === "aim") await R3.aim(e.seat, e.target);
+      else if (e.t === "bang") await R3.bang(e.target, e.hp);
+      else if (e.t === "click") { sfx.click(); await R3.blank(); }
+      else if (e.t === "round") await fx.lightsOut(mpSays(e.winner, "take round " + e.round + ".", "takes round " + e.round + "."),
+        M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".");
+      continue;
+    }
+    const v = mpView[e.seat !== undefined ? e.seat : e.target];
+    switch (e.t) {
+      case "load": {
+        const row = $("#mp-shells");
+        row.replaceChildren();
+        const shells = [...Array(e.live).fill("live"), ...Array(e.blank).fill("blank")].map(kind => { const s = el("div", "shell"); s.innerHTML = shellArt(kind); return s; });
+        for (const s of shells) { row.appendChild(s); sfx.click(); await wait(90); }
+        await wait(1300);
+        for (const s of shells) s.classList.add("gone");
+        sfx.chk();
+        await wait(350);
+        row.replaceChildren();
+        break;
+      }
+      case "item": {
+        const node = v && v.zone.querySelector('.item[data-box="' + e.box + '"]');
+        if (node) { node.classList.add("glow"); await wait(e.seat === mpMe ? 0 : 380); node.classList.add("using"); await wait(520); }
+        break;
+      }
+      case "aim":
+        $("#mp-gun").classList.add("lift");
+        mpSetGun(MP_ANGLE[mpPos(e.target)]);
+        await wait(1100);
+        break;
+      case "bang":
+        fx.restart($("#mp-flash"), "on");
+        fx.restart($("#scene"), "shaking");
+        if (e.target === mpMe) fx.restart($("#redflash"), "on");
+        if (v) { fx.restart(v.plate, "flinch"); mpDrawBolts(e.target, e.hp); v.plate.classList.toggle("out", e.hp <= 0); }
+        await wait(900);
+        $("#mp-gun").classList.remove("lift");
+        break;
+      case "click":
+        sfx.click();
+        await wait(650);
+        $("#mp-gun").classList.remove("lift");
+        break;
+      case "round":
+        $("#mp-choices").hidden = true;
+        await fx.lightsOut(mpSays(e.winner, "take round " + e.round + ".", "takes round " + e.round + "."),
+          M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".");
+        break;
+    }
+  }
+}
+async function mpPump(fast = false) {
+  if (mpBusy) return;
+  mpBusy = true;
+  try {
+    while (mpQueue.length) {
+      const action = mpQueue.shift();
+      if (!(action.seq > mpSeq)) continue;
+      mpSeq = action.seq;
+      if (action.seat === mpMe && (action.type === "item" || action.type === "shoot")) mpSending = false;
+      const events = mpApply(M, action);
+      // A long backlog (opening a game already under way) is caught up without animation.
+      await mpAnimate(events, fast || mpQueue.length > 4);
+      if (!fast) mpRender();
+    }
+  } finally { mpBusy = false; }
+  mpAfter();
+}
+function mpAfter() {
+  mpRender();
+  if (M.phase === "over") mpEnd();
+}
+function mpEnd() {
+  $("#mp-choices").hidden = true;
+  $("#mp-timer").textContent = "";
+  if (!mpFinished && !M.p[mpMe].left) {
+    mpFinished = true;
+    // Every screen reports the winner it computed; the room ends once two agree.
+    mpLive.call("finish", { winner: M.winner, why: "won" }).catch(() => { mpFinished = false; });
+  }
+  $("#mp-result-title").textContent = M.winner === mpMe ? "You win the table." : M.names[M.winner] + " wins the table.";
+  $("#mp-result-text").textContent = "Rounds: " + M.names.map((name, i) => (i === mpMe ? "you" : name) + " " + M.wins[i]).join(", ") + ". No tokens at this table; the win counts on the Multiplayer board.";
+  $("#mp-result").hidden = false;
+}
+$("#mp-result-close").onclick = () => mpLive.call("exit").catch(() => {});
+$("#mp-leave").onclick = async () => {
+  const button = $("#mp-leave");
+  if (!M || M.phase === "over" || M.p[mpMe].left) return mpLive.call("exit").catch(() => {});
+  if (!button.dataset.confirm) { button.dataset.confirm = "1"; button.textContent = "Leave and be out"; return; }
+  if (mpExit) return;
+  mpExit = true;
+  button.disabled = true;
+  // What leaving does, worked out here: if it ends the game, this screen's claim goes in before it closes.
+  const after = JSON.parse(JSON.stringify(M));
+  mpApply(after, { seat: mpMe, type: "leave", args: {} });
+  try {
+    await mpLive.call("send", { type: "leave", args: {} });
+    if (after.phase === "over") await mpLive.call("finish", { winner: after.winner, why: "left" });
+  } catch {}
+  mpLive.call("exit").catch(() => {});
+};
+
+// The turn clock and the host's chores, four times a second.
+function mpTick() {
+  if (!M || M.phase === "over" || mpExit) return;
+  const now = Date.now(), order = M.p.map((_, i) => i).filter(i => !M.p[i].left), rank = Math.max(0, order.indexOf(mpMe));
+  const timer = $("#mp-timer");
+  if (M.phase === "turn" && !mpBusy) {
+    const key = M.turnNo + ":" + M.loads;
+    if (mpClock.key !== key) mpClock = { key, at: now, sent: false };
+    const left = Math.max(0, MP_TURN_MS - (now - mpClock.at));
+    timer.textContent = Math.ceil(left / 1000) + "s";
+    timer.classList.toggle("low", left < 10000);
+    // The turn's own screen sends it at once; the others wait a moment in case that screen has gone.
+    const grace = M.turn === mpMe ? 0 : 2500 + rank * 1500;
+    if (!mpClock.sent && !M.p[mpMe].left && now - mpClock.at > MP_TURN_MS + grace) {
+      mpClock.sent = true;
+      mpLive.call("send", { type: "expire", args: { turn: M.turnNo } }).catch(() => { mpClock.sent = false; });
+    }
+  } else timer.textContent = "";
+  if (M.phase === "load" && !M.p[mpMe].left) {
+    const key = M.round + ":" + (M.loads + 1);
+    if (mpLoadClock.key !== key) mpLoadClock = { key, at: now, sent: false };
+    const grace = mpHostSeat(M) === mpMe ? 0 : 6000 + rank * 2000;
+    if (!mpLoadClock.sent && now - mpLoadClock.at >= grace) {
+      mpLoadClock.sent = true;
+      mpLive.call("send", { type: "load", args: mpCompose(M) }).catch(() => { mpLoadClock.sent = false; });
+    }
+  }
+}
+/* ── The multiplayer room in 3D ───────────────────────────────────────────
+   Three.js r149 (vendored at shotgun-roulette/vendor/three.min.js, MIT). The
+   room is drawn at 480x270 into a render target; a post pass maps every pixel
+   to an 18-colour palette with 4x4 Bayer dithering, a heavy vignette and film
+   grain, and the canvas is scaled up nearest-neighbour. Every model and
+   texture is made here (boxes, cylinders, canvas-painted maps); the only
+   images are the shared Poké sprites and item sprites, shown as billboards.
+   No WebGL, or the script didn't load: the flat table above is used instead. */
+const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
+{
+  const W = 480, H = 270;
+  const DIR = { bottom: [0, 1], left: [-1, 0], top: [0, -1], right: [1, 0] };
+  const ROT = { bottom: 0, right: Math.PI / 2, top: Math.PI, left: -Math.PI / 2 };
+  // Muted maroon, brown, olive, dusty cream, two purples, and the screen greens (only HP screens reach those).
+  const PAL = ["070505", "140b0b", "24110f", "3a1a17", "55251f", "2a1d14", "45311f", "6b4a30",
+               "2c2f1a", "464a28", "6a6c3c", "8f8a60", "bfb38c", "d8ccaa", "24152e", "4a2d5e", "2f9c4c", "8af0a0"];
+  // Item boxes, bottom side: a 2x2 block left of the charge box, one right of it (local x, z).
+  // Pokémon sprites and items are marked in the render target's alpha, so the post pass gives them a wider
+  // palette, lighter dither and a rim: Giratina 0.3 (cold purple rim), buddies 0.55 (warm rim), items and shells 0.8.
+  const MASK = { giratina: 0.3, buddy: 0.55, item: 0.8 };
+  const WIDE = ["c8a848", "e0c870", "3a5a8a", "7090b8", "a84838", "d07858", "6a4a8a", "9a78b8",
+                "707070", "a8a8a0", "d0d0c8", "c08890", "c87838", "4a8a88", "1c2440", "303030"];
+  const CAM = [0, 1.78, 4.15];
+  const SLOT = k => [[-1.62, -1.1, 1.1, 1.62][(k < 4 ? 0 : 2) + k % 2], [1.12, 1.66][Math.floor((k % 4) / 2)]];
+  let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
+  let redSpot, gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
+  const spots = [], sides = {}, cache = {};
+  const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0, atMe: 0, atMeGoal: 0 };
+  const tweens = [];
+  let seed = 11;
+  const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const now = () => performance.now() / 1000;
+
+  function loadThree() {
+    return new Promise(resolve => {
+      if (window.THREE) return resolve(window.THREE);
+      const s = document.createElement("script");
+      s.src = CONTENT_DIR + "shotgun-roulette/vendor/three.min.js";
+      s.onload = () => resolve(window.THREE || null);
+      s.onerror = () => resolve(null);
+      document.head.appendChild(s);
+    });
+  }
+  const crisp = t => { t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; return t; };
+  function paint(w, h, draw) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    draw(c.getContext("2d"), w, h);
+    return c;
+  }
+  const canvasTex = (w, h, draw) => crisp(new T.CanvasTexture(paint(w, h, draw)));
+  function speckle(g, w, h, colors, count, size, alpha) {
+    for (let k = 0; k < count; k++) {
+      g.globalAlpha = alpha * (0.4 + rnd() * 0.6);
+      g.fillStyle = colors[Math.floor(rnd() * colors.length)];
+      const s = 1 + rnd() * size;
+      g.fillRect(rnd() * w, rnd() * h, s, s * (0.5 + rnd()));
+    }
+    g.globalAlpha = 1;
+  }
+  // A sprite image as a texture. The frame is sandboxed, so the image is fetched with CORS;
+  // if it can't be used, `fallback` draws a stand-in.
+  function imageTex(url, fallback) {
+    if (cache[url]) return cache[url];
+    const t = crisp(new T.Texture(paint(1, 1, () => {})));
+    t.needsUpdate = true;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    // WebGL2 fixes a texture's size at its first upload, so the placeholder's GL texture is let go first.
+    const swap = image => { t.image = image; t.dispose(); t.needsUpdate = true; };
+    img.onload = () => swap(img);
+    img.onerror = () => { if (fallback) swap(fallback()); };
+    img.src = url;
+    return cache[url] = t;
+  }
+  // Somebody with no buddy: a dark shape in the chair.
+  const silhouette = () => paint(64, 64, g => {
+    g.fillStyle = "#4a4a48";
+    g.beginPath(); g.arc(32, 40, 20, Math.PI, 0); g.fill();
+    g.fillRect(12, 40, 40, 24);
+    g.beginPath(); g.arc(32, 20, 14, 0, 7); g.fill();
+    g.fillStyle = "#6e6e6a"; g.beginPath(); g.arc(32, 20, 14, Math.PI, 0); g.fill();
+    g.fillStyle = "#2a2a28"; g.fillRect(18, 19, 28, 3);
+    g.beginPath(); g.arc(32, 20, 4, 0, 7); g.fill();
+    g.fillStyle = "#8a8a84"; g.beginPath(); g.arc(32, 20, 2, 0, 7); g.fill();
+  });
+
+  /* Painted textures. */
+  function feltTex() {
+    const S = 512, U = S / 4.4, C = S / 2;
+    return canvasTex(S, S, g => {
+      g.fillStyle = "#565c34"; g.fillRect(0, 0, S, S);
+      speckle(g, S, S, ["#4b5130", "#5f6639", "#6b5a40", "#3f4428", "#626840"], 1400, 16, 0.35);
+      for (let k = 0; k < 70; k++) {             // dirt
+        g.globalAlpha = 0.12 + rnd() * 0.2;
+        g.fillStyle = rnd() < 0.5 ? "#3a2c1c" : "#2c3020";
+        g.beginPath(); g.arc(rnd() * S, rnd() * S, 6 + rnd() * 28, 0, 7); g.fill();
+      }
+      g.globalAlpha = 0.35; g.strokeStyle = "#2a2418"; g.lineWidth = 1;
+      for (let k = 0; k < 160; k++) { const x = rnd() * S, y = rnd() * S; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rnd() * 18 - 9, y + rnd() * 18 - 9); g.stroke(); }
+      g.globalAlpha = 1;
+      // Painted lines: faded cream, a little uneven.
+      const line = (x1, y1, x2, y2) => { g.globalAlpha = 0.45 + rnd() * 0.25; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+      g.strokeStyle = "#d8ccaa"; g.lineWidth = 2.5;
+      g.globalAlpha = 0.55; g.strokeRect(0.1 * U, 0.1 * U, S - 0.2 * U, S - 0.2 * U);
+      g.beginPath(); g.arc(C, C, 1.22 * U, 0, 7); g.stroke();
+      g.setLineDash([5, 9]); g.beginPath(); g.arc(C, C, 1.4 * U, 0, 7); g.stroke(); g.setLineDash([]);
+      for (const pos of ["bottom", "left", "top", "right"]) {
+        g.save(); g.translate(C, C); g.rotate(-ROT[pos]);
+        line(-0.12 * U, 1.22 * U, -0.12 * U, 1.72 * U); line(0.12 * U, 1.22 * U, 0.12 * U, 1.72 * U);
+        line(0.86 * U, 0.86 * U, 2.1 * U, 2.1 * U);
+        line(-0.62 * U, 1.06 * U, -0.84 * U, 2.1 * U); line(0.62 * U, 1.06 * U, 0.84 * U, 2.1 * U);
+        g.lineWidth = 2;
+        for (let k = 0; k < 8; k++) {
+          const [x, z] = SLOT(k);
+          g.globalAlpha = 0.4 + rnd() * 0.3;
+          g.strokeRect((x - 0.23) * U, (z - 0.23) * U, 0.46 * U, 0.46 * U);
+        }
+        g.globalAlpha = 0.55; g.strokeRect(-0.4 * U, 1.74 * U, 0.8 * U, 0.42 * U);
+        g.globalAlpha = 0.45; g.fillStyle = "#d8ccaa"; g.font = "bold 11px monospace"; g.textAlign = "center";
+        g.fillText("STAY IN YOUR ZONE", -1.36 * U, 2.08 * U);
+        g.fillText("NO SWITCHING OUT", 1.36 * U, 2.08 * U);
+        g.lineWidth = 2.5;
+        g.restore();
+      }
+      // Wear on the paint.
+      g.globalAlpha = 0.3; g.fillStyle = "#565c34";
+      for (let k = 0; k < 260; k++) g.fillRect(rnd() * S, rnd() * S, 2 + rnd() * 10, 1 + rnd() * 3);
+      g.globalAlpha = 1;
+    });
+  }
+  const woodTex = () => canvasTex(128, 32, (g, w, h) => {
+    g.fillStyle = "#4a2f1f"; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 2) { g.globalAlpha = 0.25 + rnd() * 0.3; g.fillStyle = rnd() < 0.5 ? "#3a2418" : "#5a3a26"; g.fillRect(0, y, w, 1); }
+    g.globalAlpha = 0.5; g.fillStyle = "#7a5a40";
+    for (let k = 0; k < 40; k++) g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 14, 1);
+    g.globalAlpha = 1;
+  });
+  const metalTex = () => canvasTex(64, 64, (g, w, h) => {
+    g.fillStyle = "#4a463c"; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, ["#3a372f", "#5a554a", "#3b2a20"], 260, 4, 0.5);
+  });
+  const brickTex = () => canvasTex(256, 128, (g, w, h) => {
+    g.fillStyle = "#0e0807"; g.fillRect(0, 0, w, h);
+    for (let row = 0; row < 16; row++) for (let col = -1; col < 9; col++) {
+      const x = col * 32 + (row % 2) * 16, y = row * 8;
+      g.fillStyle = ["#2a1410", "#24120f", "#301812", "#1f100c"][Math.floor(rnd() * 4)];
+      g.fillRect(x + 1, y + 1, 30, 6);
+    }
+    speckle(g, w, h, ["#0a0606", "#3a1c16"], 300, 3, 0.4);
+  });
+  // Cracks of purple light in the back wall (an emissive map).
+  const crackTex = () => canvasTex(256, 128, (g, w, h) => {
+    g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#7a4aa0"; g.lineWidth = 2;
+    for (let k = 0; k < 6; k++) {
+      let x = 20 + rnd() * 216, y = rnd() * 30;
+      g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 9; s++) { x += rnd() * 24 - 12; y += 6 + rnd() * 12; g.lineTo(x, y); }
+      g.stroke();
+    }
+  });
+  const plankTex = () => canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#1a100c"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 16) { g.fillStyle = "#0c0706"; g.fillRect(x, 0, 1, h); }
+    speckle(g, w, h, ["#24160f", "#120a08"], 200, 6, 0.5);
+  });
+  const speakerTex = () => canvasTex(64, 64, (g, w, h) => {
+    g.fillStyle = "#1a1412"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#2c221e"; g.lineWidth = 3; g.strokeRect(2, 2, w - 4, h - 4);
+    for (const [y, r] of [[20, 12], [46, 15]]) {
+      g.fillStyle = "#2c221e"; g.beginPath(); g.arc(32, y, r + 3, 0, 7); g.fill();
+      g.fillStyle = "#0a0706"; g.beginPath(); g.arc(32, y, r, 0, 7); g.fill();
+      g.fillStyle = "#231a17"; g.beginPath(); g.arc(32, y, r / 3, 0, 7); g.fill();
+    }
+  });
+  const radioTex = () => canvasTex(64, 32, (g, w, h) => {
+    g.fillStyle = "#3a2a1e"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#8f8a60"; g.fillRect(6, 6, 30, 12);
+    g.fillStyle = "#3a2a1e"; for (let x = 8; x < 36; x += 4) g.fillRect(x, 8, 1, 8);
+    g.fillStyle = "#1a1210"; for (const x of [44, 54]) { g.beginPath(); g.arc(x, 12, 4, 0, 7); g.fill(); }
+    speckle(g, w, h, ["#1a1210", "#5a4030"], 60, 2, 0.5);
+  });
+  const blobTex = (color, alpha) => canvasTex(32, 32, (g, w, h) => {
+    const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, color); grd.addColorStop(1, "rgba(0,0,0,0)");
+    g.globalAlpha = alpha; g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  });
+  function plateTex(name) {
+    return canvasTex(128, 32, (g, w, h) => {
+      g.fillStyle = "#2a1d14"; g.fillRect(0, 0, w, h);
+      speckle(g, w, h, ["#1a120c", "#3a2a1e"], 80, 3, 0.6);
+      g.fillStyle = "#d8ccaa"; g.globalAlpha = 0.9; g.font = "bold 17px monospace"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(String(name).slice(0, 14).toUpperCase(), w / 2, h / 2 + 1);
+    });
+  }
+  // The charge screen: green bolts on black. Lost bolts flicker, then go dark.
+  const BOLT_PTS = [[8, 0], [1, 12], [6, 12], [4, 22], [12, 8], [7, 8], [9, 0]];
+  function drawScreen(s, t, shaky) {
+    const st = s.screen, g = st.ctx;
+    g.fillStyle = st.off ? "#030604" : "#06120a"; g.fillRect(0, 0, 64, 24);
+    // Somebody is pointing the gun at me: my screen stutters.
+    if (shaky && Math.random() < 0.35) { st.tex.needsUpdate = true; return; }
+    if (!st.off) {
+      const gap = 2, bw = 9, total = st.max * (bw + gap) - gap, x0 = Math.round((64 - total) / 2);
+      for (let k = 0; k < st.max; k++) {
+        const dying = st.dying[k] && t - st.dying[k] < 0.9;
+        const lit = k < st.hp || (dying && Math.floor((t - st.dying[k]) * 14) % 2 === 0);
+        g.fillStyle = lit ? (Math.random() < 0.04 ? "#3cbf5a" : "#8af0a0") : "#143520";
+        g.beginPath();
+        BOLT_PTS.forEach(([x, y], i) => { const px = x0 + k * (bw + gap) + x * 0.68, py = 2 + y * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); });
+        g.closePath(); g.fill();
+      }
+    }
+    st.tex.needsUpdate = true;
+  }
+
+  /* The room. */
+  function build() {
+    scene = new T.Scene();
+    scene.background = new T.Color(0x070505);
+    scene.fog = new T.Fog(0x070505, 6, 14);
+    cam = new T.PerspectiveCamera(60, W / H, 0.05, 40);
+    scene.add(cam);
+    scene.add(new T.AmbientLight(0x503838, 0.5));
+    const lam = o => new T.MeshLambertMaterial(o);
+    const add = (geo, mat, x, y, z, parent = scene) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+    const box = (w, h, d, mat, x, y, z, parent) => add(new T.BoxGeometry(w, h, d), mat, x, y, z, parent);
+    const wood = woodTex(), metal = metalTex();
+    const woodMat = lam({ map: wood }), darkWood = lam({ map: wood, color: 0x777066 }), metalMat = lam({ map: metal, flatShading: true });
+    const darkMetal = lam({ map: metal, color: 0x6a6a6a, flatShading: true });
+
+    // Table: worn felt, a stepped wooden rim, a heavy body.
+    const top = add(new T.PlaneGeometry(4.4, 4.4), lam({ map: feltTex() }), 0, 0, 0);
+    top.rotation.x = -Math.PI / 2;
+    box(5.3, 1.2, 5.3, darkWood, 0, -0.61, 0);
+    for (const pos of Object.keys(DIR)) {
+      const g = new T.Group(); g.rotation.y = ROT[pos]; scene.add(g);
+      const long = pos === "bottom" || pos === "top";
+      box(long ? 5.24 : 4.4, 0.1, 0.42, woodMat, 0, 0.04, 2.41, g);
+      box(long ? 5.1 : 4.4, 0.07, 0.3, woodMat, 0, 0.125, 2.47, g);
+      box(long ? 4.4 : 4.4, 0.03, 0.04, darkWood, 0, 0.005, 2.2, g);
+      sides[pos] = { group: g, pos, seat: null };
+    }
+
+    // The turntable: beveled metal rings with small lights round the edge.
+    const ringA = add(new T.CylinderGeometry(0.98, 1.04, 0.09, 20), metalMat, 0, 0.045, 0);
+    const ringB = add(new T.CylinderGeometry(0.8, 0.86, 0.07, 20), darkMetal, 0, 0.12, 0);
+    add(new T.CylinderGeometry(0.58, 0.6, 0.03, 20), lam({ map: metal, color: 0x8a8a7a, flatShading: true }), 0, 0.17, 0);
+    ringA.userData.keep = ringB.userData.keep = true;
+    const lampMat = new T.MeshBasicMaterial({ color: 0xd8ccaa });
+    for (let k = 0; k < 16; k++) {
+      const a = k / 16 * Math.PI * 2;
+      add(new T.BoxGeometry(0.06, 0.03, 0.03), lampMat, Math.sin(a) * 1.0, 0.07, Math.cos(a) * 1.0).rotation.y = a;
+    }
+
+    // The shotgun: barrel along -z from the pivot, so turning the pivot points it.
+    gunPivot = new T.Group(); gunPivot.position.set(0, 0.24, 0); scene.add(gunPivot);
+    gunBody = new T.Group(); gunPivot.add(gunBody);
+    gunBody.scale.setScalar(1.35);
+    const gunMetal = lam({ color: 0xa8a49c, flatShading: true }), gunWood = lam({ map: wood, color: 0xf0c090, flatShading: true });
+    const part = (geo, mat, x, y, z, rx = 0) => { const m = add(geo, mat, x, y, z, gunBody); m.rotation.x = rx; m.userData.pick = { kind: "gun" }; gunParts.push(m); return m; };
+    part(new T.CylinderGeometry(0.034, 0.034, 0.95, 7), gunMetal, 0, 0.03, -0.52, Math.PI / 2);
+    part(new T.CylinderGeometry(0.028, 0.028, 0.62, 7), gunMetal, 0, -0.03, -0.4, Math.PI / 2);
+    part(new T.BoxGeometry(0.1, 0.09, 0.26), gunWood, 0, -0.035, -0.36);
+    part(new T.BoxGeometry(0.1, 0.13, 0.34), gunMetal, 0, 0, 0.12);
+    part(new T.BoxGeometry(0.035, 0.08, 0.1), gunMetal, 0, -0.08, 0.16);
+    part(new T.BoxGeometry(0.09, 0.12, 0.48), gunWood, 0, -0.045, 0.52, 0.13);
+    muzzle = new T.PointLight(0xffd9a0, 0, 7, 1); muzzle.position.set(0, 0.05, -1.05); gunBody.add(muzzle);
+    shells = new T.Group(); scene.add(shells);
+    // A narrow pool of light on the turntable, so the gun is the brightest thing on the table.
+    const gunSpot = new T.SpotLight(0xffe2b8, 2.4, 7, 0.24, 0.45, 1);
+    gunSpot.position.set(0, 3.6, 0.5); gunSpot.target.position.set(0, 0.2, 0);
+    scene.add(gunSpot, gunSpot.target);
+    // A dim red spotlight finds whoever is being pointed at.
+    redSpot = new T.SpotLight(0xb03020, 0, 9, 0.26, 0.5, 1);
+    redSpot.position.set(0, 3.8, 0);
+    scene.add(redSpot, redSpot.target);
+
+    // Per seat: a charge box set into the edge, eight item spots, a chair, the buddy, a name plate.
+    const screenGeo = new T.PlaneGeometry(0.5, 0.2);
+    for (const pos of Object.keys(DIR)) {
+      const s = sides[pos], g = s.group;
+      // What a seat shows me turns to face my seat, so its screen and name read from here.
+      const facing = z => { const w = new T.Vector3(0, 0, z).applyAxisAngle(new T.Vector3(0, 1, 0), ROT[pos]); return Math.atan2(CAM[0] - w.x, CAM[2] - w.z) - ROT[pos]; };
+      const dev = new T.Group(); dev.position.set(0, 0, 1.94); dev.rotation.y = facing(1.94); g.add(dev);
+      if (pos !== "bottom") dev.scale.setScalar(1.3);
+      s.dev = dev;
+      const body = box(0.62, 0.14, 0.32, metalMat, 0, 0.07, 0, dev);
+      const lid = new T.Group(); lid.position.set(0, 0.17, 0); lid.rotation.x = 0.7; dev.add(lid);
+      const housing = box(0.56, 0.05, 0.26, lam({ map: metal, color: 0x8a8070, flatShading: true }), 0, 0, 0, lid);
+      const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 24;
+      const screenTex = crisp(new T.CanvasTexture(canvas));
+      const screen = add(screenGeo, new T.MeshBasicMaterial({ map: screenTex }), 0, 0.031, 0, lid);
+      screen.rotation.x = -Math.PI / 2;
+      screen.position.y = 0.026;
+      s.screen = { ctx: canvas.getContext("2d"), tex: screenTex, off: true, max: 0, hp: null, dying: {}, drawn: 0 };
+      s.light = new T.PointLight(0x3cbf5a, 0, 1.8, 1); s.light.position.set(0, 0.5, 1.9); g.add(s.light);
+      s.housing = housing;
+      for (const m of [body, housing, screen]) m.userData.pick = { kind: "seat", pos };
+      s.items = [];
+      for (let k = 0; k < 8; k++) {
+        const [x, z] = SLOT(k);
+        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, fog: true }));
+        const shadow = add(new T.PlaneGeometry(0.36, 0.2), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
+        shadow.rotation.x = -Math.PI / 2;
+        sprite.scale.set(0.44, 0.44, 1);
+        sprite.position.set(x, 0.24, z);
+        sprite.visible = shadow.visible = false;
+        if (pos === "bottom") sprite.userData.pick = { kind: "item", box: k };
+        g.add(sprite);
+        s.items.push({ sprite, shadow, key: null, using: 0, lift: 0 });
+      }
+      if (pos !== "bottom") {
+        const chair = new T.Group(); chair.position.set(0, 0, 3.15); g.add(chair);
+        const chairMat = lam({ map: wood, color: 0x5a4a40 });
+        box(0.9, 0.08, 0.8, chairMat, 0, -0.42, 0, chair);
+        box(0.9, 1.0, 0.08, chairMat, 0, 0.08, 0.38, chair);
+        for (const x of [-0.4, 0.4]) box(0.06, 0.5, 0.06, chairMat, x, -0.7, -0.35, chair);
+        // The buddy stands upright behind the charge box, feet below the rim, hinged at the feet so it can fall.
+        const size = pos === "top" ? 1.9 : 1.6;
+        const yaw = new T.Group(); yaw.position.set(0, -0.06, 2.95); yaw.rotation.y = facing(2.95); g.add(yaw);
+        const fall = new T.Group(); yaw.add(fall);
+        const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, side: T.DoubleSide }), 0, size / 2, 0, fall);
+        buddy.userData.pick = { kind: "seat", pos };
+        Object.assign(s, { buddy, buddyKey: "", buddyFall: fall, buddyYaw: yaw, buddySize: size });
+        // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
+        // A small sign on the rim, leaning back so the name faces me.
+        const sign = new T.Group(); sign.position.set(0, 0.2, 2.47); sign.rotation.y = facing(2.47); g.add(sign);
+        const plate = box(1.05, 0.05, 0.3, [darkWood, darkWood, new T.MeshBasicMaterial({ map: plateTex(""), color: 0x8a8270 }), darkWood, darkWood, darkWood], 0, 0.06, 0, sign);
+        plate.rotation.x = 0.95;
+        plate.userData.pick = { kind: "seat", pos };
+        s.plate = plate; s.plateName = null;
+        s.faint = 0; s.flinch = -9;
+      }
+      pickables.push(body, housing, screen, ...(s.buddy ? [s.buddy, s.plate] : []), ...s.items.map(it => it.sprite));
+    }
+    pickables.push(...gunParts);
+    // Every item sprite is fetched up front, so a new item never pops in late.
+    for (const key of POOL) imageTex(ITEM_DIR + ITEMS[key].art + ".png");
+
+    // My buddy, peeking up from the bottom-left corner of my view.
+    myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, color: 0xd8c8b0, fog: false }));
+    myBuddy.position.set(-0.6, -0.32, -0.8);
+    myBuddy.rotation.z = 0.12;
+    cam.add(myBuddy);
+
+    // Two stage spotlights on rods, cables strung across the top.
+    for (const [x, z, tx, tz] of [[-2.1, -1.5, -0.5, 0.5], [2.1, -1.5, 0.5, 0.5]]) {
+      const light = new T.SpotLight(0xffd6a0, 2.2, 9, 0.62, 0.65, 1);
+      light.position.set(x, 2.7, z); light.target.position.set(tx, 0, tz);
+      scene.add(light, light.target);
+      const lamp = new T.Group(); lamp.position.copy(light.position); scene.add(lamp); lamp.lookAt(tx, 0, tz);
+      const shell = add(new T.CylinderGeometry(0.2, 0.3, 0.44, 8, 1, true), lam({ color: 0x2a2624, side: T.DoubleSide, flatShading: true }), 0, 0, 0, lamp);
+      shell.rotation.x = Math.PI / 2;
+      add(new T.CircleGeometry(0.24, 8), new T.MeshBasicMaterial({ color: 0xd8ccaa }), 0, 0, 0.2, lamp);
+      box(0.04, 3, 0.04, darkMetal, x, 4.2, z);
+      spots.push({ light, base: 2.2, next: 2 + rnd() * 5, until: 0 });
+    }
+    const cableMat = lam({ color: 0x15100e });
+    for (let k = 0; k < 6; k++) {
+      // Strung high and toward me, so they never cross Giratina.
+      const z = -1.6 + k * 0.7, sag = 0.4 + rnd() * 0.6;
+      const curve = new T.CatmullRomCurve3([new T.Vector3(-7, 4.8 + rnd(), z + rnd()), new T.Vector3(-2 + rnd() * 2, 4.3 - sag, z), new T.Vector3(2 + rnd() * 2, 4.4 - sag * 0.8, z + 0.4), new T.Vector3(7, 4.9, z - rnd())]);
+      scene.add(new T.Mesh(new T.TubeGeometry(curve, 24, 0.025, 4), cableMat));
+    }
+
+    // Walls, floor, speaker stacks and old radios in the shadows.
+    const brick = lam({ map: brickTex(), emissive: 0xffffff, emissiveMap: crackTex(), emissiveIntensity: 0.22 });
+    box(20, 11, 0.3, brick, 0, 3.5, -10.5);
+    const sideWall = lam({ map: brickTex() });
+    box(0.3, 11, 22, sideWall, -7.5, 3.5, -1);
+    box(0.3, 11, 22, sideWall, 7.5, 3.5, -1);
+    const floor = add(new T.PlaneGeometry(18, 18), lam({ map: plankTex() }), 0, -1.2, 0);
+    floor.rotation.x = -Math.PI / 2;
+    const speakerMat = [darkWood, darkWood, darkWood, darkWood, lam({ map: speakerTex() }), darkWood];
+    for (const sx of [-1, 1]) {
+      box(1.3, 1.6, 1.0, speakerMat, sx * 4.6, -0.4, -3.4).rotation.y = -sx * 0.35;
+      box(1.1, 1.1, 0.9, speakerMat, sx * 4.6, 0.95, -3.4).rotation.y = -sx * 0.3;
+      box(1.0, 0.9, 0.9, darkWood, sx * 3.9, -0.75, 0.4);
+      box(0.9, 0.46, 0.5, [darkWood, darkWood, darkWood, darkWood, lam({ map: radioTex() }), darkWood], sx * 3.9, -0.07, 0.4).rotation.y = -sx * 0.5;
+      box(0.7, 0.5, 0.6, lam({ map: metal, color: 0x5a4a40 }), sx * 5.2, -0.95, 1.8);
+    }
+
+    // Giratina hosts from behind the far side, lit from below.
+    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false }), 0, 3.6, -8.6);
+    // Lit from below by the table's glow.
+    const under = new T.PointLight(0x9a7aa8, 1.8, 7, 1); under.position.set(0, 1.0, -6.6); scene.add(under);
+
+    // Distortion World: purple fog at the floor, dark motes drifting up.
+    const fogTex = blobTex("#5a3a6e", 0.6);
+    for (let k = 0; k < 6; k++) {
+      const f = add(new T.PlaneGeometry(7, 7), new T.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.55 }), rnd() * 10 - 5, -1.0 + k * 0.08, rnd() * 8 - 6);
+      f.rotation.x = -Math.PI / 2;
+      fogs.push({ mesh: f, x: f.position.x, z: f.position.z, p: rnd() * 6 });
+    }
+    const n = 170, pts = new Float32Array(n * 3);
+    for (let k = 0; k < n; k++) pts.set([rnd() * 14 - 7, rnd() * 5 - 1.2, rnd() * 10 - 7], k * 3);
+    const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(pts, 3));
+    dust = new T.Points(geo, new T.PointsMaterial({ color: 0x4a3a58, size: 1.5, sizeAttenuation: false }));
+    scene.add(dust);
+
+    // The post pass: palette, Bayer dither, vignette, grain, flashes.
+    post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+      uniforms: { tScene: { value: rt.texture }, uPal: { value: PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
+                  uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 }, uEdge: { value: 0 },
+                  uWide: { value: WIDE.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) } },
+      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      fragmentShader: [
+        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec3 uWide[16]; uniform vec2 uRes; uniform float uTime, uFlash, uHit, uEdge; varying vec2 vUv;",
+        "float kind(float a){ return a < 0.42 ? 1.0 : a < 0.67 ? 2.0 : a < 0.9 ? 3.0 : 0.0; }",
+        "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
+        "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
+        "float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }",
+        "void main(){",
+        "  vec2 px = floor(vUv * uRes);",
+        "  vec4 src = texture2D(tScene, vUv);",
+        "  vec3 c = src.rgb; float m = kind(src.a);",
+        // A rim around the Pokémon: cold purple for Giratina, warm for buddies.
+        "  if (m == 0.0) {",
+        "    vec2 o = 1.0 / uRes; float g = 0.0, b = 0.0;",
+        "    float n1 = kind(texture2D(tScene, vUv + vec2(o.x, 0.0)).a), n2 = kind(texture2D(tScene, vUv - vec2(o.x, 0.0)).a);",
+        "    float n3 = kind(texture2D(tScene, vUv + vec2(0.0, o.y)).a), n4 = kind(texture2D(tScene, vUv - vec2(0.0, o.y)).a);",
+        "    if (n1 == 1.0 || n2 == 1.0 || n3 == 1.0 || n4 == 1.0) c = mix(c, vec3(0.44, 0.38, 0.66), 0.8);",
+        "    else if (n1 == 2.0 || n2 == 2.0 || n3 == 2.0 || n4 == 2.0) c = mix(c, vec3(0.66, 0.5, 0.32), 0.6);",
+        "  }",
+        "  c += uFlash * vec3(0.6, 0.5, 0.36);",
+        "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
+        "  c *= mix(m > 0.0 ? 0.25 : 0.03, 1.0, smoothstep(0.72, 0.2, d));",
+        "  c += (hash(px + fract(uTime) * 97.0) - 0.5) * (m > 0.0 ? 0.02 : 0.045);",
+        "  c = mix(c, vec3(0.42, 0.12, 0.09), uHit * 0.5);",
+        "  c = mix(c, vec3(0.36, 0.08, 0.06), uEdge * smoothstep(0.32, 0.7, d) * 0.85);",
+        "  c += (bayer(px) - 0.5) * (m > 0.0 ? 0.045 : 0.1);",
+        "  bool hp = m == 0.0 && c.g > 0.3 && c.g > c.r * 1.6 && c.g > c.b * 1.3;",
+        "  vec3 best = uPal[0]; float bd = 99.0;",
+        "  for (int i = 0; i < 18; i++) {",
+        "    bool use = hp ? (i < 3 || i > 15) : (i < 16);",
+        "    vec3 e = (c - uPal[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
+        "    if (use && dd < bd) { bd = dd; best = uPal[i]; }",
+        "  }",
+        // Sprites, items and shells may also use the wider set.
+        "  if (m > 0.0) for (int i = 0; i < 16; i++) {",
+        "    vec3 e = (c - uWide[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
+        "    if (dd < bd) { bd = dd; best = uWide[i]; }",
+        "  }",
+        "  gl_FragColor = vec4(best, 1.0);",
+        "}"
+      ].join("\n"),
+      depthTest: false, depthWrite: false
+    }));
+    post.frustumCulled = false;
+  }
+  let postScene, postCam;
+
+  /* What the table shows, from the game's state. */
+  const seatAt = pos => sides[pos] && sides[pos].seat;
+  const sideOf = seat => sides[mpPos(seat)];
+  const angleTo = ([dx, dz]) => Math.atan2(-dx, -dz);
+  const itemOk = key => {
+    const you = M.p[mpMe];
+    return !((key === "potion" && you.hp >= you.max) || (key === "band" && you.band) ||
+      (key === "wave" && !(mpWaveOk(M, mpMe) && mpWaveTargets(M, mpMe).length)));
+  };
+  const seatOk = seat => seat !== null && seat !== undefined && mpCanAct() &&
+    (mpPick ? mpWaveTargets(M, mpMe).includes(seat) : R3.holding && mpUp(M, seat));
+  function buddyURL(name) {
+    const b = buddyOf[name];
+    return b ? SPRITE_DIR + (b.shiny ? "shiny/" : "") + b.species + ".png" : "";
+  }
+  R3.sync = () => {
+    if (!R3.ok || !M) return;
+    const act = mpCanAct();
+    if (!act) R3.holding = false;
+    const at = {};
+    for (let i = 0; i < M.n; i++) at[mpPos(i)] = i;
+    for (const pos of Object.keys(DIR)) {
+      const s = sides[pos], seat = at[pos] === undefined ? null : at[pos], p = seat === null ? null : M.p[seat];
+      s.seat = seat;
+      for (let k = 0; k < 8; k++) {
+        const it = s.items[k], key = p ? p.items[k] : null;
+        if (it.key !== key) {
+          it.key = key; it.using = 0;
+          if (key) { it.sprite.material.map = imageTex(ITEM_DIR + ITEMS[key].art + ".png"); it.sprite.material.opacity = MASK.item; it.sprite.material.needsUpdate = true; }
+        }
+        it.sprite.visible = it.shadow.visible = !!key;
+      }
+      const st = s.screen;
+      const off = !p || p.left;
+      if (st.off !== off || st.max !== (p ? p.max : 0) || (p && st.hp !== p.hp)) {
+        if (p && st.max === p.max && st.hp !== null && p.hp < st.hp) for (let k = p.hp; k < st.hp; k++) st.dying[k] = now();
+        if (p && (st.max !== p.max || p.hp > (st.hp || 0))) st.dying = {};
+        Object.assign(st, { off, max: p ? p.max : 0, hp: p ? p.hp : 0, drawn: 0 });
+      }
+      s.light.intensity = off ? 0 : 0.85;
+      s.dev.visible = !!p;
+      if (s.buddy) {
+        s.buddy.visible = !!p && !p.left;
+        s.plate.visible = !!p;
+        const name = p ? M.names[seat] : "";
+        if (s.plateName !== name) { s.plateName = name; s.plate.material[2].map = plateTex(name); s.plate.material[2].needsUpdate = true; }
+        const url = p ? buddyURL(name) : "";
+        if (s.buddyKey !== url + "|" + name) {
+          s.buddyKey = url + "|" + name;
+          s.buddy.material.map = s.buddy.material.emissiveMap = url ? imageTex(url, silhouette) : imageTex("", silhouette);
+          s.buddy.material.needsUpdate = true;
+        }
+        s.out = !!(p && p.out);
+        if (!s.out) s.faint = 0;
+      }
+    }
+    const mine = buddyURL(M.names[mpMe]);
+    if (myBuddy.userData.url !== mine) { myBuddy.userData.url = mine; myBuddy.material.map = imageTex(mine, silhouette); myBuddy.material.needsUpdate = true; }
+    // The grip faces whoever's turn it is; held by me, the barrel follows what I point at.
+    if (!anim.aim && M.phase === "turn") {
+      const d = DIR[mpPos(M.turn)];
+      anim.goal = angleTo([-d[0], -d[1]]) + (R3.holding ? 0 : 0.55);
+      anim.liftGoal = R3.holding ? 1 : 0;
+    }
+    if (!R3.holding && !mpPick) hover = hover && hover.kind === "item" && act ? hover : null;
+  };
+  function holderDir() {
+    if (!M) return [0, 0];
+    const seat = anim.aim !== null ? anim.aimShooter : M.turn;
+    return DIR[mpPos(seat)] || [0, 0];
+  }
+
+  /* Pointer: hover, click, right-click. */
+  const ray = () => { const r = new T.Raycaster(); r.camera = cam; return r; };
+  let caster = null, mouse = null;
+  function pick() {
+    hover = null;
+    if (!mouseIn || !M || !mpCanAct()) return;
+    caster.setFromCamera(mouse, cam);
+    for (const hit of caster.intersectObjects(pickables, false)) {
+      const p = hit.object.userData.pick;
+      if (!p || !hit.object.visible) continue;
+      if (p.kind === "gun") { if (!R3.holding && !mpPick) { hover = p; break; } continue; }
+      if (p.kind === "item") {
+        const key = sides.bottom.items[p.box].key;
+        if (key && !R3.holding && !mpPick) { hover = { kind: "item", box: p.box, key, ok: itemOk(key) }; break; }
+        continue;
+      }
+      if (p.kind === "seat") { const seat = seatAt(p.pos); if (seatOk(seat)) { hover = { kind: "seat", seat }; break; } }
+    }
+  }
+  function hoverText() {
+    if (!hover || !M) return null;
+    if (hover.kind === "seat") return mpPick ? "Thunder Wave on " + (hover.seat === mpMe ? "you" : M.names[hover.seat]) + "."
+      : hover.seat === mpMe ? "Shoot yourself." : "Shoot " + M.names[hover.seat] + ".";
+    if (hover.kind === "gun") return "Pick up the gun.";
+    return null;
+  }
+  function onMove(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    mouse.set((event.clientX - box.left) / box.width * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1);
+    mouseIn = true;
+    const before = hover && JSON.stringify(hover);
+    pick();
+    const canvas = event.currentTarget;
+    canvas.style.cursor = hover && (hover.kind !== "item" || hover.ok) ? "pointer" : "default";
+    if (hover && hover.kind === "item") { showTip(hover.key, event); moveTip(event); } else $("#tip").hidden = true;
+    if ((hover && JSON.stringify(hover)) !== before) { const text = hoverText(); if (text) mpSay(text); else mpRender(); }
+  }
+  function onDown(event) {
+    if (!M) return;
+    if (event.button === 2) return R3.cancel();
+    if (event.button !== 0 || !mpCanAct()) return;
+    pick();
+    if (!hover) return;
+    if (hover.kind === "item" && hover.ok) { $("#tip").hidden = true; return mpUseItem(hover.box); }
+    if (hover.kind === "gun") { R3.holding = true; hover = null; sfx.chk(); return mpRender(); }
+    if (hover.kind === "seat") { const seat = hover.seat; hover = null; return mpPlateClick(seat); }
+  }
+  R3.cancel = () => {
+    if (!R3.holding && !mpPick) return false;
+    R3.holding = false; mpPick = null; hover = null;
+    mpRender();
+    return true;
+  };
+
+  /* Animations the game awaits. */
+  const SHELL_GEO = [];
+  R3.load = async (live, blank) => {
+    shells.clear();
+    if (!SHELL_GEO.length) SHELL_GEO.push(new T.CylinderGeometry(0.05, 0.05, 0.17, 10), new T.CylinderGeometry(0.056, 0.056, 0.05, 10),
+      new T.CylinderGeometry(0.062, 0.062, 0.012, 10), new T.CylinderGeometry(0.038, 0.05, 0.02, 10));
+    const mat = (color, glow = 0) => new T.MeshLambertMaterial({ color, emissive: glow, opacity: MASK.item });
+    const brass = mat(0xd8b058), rim = mat(0xa88838);
+    const list = [...Array(live).fill([0xb83a30, 0x7a2018, 0x5a1810]), ...Array(blank).fill([0x9a9a94, 0x5a5a56, 0x34342f])].map(([color, crimp, glow], k, all) => {
+      const g = new T.Group();
+      const parts = [[SHELL_GEO[0], mat(color, glow), 0.135], [SHELL_GEO[3], mat(crimp), 0.23], [SHELL_GEO[1], brass, 0.03], [SHELL_GEO[2], rim, 0.006]];
+      for (const [geo, m, y] of parts) { const mesh = new T.Mesh(geo, m); mesh.position.y = y; g.add(mesh); }
+      g.position.set((k - (all.length - 1) / 2) * 0.19, 0, 1.3);
+      return g;
+    });
+    for (const g of list) { shells.add(g); sfx.click(); await wait(95); }
+    await wait(1300);
+    // Into the gun's port, one at a time in an order you can't follow, then it racks.
+    const port = new T.Vector3();
+    for (const g of shuffle([...list])) {
+      gunBody.localToWorld(port.set(0, -0.06, 0.05));
+      await new Promise(done => tweens.push({ obj: g, from: g.position.clone(), to: port.clone(), t0: performance.now() / 1000, dur: 0.16, done }));
+      shells.remove(g); sfx.click();
+      await wait(40);
+    }
+    anim.recoil = 0.55; sfx.chk();
+    await wait(160);
+    anim.recoil = 0.55; sfx.chk();
+    await wait(250);
+  };
+  R3.useItem = async (seat, box) => {
+    const it = sideOf(seat).items[box];
+    if (!it || !it.key) return;
+    it.using = now();
+    await wait(650);
+  };
+  R3.aim = async (shooter, target) => {
+    anim.aim = target; anim.aimShooter = shooter;
+    if (target === mpMe) anim.atMeGoal = 1;
+    anim.goal = angleTo(DIR[mpPos(target)]);
+    anim.liftGoal = 1;
+    const pos = mpPos(target);
+    anim.yawGoal = pos === "left" ? 0.3 : pos === "right" ? -0.3 : 0;
+    anim.pitchGoal = pos === "bottom" ? -0.1 : pos === "top" ? 0.05 : 0;
+    await wait(1000);
+  };
+  R3.bang = async (target, hp) => {
+    anim.flash = 2; anim.muzzle = 2; anim.shake = 0.5; anim.recoil = 1;
+    const s = sideOf(target), st = s.screen;
+    if (st.hp !== null && hp < st.hp) for (let k = hp; k < st.hp; k++) st.dying[k] = now();
+    st.hp = hp; st.drawn = 0;
+    if (s.buddy) { s.flinch = now(); if (hp <= 0) s.out = true; }
+    if (target === mpMe) anim.hit = 1;
+    await wait(950);
+    R3.endShot();
+  };
+  R3.blank = async () => { anim.recoil = 0.45; await wait(700); R3.endShot(); };
+  R3.endShot = () => { anim.atMeGoal = 0; anim.aim = null; anim.liftGoal = 0; anim.yawGoal = 0; anim.pitchGoal = 0; };
+
+  /* Every frame. */
+  const ease = (from, to, k) => from + (to - from) * Math.min(1, k);
+  function frame(ms) {
+    requestAnimationFrame(frame);
+    if ($("#mp-tablewrap").hidden) return;
+    const t = ms / 1000, dt = Math.min(0.05, t - last || 0.016);
+    last = t;
+    // Gun: turn the short way, lift when held or aimed, kick back on a shot.
+    // Held by me: the barrel follows whoever I'm pointing at, else away from me.
+    if (R3.holding && anim.aim === null) anim.goal = angleTo(hover && hover.kind === "seat" ? DIR[mpPos(hover.seat)] : [0, -1]);
+    const diff = ((anim.goal - anim.angle) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+    anim.angle += diff * Math.min(1, dt * 6);
+    anim.lift = ease(anim.lift, anim.liftGoal, dt * 7);
+    anim.recoil = Math.max(0, anim.recoil - dt * 3.5);
+    gunPivot.rotation.y = anim.angle;
+    gunBody.position.set(0, anim.lift * 0.3, anim.recoil * 0.14);
+    gunBody.rotation.x = anim.lift * 0.08 + anim.recoil * 0.12;
+    const gunGlow = hover && hover.kind === "gun" ? 0x4a3420 : R3.holding ? 0x2a1c0e : 0x140e08;
+    for (const m of gunParts) m.material.emissive.setHex(gunGlow);
+    muzzle.intensity = anim.muzzle > 0 ? 7 : 0;
+    // The red spot: on whoever I'm pointing at, or whoever is being aimed at.
+    const marked = anim.aim !== null ? anim.aim : hover && hover.kind === "seat" ? hover.seat : null;
+    if (marked !== null && M && marked !== mpMe) {
+      const d = DIR[mpPos(marked)];
+      redSpot.target.position.set(d[0] * 2.95, 0.6, d[1] * 2.95);
+      redSpot.intensity = ease(redSpot.intensity, 2.4, dt * 8);
+    } else redSpot.intensity = ease(redSpot.intensity, 0, dt * 8);
+    anim.atMe = ease(anim.atMe, anim.atMeGoal, dt * 5);
+    for (let i = tweens.length - 1; i >= 0; i--) {
+      const w = tweens[i], k = Math.min(1, (t - w.t0) / w.dur);
+      w.obj.position.lerpVectors(w.from, w.to, k);
+      w.obj.scale.setScalar(1 - k * 0.5);
+      if (k >= 1) { tweens.splice(i, 1); w.done(); }
+    }
+    // Camera: low at my edge, breathing, turning a little toward whoever is aimed at.
+    anim.yaw = ease(anim.yaw, anim.yawGoal, dt * 4);
+    anim.pitch = ease(anim.pitch, anim.pitchGoal, dt * 4);
+    anim.shake = Math.max(0, anim.shake - dt);
+    const sh = anim.shake * 0.09;
+    cam.position.set(CAM[0] + Math.sin(t * 0.5) * 0.025 + (Math.random() - 0.5) * sh, CAM[1] + Math.sin(t * 0.83) * 0.014 + (Math.random() - 0.5) * sh, CAM[2]);
+    cam.lookAt(0, 0.2, -0.9);
+    cam.rotateY(anim.yaw);
+    cam.rotateX(anim.pitch);
+    // Spotlights flicker now and then.
+    for (const s of spots) {
+      if (t > s.next) { s.until = t + 0.06 + Math.random() * 0.16; s.next = t + 3 + Math.random() * 7; }
+      s.light.intensity = s.base * (t < s.until ? 0.35 + Math.random() * 0.3 : 0.96 + Math.random() * 0.04);
+    }
+    // Seats: buddies bob, flinch red when hit, fall and fade when out.
+    let k = 0;
+    for (const pos of Object.keys(DIR)) {
+      const s = sides[pos];
+      const shaky = pos === "bottom" && anim.atMe > 0.5;
+      if (t - s.screen.drawn > (shaky ? 0.05 : 0.11)) { drawScreen(s, now(), shaky); s.screen.drawn = t; }
+      const hovered = hover && hover.kind === "seat" && hover.seat === s.seat;
+      s.housing.material.emissive.setHex(hovered ? 0x3a2a14 : 0);
+      for (const it of s.items) {
+        const up = pos === "bottom" && hover && hover.kind === "item" && hover.box === s.items.indexOf(it) && hover.ok;
+        it.lift = ease(it.lift, up ? 1 : 0, dt * 10);
+        const using = it.using ? Math.min(1, (now() - it.using) / 0.6) : 0;
+        it.sprite.position.y = 0.24 + it.lift * 0.09 + using * 0.5;
+        const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
+        it.sprite.scale.set(scale, scale, 1);
+        it.sprite.material.color.setScalar(1 + it.lift * 0.35);
+        it.sprite.material.opacity = MASK.item * (1 - using);
+      }
+      if (!s.buddy) continue;
+      s.plate.material[2].color.setHex(hovered ? 0xffffff : M && M.phase === "turn" && M.turn === s.seat ? 0xd8ccaa : 0x8a8270);
+      s.faint = ease(s.faint, s.out ? 1 : 0, dt * 2.2);
+      const flinching = t - s.flinch < 0.32 && now() - s.flinch < 0.32;
+      const b = s.buddy;
+      s.buddyFall.rotation.z = -s.faint * 1.4;
+      s.buddyFall.position.x = flinching ? (Math.random() - 0.5) * 0.1 : 0;
+      b.position.y = s.buddySize / 2 + Math.sin(t * 2 + k * 1.7) * 0.03 * (1 - s.faint);
+      if (flinching) b.material.color.setRGB(1.4, 0.45, 0.4);
+      else b.material.color.setScalar(hovered ? 1.35 : 1 - s.faint * 0.7);
+      k++;
+    }
+    myBuddy.position.y = -0.32 + Math.sin(t * 1.7) * 0.01;
+    // Giratina floats, and leans toward whoever holds the gun.
+    const hd = holderDir();
+    anim.gx = ease(anim.gx, hd[0] * 0.6, dt * 1.5);
+    anim.lean = ease(anim.lean, -hd[0] * 0.1, dt * 1.5);
+    giratina.position.set(anim.gx, 3.42 + Math.sin(t * 0.45) * 0.1, -8.6 - hd[1] * 0.2);
+    giratina.rotation.z = anim.lean;
+    // Fog and motes drift.
+    for (const f of fogs) f.mesh.position.set(f.x + Math.sin(t * 0.1 + f.p) * 1.2, f.mesh.position.y, f.z + Math.cos(t * 0.08 + f.p) * 0.9);
+    const arr = dust.geometry.attributes.position.array;
+    for (let i = 1; i < arr.length; i += 3) { arr[i] += dt * 0.06; if (arr[i] > 3.8) arr[i] = -1.2; }
+    dust.geometry.attributes.position.needsUpdate = true;
+    // Draw low, then the post pass.
+    const u = post.material.uniforms;
+    u.uTime.value = t;
+    u.uFlash.value = anim.flash > 0 ? 1 : 0;
+    u.uHit.value = anim.hit;
+    u.uEdge.value = anim.atMe;
+    anim.hit = Math.max(0, anim.hit - dt * 2.5);
+    if (anim.flash > 0) anim.flash--;
+    if (anim.muzzle > 0) anim.muzzle--;
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, cam);
+    renderer.setRenderTarget(null);
+    renderer.render(postScene, postCam);
+  }
+
+  R3.start = async () => {
+    try {
+      T = await loadThree();
+      if (!T) return false;
+      const canvas = $("#mp-3d");
+      renderer = new T.WebGLRenderer({ canvas, antialias: false, powerPreference: "low-power" });
+      renderer.setPixelRatio(1);
+      renderer.setSize(W, H, false);
+      rt = new T.WebGLRenderTarget(W, H, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+      build();
+      postScene = new T.Scene(); postScene.add(post);
+      postCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      caster = ray(); mouse = new T.Vector2();
+      canvas.addEventListener("pointermove", onMove);
+      canvas.addEventListener("pointerleave", () => { mouseIn = false; hover = null; $("#tip").hidden = true; canvas.style.cursor = "default"; });
+      canvas.addEventListener("pointerdown", onDown);
+      canvas.addEventListener("contextmenu", event => event.preventDefault());
+      R3.ok = true;
+      document.body.classList.add("r3");
+      canvas.hidden = false;
+      requestAnimationFrame(frame);
+      return true;
+    } catch (error) {
+      console.log("Shotgun Roulette: the 3D table isn't available here, so the flat one is used.", error);
+      R3.ok = false;
+      return false;
+    }
+  };
+}
+
+async function mpHello() {
+  let r;
+  try { r = await mpLive.call("hello"); }
+  catch (error) { mpShow("lobby"); mpLobbyNote(error.message || "The room didn't answer."); return; }
+  const room = r.game || {};
+  mpIsHost = !!r.host;
+  if (room.status === "lobby") return drawRoom(room);
+  if (room.status !== "active" && room.status !== "completed") {
+    mpRoom = room;
+    mpShow("lobby");
+    $("#mp-seats-list").replaceChildren();
+    $("#mp-code-line").textContent = "";
+    for (const id of ["#mp-ready", "#mp-start", "#mp-newcode"]) $(id).hidden = true;
+    $("#mp-leave-lobby").textContent = "Back";
+    return mpLobbyNote("This room was closed.");
+  }
+  if (M) return;
+  await mpRoom3D;
+  if (M) return;
+  mpRoom = room;
+  const seats = (room.start && room.start.seats) || [];
+  M = mpGame(seats, room.start && room.start.options && room.start.options.seed);
+  mpMe = Number.isInteger(room.me) && room.me >= 0 && room.me < M.n ? room.me : 0;
+  mpBuildTable();
+  mpRound(M);
+  mpAnimate(M.ev, true);
+  M.ev = [];
+  mpQueue.push(...(r.actions || []));
+  await mpPump(true);
+  mpRender();
+}
+// The 3D room loads while the lobby is up; four seconds at most, then the flat table.
+const mpRoom3D = mpLive ? Promise.race([R3.start(), wait(4000)]) : Promise.resolve(false);
+if (mpLive) {
+  document.body.classList.add("live");
+  $("#lobby").hidden = true;
+  $("#dealer").classList.remove("away");
+  $("#dealer-img").src = SPRITE_DIR + "10007.png";
+  mpShow("lobby");
+  mpLobbyNote("Opening the room...");
+  for (const id of ["#mp-ready", "#mp-start", "#mp-newcode"]) $(id).hidden = true;
+  mpLive.on(event => {
+    if (!event) return;
+    if (event.event === "game" && event.game) {
+      if (event.game.status === "lobby") drawRoom(event.game);
+      else if (!M) mpHello();
+    } else if (event.event === "actions" && M) {
+      mpQueue.push(...(event.actions || []));
+      mpPump();
+    } else if (event.event === "presence") {
+      for (const s of event.seats || []) mpOnline[s.seat] = !!s.online;
+      mpRender();
+    } else if (event.event === "net") {
+      mpSay(event.online ? "Back online." : "Connection lost. Trying again...");
+    } else if (event.event === "removed") {
+      mpShow("lobby");
+      mpLobbyNote("The host removed you from this room.");
+      setTimeout(() => mpLive.call("exit").catch(() => {}), 2500);
+    }
+  });
+  setInterval(mpTick, 250);
+  mpHello();
+}
+
+addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  if (R3.ok && R3.cancel()) return;
+  if (!$("#mp-panel").hidden) { $("#mp-panel").hidden = true; return; }
+  parent.postMessage({ type: "bored:close" }, "*");
+});
+
+/* Solo title screen: open, create or join a room through the lobby bridge. */
+function mpNote(text) { $("#mp-note").textContent = text; }
+async function mpPanel() {
+  $("#mp-panel").hidden = false;
+  const extra = $("#mp-together");
+  extra.hidden = true;
+  $("#mp-rooms").replaceChildren();
+  let status;
+  try { status = await mpLobby.call("status"); } catch (error) { return mpNote(error.message || "The arcade didn't answer."); }
+  if (!status.signedIn) {
+    mpNote("Sign in to Bored to play multiplayer.");
+    extra.textContent = "Sign in";
+    extra.dataset.op = "sign-in";
+    extra.hidden = false;
+    return;
+  }
+  if (!status.enrolled) {
+    mpNote("Multiplayer runs on Bored Together. Join it there first, then come back.");
+    extra.textContent = "Open Bored Together";
+    extra.dataset.op = "open-together";
+    extra.hidden = false;
+    return;
+  }
+  mpNote("Play live with 2 to 4 people. Same rules as Normal, no Giratina buffs, no tokens.");
+  const rooms = $("#mp-rooms"), add = (text, fn) => { const b = el("button", "mp-btn quiet", text); b.type = "button"; b.onclick = fn; rooms.appendChild(b); };
+  try {
+    const [invites, games] = await Promise.all([mpLobby.call("invites"), mpLobby.call("games")]);
+    for (const inv of invites || []) add("Join " + inv.host + "'s room (" + (inv.players || []).join(", ") + ")", () => mpGo("join", { invite: inv.id }));
+    for (const room of (games && games.live) || []) {
+      if (room.status === "lobby") add("Back to your room (" + room.players.map(p => p.name).join(", ") + ")", () => mpGo("open", { game: room.id }));
+      else if (room.status === "active") add("Back to your game (" + room.players.map(p => p.name).join(", ") + ")", () => mpGo("open", { game: room.id }));
+    }
+  } catch {}
+}
+async function mpGo(op, payload) {
+  for (const b of document.querySelectorAll("#mp-panel button")) b.disabled = true;
+  mpNote(op === "host" ? "Opening a room..." : "Joining...");
+  try { await mpLobby.call(op, payload); }
+  catch (error) { mpNote(error.message || "That didn't go through."); }
+  for (const b of document.querySelectorAll("#mp-panel button")) b.disabled = false;
+}
+if (mpLobby && !mpLive) {
+  $("#mp-open").hidden = false;
+  $("#mp-open").onclick = mpPanel;
+  $("#mp-close").onclick = () => { $("#mp-panel").hidden = true; };
+  $("#mp-create").onclick = () => mpGo("host", { settings: MP_ROOM, invitees: [], humans: 4 });
+  $("#mp-join").onclick = () => {
+    const code = $("#mp-code").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length < 4) return mpNote("Type the room code your friend sent you.");
+    mpGo("join-code", { code });
+  };
+  $("#mp-code").addEventListener("keydown", event => { if (event.key === "Enter") $("#mp-join").click(); });
+  $("#mp-together").onclick = () => mpLobby.call($("#mp-together").dataset.op || "open-together").catch(() => {});
+  mpLobby.on(event => { if (event && event.event === "account" && !$("#mp-panel").hidden) mpPanel(); });
+}
 
 // The hub reads this. Unscored in the arcade: rounds you've won this game, and whether it ended.
 // The board ranks `profit` from a real, won game. The frame is sandboxed, so the

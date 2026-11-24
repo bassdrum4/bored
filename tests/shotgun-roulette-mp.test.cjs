@@ -1,0 +1,153 @@
+// Shotgun Roulette multiplayer: the rules engine in src/games/content/shotgun-roulette.html, cut out of
+// the page and run here. Every screen replays the room's one action log, so the main promise is that
+// screens fed the same log hold the same game, however the moves and loads land.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const html = fs.readFileSync(path.join(__dirname, '../src/games/content/shotgun-roulette.html'), 'utf8');
+const between = (from, to) => {
+  const a = html.indexOf(from), b = html.indexOf(to, a + from.length);
+  assert.ok(a >= 0 && b > a, 'found ' + from);
+  return html.slice(a, b);
+};
+const line = start => between(start, '\n');
+const SOURCE = [
+  line('const RULES ='), line('const rand ='), line('const shuffle ='), line('const emptyBoxes ='),
+  between('const ITEMS = {', 'const YOU = 0'),
+  between('function rollLoad()', '// The chance the shell in the chamber'),
+  line('const MP_POS ='),
+  'let M = null, mpMe = 0;',
+  between('// A fixed 0-1 number per (seed, turn)', '/* The screen. */'),
+  'this.api = { mpGame, mpRound, mpApply, mpCompose, mpUp, mpRoll, mpHostSeat, setView(m, me) { M = m; mpMe = me; } };'
+].join('\n');
+
+// One screen: its own copy of the rules (a separate VM), and a seat to look from.
+function screen(seats, seed, me) {
+  const box = {};
+  vm.runInNewContext(SOURCE, box);
+  const api = box.api, m = api.mpGame(seats.map(handle => ({ handle })), seed);
+  api.setView(m, me);
+  api.mpRound(m);
+  return { api, m, apply: action => api.mpApply(m, JSON.parse(JSON.stringify(action))) };
+}
+const state = m => JSON.stringify({ ...m, ev: undefined });
+const NAMES = ['WackyPenguin', 'BananaWizard', 'QuietOwl', 'FourthPlayer'];
+
+// Plays one random game: whoever's turn it is picks an item or a shot, the host's screen loads,
+// now and then someone times out or leaves, and a few junk or stale actions are thrown in.
+function playRandom(n, seed, random) {
+  const seats = NAMES.slice(0, n), screens = seats.map((_, i) => screen(seats, seed, i));
+  const log = [];
+  const send = (seat, type, args) => {
+    const action = { seq: log.length + 1, seat, type, args };
+    log.push(action);
+    for (const s of screens) s.apply(action);
+  };
+  const host = screens[0];
+  for (let step = 0; step < 3000 && host.m.phase !== 'over'; step++) {
+    const m = host.m;
+    if (m.phase === 'load') { send(host.api.mpHostSeat(m), 'load', host.api.mpCompose(m)); continue; }
+    const seat = m.turn, me = m.p[seat], roll = random();
+    if (roll < 0.03) { send(seat, 'expire', { turn: m.turnNo }); continue; }
+    if (roll < 0.04) { send((seat + 1) % n, 'shoot', { turn: m.turnNo, target: seat }); continue; }      // not their turn
+    if (roll < 0.05) { send(seat, 'shoot', { turn: m.turnNo - 1, target: seat }); continue; }           // stale
+    if (roll < 0.055 && n > 2) { send(Math.floor(random() * n), 'leave', {}); continue; }
+    const boxes = me.items.map((k, b) => k ? b : -1).filter(b => b >= 0);
+    if (boxes.length && roll < 0.45) {
+      const target = Math.floor(random() * n);
+      send(seat, 'item', { turn: m.turnNo, box: boxes[Math.floor(random() * boxes.length)], target });
+      continue;
+    }
+    const up = m.p.map((_, i) => i).filter(i => host.api.mpUp(m, i));
+    send(seat, 'shoot', { turn: m.turnNo, target: up[Math.floor(random() * up.length)] });
+  }
+  return { screens, log };
+}
+function seeded(a) { return () => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }; }
+
+test('every screen fed the same log holds the same game, 2 to 4 players', () => {
+  const random = seeded(7);
+  let finished = 0;
+  for (let game = 0; game < 150; game++) {
+    const n = 2 + game % 3;
+    const { screens, log } = playRandom(n, 1000 + game, random);
+    const first = screens[0].m;
+    assert.equal(first.phase, 'over', 'game ' + game + ' ends');
+    finished++;
+    for (const s of screens.slice(1)) assert.equal(state(s.m), state(first), 'game ' + game + ': screens agree');
+    // A screen that opens the game late (replaying the whole log at once) lands in the same place.
+    const late = screen(NAMES.slice(0, n), 1000 + game, n - 1);
+    for (const action of log) late.apply(action);
+    assert.equal(state(late.m), state(first));
+    assert.ok(first.winner >= 0 && first.winner < n);
+    const standing = first.p.filter(p => !p.left).length;
+    assert.ok(first.wins[first.winner] >= 2 || standing === 1, 'a winner took 2 rounds or is the last one at the table');
+  }
+  assert.equal(finished, 150);
+});
+
+test('the rules: turns, blanks at yourself, damage, rounds, paralysis, leaving', () => {
+  const s = screen(['A', 'B', 'C'], 42, 0), m = s.m;
+  assert.deepEqual([m.round, m.phase, m.turn, m.p.map(p => p.hp)], [1, 'load', 0, [2, 2, 2]]);
+  // A load before it's due, or for the wrong round, or with only one kind of shell, is ignored.
+  s.apply({ seq: 1, seat: 0, type: 'load', args: { round: 2, n: 1, shells: [1, 0, 1], items: [[], [], []] } });
+  s.apply({ seq: 2, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [1, 1, 1], items: [[], [], []] } });
+  assert.equal(m.phase, 'load');
+  s.apply({ seq: 3, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [0, 1, 1, 0], items: [['potion', 'wave'], ['band'], ['scope', 'nonsense']] } });
+  assert.equal(m.phase, 'turn');
+  assert.equal(JSON.stringify(m.p.map(p => p.items.filter(Boolean))), JSON.stringify([['potion', 'wave'], ['band'], ['scope']]));
+  const turn = () => m.turnNo;
+  // Seat 1 can't shoot on seat 0's turn.
+  s.apply({ seq: 4, seat: 1, type: 'shoot', args: { turn: turn(), target: 0 } });
+  assert.equal(m.shells.length, 4);
+  // A blank at yourself keeps the turn.
+  s.apply({ seq: 5, seat: 0, type: 'shoot', args: { turn: turn(), target: 0 } });
+  assert.deepEqual([m.turn, m.shells.length, m.p[0].hp], [0, 3, 2]);
+  // Thunder Wave on seat 1, then a live shot at seat 2: the turn moves clockwise to seat 1, who is paralyzed.
+  s.apply({ seq: 6, seat: 0, type: 'item', args: { turn: turn(), box: 1, target: 1 } });
+  assert.equal(m.p[1].para, true);
+  s.apply({ seq: 7, seat: 0, type: 'shoot', args: { turn: turn(), target: 2 } });
+  assert.equal(m.p[2].hp, 1);
+  assert.equal(m.p[1].para, false, 'paralysis is spent at the start of their turn');
+  const stuck = s.api.mpRoll(42, m.turnNo - 1) < 0.5;
+  assert.equal(m.turn, stuck ? 2 : 1, 'the seeded roll decides, the same on every screen');
+  // Leaving puts the seat out for good; two players left keep playing.
+  s.apply({ seq: 8, seat: 2, type: 'leave', args: {} });
+  assert.deepEqual([m.p[2].left, m.p[2].out, m.phase === 'over'], [true, true, false]);
+  assert.notEqual(m.turn, 2);
+  // The next leaver hands the game to the last player at the table.
+  s.apply({ seq: 9, seat: 1, type: 'leave', args: {} });
+  assert.deepEqual([m.phase, m.winner], ['over', 0]);
+});
+
+test('an expired turn fires at the player whose turn it was, once', () => {
+  const s = screen(['A', 'B'], 9, 1), m = s.m;
+  s.apply({ seq: 1, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [1, 0, 0], items: [[], []] } });
+  const t = m.turnNo;
+  s.apply({ seq: 2, seat: 1, type: 'expire', args: { turn: t } });
+  assert.equal(m.p[0].hp, 1, 'seat 0 shot themself with the live shell');
+  s.apply({ seq: 3, seat: 0, type: 'expire', args: { turn: t } });
+  assert.equal(m.shells.length, 2, 'a second expiry for the same turn does nothing');
+});
+
+test('round HP goes 2, 3, 4 and the first player moves clockwise each round', () => {
+  const s = screen(['A', 'B', 'C'], 5, 0), m = s.m;
+  for (let round = 1; round <= 3; round++) {
+    assert.equal(m.round, round);
+    assert.equal(m.turn, (round - 1) % 3);
+    assert.ok(m.p.every(p => p.hp === [2, 3, 4][round - 1]));
+    // Loads are all live but one, and each player fires at the next one still standing.
+    let seq = 100 * round;
+    while (m.round === round && m.phase !== 'over') {
+      if (m.phase === 'load') { s.apply({ seq: ++seq, seat: 0, type: 'load', args: { round: m.round, n: m.loads + 1, shells: [1, 1, 1, 1, 1, 1, 1, 0], items: [[], [], []] } }); continue; }
+      const target = [0, 1, 2].find(i => i !== m.turn && s.api.mpUp(m, i));
+      s.apply({ seq: ++seq, seat: m.turn, type: 'shoot', args: { turn: m.turnNo, target } });
+    }
+    if (m.phase === 'over') break;
+  }
+  assert.equal(m.phase, 'over');
+  assert.equal(Math.max(...m.wins), 2);
+});
