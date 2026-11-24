@@ -70,6 +70,7 @@ test('Poké Gacha opens through the hub, and every screen draws without an error
 
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  await tab.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true && document.querySelector('#getaway-loading')?.hidden === true);
   const game = await (await tab.$('#frame')).contentFrame();
   await passStarter(game);
   const ids = await game.evaluate(() => TABS.map(([id]) => id));
@@ -116,6 +117,7 @@ async function openWithMons(t) {
   await tab.waitForFunction(() => typeof openGame === 'function');
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  await tab.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true && document.querySelector('#getaway-loading')?.hidden === true);
   const game = await (await tab.$('#frame')).contentFrame();
   await passStarter(game);
   // The page has activated the wallet; fund it, pull 45 eggs, earn waves after the pulls, hatch them all.
@@ -154,6 +156,7 @@ test('roster cut: an owned cut line is refunded once with a note, and leaves the
   const before = await game.evaluate(() => G.state().balance.regular);
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  await tab.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true && document.querySelector('#getaway-loading')?.hidden === true);
   const again = await (await tab.$('#frame')).contentFrame();
   await again.waitForFunction(() => !document.querySelector('#cut-note').hidden);
   const note = await again.$eval('#cut-note', n => n.textContent);
@@ -169,6 +172,7 @@ test('roster cut: an owned cut line is refunded once with a note, and leaves the
   // Once: opening again shows no note and pays nothing.
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  await tab.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true && document.querySelector('#getaway-loading')?.hidden === true);
   const third = await (await tab.$('#frame')).contentFrame();
   await pause(300);
   assert.equal(await third.$eval('#cut-note', n => n.hidden), true);
@@ -942,6 +946,7 @@ test('a new account picks a starter, clears 1-1 with the gifts, pulls and hatche
   assert.equal(await tab.evaluate(() => localStorage.getItem('bored.wallet')), null, 'a brand new browser, no wallet');
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  await tab.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true && document.querySelector('#getaway-loading')?.hidden === true);
   const game = await (await tab.$('#frame')).contentFrame();
 
   // 1. The pick screen is all there is: no mons, tabs locked, number keys stay put.
@@ -1938,6 +1943,7 @@ async function freshGame(t) {
   const hub = await tab.evaluate(() => typeof window.__boredGacha?.pickStarter === 'function' && !!window.__boredGacha?.td);
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  await tab.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true && document.querySelector('#getaway-loading')?.hidden === true);
   const game = await (await tab.$('#frame')).contentFrame();
   return { tab, game, errors, hub };
 }
