@@ -242,7 +242,7 @@ function drawFromDeck() {
   return state.deck.pop() || null;
 }
 function fillMarket() {
-  state.market = [];
+  // Keep the cards that are already face-up; replace only empty slots.
   while (state.market.length < 5) {
     const card = drawFromDeck();
     if (!card) break;
@@ -300,6 +300,8 @@ function payCards(player, color, count) {
   player.hand.locomotive -= useWilds;
   for (let i = 0; i < useColor; i++) state.discard.push(color);
   for (let i = 0; i < useWilds; i++) state.discard.push("locomotive");
+  // Newly discarded cards can replenish a previously exhausted market.
+  fillMarket();
 }
 function claimRoute(route, index, color) {
   const player = state.players[index];
@@ -471,6 +473,12 @@ function beginTurn() {
   state.drawCount = 0;
   render();
   if (state.turn === 0) {
+    if (!canDrawTrainCard(0) && !state.ticketDeck.length &&
+        !ROUTES.some(route => canClaim(route, 0) && affordableColors(route, state.players[0]).length)) {
+      addLog("You passed (no legal actions available)");
+      endTurn();
+      return;
+    }
     setStatus("Your turn. Draw two train cards, claim a route, or draw destination tickets.");
   } else {
     setStatus(state.players[state.turn].name + " is taking a turn…");
@@ -534,6 +542,15 @@ function drawBlind(index) {
   return card;
 }
 
+function canDrawTrainCard(drawCount) {
+  return state.deck.length > 0 || state.discard.length > 0 ||
+    state.market.some(color => drawCount === 0 || color !== "locomotive");
+}
+function finishHumanDraw() {
+  if (state.drawCount >= 2 || !canDrawTrainCard(state.drawCount)) endTurn();
+  else { setStatus("Draw one more card."); render(); }
+}
+
 function humanMarket(marketIndex) {
   if (!canAct()) return;
   const color = state.market[marketIndex];
@@ -545,18 +562,20 @@ function humanMarket(marketIndex) {
   takeMarketCard(0, marketIndex);
   state.drawCount += color === "locomotive" ? 2 : 1;
   addLog("You drew " + COLOR_LABEL[color] + " from the market");
-  if (state.drawCount >= 2) endTurn();
-  else { setStatus("Draw one more card."); render(); }
+  finishHumanDraw();
 }
 
 function humanBlind() {
   if (!canAct()) return;
   const card = drawBlind(0);
-  if (!card) { setStatus("The train deck is empty."); return; }
+  if (!card) {
+    if (state.drawCount > 0 && !canDrawTrainCard(state.drawCount)) endTurn();
+    else setStatus("The train deck is empty. Take a face-up card if available.");
+    return;
+  }
   state.drawCount++;
   addLog("You drew a card from the deck");
-  if (state.drawCount >= 2) endTurn();
-  else { setStatus("Draw one more card."); render(); }
+  finishHumanDraw();
 }
 
 function humanClaim(route) {
@@ -703,8 +722,7 @@ function aiDrawTwo(index) {
       const loco = state.market.indexOf("locomotive");
       if (loco >= 0 && (needed.get("locomotive") || player.hand.locomotive < 2)) {
         takeMarketCard(index, loco);
-        draws = 2;
-        break;
+        return 1;
       }
     }
     let pick = -1;
@@ -712,10 +730,20 @@ function aiDrawTwo(index) {
       const color = state.market[i];
       if (color !== "locomotive" && (needed.get(color) || 0) > 0) { pick = i; break; }
     }
-    if (pick >= 0) takeMarketCard(index, pick);
-    else drawBlind(index);
+    let card = pick >= 0 ? takeMarketCard(index, pick) : drawBlind(index);
+    if (!card) {
+      // A genuinely exhausted blind pile is not a draw. Try the market.
+      pick = state.market.findIndex(color => color !== "locomotive");
+      if (pick >= 0) card = takeMarketCard(index, pick);
+      else if (draws === 0 && state.market.includes("locomotive")) {
+        takeMarketCard(index, state.market.indexOf("locomotive"));
+        return 1;
+      }
+    }
+    if (!card) break;
     draws++;
   }
+  return draws;
 }
 
 function aiTurn() {
@@ -746,8 +774,8 @@ function aiTurn() {
       return;
     }
   }
-  aiDrawTwo(index);
-  addLog(player.name + " drew train cards");
+  const drawn = aiDrawTwo(index);
+  addLog(player.name + (drawn ? " drew " + drawn + " train card" + (drawn === 1 ? "" : "s") : " passed (no train cards available)"));
   endTurn();
 }
 
@@ -821,7 +849,7 @@ function renderMarket() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "card" + (color === "locomotive" ? " loco" : "");
-    button.disabled = !active;
+    button.disabled = !active || (color === "locomotive" && state.drawCount > 0);
     button.setAttribute("aria-label", "Take " + COLOR_LABEL[color] + " from the market");
     const swatch = document.createElement("i");
     swatch.style.background = color === "locomotive" ? "linear-gradient(90deg,#a8403a,#c2a03c,#4f7750,#3c628c)" : COLOR[color];
@@ -830,8 +858,8 @@ function renderMarket() {
     market.append(button);
   });
   const deck = $("deck");
-  deck.disabled = !active;
-  deck.textContent = "DECK " + state.deck.length;
+  deck.disabled = !active || (!state.deck.length && !state.discard.length);
+  deck.textContent = "DECK " + (state.deck.length || state.discard.length);
 }
 
 function renderHand() {
