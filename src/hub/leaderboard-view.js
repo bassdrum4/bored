@@ -384,7 +384,10 @@ async function loadLeaderboard(force = false, full = false) {
     const rows = everyone ? await readWholeBoard() : await readTopBoards();
     state.lbCache.set(key, { rows, at: Date.now() });
   } catch (err) {
-    state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
+    // A gateway outage must not erase the last successfully loaded rankings.
+    if (!(err?.transient && cached && !cached.error)) {
+      state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
+    }
   } finally {
     lbLoading = false;
   }
