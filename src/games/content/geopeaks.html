@@ -213,6 +213,17 @@
   #pause .actions button {min-width:100px}
   #peak-search {width:100%;padding:6px;margin-bottom:4px;border:1px solid var(--hair);font:inherit;background:var(--paper)}
   @media(max-width:620px){#mountain .tools{left:10px;right:10px}#mountain .runs{right:10px;max-height:36vh;top:142px}#mountain .actions{left:10px;bottom:85px}#run-tools{top:110px;right:10px}#peak-search{min-width:120px;max-width:120px;align-self:start}}
+  /* A quiet glass HUD: keep the mountain, not the UI, as the visual focus. */
+  :root{--paper-dim:rgba(247,250,253,.88);--hair:rgba(36,59,82,.16);--dim:#516477;--accent:#cb622d}
+  .pane,#hud .slab,#mountain .tools>*,#mountain .runs,#mountain .actions,#mountain .hint{border-radius:10px;box-shadow:0 3px 18px rgba(16,39,62,.10)}
+  #hud .slab,#run-tools button{background:rgba(246,250,255,.84)}
+  #hud #speed-box b{font-size:34px;font-weight:700}
+  #run-tools button{border-radius:7px}
+  #mountain .hint{font-size:11px}
+  #card .go,.sheet .go{border-radius:7px;background:#203c51;border-color:#203c51}
+  #card .go:hover,.sheet .go:hover{background:#315b74;border-color:#315b74}
+  #mountain .actions button{border-radius:6px}
+  @media(max-width:620px){#hud #speed-box b{font-size:24px}}
 </style>
 </head>
 <body>
@@ -418,7 +429,7 @@ function project(lat, lon, z) {
     y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * PI)) * n
   };
 }
-const metresPerPixel = lat => 156543.03392 * Math.cos(rad(lat)) / Math.pow(2, ZOOM);
+const metresPerPixel = (lat,zoom=ZOOM) => 156543.03392 * Math.cos(rad(lat)) / Math.pow(2, zoom);
 
 function offsetLatLon(lat, lon, distance, bearing) {
   const R = 6371000, b = rad(bearing), d = distance / R;
@@ -497,18 +508,18 @@ async function decodeTile(url) {
   return ctx.getImageData(0, 0, TILE_PX, TILE_PX).data;
 }
 
-async function loadTerrain(peak, onProgress) {
-  const p = project(peak.lat, peak.lon, ZOOM);
-  const tx0 = Math.round(p.x / TILE_PX) - TILE_SPAN / 2;
-  const ty0 = Math.round(p.y / TILE_PX) - TILE_SPAN / 2;
-  const W = TILE_SPAN * TILE_PX;
+async function loadTerrain(peak,onProgress,zoom=ZOOM,span=TILE_SPAN) {
+  const p = project(peak.lat,peak.lon,zoom);
+  const tx0=Math.round(p.x/TILE_PX)-span/2;
+  const ty0=Math.round(p.y/TILE_PX)-span/2;
+  const W=span*TILE_PX;
   const heights = new Float32Array(W * W);
 
   const jobs = [];
-  for (let ty = 0; ty < TILE_SPAN; ty++) {
-    for (let tx = 0; tx < TILE_SPAN; tx++) {
+  for (let ty=0;ty<span;ty++) {
+    for (let tx=0;tx<span;tx++) {
       jobs.push(async () => {
-        const data = await decodeTile(TILE_URL(ZOOM, tx0 + tx, ty0 + ty));
+        const data = await decodeTile(TILE_URL(zoom,tx0+tx,ty0+ty));
         const ox = tx * TILE_PX, oy = ty * TILE_PX;
         for (let y = 0; y < TILE_PX; y++) {
           let row = (oy + y) * W + ox;
@@ -537,7 +548,7 @@ async function loadTerrain(peak, onProgress) {
 
   return new Terrain(peak, heights, {
     W, H: W,
-    mpp: metresPerPixel(peak.lat),
+    mpp: metresPerPixel(peak.lat,zoom),
     i0: p.x - tx0 * TILE_PX,
     j0: p.y - ty0 * TILE_PX
   });
@@ -688,8 +699,8 @@ function pisteTexture() {
     ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(0, y + 1, w, 1);
   }
   // crisp edges: a groomed run is a cut, and the cut is what the eye follows
-  ctx.fillStyle = 'rgba(126,158,196,.8)';
-  ctx.fillRect(0, 0, 3, h); ctx.fillRect(w - 3, 0, 3, h);
+  // Feather the piste edges into the surrounding snow instead of drawing blue borders.
+  ctx.globalCompositeOperation='destination-in';const edge=ctx.createLinearGradient(0,0,w,0);edge.addColorStop(0,'rgba(255,255,255,0)');edge.addColorStop(.18,'white');edge.addColorStop(.82,'white');edge.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=edge;ctx.fillRect(0,0,w,h);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -735,8 +746,8 @@ function buildPiste(terrain, run) {
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
   // Unlit on purpose: a groomed piste is the brightest thing on the mountain,
   // and lambert shading turned it into grey tarmac the moment the sun was low.
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-    color: 0xf2f7fd, map: pisteTexture(), transparent: true, opacity: 0.95,
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: 0xf3f7fd, map: pisteTexture(), roughness:.92, transparent: true, opacity: 0.62,
     side: THREE.DoubleSide, depthWrite: false, fog: true,
     polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4
   }));
@@ -753,14 +764,14 @@ let THREE;
 let renderer, runScene, globeScene, camera, globeCamera;
 const sunDir = { x: 0, y: 0, z: 0 };
 const SUN_ALT = 27, SUN_AZ = 226;
-const FOG = 0xc9daea;
+const FOG = 0xc4d8ec;
 
 function makeRenderer() {
   renderer = new THREE.WebGLRenderer({ canvas: $('#gl'), antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.9;
+  renderer.toneMappingExposure = 1.12;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.autoClear = false;
 }
@@ -768,7 +779,7 @@ function makeRenderer() {
 function buildSky(scene) {
   const uniforms = {
     uSun: { value: new THREE.Vector3(sunDir.x, sunDir.y, sunDir.z) },
-    uZenith: { value: new THREE.Color(0x214f80) },
+    uZenith: { value: new THREE.Color(0x2465a3) },
     uHorizon: { value: new THREE.Color(FOG) },
     uSunCol: { value: new THREE.Color(0xfff1d6) }
   };
@@ -784,6 +795,8 @@ function buildSky(scene) {
     fragmentShader: `
       uniform vec3 uSun; uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uSunCol;
       varying vec3 vDir;
+      float cloudHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float cloudNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(cloudHash(i),cloudHash(i+vec2(1.,0.)),f.x),mix(cloudHash(i+vec2(0.,1.)),cloudHash(i+vec2(1.,1.)),f.x),f.y);}
       void main() {
         vec3 d = normalize(vDir);
         float up = clamp(d.y, 0.0, 1.0);
@@ -792,13 +805,19 @@ function buildSky(scene) {
         col += uSunCol * pow(sd, 1400.0) * 9.0;
         col += uSunCol * pow(sd, 22.0) * 0.20;
         col += uSunCol * pow(sd, 3.0) * 0.05;
-        col = mix(col, uHorizon, smoothstep(0.12, -0.04, d.y));
+        // High, thin cirrus, projected onto a sky plane rather than a dome texture.
+        vec2 cp=d.xz/max(d.y+.16,.12);
+        cp=vec2(cp.x*.95+cp.y*.48,cp.y*3.2)*2.2;
+        float c=cloudNoise(cp)*.55+cloudNoise(cp*2.1)*.26+cloudNoise(cp*4.3)*.13+cloudNoise(cp*9.0)*.06;
+        float clouds=smoothstep(.58,.79,c)*smoothstep(.04,.24,d.y)*.48;
+        col=mix(col,mix(vec3(.76,.85,.94),uSunCol,.18+.32*sd),clouds);
+        col = mix(col, uHorizon, 1.0-smoothstep(-.04,.12,d.y));
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(9000, 32, 20), mat);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(45000, 40, 24), mat);
   sky.frustumCulled = false;
   sky.renderOrder = -10;
   scene.add(sky);
@@ -882,6 +901,59 @@ const world = {
   mapCanvas: null, mapRoute: null, shadowBias: 0
 };
 
+// The high-resolution playable terrain stays untouched. These four skirts use
+// actual lower-resolution elevation tiles to extend the skyline, not random peaks.
+function timberline(peak){return peak.id==='snowbird'?2950:peak.id==='whistler'?1800:peak.id==='portillo'?2200:2180}
+function buildDistantTerrain(near,far){
+  const group=new THREE.Group();
+  const bounds=[
+    [far.minX,far.maxX,far.minZ,near.minZ+90],
+    [far.minX,far.maxX,near.maxZ-90,far.maxZ],
+    [far.minX,near.minX+90,near.minZ,near.maxZ],
+    [near.maxX-90,far.maxX,near.minZ,near.maxZ]
+  ];
+  const sample=(x,z)=>{
+    const cx=clamp(x,near.minX,near.maxX),cz=clamp(z,near.minZ,near.maxZ);
+    const edge=Math.hypot(x-cx,z-cz);
+    const inside=Math.min(x-near.minX,near.maxX-x,z-near.minZ,near.maxZ-z);
+    // An overlapping lowered seam prevents gaps between the two mesh resolutions.
+    const lower=inside>=0?25:25*(1-sstep(0,160,edge));
+    return lerp(near.height(cx,cz),far.height(x,z),sstep(0,650,edge))-lower;
+  };
+  for(const [x0,x1,z0,z1] of bounds){
+    if(x1<=x0||z1<=z0)continue;
+    // Coarse distant strips overlap slightly under the detailed mountain.
+    const nx=Math.max(2,Math.min(180,Math.ceil((x1-x0)/95)));
+    const nz=Math.max(2,Math.min(180,Math.ceil((z1-z0)/95)));
+    const pos=[],col=[],idx=[];
+    for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){
+      const x=lerp(x0,x1,i/nx),z=lerp(z0,z1,j/nz),h=sample(x,z);
+      pos.push(x,h-.35,z);
+      const sx=(sample(x+90,z)-sample(x-90,z))/180,sz=(sample(x,z+90)-sample(x,z-90))/180;
+      const steep=1-1/Math.hypot(1,sx,sz);
+      const snow=1-sstep(.17,.62,steep);
+      const wood=(1-sstep(timberline(near.peak)-350,timberline(near.peak),h))*(1-sstep(.22,.55,steep))*sstep(.35,.66,vnoise(x/320,z/320,3));
+      const rock=.29+vnoise(x/140,z/140,9)*.10;
+      col.push(lerp(lerp(rock,.89,snow),.14,wood*.65),lerp(lerp(rock*.96,.93,snow),.23,wood*.65),lerp(lerp(rock*.93,.98,snow),.22,wood*.65));
+    }
+    for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const a=j*(nx+1)+i,b=a+1,c=a+nx+1,d=c+1;idx.push(a,c,b,b,c,d)}
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
+    group.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,side:THREE.DoubleSide})));
+  }
+  return group;
+}
+let panoramaCache=null;
+function loadPanorama(terrain,group){
+  const peak=terrain.peak;
+  const zoom=game.quality==='high'?11:10,span=zoom===11?4:2;
+  const pending=panoramaCache?.peak===peak&&panoramaCache.zoom===zoom?panoramaCache.promise:loadTerrain(peak,null,zoom,span);
+  panoramaCache={peak,zoom,promise:pending};
+  pending.then(far=>{
+    if(world.group!==group||world.terrain!==terrain)return;
+    group.add(buildDistantTerrain(terrain,far));
+  }).catch(()=>{if(panoramaCache?.promise===pending)panoramaCache=null});
+}
 function buildTerrainMesh(terrain, run) {
   const N = MESH_N;
   const step = (terrain.W - 1) / (N - 1);
@@ -925,17 +997,17 @@ function buildTerrainMesh(terrain, run) {
       }
       // A kilometre of shade-march instead of 570 m: ridges now throw shadows
       // down the faces below them, which is most of what makes a mountain read.
-      const shade = clamp(1 - occ * 0.055, 0.42, 1);
+      const shade = clamp(1 - occ * 0.075, 0.30, 1);
 
       // ── albedo: snow, exposed rock, scree, forest
       const steep = 1 - n.y;
-      const snow = 1 - sstep(0.30, 0.72, steep);
+      const snow = 1 - sstep(0.17, 0.60, steep);
       const alt = sstep(1250, 1900, h);
       const glacier = sstep(3100, 3700, h) * (1 - sstep(0.18, 0.45, steep));
       // Two scales of mottling: snow is never one flat tone, and the big
       // patches are what give a slope its shape when the sun is low.
-      const patch = hash2(Math.floor(i / 11) * 0.71, Math.floor(j / 11) * 0.71);
-      const grit = hash2(i * 0.37, j * 0.37) * 0.05 - 0.025 + (patch - 0.5) * 0.10;
+      const patch = vnoise(i / 11,j / 11,8);
+      const grit = (hash2(i*.37,j*.37)-.5)*.025+(patch-.5)*.085;
       // scree poking through on the high, broken faces
       const scree = sstep(0.16, 0.30, steep) * (1 - sstep(0.32, 0.44, steep)) * sstep(2350, 2750, h) * hash2(i * 1.7, j * 1.7) * 0.55;
 
@@ -945,7 +1017,7 @@ function buildTerrainMesh(terrain, run) {
       r = lerp(r, 0.44, scree); g = lerp(g, 0.43, scree); b = lerp(b, 0.43, scree);
       // Timber below the tree line, in patches. Distant conifers are a dark
       // mass, not a pepper of individual trees, so most of the forest is paint.
-      const wood = (1 - sstep(1480, 1830, h)) * (1 - sstep(0.30, 0.56, steep)) *
+      const wood = (1 - sstep(timberline(terrain.peak)-420,timberline(terrain.peak), h)) * (1 - sstep(0.30, 0.56, steep)) *
         sstep(0.44, 0.62, vnoise(i / 9, j / 9, 3));
       r = lerp(r, 0.17, wood * 0.72); g = lerp(g, 0.24, wood * 0.72); b = lerp(b, 0.21, wood * 0.72);
       // forested valley floor
@@ -957,9 +1029,9 @@ function buildTerrainMesh(terrain, run) {
       g = lerp(g, g * 0.94, glacier);
       b = lerp(b, b * 1.0, glacier);
       // long shadows read cold, not black
-      r = (r + grit) * lerp(0.86, 1, shade) * lerp(1, 0.97, occ / 11);
-      g = (g + grit) * lerp(0.90, 1, shade) * lerp(1, 0.985, occ / 11);
-      b = (b + grit) * lerp(0.97, 1, shade);
+      r=(r+grit)*lerp(.42,1,shade);
+      g=(g+grit)*lerp(.56,1,shade);
+      b=(b+grit)*lerp(.78,1,shade);
       col[k * 3] = clamp(r, 0, 1);
       col[k * 3 + 1] = clamp(g, 0, 1);
       col[k * 3 + 2] = clamp(b, 0, 1);
@@ -988,19 +1060,55 @@ function buildTerrainMesh(terrain, run) {
     vertexColors: true,
     map: grainTexture(),
     normalMap: snowNormalMap(),
-    normalScale: new THREE.Vector2(0.3, 0.3),
-    roughness: 0.8, metalness: 0.0
+    normalScale: new THREE.Vector2(0.48,0.48),
+    roughness: 0.83, metalness: 0.0
   });
+  // Meter-scale snow grain and rock strata fade out with distance to avoid
+  // aliasing. Vertex colours still carry the real slope/altitude material mask.
+  mat.onBeforeCompile=shader=>{
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vAlpine;').replace('#include <begin_vertex>','#include <begin_vertex>\nvAlpine=position;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
+      varying vec3 vAlpine;
+      float alpineHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float alpineNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(alpineHash(i),alpineHash(i+vec2(1.,0.)),f.x),mix(alpineHash(i+vec2(0.,1.)),alpineHash(i+vec2(1.,1.)),f.x),f.y);}
+    `).replace('#include <color_fragment>',`#include <color_fragment>
+      float detail=1.0-smoothstep(100.,650.,length(vViewPosition));
+      float rock=1.0-smoothstep(.30,.65,max(max(diffuseColor.r,diffuseColor.g),diffuseColor.b));
+      float snowRipples=alpineNoise(vec2(vAlpine.x*.40+vAlpine.z*.18,vAlpine.z*1.9));
+      float strata=alpineNoise(vec2(vAlpine.x*.14+vAlpine.z*.17,vAlpine.y*1.45));
+      float fine=alpineNoise(vAlpine.xz*4.0);
+      diffuseColor.rgb*=1.0+detail*(mix((snowRipples-.5)*.11,(strata-.5)*.36,rock)+(fine-.5)*.045);
+    `);
+  };
+  mat.customProgramCacheKey=()=> 'geopeaks-alpine-detail-v1';
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = false;
   return mesh;
 }
 
 function buildTrees(terrain, run) {
-  const geo = new THREE.ConeGeometry(1, 3.6, 5, 1);
-  geo.translate(0, 1.8, 0);
-  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: false });
-  const max = 6400;
+  // One instanced, layered evergreen mesh: bark, dark underside and
+  // snow-laden upper branches. Avoid thousands of separate tree objects.
+  const vertices=[],colors=[],normals=[];
+  const append=(geometry,base,snow)=>{
+    const g=geometry.index?geometry.toNonIndexed():geometry;
+    const p=g.attributes.position,n=g.attributes.normal;
+    const green=new THREE.Color(base),white=new THREE.Color(0xe4edf3);
+    for(let i=0;i<p.count;i++){
+      vertices.push(p.getX(i),p.getY(i),p.getZ(i));normals.push(n.getX(i),n.getY(i),n.getZ(i));
+      const c=green.clone().lerp(white,snow?clamp((n.getY(i)-.05)*1.8,0,.85):0);
+      colors.push(c.r,c.g,c.b);
+    }
+    if(g!==geometry)g.dispose();geometry.dispose();
+  };
+  const trunk=new THREE.CylinderGeometry(.09,.14,3.1,5);trunk.translate(0,1.55,0);append(trunk,0x59443a,false);
+  for(const [radius,height,y] of [[1,1.65,1.0],[.70,1.65,1.85],[.40,1.55,2.65]]){
+    const tier=new THREE.LatheGeometry([new THREE.Vector2(.07,0),new THREE.Vector2(radius,.10),new THREE.Vector2(radius*.50,height*.52),new THREE.Vector2(0,height)],6);
+    tier.translate(0,y-.4,0);append(tier,0x294c43,true);
+  }
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));
+  const mat=new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true});
+  const max=game.quality==='low'?2200:game.quality==='high'?8500:4800;
   const inst = new THREE.InstancedMesh(geo, mat, max);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const m = new THREE.Matrix4();
@@ -1018,7 +1126,7 @@ function buildTrees(terrain, run) {
 
   // Real conifers only near the line: beyond about a kilometre they are a
   // few pixels each, and the painted timber on the terrain does that job.
-  const reach = 900;
+  const reach = 1400;
   // A clear corridor down the whole line: a conifer in the lens is a green
   // wall, not scenery. Grid the route so the test is a lookup, not a scan.
   const CELL = 20, clear = new Set();
@@ -1031,24 +1139,25 @@ function buildTrees(terrain, run) {
     const from = run.points[Math.floor(rnd() * run.points.length)];
     const angle = rnd() * 6.2832;
     const away = rnd() * reach;
-    const x = from.x + Math.sin(angle) * away;
-    const z = from.z + Math.cos(angle) * away;
+    const wide=guard%3===0;
+    const x=wide?lerp(terrain.minX,terrain.maxX,rnd()):from.x+Math.sin(angle)*away;
+    const z=wide?lerp(terrain.minZ,terrain.maxZ,rnd()):from.z+Math.cos(angle)*away;
     if (!terrain.inside(x, z)) continue;
     if (clear.has(Math.round(x / CELL) + ',' + Math.round(z / CELL))) continue;
     const h = terrain.height(x, z);
-    if (h > 1980 || h < 520) continue;
+    if (h > timberline(terrain.peak) || h < 300) continue;
     terrain.normal(x, z, n);
     if (1 - n.y > 0.52) continue;
     // Forests grow in patches, not in a pepper of single trees: a coarse
     // hash decides which parts of the slope are wooded at all.
-    if (hash2(Math.floor(x / 58), Math.floor(z / 58)) < 0.42) continue;
+    if (vnoise(x/180,z/180,3)<.39) continue;
     // then the tree line thins out with altitude
-    const density = sstep(2005, 1840, h) * 0.88 + 0.12;
+    const density=(1-sstep(timberline(terrain.peak)-320,timberline(terrain.peak),h))*.88+.12;
     if (rnd() > density) continue;
     const height = 5 + rnd() * 8;
     // Conifers are roughly 4:1, not 8:1: the thin version read as black spikes.
-    const width = height * (0.28 + rnd() * 0.13);
-    s.set(width, height * 0.40, width);
+    const width = height * (.13 + rnd() * .065);
+    s.set(width,height*.29,width);
     p.set(x, h - 0.4, z);
     q.setFromAxisAngle(up, rnd() * 6.2832);
     // A forest of plumb verticals reads as a diagram; give each one a lean.
@@ -1057,8 +1166,8 @@ function buildTrees(terrain, run) {
     q.premultiply(lean);
     m.compose(p, q, s);
     inst.setMatrixAt(count, m);
-    const shade = 0.30 + rnd() * 0.26;
-    colour.setRGB(shade * 0.62, shade * 0.94, shade * 0.78);
+    const shade=.65+rnd()*.35;
+    colour.setRGB(shade*.96,shade,shade);
     inst.setColorAt(count, colour);
     count++;
   }
@@ -1426,7 +1535,9 @@ function buildSkier() {
   const pale = new THREE.MeshLambertMaterial({ color: 0xe8e4da });
 
   const box = (w, h, d, mat, x, y, z) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const soft=y>.25 && h>.10 && w>.09;
+    const mesh=new THREE.Mesh(soft?new THREE.SphereGeometry(1,12,8):new THREE.BoxGeometry(w,h,d),mat);
+    if(soft)mesh.scale.set(w/2,h/2,d/2);
     mesh.position.set(x, y, z);
     return mesh;
   };
@@ -1456,12 +1567,12 @@ function buildSkier() {
   const torso = box(0.46, 0.57, 0.31, jacket, 0, 1.27, 0.04);
   torso.rotation.x = 0.3;
   body.add(torso);
-  const pack = box(0.26, 0.3, 0.1, new THREE.MeshLambertMaterial({ color: 0x3b4652 }), 0, 1.3, -0.19);
+  const pack = box(0.30, 0.36, 0.14, new THREE.MeshLambertMaterial({ color: 0x3b4652 }), 0, 1.3, -0.19);
   pack.rotation.x = 0.3;
   body.add(pack);
   // A pale helmet, so the head is a helmet and not a black brick on an orange box.
   body.add(box(0.25, 0.26, 0.29, pale, 0, 1.67, 0.1));
-  body.add(box(0.26, 0.085, 0.04, dark, 0, 1.65, 0.25));
+  body.add(box(0.26,0.085,0.04,new THREE.MeshStandardMaterial({color:0x267ba3,metalness:.35,roughness:.18}),0,1.65,.25));
 
   for (const side of [-1, 1]) {
     const upper = box(0.13, 0.37, 0.15, jacket, side * 0.28, 1.31, 0.07);
@@ -1492,7 +1603,8 @@ function placeSkier(dt) {
   const pl = game.player;
   const t = world.terrain;
   skier.position.set(pl.x, pl.y + (pl.air ? 0.16 : 0.015), pl.z);
-  skier.rotation.y = pl.heading;
+  skier.rotation.y=pl.heading;
+  if(world.contactShadow){const normal={x:0,y:1,z:0};t.normal(pl.x,pl.z,normal);const sh=world.contactShadow;sh.position.set(pl.x,t.height(pl.x,pl.z)+.045,pl.z);sh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(normal.x,normal.y,normal.z));sh.material.opacity=clamp(1-(pl.y-t.height(pl.x,pl.z))/6,0,1)*.8;sh.visible=game.mode!=='mountain';}
 
   const tilt = skier.userData.tilt;
   const body = skier.userData.body;
@@ -1906,7 +2018,7 @@ function showMountain(reset=false){
   game.mode='mountain';if(replay.mesh)replay.mesh.visible=false;
   for(const id of ['picker','hud','ready','pause','result','veil'])$('#'+id).hidden=true;
   $('#mountain').hidden=false;$('#vig').style.opacity='0';
-  if(overview.lines)overview.lines.visible=true;if(world.skier)world.skier.visible=false;if(world.gateGroup)world.gateGroup.visible=false;if(world.finish)world.finish.group.visible=false;if(world.snowfall)world.snowfall.pts.visible=false;
+  if(overview.lines)overview.lines.visible=true;if(world.skier)world.skier.visible=false;if(world.contactShadow)world.contactShadow.visible=false;if(world.routeMarks)world.routeMarks.visible=false;if(world.gateGroup)world.gateGroup.visible=false;if(world.finish)world.finish.group.visible=false;if(world.snowfall)world.snowfall.pts.visible=false;
   if(reset){const p=world.run.points[0];overview.x=p.x;overview.z=p.z;overview.yaw=.65;overview.pitch=.9;overview.distance=Math.max(1400,Math.min(4500,world.run.distance*1.05))}
   else{overview.x=game.player.x;overview.z=game.player.z;overview.spawn=null;if(overview.marker)overview.marker.visible=false;}
   $('#mountain-name').textContent=game.peak.area;
@@ -1938,6 +2050,7 @@ function pickMountainAt(cx,cy){
 }
 function setActivityVisibility(){
   if(world.snowfall)world.snowfall.pts.visible=true;
+  if(world.routeMarks)world.routeMarks.visible=game.activity==='slalom';
   if(world.gateGroup)world.gateGroup.visible=game.activity==='slalom';
   if(world.finish)world.finish.group.visible=game.activity!=='free';
   $('#gate').hidden=game.activity!=='slalom';$('#pause-end').hidden=game.activity!=='free';$('#pause-recover').hidden=game.activity!=='free';
@@ -1991,12 +2104,13 @@ async function startPeak(index, runIndex,direct=false) {
     const mesh = buildTerrainMesh(terrain, run);
     world.group.add(mesh);
     world.group.add(buildPiste(terrain, run));
+    loadPanorama(terrain,world.group);
 
     veil('Planting the tree line…', 0.86);
     await frame();
     world.group.add(buildTrees(terrain, run));
     world.group.add(buildBoulders(terrain, run));
-    world.group.add(buildRouteMarks(terrain, run));
+    world.routeMarks=buildRouteMarks(terrain,run);world.group.add(world.routeMarks);
 
     const gateData = buildGates(terrain, run);
     world.gateGroup=new THREE.Group();gateData.gates.forEach(g=>world.gateGroup.add(g));world.group.add(world.gateGroup);
@@ -2010,8 +2124,9 @@ async function startPeak(index, runIndex,direct=false) {
     world.spray = new Spray(runScene);
     if (!world.snowfall) world.snowfall = new Snowfall(runScene);
     if (!world.skier) {
-      world.skier = buildSkier();
-      runScene.add(world.skier);
+      world.skier=buildSkier();runScene.add(world.skier);
+      const c=document.createElement('canvas');c.width=c.height=64;const ctx=c.getContext('2d'),g=ctx.createRadialGradient(32,32,3,32,32,32);g.addColorStop(0,'rgba(25,43,65,.6)');g.addColorStop(1,'rgba(25,43,65,0)');ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
+      world.contactShadow=new THREE.Mesh(new THREE.PlaneGeometry(2.5,3.8),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3}));runScene.add(world.contactShadow);
     }
 
     buildMap(terrain, run);buildOverview(terrain,peak,entry,run);
@@ -2333,12 +2448,12 @@ function chaseCamera(dt, back, up, ease, side = 0, aimSide = 0) {
   // screen: the summit sheet then covers snow instead of their back.
   const lookX = pl.x + fx * 1.2 - fz * aimSide;
   const lookZ = pl.z + fz * 1.2 + fx * aimSide;
-  const targetY = pl.y + 1.3;
+  const targetY = pl.y + 1.65;
   game.lookY = game.lookY == null ? targetY : lerp(game.lookY, targetY, Math.min(1, dt * 12));
   camera.lookAt(lookX, game.lookY, lookZ);
   camera.rotateZ(-pl.yawRate * 0.05 * clamp(pl.speed / 12, 0, 1));
 
-  const fov = 62 + Math.min(12, pl.speed * 0.25);
+  const fov = 68 + Math.min(9,pl.speed*.20);
   if (Math.abs(camera.fov - fov) > 0.25) {
     camera.fov = fov;
     camera.updateProjectionMatrix();
@@ -2350,8 +2465,8 @@ function updateCamera(dt) {
   // Higher and further back than a first-person trail: a chase camera has to
   // show the next hundred metres of piste, not the back of a jacket.
   if(world.skier)world.skier.visible=game.cameraMode!=='first';
-  if(game.cameraMode==='first'){const p=game.player,fx=Math.sin(p.heading),fz=Math.cos(p.heading);camera.position.set(p.x,p.y+1.65,p.z);camera.up.set(0,1,0);camera.lookAt(p.x+fx*30,p.y-2,p.z+fz*30)}else if(game.cameraMode==='wide')chaseCamera(dt,15,6,5);else chaseCamera(dt,7.2,3,6.5);
-  const vig = Math.min(0.85, Math.max(0, (game.player.speed - 12) / 34));
+  if(game.cameraMode==='first'){const p=game.player,fx=Math.sin(p.heading),fz=Math.cos(p.heading);camera.position.set(p.x,p.y+1.65,p.z);camera.up.set(0,1,0);camera.lookAt(p.x+fx*30,p.y-2,p.z+fz*30)}else if(game.cameraMode==='wide')chaseCamera(dt,15,6,5);else chaseCamera(dt,8.8,3.6,6.5);
+  const vig = Math.min(.25, Math.max(0,(game.player.speed-12)/80));
   $('#vig').style.opacity = String(vig);
 }
 
@@ -2770,20 +2885,20 @@ async function boot() {
   sunDir.z = Math.cos(alt) * Math.cos(az);
 
   runScene = new THREE.Scene();
-  runScene.fog = new THREE.FogExp2(FOG, 0.00017);
+  runScene.fog = new THREE.FogExp2(FOG,0.000066);
   runScene.background = new THREE.Color(FOG);
-  camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.4, 16000);
+  camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.65, 60000);
   camera.position.set(0, 60, 0);
   runScene.add(camera);
   world.sky = buildSky(runScene);
 
-  const sun = new THREE.DirectionalLight(0xfff3e2, 2.3);
+  const sun = new THREE.DirectionalLight(0xffdfb2,2.55);world.sun=sun;
   sun.position.set(sunDir.x * 100, sunDir.y * 100, sunDir.z * 100);
   runScene.add(sun);
   // Snow in shadow is still bright: it is lit by half the sky, which is why a
   // shadowed slope never goes black in the mountains. Keep it low enough that
   // the sun still sculpts the ridges.
-  const hemi = new THREE.HemisphereLight(0xcfe2f5, 0xeef4fa, 0.88);
+  const hemi = new THREE.HemisphereLight(0xc6ddff,0xd6dce5,1.05);world.hemi=hemi;
   runScene.add(hemi);
 
   wireInput();
