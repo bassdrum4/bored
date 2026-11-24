@@ -1093,7 +1093,7 @@ function renderStreak() {
   const line = $('#daily-streak');
   if (!line) return;
   const { current, best } = dailyStreak(completedDailyDates(), challengeDate());
-  if (!current && !best) { line.hidden = true; return; }
+  if (!current && !best) { line.hidden = true; line.textContent = ''; return; }
   line.hidden = false;
   line.textContent = current
     ? current + '-day streak' + (best > current ? ' · best ' + best : '')
