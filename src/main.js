@@ -78,6 +78,8 @@ const getawayLoaderPercent = $('#getaway-loading-percent');
 let getawayLoaderTimer = 0;
 let documentLoaderTimer = 0;
 let documentLoaderToken = null;
+let documentLoaderStarted = 0;
+const MIN_LOADING_MS = 2000;
 
 function resetGetawayLoader() {
   clearTimeout(getawayLoaderTimer);
@@ -105,6 +107,7 @@ function beginGetawayLoader() {
 function beginDocumentLoader(name, token) {
   resetGetawayLoader();
   documentLoaderToken = token;
+  documentLoaderStarted = performance.now();
   $('#game-loading-title').textContent = name;
   setBo($('#game-loading-bo'), 'bored');
   getawayLoaderText.textContent = 'Downloading the game…';
@@ -117,6 +120,12 @@ function beginDocumentLoader(name, token) {
 
 function finishDocumentLoader(token) {
   if (token !== loadToken || token !== documentLoaderToken) return;
+  clearTimeout(documentLoaderTimer);
+  const remaining = MIN_LOADING_MS - (performance.now() - documentLoaderStarted);
+  if (remaining > 0) {
+    documentLoaderTimer = setTimeout(() => finishDocumentLoader(token), remaining);
+    return;
+  }
   resetGetawayLoader();
   if (menuPanel.hidden && !document.querySelector('dialog[open]')) gameFrame.focus();
 }
@@ -247,7 +256,10 @@ const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, sco
 window.addEventListener('bored:together-telemetry', event => analytics.track(event.detail?.kind, event.detail));
 const enjoyment = createEnjoymentUI({ analytics });
 createGameFinder({ openGame, track: (kind, details) => analytics.track(kind, details) });
-gameFrame.addEventListener('load', () => { if (activeSlug && !SANDBOXED_GAMES.includes(activeSlug)) analytics.ready(!!EXTERNS[activeSlug]); });
+gameFrame.addEventListener('load', () => {
+  if (activeSlug && !SANDBOXED_GAMES.includes(activeSlug)) analytics.ready(!!EXTERNS[activeSlug]);
+  if (activeSlug && EXTERNS[activeSlug] && documentLoaderToken !== null) finishDocumentLoader(documentLoaderToken);
+});
 
 function restartGame() {
   if (!activeSlug) return;
@@ -401,9 +413,13 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (slug === 'getaway-shootout') {
     beginGetawayLoader();
     $('#hint').hidden = true;
-  } else resetGetawayLoader();
+  } else beginDocumentLoader(name, token);
 
   if (external || slug === 'getaway-shootout') {
+    if (external) {
+      getawayLoaderText.textContent = 'Connecting to the game…';
+      documentLoaderTimer = setTimeout(() => finishDocumentLoader(token), 12000);
+    }
     // Unity WebGL's loader uses its document URL and scene lifecycle. In a
     // srcdoc frame the compiled Getaway Shootout build can finish loading but
     // remain on an empty blue scene. The normal same-origin HTML document
@@ -416,7 +432,6 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       'Getaway Shootout · Esc leaves · Shift+R restarts');
   } else {
     const native = NEW_GAMES.includes(slug);
-    if (!native) beginDocumentLoader(name, token);
     const paint = source => {
       // The player may have left, or opened another game, while this one was on
       // its way. Dropping the response keeps a late document from painting over
@@ -458,7 +473,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // which need same-origin storage it does not have.
       // Signal document startup from inside the frame, including opaque sandbox
       // origins. The launch token rejects messages from a superseded document.
-      if (!native) {
+      {
         getawayLoaderText.textContent = 'Starting the game…';
         head += '<scr' + 'ipt>document.addEventListener("DOMContentLoaded",function(){parent.postMessage({type:"bored:document-loaded",token:' + token + '},"*")},{once:true});<\/scr' + 'ipt>';
         // A game with its own startup problem must not be permanently covered.
@@ -476,9 +491,10 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
         : ownsEsc ? 'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen'
           : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
     };
-    const fail = () => {
+    const fail = error => {
       if (token !== loadToken) return;
-      resetGetawayLoader();
+      console.error('Bored: could not open ' + slug, error);
+      finishDocumentLoader(token);
       gameFrame.srcdoc = frameStandIn(name + ' did not load.',
         'Couldn\'t grab that game. Check your connection and pick it again.');
       analytics.event('error', { code: 'load_failed' });
@@ -488,8 +504,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     gameFrame.removeAttribute('src');
     // A blank white rectangle reads as "broken" while the document is in flight.
     gameFrame.srcdoc = native ? '' : frameStandIn('Loading ' + name + '…', 'Downloading the game.');
-    if (native) paint(nativeHTML(slug));
-    else loadGameDocument(slug).then(paint).catch(fail);
+    if (native) {
+      try { paint(nativeHTML(slug)); } catch (error) { fail(error); }
+    } else loadGameDocument(slug).then(paint).catch(fail);
   }
 
   playerPanel.hidden = false;
@@ -1326,7 +1343,7 @@ addEventListener('keydown', event => {
     else if (fullscreenElement()) { event.preventDefault(); leaveFullscreen(); }
     // Leaving a game and leaving a page both end at the hub's home. A duel asks
     // to send the run first, and that prompt must stay on its own view.
-    else if (activeSlug && OWNS_ESCAPE.has(activeSlug)) gameFrame.focus();   // the game's own Esc: back into it, never out
+    else if (activeSlug && OWNS_ESCAPE.has(activeSlug) && getawayLoader.hidden) gameFrame.focus();   // the game's own Esc: back into it, never out
     else if (activeSlug && Date.now() - leftFullscreenAt > 500) { closeGame(); if (!activeSlug) navigation.goHome(); }
     else if (!activeSlug) navigation.goHome();
   } else if (activeSlug && !typing && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -1361,7 +1378,7 @@ void loadPopularity();
 // The shell's watchdog reads this. It also clears the watchdog's one retry so a
 // later reload can recover from a fresh load failure.
 window.__boredHubReady = true;
-$('#hub-loading').hidden = true;
+setTimeout(() => { $('#hub-loading').hidden = true; }, Math.max(0, MIN_LOADING_MS - (performance.now() - (window.__boredBootStarted ?? 0))));
 try { sessionStorage.removeItem('bored.boot-retry'); } catch {}
 const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });

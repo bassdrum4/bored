@@ -53,12 +53,14 @@ async function open(slug, selector = '#board') {
     ({ '2048': '2048', memory: 'Memory', 'connect-four': 'Connect Four', 'aim-lab': 'Aim Lab' })[id], {}, slug);
   const frame = await (await page.$('#frame')).contentFrame();
   await frame.waitForSelector(selector);
+  await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
   return frame;
 }
 async function openTitle(slug, title) {
   await page.evaluate(id => openGame(id), slug);
   await page.waitForFunction(t => document.querySelector('#frame')?.title === t &&
     document.querySelector('#frame')?.contentDocument?.body?.childElementCount > 0, {}, title);
+  await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
   return (await page.$('#frame')).contentFrame();
 }
 async function close({ dismissClaim = true } = {}) {
@@ -89,6 +91,7 @@ async function filter(name) {
 // with it. Clicks are coordinate based, so let the page stop moving before
 // touching the shelf: otherwise a click lands on whatever slid under the pointer.
 async function settleBoard() {
+  await page.waitForFunction(() => document.querySelector('#hub-loading').hidden);
   await page.waitForFunction(() => {
     const note = document.querySelector('#lb-empty');
     if (note && !note.hidden && /loading/i.test(note.textContent)) return false;
@@ -348,8 +351,16 @@ test('browser regressions', async t => {
     assert.equal(await page.$eval('#admin-preview-link', el => el.hidden), true);
     assert.equal(await page.evaluate(() => ORDER.some(([id]) => id === 'shotgun-roulette')), true);
     assert.equal(await page.evaluate(() => document.querySelectorAll('.card[data-slug="shotgun-roulette"]').length), 1);
-    await page.evaluate(() => openGame('shotgun-roulette'));
+    const started = await page.evaluate(() => { const now = performance.now(); openGame('shotgun-roulette'); return now; });
     try {
+      assert.equal(await page.$eval('#getaway-loading', el => el.hidden), false);
+      await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
+      assert.ok(await page.evaluate(start => performance.now() - start >= 1950, started), 'loader stays up for two seconds');
+      const rouletteFrame = await (await page.$('#frame')).contentFrame();
+      await rouletteFrame.waitForFunction(() => typeof window.__boredSnapshot === 'function' && !document.querySelector('#lobby').hidden);
+      assert.equal(await rouletteFrame.evaluate(() => getComputedStyle(document.body).visibility), 'visible');
+      assert.equal(await rouletteFrame.evaluate(() => document.querySelector('#startup-error').hidden), true);
+      assert.equal(await rouletteFrame.evaluate(() => document.querySelector('#mp-open').hidden), false);
       await page.waitForFunction(() => document.querySelector('#frame')?.title === 'Shotgun Roulette');
       // Public, but still an opaque origin: it cannot read the session or the wallet.
       assert.equal(await page.$eval('#frame', el => el.getAttribute('sandbox')), 'allow-scripts');
@@ -368,7 +379,11 @@ test('browser regressions', async t => {
   await t.test('Shotgun Roulette opened on its own still offers a test game', async () => {
     const directPage = await browser.newPage();
     try {
+      await directPage.setRequestInterception(true);
+      directPage.on('request', request => request.url().startsWith(origin) ? request.continue() : request.abort());
       await directPage.goto(new URL('games/content/shotgun-roulette.html', url).href);
+      await directPage.waitForFunction(() => typeof window.__boredSnapshot === 'function');
+      assert.equal(await directPage.evaluate(() => getComputedStyle(document.body).visibility), 'visible');
       assert.equal(await directPage.evaluate(() => document.querySelectorAll('button[data-mode]').length), 2);
       assert.equal(await directPage.evaluate(() => !!document.querySelector('#test-start')), true);
     } finally {

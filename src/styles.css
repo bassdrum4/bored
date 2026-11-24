@@ -42,8 +42,8 @@ h1{font-family:var(--display);font-size:clamp(44px,10vw,72px);font-weight:700;li
   font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--dim)}
 #player{position:fixed;inset:0;z-index:50;background:#000}
 #frame{width:100%;height:100%;border:0;display:block;background:#000}
-/* One paper-style loading system for boot and game documents. No artificial
-   minimum display time; progress is indeterminate unless the game reports it. */
+/* One paper-style loading system for boot and game documents. A two-second
+   minimum is managed by the launcher; no fake numeric progress. */
 .game-loading{position:fixed;inset:0;display:grid;place-items:center;
   padding:clamp(24px,7vw,72px);background:var(--paper);color:var(--ink);overflow:auto}
 #hub-loading{z-index:45}
