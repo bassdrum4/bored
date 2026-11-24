@@ -351,6 +351,25 @@
   body.live .haze, body.live .rig { opacity: .55 }
   body.live .dark, body.live .redflash { z-index: 8 }
   .mp-wins { color: var(--dim) }
+  /* The 3D room: the canvas is 480x270, scaled up without smoothing. Words sit on dim terminal readouts. */
+  .mp-3d { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; display: block; image-rendering: pixelated; image-rendering: crisp-edges }
+  .mp-3d[hidden], .mp-status:empty { display: none }
+  body.r3 .scene, body.r3 .mp-persp, body.r3 .mp-plate, body.r3 .mp-choices { display: none }
+  body.r3 .mp-hud { top: 14px; right: 16px; display: grid; grid-template-columns: auto auto auto; gap: 4px 14px; align-items: center; padding: 6px 10px;
+                    background: #040604ee; border: 1px solid #1d3a24; font: 12px/1.4 var(--mono); color: #5f9c6c; text-transform: uppercase }
+  body.r3 .mp-hud .plain { padding: 0; border: 0; border-radius: 0; background: none; font: 12px var(--mono); color: #5f9c6c; text-transform: uppercase }
+  body.r3 .mp-hud .plain:hover { color: #8af0a0 }
+  body.r3 .mp-timer { font: 12px var(--mono); color: #8af0a0; min-width: 0 }
+  body.r3 .mp-timer.low { color: #d0705f }
+  .mp-status { display: none }
+  body.r3 .mp-status { display: block; grid-column: 1 / -1; white-space: pre; color: #4f8a5c; border-top: 1px solid #1d3a24; padding-top: 4px }
+  body.r3 .mp-log { top: 14px; left: 16px; width: 330px; height: 124px; padding: 6px 8px; border: 1px solid #1d3a24; border-radius: 0;
+                    background: #040604; font: 11px/1.45 var(--mono); overflow: hidden }
+  body.r3 .mp-log p { color: #4f8a5c; font-family: var(--mono) }
+  body.r3 .mp-log p.round, body.r3 .mp-log p.status, body.r3 .mp-log p.secret { color: #8af0a0 }
+  body.r3 .mp-log p.live { color: #d0705f }
+  body.r3 .mp-log p.you { color: #a7d8b0 }
+  body.r3 .mp-say { bottom: 12px; width: 640px; margin-left: -320px; padding: 3px 10px; background: #040604cc; font: 12px/1.5 var(--mono); font-style: normal; color: #bfb38c }
 
   @media (prefers-reduced-motion: reduce) {
     .mp-plate .mp-buddy { animation: none }
@@ -539,6 +558,7 @@
       </div>
     </div>
     <div class="mp-tablewrap" id="mp-tablewrap" hidden>
+      <canvas class="mp-3d" id="mp-3d" width="480" height="270" hidden></canvas>
       <div class="mp-persp">
         <div class="mp-table" id="mp-table">
           <svg class="mp-felt" viewBox="0 0 600 600" aria-hidden="true">
@@ -580,6 +600,7 @@
         <span class="mp-round" id="mp-round"></span>
         <span class="mp-timer" id="mp-timer"></span>
         <button class="plain" id="mp-leave" type="button">Leave game</button>
+        <div class="mp-status" id="mp-status"></div>
       </div>
       <p class="say mp-say" id="mp-say" role="status" aria-live="polite"></p>
       <div class="choices mp-choices" id="mp-choices" hidden></div>
@@ -2105,6 +2126,7 @@ function mpRender() {
     v.plate.classList.toggle("target", act && (mpPick ? waveTo.includes(i) : mpUp(M, i)));
   }
   $("#mp-round").textContent = M.phase === "over" ? "Game over" : "Round " + M.round + ". First to 2.";
+  if (R3.ok) return mpRender3D(act);
   const choices = $("#mp-choices");
   choices.replaceChildren();
   choices.hidden = !act;
@@ -2124,6 +2146,25 @@ function mpRender() {
     const you = M.p[mpMe], known = you.knows;
     mpSay(act ? (mpPick ? "Who gets the Thunder Wave?" : "Your turn. Use items, then shoot someone: click their side." + (known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.")))
       : M.turn === mpMe ? "Sending..." : M.names[M.turn] + "'s turn.");
+  }
+}
+// The 3D table: the room draws itself every frame; this hands it the state and writes the words.
+function mpRender3D(act) {
+  $("#mp-choices").hidden = true;
+  R3.sync();
+  const rows = M.names.map((name, i) => {
+    const s = M.p[i];
+    const flags = [s.left ? "LEFT" : s.out && "OUT", s.para && "PARA", s.band && "BAND", mpOnline[i] === false && !s.left && "AWAY"].filter(Boolean);
+    return (M.phase === "turn" && M.turn === i ? "> " : "  ") + (i === mpMe ? "YOU" : name).slice(0, 12).toUpperCase().padEnd(12) + " W" + M.wins[i] + (flags.length ? " " + flags.join(" ") : "");
+  });
+  $("#mp-status").textContent = rows.join("\n");
+  if (!mpBusy && M.phase === "turn") {
+    const known = M.p[mpMe].knows;
+    const seen = known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.");
+    mpSay(act ? (mpPick ? "Click who gets the Thunder Wave. Right-click or Esc cancels."
+        : R3.holding ? "Click someone to shoot them, or your own charge box to shoot yourself. Right-click puts it down." + seen
+        : "Your turn. Use your items, then click the gun." + seen)
+      : M.turn === mpMe ? "..." : M.names[M.turn] + " has the gun.");
   }
 }
 async function mpSend(type, args) {
@@ -2160,6 +2201,16 @@ async function mpAnimate(events, fast) {
   for (const e of events) {
     if (e.t === "log") { mpWrite(e); continue; }
     if (fast) continue;
+    if (R3.ok) {
+      if (e.t === "load") await R3.load(e.live, e.blank);
+      else if (e.t === "item") await R3.useItem(e.seat, e.box);
+      else if (e.t === "aim") await R3.aim(e.seat, e.target);
+      else if (e.t === "bang") await R3.bang(e.target, e.hp);
+      else if (e.t === "click") { sfx.click(); await R3.blank(); }
+      else if (e.t === "round") await fx.lightsOut(mpSays(e.winner, "take round " + e.round + ".", "takes round " + e.round + "."),
+        M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".");
+      continue;
+    }
     const v = mpView[e.seat !== undefined ? e.seat : e.target];
     switch (e.t) {
       case "load": {
@@ -2284,6 +2335,705 @@ function mpTick() {
     }
   }
 }
+/* ── The multiplayer room in 3D ───────────────────────────────────────────
+   Three.js r149 (vendored at shotgun-roulette/vendor/three.min.js, MIT). The
+   room is drawn at 480x270 into a render target; a post pass maps every pixel
+   to an 18-colour palette with 4x4 Bayer dithering, a heavy vignette and film
+   grain, and the canvas is scaled up nearest-neighbour. Every model and
+   texture is made here (boxes, cylinders, canvas-painted maps); the only
+   images are the shared Poké sprites and item sprites, shown as billboards.
+   No WebGL, or the script didn't load: the flat table above is used instead. */
+const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
+{
+  const W = 480, H = 270;
+  const DIR = { bottom: [0, 1], left: [-1, 0], top: [0, -1], right: [1, 0] };
+  const ROT = { bottom: 0, right: Math.PI / 2, top: Math.PI, left: -Math.PI / 2 };
+  // Muted maroon, brown, olive, dusty cream, two purples, and the screen greens (only HP screens reach those).
+  const PAL = ["070505", "140b0b", "24110f", "3a1a17", "55251f", "2a1d14", "45311f", "6b4a30",
+               "2c2f1a", "464a28", "6a6c3c", "8f8a60", "bfb38c", "d8ccaa", "24152e", "4a2d5e", "2f9c4c", "8af0a0"];
+  // Item boxes, bottom side: a 2x2 block left of the charge box, one right of it (local x, z).
+  const SLOT = k => [[-1.62, -1.1, 1.1, 1.62][(k < 4 ? 0 : 2) + k % 2], [1.12, 1.66][Math.floor((k % 4) / 2)]];
+  let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
+  let gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
+  const spots = [], sides = {}, cache = {};
+  const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0 };
+  let seed = 11;
+  const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const now = () => performance.now() / 1000;
+
+  function loadThree() {
+    return new Promise(resolve => {
+      if (window.THREE) return resolve(window.THREE);
+      const s = document.createElement("script");
+      s.src = CONTENT_DIR + "shotgun-roulette/vendor/three.min.js";
+      s.onload = () => resolve(window.THREE || null);
+      s.onerror = () => resolve(null);
+      document.head.appendChild(s);
+    });
+  }
+  const crisp = t => { t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; return t; };
+  function paint(w, h, draw) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    draw(c.getContext("2d"), w, h);
+    return c;
+  }
+  const canvasTex = (w, h, draw) => crisp(new T.CanvasTexture(paint(w, h, draw)));
+  function speckle(g, w, h, colors, count, size, alpha) {
+    for (let k = 0; k < count; k++) {
+      g.globalAlpha = alpha * (0.4 + rnd() * 0.6);
+      g.fillStyle = colors[Math.floor(rnd() * colors.length)];
+      const s = 1 + rnd() * size;
+      g.fillRect(rnd() * w, rnd() * h, s, s * (0.5 + rnd()));
+    }
+    g.globalAlpha = 1;
+  }
+  // A sprite image as a texture. The frame is sandboxed, so the image is fetched with CORS;
+  // if it can't be used, `fallback` draws a stand-in.
+  function imageTex(url, fallback) {
+    if (cache[url]) return cache[url];
+    const t = crisp(new T.Texture(paint(1, 1, () => {})));
+    t.needsUpdate = true;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    // WebGL2 fixes a texture's size at its first upload, so the placeholder's GL texture is let go first.
+    const swap = image => { t.image = image; t.dispose(); t.needsUpdate = true; };
+    img.onload = () => swap(img);
+    img.onerror = () => { if (fallback) swap(fallback()); };
+    img.src = url;
+    return cache[url] = t;
+  }
+  // Somebody with no buddy: a dark shape in the chair.
+  const silhouette = () => paint(64, 64, g => {
+    g.fillStyle = "#6b4a30";
+    g.beginPath(); g.arc(32, 22, 13, 0, 7); g.fill();
+    g.fillRect(12, 36, 40, 28);
+    g.beginPath(); g.arc(32, 38, 20, Math.PI, 0); g.fill();
+    g.fillStyle = "#2a1d14";
+    g.beginPath(); g.arc(32, 22, 11, 0, 7); g.fill();
+    g.fillRect(14, 36, 36, 28);
+    g.beginPath(); g.arc(32, 38, 18, Math.PI, 0); g.fill();
+  });
+
+  /* Painted textures. */
+  function feltTex() {
+    const S = 512, U = S / 4.4, C = S / 2;
+    return canvasTex(S, S, g => {
+      g.fillStyle = "#565c34"; g.fillRect(0, 0, S, S);
+      speckle(g, S, S, ["#4b5130", "#5f6639", "#6b5a40", "#3f4428", "#626840"], 1400, 16, 0.35);
+      for (let k = 0; k < 70; k++) {             // dirt
+        g.globalAlpha = 0.12 + rnd() * 0.2;
+        g.fillStyle = rnd() < 0.5 ? "#3a2c1c" : "#2c3020";
+        g.beginPath(); g.arc(rnd() * S, rnd() * S, 6 + rnd() * 28, 0, 7); g.fill();
+      }
+      g.globalAlpha = 0.35; g.strokeStyle = "#2a2418"; g.lineWidth = 1;
+      for (let k = 0; k < 160; k++) { const x = rnd() * S, y = rnd() * S; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rnd() * 18 - 9, y + rnd() * 18 - 9); g.stroke(); }
+      g.globalAlpha = 1;
+      // Painted lines: faded cream, a little uneven.
+      const line = (x1, y1, x2, y2) => { g.globalAlpha = 0.45 + rnd() * 0.25; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+      g.strokeStyle = "#d8ccaa"; g.lineWidth = 2.5;
+      g.globalAlpha = 0.55; g.strokeRect(0.1 * U, 0.1 * U, S - 0.2 * U, S - 0.2 * U);
+      g.beginPath(); g.arc(C, C, 1.22 * U, 0, 7); g.stroke();
+      g.setLineDash([5, 9]); g.beginPath(); g.arc(C, C, 1.4 * U, 0, 7); g.stroke(); g.setLineDash([]);
+      for (const pos of ["bottom", "left", "top", "right"]) {
+        g.save(); g.translate(C, C); g.rotate(-ROT[pos]);
+        line(-0.12 * U, 1.22 * U, -0.12 * U, 1.72 * U); line(0.12 * U, 1.22 * U, 0.12 * U, 1.72 * U);
+        line(0.86 * U, 0.86 * U, 2.1 * U, 2.1 * U);
+        line(-0.62 * U, 1.06 * U, -0.84 * U, 2.1 * U); line(0.62 * U, 1.06 * U, 0.84 * U, 2.1 * U);
+        g.lineWidth = 2;
+        for (let k = 0; k < 8; k++) {
+          const [x, z] = SLOT(k);
+          g.globalAlpha = 0.4 + rnd() * 0.3;
+          g.strokeRect((x - 0.23) * U, (z - 0.23) * U, 0.46 * U, 0.46 * U);
+        }
+        g.globalAlpha = 0.55; g.strokeRect(-0.4 * U, 1.74 * U, 0.8 * U, 0.42 * U);
+        g.globalAlpha = 0.45; g.fillStyle = "#d8ccaa"; g.font = "bold 11px monospace"; g.textAlign = "center";
+        g.fillText("STAY IN YOUR ZONE", -1.36 * U, 2.08 * U);
+        g.fillText("NO SWITCHING OUT", 1.36 * U, 2.08 * U);
+        g.lineWidth = 2.5;
+        g.restore();
+      }
+      // Wear on the paint.
+      g.globalAlpha = 0.3; g.fillStyle = "#565c34";
+      for (let k = 0; k < 260; k++) g.fillRect(rnd() * S, rnd() * S, 2 + rnd() * 10, 1 + rnd() * 3);
+      g.globalAlpha = 1;
+    });
+  }
+  const woodTex = () => canvasTex(128, 32, (g, w, h) => {
+    g.fillStyle = "#4a2f1f"; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 2) { g.globalAlpha = 0.25 + rnd() * 0.3; g.fillStyle = rnd() < 0.5 ? "#3a2418" : "#5a3a26"; g.fillRect(0, y, w, 1); }
+    g.globalAlpha = 0.5; g.fillStyle = "#7a5a40";
+    for (let k = 0; k < 40; k++) g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 14, 1);
+    g.globalAlpha = 1;
+  });
+  const metalTex = () => canvasTex(64, 64, (g, w, h) => {
+    g.fillStyle = "#4a463c"; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, ["#3a372f", "#5a554a", "#3b2a20"], 260, 4, 0.5);
+  });
+  const brickTex = () => canvasTex(256, 128, (g, w, h) => {
+    g.fillStyle = "#0e0807"; g.fillRect(0, 0, w, h);
+    for (let row = 0; row < 16; row++) for (let col = -1; col < 9; col++) {
+      const x = col * 32 + (row % 2) * 16, y = row * 8;
+      g.fillStyle = ["#2a1410", "#24120f", "#301812", "#1f100c"][Math.floor(rnd() * 4)];
+      g.fillRect(x + 1, y + 1, 30, 6);
+    }
+    speckle(g, w, h, ["#0a0606", "#3a1c16"], 300, 3, 0.4);
+  });
+  // Cracks of purple light in the back wall (an emissive map).
+  const crackTex = () => canvasTex(256, 128, (g, w, h) => {
+    g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#7a4aa0"; g.lineWidth = 2;
+    for (let k = 0; k < 6; k++) {
+      let x = 20 + rnd() * 216, y = rnd() * 30;
+      g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 9; s++) { x += rnd() * 24 - 12; y += 6 + rnd() * 12; g.lineTo(x, y); }
+      g.stroke();
+    }
+  });
+  const plankTex = () => canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#1a100c"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 16) { g.fillStyle = "#0c0706"; g.fillRect(x, 0, 1, h); }
+    speckle(g, w, h, ["#24160f", "#120a08"], 200, 6, 0.5);
+  });
+  const speakerTex = () => canvasTex(64, 64, (g, w, h) => {
+    g.fillStyle = "#1a1412"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#2c221e"; g.lineWidth = 3; g.strokeRect(2, 2, w - 4, h - 4);
+    for (const [y, r] of [[20, 12], [46, 15]]) {
+      g.fillStyle = "#2c221e"; g.beginPath(); g.arc(32, y, r + 3, 0, 7); g.fill();
+      g.fillStyle = "#0a0706"; g.beginPath(); g.arc(32, y, r, 0, 7); g.fill();
+      g.fillStyle = "#231a17"; g.beginPath(); g.arc(32, y, r / 3, 0, 7); g.fill();
+    }
+  });
+  const radioTex = () => canvasTex(64, 32, (g, w, h) => {
+    g.fillStyle = "#3a2a1e"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#8f8a60"; g.fillRect(6, 6, 30, 12);
+    g.fillStyle = "#3a2a1e"; for (let x = 8; x < 36; x += 4) g.fillRect(x, 8, 1, 8);
+    g.fillStyle = "#1a1210"; for (const x of [44, 54]) { g.beginPath(); g.arc(x, 12, 4, 0, 7); g.fill(); }
+    speckle(g, w, h, ["#1a1210", "#5a4030"], 60, 2, 0.5);
+  });
+  const blobTex = (color, alpha) => canvasTex(32, 32, (g, w, h) => {
+    const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, color); grd.addColorStop(1, "rgba(0,0,0,0)");
+    g.globalAlpha = alpha; g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  });
+  function plateTex(name) {
+    return canvasTex(128, 32, (g, w, h) => {
+      g.fillStyle = "#2a1d14"; g.fillRect(0, 0, w, h);
+      speckle(g, w, h, ["#1a120c", "#3a2a1e"], 80, 3, 0.6);
+      g.fillStyle = "#d8ccaa"; g.globalAlpha = 0.9; g.font = "bold 17px monospace"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(String(name).slice(0, 14).toUpperCase(), w / 2, h / 2 + 1);
+    });
+  }
+  // The charge screen: green bolts on black. Lost bolts flicker, then go dark.
+  const BOLT_PTS = [[8, 0], [1, 12], [6, 12], [4, 22], [12, 8], [7, 8], [9, 0]];
+  function drawScreen(s, t) {
+    const st = s.screen, g = st.ctx;
+    g.fillStyle = st.off ? "#030604" : "#06120a"; g.fillRect(0, 0, 64, 24);
+    if (!st.off) {
+      const gap = 2, bw = 9, total = st.max * (bw + gap) - gap, x0 = Math.round((64 - total) / 2);
+      for (let k = 0; k < st.max; k++) {
+        const dying = st.dying[k] && t - st.dying[k] < 0.9;
+        const lit = k < st.hp || (dying && Math.floor((t - st.dying[k]) * 14) % 2 === 0);
+        g.fillStyle = lit ? (Math.random() < 0.04 ? "#3cbf5a" : "#8af0a0") : "#143520";
+        g.beginPath();
+        BOLT_PTS.forEach(([x, y], i) => { const px = x0 + k * (bw + gap) + x * 0.68, py = 2 + y * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); });
+        g.closePath(); g.fill();
+      }
+    }
+    st.tex.needsUpdate = true;
+  }
+
+  /* The room. */
+  function build() {
+    scene = new T.Scene();
+    scene.background = new T.Color(0x070505);
+    scene.fog = new T.Fog(0x070505, 6, 14);
+    cam = new T.PerspectiveCamera(60, W / H, 0.05, 40);
+    scene.add(cam);
+    scene.add(new T.AmbientLight(0x503838, 0.5));
+    const lam = o => new T.MeshLambertMaterial(o);
+    const add = (geo, mat, x, y, z, parent = scene) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+    const box = (w, h, d, mat, x, y, z, parent) => add(new T.BoxGeometry(w, h, d), mat, x, y, z, parent);
+    const wood = woodTex(), metal = metalTex();
+    const woodMat = lam({ map: wood }), darkWood = lam({ map: wood, color: 0x777066 }), metalMat = lam({ map: metal, flatShading: true });
+    const darkMetal = lam({ map: metal, color: 0x6a6a6a, flatShading: true });
+
+    // Table: worn felt, a stepped wooden rim, a heavy body.
+    const top = add(new T.PlaneGeometry(4.4, 4.4), lam({ map: feltTex() }), 0, 0, 0);
+    top.rotation.x = -Math.PI / 2;
+    box(5.3, 1.2, 5.3, darkWood, 0, -0.61, 0);
+    for (const pos of Object.keys(DIR)) {
+      const g = new T.Group(); g.rotation.y = ROT[pos]; scene.add(g);
+      const long = pos === "bottom" || pos === "top";
+      box(long ? 5.24 : 4.4, 0.1, 0.42, woodMat, 0, 0.04, 2.41, g);
+      box(long ? 5.1 : 4.4, 0.07, 0.3, woodMat, 0, 0.125, 2.47, g);
+      box(long ? 4.4 : 4.4, 0.03, 0.04, darkWood, 0, 0.005, 2.2, g);
+      sides[pos] = { group: g, pos, seat: null };
+    }
+
+    // The turntable: beveled metal rings with small lights round the edge.
+    const ringA = add(new T.CylinderGeometry(0.98, 1.04, 0.09, 20), metalMat, 0, 0.045, 0);
+    const ringB = add(new T.CylinderGeometry(0.8, 0.86, 0.07, 20), darkMetal, 0, 0.12, 0);
+    add(new T.CylinderGeometry(0.58, 0.6, 0.03, 20), lam({ map: metal, color: 0x8a8a7a, flatShading: true }), 0, 0.17, 0);
+    ringA.userData.keep = ringB.userData.keep = true;
+    const lampMat = new T.MeshBasicMaterial({ color: 0xd8ccaa });
+    for (let k = 0; k < 16; k++) {
+      const a = k / 16 * Math.PI * 2;
+      add(new T.BoxGeometry(0.06, 0.03, 0.03), lampMat, Math.sin(a) * 1.0, 0.07, Math.cos(a) * 1.0).rotation.y = a;
+    }
+
+    // The shotgun: barrel along -z from the pivot, so turning the pivot points it.
+    gunPivot = new T.Group(); gunPivot.position.set(0, 0.24, 0); scene.add(gunPivot);
+    gunBody = new T.Group(); gunPivot.add(gunBody);
+    gunBody.scale.setScalar(1.35);
+    const gunMetal = lam({ color: 0x6e6860, flatShading: true }), gunWood = lam({ map: wood, color: 0xd8a888, flatShading: true });
+    const part = (geo, mat, x, y, z, rx = 0) => { const m = add(geo, mat, x, y, z, gunBody); m.rotation.x = rx; m.userData.pick = { kind: "gun" }; gunParts.push(m); return m; };
+    part(new T.CylinderGeometry(0.034, 0.034, 0.95, 7), gunMetal, 0, 0.03, -0.52, Math.PI / 2);
+    part(new T.CylinderGeometry(0.028, 0.028, 0.62, 7), gunMetal, 0, -0.03, -0.4, Math.PI / 2);
+    part(new T.BoxGeometry(0.1, 0.09, 0.26), gunWood, 0, -0.035, -0.36);
+    part(new T.BoxGeometry(0.1, 0.13, 0.34), gunMetal, 0, 0, 0.12);
+    part(new T.BoxGeometry(0.035, 0.08, 0.1), gunMetal, 0, -0.08, 0.16);
+    part(new T.BoxGeometry(0.09, 0.12, 0.48), gunWood, 0, -0.045, 0.52, 0.13);
+    muzzle = new T.PointLight(0xffd9a0, 0, 7, 1); muzzle.position.set(0, 0.05, -1.05); gunBody.add(muzzle);
+    shells = new T.Group(); scene.add(shells);
+
+    // Per seat: a charge box set into the edge, eight item spots, a chair, the buddy, a name plate.
+    const screenGeo = new T.PlaneGeometry(0.5, 0.2);
+    for (const pos of Object.keys(DIR)) {
+      const s = sides[pos], g = s.group;
+      const dev = new T.Group(); dev.position.set(0, 0, 1.94); g.add(dev);
+      const body = box(0.62, 0.14, 0.32, metalMat, 0, 0.07, 0, dev);
+      const lid = new T.Group(); lid.position.set(0, 0.17, 0); lid.rotation.x = 0.7; dev.add(lid);
+      const housing = box(0.56, 0.05, 0.26, lam({ map: metal, color: 0x8a8070, flatShading: true }), 0, 0, 0, lid);
+      const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 24;
+      const screenTex = crisp(new T.CanvasTexture(canvas));
+      const screen = add(screenGeo, new T.MeshBasicMaterial({ map: screenTex }), 0, 0.031, 0, lid);
+      screen.rotation.x = -Math.PI / 2;
+      screen.position.y = 0.026;
+      s.screen = { ctx: canvas.getContext("2d"), tex: screenTex, off: true, max: 0, hp: null, dying: {}, drawn: 0 };
+      s.light = new T.PointLight(0x3cbf5a, 0, 1.8, 1); s.light.position.set(0, 0.5, 1.9); g.add(s.light);
+      s.housing = housing;
+      for (const m of [body, housing, screen]) m.userData.pick = { kind: "seat", pos };
+      s.items = [];
+      for (let k = 0; k < 8; k++) {
+        const [x, z] = SLOT(k);
+        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.4, fog: true }));
+        const shadow = add(new T.PlaneGeometry(0.36, 0.2), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
+        shadow.rotation.x = -Math.PI / 2;
+        sprite.scale.set(0.44, 0.44, 1);
+        sprite.position.set(x, 0.24, z);
+        sprite.visible = shadow.visible = false;
+        if (pos === "bottom") sprite.userData.pick = { kind: "item", box: k };
+        g.add(sprite);
+        s.items.push({ sprite, shadow, key: null, using: 0, lift: 0 });
+      }
+      if (pos !== "bottom") {
+        const chair = new T.Group(); chair.position.set(0, 0, 3.15); g.add(chair);
+        const chairMat = lam({ map: wood, color: 0x5a4a40 });
+        box(0.9, 0.08, 0.8, chairMat, 0, -0.42, 0, chair);
+        box(0.9, 1.0, 0.08, chairMat, 0, 0.08, 0.38, chair);
+        for (const x of [-0.4, 0.4]) box(0.06, 0.5, 0.06, chairMat, x, -0.7, -0.35, chair);
+        const buddy = add(new T.PlaneGeometry(1.45, 1.45), lam({ map: imageTex("", silhouette), alphaTest: 0.4, side: T.DoubleSide }), 0, 0.72, 2.92, g);
+        buddy.userData.pick = { kind: "seat", pos };
+        s.buddy = buddy; s.buddyKey = "";
+        // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
+        const plate = box(0.9, 0.05, 0.22, [darkWood, darkWood, new T.MeshBasicMaterial({ map: plateTex(""), color: 0x8a8270 }), darkWood, darkWood, darkWood], 0, 0.185, 2.47, g);
+        plate.rotation.y = Math.PI;
+        plate.userData.pick = { kind: "seat", pos };
+        s.plate = plate; s.plateName = null;
+        s.faint = 0; s.flinch = -9;
+      }
+      pickables.push(body, housing, screen, ...(s.buddy ? [s.buddy, s.plate] : []), ...s.items.map(it => it.sprite));
+    }
+    pickables.push(...gunParts);
+
+    // My buddy, peeking up from the bottom-left corner of my view.
+    myBuddy = new T.Mesh(new T.PlaneGeometry(0.17, 0.17), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.4, color: 0x9a9080, fog: false }));
+    myBuddy.position.set(-0.56, -0.33, -0.75);
+    myBuddy.rotation.z = 0.12;
+    cam.add(myBuddy);
+
+    // Two stage spotlights on rods, cables strung across the top.
+    for (const [x, z, tx, tz] of [[-2.1, -1.5, -0.5, 0.5], [2.1, -1.5, 0.5, 0.5]]) {
+      const light = new T.SpotLight(0xffd6a0, 2.2, 9, 0.62, 0.65, 1);
+      light.position.set(x, 2.7, z); light.target.position.set(tx, 0, tz);
+      scene.add(light, light.target);
+      const lamp = new T.Group(); lamp.position.copy(light.position); scene.add(lamp); lamp.lookAt(tx, 0, tz);
+      const shell = add(new T.CylinderGeometry(0.2, 0.3, 0.44, 8, 1, true), lam({ color: 0x2a2624, side: T.DoubleSide, flatShading: true }), 0, 0, 0, lamp);
+      shell.rotation.x = Math.PI / 2;
+      add(new T.CircleGeometry(0.24, 8), new T.MeshBasicMaterial({ color: 0xd8ccaa }), 0, 0, 0.2, lamp);
+      box(0.04, 3, 0.04, darkMetal, x, 4.2, z);
+      spots.push({ light, base: 2.2, next: 2 + rnd() * 5, until: 0 });
+    }
+    const cableMat = lam({ color: 0x15100e });
+    for (let k = 0; k < 6; k++) {
+      const z = -3 + k * 0.9, sag = 0.6 + rnd() * 0.9;
+      const curve = new T.CatmullRomCurve3([new T.Vector3(-7, 4.2 + rnd(), z + rnd()), new T.Vector3(-2 + rnd() * 2, 3.6 - sag, z), new T.Vector3(2 + rnd() * 2, 3.7 - sag * 0.8, z + 0.4), new T.Vector3(7, 4.3, z - rnd())]);
+      scene.add(new T.Mesh(new T.TubeGeometry(curve, 24, 0.025, 4), cableMat));
+    }
+
+    // Walls, floor, speaker stacks and old radios in the shadows.
+    const brick = lam({ map: brickTex(), emissive: 0xffffff, emissiveMap: crackTex(), emissiveIntensity: 0.9 });
+    box(18, 9, 0.3, brick, 0, 2.5, -7.5);
+    const sideWall = lam({ map: brickTex() });
+    box(0.3, 9, 18, sideWall, -7.5, 2.5, 0);
+    box(0.3, 9, 18, sideWall, 7.5, 2.5, 0);
+    const floor = add(new T.PlaneGeometry(18, 18), lam({ map: plankTex() }), 0, -1.2, 0);
+    floor.rotation.x = -Math.PI / 2;
+    const speakerMat = [darkWood, darkWood, darkWood, darkWood, lam({ map: speakerTex() }), darkWood];
+    for (const sx of [-1, 1]) {
+      box(1.3, 1.6, 1.0, speakerMat, sx * 4.6, -0.4, -3.4).rotation.y = -sx * 0.35;
+      box(1.1, 1.1, 0.9, speakerMat, sx * 4.6, 0.95, -3.4).rotation.y = -sx * 0.3;
+      box(1.0, 0.9, 0.9, darkWood, sx * 3.9, -0.75, 0.4);
+      box(0.9, 0.46, 0.5, [darkWood, darkWood, darkWood, darkWood, lam({ map: radioTex() }), darkWood], sx * 3.9, -0.07, 0.4).rotation.y = -sx * 0.5;
+      box(0.7, 0.5, 0.6, lam({ map: metal, color: 0x5a4a40 }), sx * 5.2, -0.95, 1.8);
+    }
+
+    // Giratina hosts from behind the far side, lit from below.
+    giratina = add(new T.PlaneGeometry(3.4, 3.4), lam({ map: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.4, side: T.DoubleSide }), 0, 2.4, -5.0);
+    const under = new T.PointLight(0x7a5a9a, 1.6, 7, 1); under.position.set(0, 0.2, -3.6); scene.add(under);
+
+    // Distortion World: purple fog at the floor, dark motes drifting up.
+    const fogTex = blobTex("#5a3a6e", 0.6);
+    for (let k = 0; k < 6; k++) {
+      const f = add(new T.PlaneGeometry(7, 7), new T.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.55 }), rnd() * 10 - 5, -1.0 + k * 0.08, rnd() * 8 - 6);
+      f.rotation.x = -Math.PI / 2;
+      fogs.push({ mesh: f, x: f.position.x, z: f.position.z, p: rnd() * 6 });
+    }
+    const n = 170, pts = new Float32Array(n * 3);
+    for (let k = 0; k < n; k++) pts.set([rnd() * 14 - 7, rnd() * 5 - 1.2, rnd() * 10 - 7], k * 3);
+    const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(pts, 3));
+    dust = new T.Points(geo, new T.PointsMaterial({ color: 0x4a3a58, size: 1.5, sizeAttenuation: false }));
+    scene.add(dust);
+
+    // The post pass: palette, Bayer dither, vignette, grain, flashes.
+    post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+      uniforms: { tScene: { value: rt.texture }, uPal: { value: PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
+                  uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 } },
+      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      fragmentShader: [
+        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec2 uRes; uniform float uTime, uFlash, uHit; varying vec2 vUv;",
+        "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
+        "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
+        "float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }",
+        "void main(){",
+        "  vec2 px = floor(vUv * uRes);",
+        "  vec3 c = texture2D(tScene, vUv).rgb;",
+        "  c += uFlash * vec3(0.6, 0.5, 0.36);",
+        "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
+        "  c *= mix(0.03, 1.0, smoothstep(0.72, 0.2, d));",
+        "  c += (hash(px + fract(uTime) * 97.0) - 0.5) * 0.045;",
+        "  c = mix(c, vec3(0.42, 0.12, 0.09), uHit * 0.5);",
+        "  c += (bayer(px) - 0.5) * 0.1;",
+        "  bool hp = c.g > 0.3 && c.g > c.r * 1.6 && c.g > c.b * 1.3;",
+        "  vec3 best = uPal[0]; float bd = 99.0;",
+        "  for (int i = 0; i < 18; i++) {",
+        "    bool use = hp ? (i < 3 || i > 15) : (i < 16);",
+        "    vec3 e = (c - uPal[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
+        "    if (use && dd < bd) { bd = dd; best = uPal[i]; }",
+        "  }",
+        "  gl_FragColor = vec4(best, 1.0);",
+        "}"
+      ].join("\n"),
+      depthTest: false, depthWrite: false
+    }));
+    post.frustumCulled = false;
+  }
+  let postScene, postCam;
+
+  /* What the table shows, from the game's state. */
+  const seatAt = pos => sides[pos] && sides[pos].seat;
+  const sideOf = seat => sides[mpPos(seat)];
+  const angleTo = ([dx, dz]) => Math.atan2(-dx, -dz);
+  const itemOk = key => {
+    const you = M.p[mpMe];
+    return !((key === "potion" && you.hp >= you.max) || (key === "band" && you.band) ||
+      (key === "wave" && !(mpWaveOk(M, mpMe) && mpWaveTargets(M, mpMe).length)));
+  };
+  const seatOk = seat => seat !== null && seat !== undefined && mpCanAct() &&
+    (mpPick ? mpWaveTargets(M, mpMe).includes(seat) : R3.holding && mpUp(M, seat));
+  function buddyURL(name) {
+    const b = buddyOf[name];
+    return b ? SPRITE_DIR + (b.shiny ? "shiny/" : "") + b.species + ".png" : "";
+  }
+  R3.sync = () => {
+    if (!R3.ok || !M) return;
+    const act = mpCanAct();
+    if (!act) R3.holding = false;
+    const at = {};
+    for (let i = 0; i < M.n; i++) at[mpPos(i)] = i;
+    for (const pos of Object.keys(DIR)) {
+      const s = sides[pos], seat = at[pos] === undefined ? null : at[pos], p = seat === null ? null : M.p[seat];
+      s.seat = seat;
+      for (let k = 0; k < 8; k++) {
+        const it = s.items[k], key = p ? p.items[k] : null;
+        if (it.key !== key) {
+          it.key = key; it.using = 0;
+          if (key) { it.sprite.material.map = imageTex(ITEM_DIR + ITEMS[key].art + ".png"); it.sprite.material.opacity = 1; it.sprite.material.needsUpdate = true; }
+        }
+        it.sprite.visible = it.shadow.visible = !!key;
+      }
+      const st = s.screen;
+      const off = !p || p.left;
+      if (st.off !== off || st.max !== (p ? p.max : 0) || (p && st.hp !== p.hp)) {
+        if (p && st.max === p.max && st.hp !== null && p.hp < st.hp) for (let k = p.hp; k < st.hp; k++) st.dying[k] = now();
+        if (p && (st.max !== p.max || p.hp > (st.hp || 0))) st.dying = {};
+        Object.assign(st, { off, max: p ? p.max : 0, hp: p ? p.hp : 0, drawn: 0 });
+      }
+      s.light.intensity = off ? 0 : 0.85;
+      if (s.buddy) {
+        s.buddy.visible = !!p && !p.left;
+        s.plate.visible = !!p;
+        const name = p ? M.names[seat] : "";
+        if (s.plateName !== name) { s.plateName = name; s.plate.material[2].map = plateTex(name); s.plate.material[2].needsUpdate = true; }
+        const url = p ? buddyURL(name) : "";
+        if (s.buddyKey !== url + "|" + name) {
+          s.buddyKey = url + "|" + name;
+          s.buddy.material.map = url ? imageTex(url, silhouette) : imageTex("", silhouette);
+          s.buddy.material.needsUpdate = true;
+        }
+        s.out = !!(p && p.out);
+        if (!s.out) s.faint = 0;
+      }
+    }
+    const mine = buddyURL(M.names[mpMe]);
+    if (myBuddy.userData.url !== mine) { myBuddy.userData.url = mine; myBuddy.material.map = imageTex(mine, silhouette); myBuddy.material.needsUpdate = true; }
+    // The grip faces whoever's turn it is; held by me, the barrel follows what I point at.
+    if (!anim.aim && M.phase === "turn") {
+      const d = DIR[mpPos(M.turn)];
+      anim.goal = angleTo([-d[0], -d[1]]) + (R3.holding ? 0 : 0.55);
+      anim.liftGoal = R3.holding ? 1 : 0;
+    }
+    if (!R3.holding && !mpPick) hover = hover && hover.kind === "item" && act ? hover : null;
+  };
+  function holderDir() {
+    if (!M) return [0, 0];
+    const seat = anim.aim !== null ? anim.aimShooter : M.turn;
+    return DIR[mpPos(seat)] || [0, 0];
+  }
+
+  /* Pointer: hover, click, right-click. */
+  const ray = () => { const r = new T.Raycaster(); r.camera = cam; return r; };
+  let caster = null, mouse = null;
+  function pick() {
+    hover = null;
+    if (!mouseIn || !M || !mpCanAct()) return;
+    caster.setFromCamera(mouse, cam);
+    for (const hit of caster.intersectObjects(pickables, false)) {
+      const p = hit.object.userData.pick;
+      if (!p || !hit.object.visible) continue;
+      if (p.kind === "gun") { if (!R3.holding && !mpPick) { hover = p; break; } continue; }
+      if (p.kind === "item") {
+        const key = sides.bottom.items[p.box].key;
+        if (key && !R3.holding && !mpPick) { hover = { kind: "item", box: p.box, key, ok: itemOk(key) }; break; }
+        continue;
+      }
+      if (p.kind === "seat") { const seat = seatAt(p.pos); if (seatOk(seat)) { hover = { kind: "seat", seat }; break; } }
+    }
+  }
+  function hoverText() {
+    if (!hover || !M) return null;
+    if (hover.kind === "seat") return mpPick ? "Thunder Wave on " + (hover.seat === mpMe ? "you" : M.names[hover.seat]) + "."
+      : hover.seat === mpMe ? "Shoot yourself." : "Shoot " + M.names[hover.seat] + ".";
+    if (hover.kind === "gun") return "Pick up the gun.";
+    return null;
+  }
+  function onMove(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    mouse.set((event.clientX - box.left) / box.width * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1);
+    mouseIn = true;
+    const before = hover && JSON.stringify(hover);
+    pick();
+    const canvas = event.currentTarget;
+    canvas.style.cursor = hover && (hover.kind !== "item" || hover.ok) ? "pointer" : "default";
+    if (hover && hover.kind === "item") { showTip(hover.key, event); moveTip(event); } else $("#tip").hidden = true;
+    if ((hover && JSON.stringify(hover)) !== before) { const text = hoverText(); if (text) mpSay(text); else mpRender(); }
+  }
+  function onDown(event) {
+    if (!M) return;
+    if (event.button === 2) return R3.cancel();
+    if (event.button !== 0 || !mpCanAct()) return;
+    pick();
+    if (!hover) return;
+    if (hover.kind === "item" && hover.ok) { $("#tip").hidden = true; return mpUseItem(hover.box); }
+    if (hover.kind === "gun") { R3.holding = true; hover = null; sfx.chk(); return mpRender(); }
+    if (hover.kind === "seat") { const seat = hover.seat; hover = null; return mpPlateClick(seat); }
+  }
+  R3.cancel = () => {
+    if (!R3.holding && !mpPick) return false;
+    R3.holding = false; mpPick = null; hover = null;
+    mpRender();
+    return true;
+  };
+
+  /* Animations the game awaits. */
+  const SHELL_GEO = [];
+  R3.load = async (live, blank) => {
+    shells.clear();
+    if (!SHELL_GEO.length) SHELL_GEO.push(new T.CylinderGeometry(0.045, 0.045, 0.15, 8), new T.CylinderGeometry(0.05, 0.05, 0.045, 8));
+    const brass = new T.MeshLambertMaterial({ color: 0xc9a24a });
+    const list = [...Array(live).fill(0x9e2b2b), ...Array(blank).fill(0x6f7c8c)].map((color, k, all) => {
+      const g = new T.Group();
+      const hull = new T.Mesh(SHELL_GEO[0], new T.MeshLambertMaterial({ color })); hull.position.y = 0.1;
+      const base = new T.Mesh(SHELL_GEO[1], brass); base.position.y = 0.022;
+      g.add(hull, base);
+      g.position.set((k - (all.length - 1) / 2) * 0.17, 0, 1.28);
+      return g;
+    });
+    for (const g of list) { shells.add(g); sfx.click(); await wait(90); }
+    await wait(1300);
+    for (const g of shuffle([...list])) { shells.remove(g); sfx.click(); await wait(80); }
+    anim.recoil = 0.5; sfx.chk();
+    await wait(300);
+  };
+  R3.useItem = async (seat, box) => {
+    const it = sideOf(seat).items[box];
+    if (!it || !it.key) return;
+    it.using = now();
+    await wait(650);
+  };
+  R3.aim = async (shooter, target) => {
+    anim.aim = target; anim.aimShooter = shooter;
+    anim.goal = angleTo(DIR[mpPos(target)]);
+    anim.liftGoal = 1;
+    const pos = mpPos(target);
+    anim.yawGoal = pos === "left" ? 0.3 : pos === "right" ? -0.3 : 0;
+    anim.pitchGoal = pos === "bottom" ? -0.1 : pos === "top" ? 0.05 : 0;
+    await wait(1000);
+  };
+  R3.bang = async (target, hp) => {
+    anim.flash = 2; anim.muzzle = 2; anim.shake = 0.5; anim.recoil = 1;
+    const s = sideOf(target), st = s.screen;
+    if (st.hp !== null && hp < st.hp) for (let k = hp; k < st.hp; k++) st.dying[k] = now();
+    st.hp = hp; st.drawn = 0;
+    if (s.buddy) { s.flinch = now(); if (hp <= 0) s.out = true; }
+    if (target === mpMe) anim.hit = 1;
+    await wait(950);
+    R3.endShot();
+  };
+  R3.blank = async () => { anim.recoil = 0.45; await wait(700); R3.endShot(); };
+  R3.endShot = () => { anim.aim = null; anim.liftGoal = 0; anim.yawGoal = 0; anim.pitchGoal = 0; };
+
+  /* Every frame. */
+  const ease = (from, to, k) => from + (to - from) * Math.min(1, k);
+  function frame(ms) {
+    requestAnimationFrame(frame);
+    if ($("#mp-tablewrap").hidden) return;
+    const t = ms / 1000, dt = Math.min(0.05, t - last || 0.016);
+    last = t;
+    // Gun: turn the short way, lift when held or aimed, kick back on a shot.
+    // Held by me: the barrel follows whoever I'm pointing at, else away from me.
+    if (R3.holding && anim.aim === null) anim.goal = angleTo(hover && hover.kind === "seat" ? DIR[mpPos(hover.seat)] : [0, -1]);
+    const diff = ((anim.goal - anim.angle) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+    anim.angle += diff * Math.min(1, dt * 6);
+    anim.lift = ease(anim.lift, anim.liftGoal, dt * 7);
+    anim.recoil = Math.max(0, anim.recoil - dt * 3.5);
+    gunPivot.rotation.y = anim.angle;
+    gunBody.position.set(0, anim.lift * 0.3, anim.recoil * 0.14);
+    gunBody.rotation.x = anim.lift * 0.08 + anim.recoil * 0.12;
+    const gunGlow = hover && hover.kind === "gun" ? 0x3a2a18 : R3.holding ? 0x1e1408 : 0;
+    for (const m of gunParts) m.material.emissive.setHex(gunGlow);
+    muzzle.intensity = anim.muzzle > 0 ? 7 : 0;
+    // Camera: low at my edge, breathing, turning a little toward whoever is aimed at.
+    anim.yaw = ease(anim.yaw, anim.yawGoal, dt * 4);
+    anim.pitch = ease(anim.pitch, anim.pitchGoal, dt * 4);
+    anim.shake = Math.max(0, anim.shake - dt);
+    const sh = anim.shake * 0.09;
+    cam.position.set(Math.sin(t * 0.5) * 0.025 + (Math.random() - 0.5) * sh, 1.62 + Math.sin(t * 0.83) * 0.014 + (Math.random() - 0.5) * sh, 3.55);
+    cam.lookAt(0, -0.05, -0.75);
+    cam.rotateY(anim.yaw);
+    cam.rotateX(anim.pitch);
+    // Spotlights flicker now and then.
+    for (const s of spots) {
+      if (t > s.next) { s.until = t + 0.06 + Math.random() * 0.16; s.next = t + 3 + Math.random() * 7; }
+      s.light.intensity = s.base * (t < s.until ? 0.35 + Math.random() * 0.3 : 0.96 + Math.random() * 0.04);
+    }
+    // Seats: buddies bob, flinch red when hit, fall and fade when out.
+    let k = 0;
+    for (const pos of Object.keys(DIR)) {
+      const s = sides[pos];
+      if (t - s.screen.drawn > 0.11) { drawScreen(s, now()); s.screen.drawn = t; }
+      const hovered = hover && hover.kind === "seat" && hover.seat === s.seat;
+      s.housing.material.emissive.setHex(hovered ? 0x3a2a14 : 0);
+      for (const it of s.items) {
+        const up = pos === "bottom" && hover && hover.kind === "item" && hover.box === s.items.indexOf(it) && hover.ok;
+        it.lift = ease(it.lift, up ? 1 : 0, dt * 10);
+        const using = it.using ? Math.min(1, (now() - it.using) / 0.6) : 0;
+        it.sprite.position.y = 0.24 + it.lift * 0.09 + using * 0.5;
+        const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
+        it.sprite.scale.set(scale, scale, 1);
+        it.sprite.material.color.setScalar(1 + it.lift * 0.35);
+        it.sprite.material.opacity = 1 - using;
+        it.sprite.material.transparent = using > 0;
+      }
+      if (!s.buddy) continue;
+      s.plate.material[2].color.setHex(hovered ? 0xffffff : M && M.phase === "turn" && M.turn === s.seat ? 0xd8ccaa : 0x8a8270);
+      s.faint = ease(s.faint, s.out ? 1 : 0, dt * 2.2);
+      const flinching = t - s.flinch < 0.32 && now() - s.flinch < 0.32;
+      const b = s.buddy;
+      b.quaternion.copy(cam.quaternion);
+      b.rotateZ(-s.faint * 1.3);
+      b.position.set((flinching ? (Math.random() - 0.5) * 0.12 : 0) + s.faint * 0.3, 0.72 + Math.sin(t * 2 + k * 1.7) * 0.035 * (1 - s.faint) - s.faint * 0.45, 2.92);
+      if (flinching) b.material.color.setRGB(1.4, 0.45, 0.4);
+      else b.material.color.setScalar(hovered ? 1.35 : 1 - s.faint * 0.7);
+      k++;
+    }
+    myBuddy.position.y = -0.335 + Math.sin(t * 1.7) * 0.008;
+    // Giratina floats, and leans toward whoever holds the gun.
+    const hd = holderDir();
+    anim.gx = ease(anim.gx, hd[0] * 0.6, dt * 1.5);
+    anim.lean = ease(anim.lean, -hd[0] * 0.1, dt * 1.5);
+    giratina.position.set(anim.gx, 1.75 + Math.sin(t * 0.45) * 0.14, -4.6 - hd[1] * 0.2);
+    giratina.rotation.z = anim.lean;
+    // Fog and motes drift.
+    for (const f of fogs) f.mesh.position.set(f.x + Math.sin(t * 0.1 + f.p) * 1.2, f.mesh.position.y, f.z + Math.cos(t * 0.08 + f.p) * 0.9);
+    const arr = dust.geometry.attributes.position.array;
+    for (let i = 1; i < arr.length; i += 3) { arr[i] += dt * 0.06; if (arr[i] > 3.8) arr[i] = -1.2; }
+    dust.geometry.attributes.position.needsUpdate = true;
+    // Draw low, then the post pass.
+    const u = post.material.uniforms;
+    u.uTime.value = t;
+    u.uFlash.value = anim.flash > 0 ? 1 : 0;
+    u.uHit.value = anim.hit;
+    anim.hit = Math.max(0, anim.hit - dt * 2.5);
+    if (anim.flash > 0) anim.flash--;
+    if (anim.muzzle > 0) anim.muzzle--;
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, cam);
+    renderer.setRenderTarget(null);
+    renderer.render(postScene, postCam);
+  }
+
+  R3.start = async () => {
+    try {
+      T = await loadThree();
+      if (!T) return false;
+      const canvas = $("#mp-3d");
+      renderer = new T.WebGLRenderer({ canvas, antialias: false, powerPreference: "low-power" });
+      renderer.setPixelRatio(1);
+      renderer.setSize(W, H, false);
+      rt = new T.WebGLRenderTarget(W, H, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+      build();
+      postScene = new T.Scene(); postScene.add(post);
+      postCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      caster = ray(); mouse = new T.Vector2();
+      canvas.addEventListener("pointermove", onMove);
+      canvas.addEventListener("pointerleave", () => { mouseIn = false; hover = null; $("#tip").hidden = true; canvas.style.cursor = "default"; });
+      canvas.addEventListener("pointerdown", onDown);
+      canvas.addEventListener("contextmenu", event => event.preventDefault());
+      R3.ok = true;
+      document.body.classList.add("r3");
+      canvas.hidden = false;
+      requestAnimationFrame(frame);
+      return true;
+    } catch (error) {
+      console.log("Shotgun Roulette: the 3D table isn't available here, so the flat one is used.", error);
+      R3.ok = false;
+      return false;
+    }
+  };
+}
+
 async function mpHello() {
   let r;
   try { r = await mpLive.call("hello"); }
@@ -2301,6 +3051,8 @@ async function mpHello() {
     return mpLobbyNote("This room was closed.");
   }
   if (M) return;
+  await mpRoom3D;
+  if (M) return;
   mpRoom = room;
   const seats = (room.start && room.start.seats) || [];
   M = mpGame(seats, room.start && room.start.options && room.start.options.seed);
@@ -2313,6 +3065,8 @@ async function mpHello() {
   await mpPump(true);
   mpRender();
 }
+// The 3D room loads while the lobby is up; four seconds at most, then the flat table.
+const mpRoom3D = mpLive ? Promise.race([R3.start(), wait(4000)]) : Promise.resolve(false);
 if (mpLive) {
   document.body.classList.add("live");
   $("#lobby").hidden = true;
@@ -2343,6 +3097,14 @@ if (mpLive) {
   setInterval(mpTick, 250);
   mpHello();
 }
+
+addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  if (R3.ok && R3.cancel()) return;
+  if (!$("#mp-panel").hidden) { $("#mp-panel").hidden = true; return; }
+  parent.postMessage({ type: "bored:close" }, "*");
+});
 
 /* Solo title screen: open, create or join a room through the lobby bridge. */
 function mpNote(text) { $("#mp-note").textContent = text; }
