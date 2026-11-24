@@ -907,19 +907,22 @@ function timberline(peak){return peak.id==='snowbird'?2950:peak.id==='whistler'?
 function buildDistantTerrain(near,far){
   const group=new THREE.Group();
   const bounds=[
-    [far.minX,far.maxX,far.minZ,near.minZ],
-    [far.minX,far.maxX,near.maxZ,far.maxZ],
-    [far.minX,near.minX,near.minZ,near.maxZ],
-    [near.maxX,far.maxX,near.minZ,near.maxZ]
+    [far.minX,far.maxX,far.minZ,near.minZ+90],
+    [far.minX,far.maxX,near.maxZ-90,far.maxZ],
+    [far.minX,near.minX+90,near.minZ,near.maxZ],
+    [near.maxX-90,far.maxX,near.minZ,near.maxZ]
   ];
   const sample=(x,z)=>{
     const cx=clamp(x,near.minX,near.maxX),cz=clamp(z,near.minZ,near.maxZ);
     const edge=Math.hypot(x-cx,z-cz);
-    return lerp(near.height(cx,cz),far.height(x,z),sstep(0,650,edge));
+    const inside=Math.min(x-near.minX,near.maxX-x,z-near.minZ,near.maxZ-z);
+    // An overlapping lowered seam prevents gaps between the two mesh resolutions.
+    const lower=inside>=0?25:25*(1-sstep(0,160,edge));
+    return lerp(near.height(cx,cz),far.height(x,z),sstep(0,650,edge))-lower;
   };
   for(const [x0,x1,z0,z1] of bounds){
     if(x1<=x0||z1<=z0)continue;
-    // Side strips use the identical near-edge grid along their shared boundary.
+    // Coarse distant strips overlap slightly under the detailed mountain.
     const nx=Math.max(2,Math.min(180,Math.ceil((x1-x0)/95)));
     const nz=Math.max(2,Math.min(180,Math.ceil((z1-z0)/95)));
     const pos=[],col=[],idx=[];
@@ -943,8 +946,9 @@ function buildDistantTerrain(near,far){
 let panoramaCache=null;
 function loadPanorama(terrain,group){
   const peak=terrain.peak;
-  const pending=panoramaCache?.peak===peak?panoramaCache.promise:loadTerrain(peak,null,11,4);
-  panoramaCache={peak,promise:pending};
+  const zoom=game.quality==='high'?11:10,span=zoom===11?4:2;
+  const pending=panoramaCache?.peak===peak&&panoramaCache.zoom===zoom?panoramaCache.promise:loadTerrain(peak,null,zoom,span);
+  panoramaCache={peak,zoom,promise:pending};
   pending.then(far=>{
     if(world.group!==group||world.terrain!==terrain)return;
     group.add(buildDistantTerrain(terrain,far));
@@ -1085,26 +1089,26 @@ function buildTerrainMesh(terrain, run) {
 function buildTrees(terrain, run) {
   // One instanced, layered evergreen mesh: bark, dark underside and
   // snow-laden upper branches. Avoid thousands of separate tree objects.
-  const vertices=[],colors=[];
+  const vertices=[],colors=[],normals=[];
   const append=(geometry,base,snow)=>{
     const g=geometry.index?geometry.toNonIndexed():geometry;
     const p=g.attributes.position,n=g.attributes.normal;
     const green=new THREE.Color(base),white=new THREE.Color(0xe4edf3);
     for(let i=0;i<p.count;i++){
-      vertices.push(p.getX(i),p.getY(i),p.getZ(i));
+      vertices.push(p.getX(i),p.getY(i),p.getZ(i));normals.push(n.getX(i),n.getY(i),n.getZ(i));
       const c=green.clone().lerp(white,snow?clamp((n.getY(i)-.05)*1.8,0,.85):0);
       colors.push(c.r,c.g,c.b);
     }
     if(g!==geometry)g.dispose();geometry.dispose();
   };
   const trunk=new THREE.CylinderGeometry(.09,.14,3.1,5);trunk.translate(0,1.55,0);append(trunk,0x59443a,false);
-  for(const [radius,height,y] of [[1,1.55,1.0],[.80,1.55,1.65],[.56,1.5,2.32],[.34,1.15,3.03]]){
-    const tier=new THREE.LatheGeometry([new THREE.Vector2(.07,0),new THREE.Vector2(radius*.87,0),new THREE.Vector2(radius,.13),new THREE.Vector2(radius*.55,height*.46),new THREE.Vector2(0,height)],7);
+  for(const [radius,height,y] of [[1,1.65,1.0],[.70,1.65,1.85],[.40,1.55,2.65]]){
+    const tier=new THREE.LatheGeometry([new THREE.Vector2(.07,0),new THREE.Vector2(radius,.10),new THREE.Vector2(radius*.50,height*.52),new THREE.Vector2(0,height)],6);
     tier.translate(0,y-.4,0);append(tier,0x294c43,true);
   }
-  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.computeVertexNormals();
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));
   const mat=new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true});
-  const max=game.quality==='low'?2600:game.quality==='high'?9000:6000;
+  const max=game.quality==='low'?2200:game.quality==='high'?8500:4800;
   const inst = new THREE.InstancedMesh(geo, mat, max);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const m = new THREE.Matrix4();
@@ -1600,7 +1604,7 @@ function placeSkier(dt) {
   const t = world.terrain;
   skier.position.set(pl.x, pl.y + (pl.air ? 0.16 : 0.015), pl.z);
   skier.rotation.y=pl.heading;
-  if(world.contactShadow){const normal={x:0,y:1,z:0};t.normal(pl.x,pl.z,normal);const sh=world.contactShadow;sh.position.set(pl.x,t.height(pl.x,pl.z)+.045,pl.z);sh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(normal.x,normal.y,normal.z));sh.material.opacity=clamp(1-(pl.y-t.height(pl.x,pl.z))/6,0,1)*.8;sh.visible=true;}
+  if(world.contactShadow){const normal={x:0,y:1,z:0};t.normal(pl.x,pl.z,normal);const sh=world.contactShadow;sh.position.set(pl.x,t.height(pl.x,pl.z)+.045,pl.z);sh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(normal.x,normal.y,normal.z));sh.material.opacity=clamp(1-(pl.y-t.height(pl.x,pl.z))/6,0,1)*.8;sh.visible=game.mode!=='mountain';}
 
   const tilt = skier.userData.tilt;
   const body = skier.userData.body;
@@ -2883,7 +2887,7 @@ async function boot() {
   runScene = new THREE.Scene();
   runScene.fog = new THREE.FogExp2(FOG,0.000066);
   runScene.background = new THREE.Color(FOG);
-  camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.4, 60000);
+  camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.65, 60000);
   camera.position.set(0, 60, 0);
   runScene.add(camera);
   world.sky = buildSky(runScene);
