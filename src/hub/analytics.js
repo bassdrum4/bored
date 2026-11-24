@@ -139,7 +139,10 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   // Nothing is dropped: the queue is only ever delayed, a page that is closing
   // still flushes at once, and the keepalive flush covers the exit.
   const FLUSH_WINDOW = 8000, FLUSH_SOON = 1500;
-  const scheduleFlush = (delay = FLUSH_WINDOW) => {
+  // A hidden tab has no next scroll to wait for: its batch will not grow, so
+  // what is queued leaves on the short window instead of the full one.
+  const flushWindow = () => (document.hidden ? FLUSH_SOON : FLUSH_WINDOW);
+  const scheduleFlush = (delay = flushWindow()) => {
     const at = Date.now() + delay;
     // A shorter request (a finished run, an error) may pull an earlier
     // deadline forward, never the other way round.
@@ -384,10 +387,15 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       lastFlush = now(); flushSoon();
     }
   }, 1000);
-  // Hidden is not gone: pagehide follows when a tab really closes, and that
-  // path flushes at once with keepalive. Switching tabs therefore records its
-  // checkpoint without buying a request of its own.
-  const visibility = () => { sample(); emit('checkpoint'); flushSoon(); };
+  // Going hidden is a boundary, not a pause: the queue has nothing more coming
+  // to join it, and the tab may be closed from the task switcher without a
+  // pagehide. Send what is queued now, with keepalive so the request outlives
+  // the page if it is discarded. Coming back into view is not urgent.
+  const visibility = () => {
+    sample();
+    emit('checkpoint');
+    if (document.hidden) void flush(true); else flushSoon();
+  };
   let suspended = null;
   const leave = () => { suspended = run && { game: run.game, context: run.context }; emit('end', { reason: 'page_exit' }); run = null; detach(); void flush(true); };
   const resume = event => { if (event.persisted && suspended) { start(suspended.game, suspended.context); ready(!!suspended.context.external); suspended = null; } };
