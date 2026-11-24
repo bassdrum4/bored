@@ -52,6 +52,36 @@ Someone has to work through that list; it is not a single shared cause.
 
 ---
 
+## 2026-11-24 — GeoPeaks: the browser suite was never run
+
+**Symptom** — `npm test` cannot start in a cloud workspace: `CHROME_PATH` is
+empty and `~/.cache/puppeteer` holds no browser, so `puppeteer.launch` throws
+before a single assertion. GeoPeaks (`f76f444`, `src/games/content/geopeaks.html`)
+was added and pushed on top of that, so `tests/bored.test.cjs`,
+`tests/discovery.test.cjs` and `tests/visual.test.cjs` have not seen it.
+
+**What was checked instead** — `npm run games:check` prints
+`Game contract OK: 70 entries, 68 local, 60 scored, 40 daily, 2 online.`; the
+module script passes `node --check`; the hub fetches
+`games/previews/geopeaks.webp` for the card; and the game was played in the
+chat's cloud browser (globe picker, all twelve traced descents, gates, finish,
+pause and result sheets, no page errors). That is evidence the page runs, not
+evidence the repo's suite accepts it.
+
+**Rule for next time** — Set up B2–B4 before touching a game, or say outright
+that the suite did not run. `npx puppeteer browsers install chrome` on its own is
+not enough in this image: the shared libraries and the Fontconfig file from B2
+and B3 are still missing, and without them the renderer dies at `page.goto`.
+
+**Also** — `Check Bored` is already red on this base commit (see the entry
+above), so a failing run for GeoPeaks is not automatically its fault; compare
+the failing test names against that list first. And the preview hostname is new
+each time the workspace is recreated — the dev server needs the current
+`PREVIEW_HOSTS` value, and that cloud browser renders in software at roughly a
+quarter speed, so it is good for judging pixels and useless for judging timing.
+
+---
+
 ## 2026-11-24 — Announcement polls: one feature, five CI failures
 
 The poll/question work first landed as `a4d9e7d`. Its CI run `45291236352`
