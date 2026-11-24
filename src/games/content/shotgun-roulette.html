@@ -276,12 +276,47 @@
   .mp-lobby h2 { font: 400 30px/1.2 var(--display); margin-bottom: 4px }
   .mp-code-line { color: var(--dim); margin-bottom: 14px }
   .mp-code-line b { font: 600 22px var(--mono); color: var(--gold); letter-spacing: .14em; margin-left: 6px }
-  .mp-settings { display: grid; gap: 6px; margin: 4px 0 10px; color: var(--dim); font-size: 15px }
+  /* The room lobby is a CRT terminal, like the in-game log: green on black, a 2px dither, the mono font. */
+  .mp-lobby { position: relative; background-color: #040604; background-image: repeating-conic-gradient(#0b160d 0 25%, #040604 0 50%);
+              background-size: 2px 2px; border: 1px solid #2e5a38; color: #8af0a0; font: 13px/1.5 var(--mono) }
+  .mp-lobby h2 { font: 600 18px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #8af0a0 }
+  .mp-lobby h2::before { content: "> " }
+  .mp-lobby .mp-code-line { color: #5f9c6c; font: 13px/1.6 var(--mono) }
+  .mp-code { padding: 1px 10px; border: 1px dashed #2e5a38; background: none; color: #8af0a0; font: 600 22px var(--mono); letter-spacing: .16em; cursor: pointer }
+  .mp-code:hover { border-color: #8af0a0 }
+  .mp-code.flash { background: #8af0a0; color: #040604 }
+  .mp-lobby .copied { margin-left: 10px; color: #8af0a0 }
+  .mp-lobby .mp-seats li { border: 1px solid #1d3a24; background: #040604cc; color: #a7d8b0; font: 14px var(--mono); min-height: 60px }
+  .mp-lobby .mp-seats li.empty { border-style: dashed; color: #4f8a5c }
+  .mp-lobby .mp-seats .state { color: #4f8a5c; font: 12px var(--mono); text-transform: uppercase }
+  .mp-lobby .mp-seats .state.ready { color: #8af0a0 }
+  .mp-lobby .mp-seats .state.host { color: #c9bc94 }
+  .mp-lobby .mp-buddy .none { border-color: #2e5a38; color: #4f8a5c }
+  .mp-lobby .mp-btn { border: 1px solid #2e5a38; border-radius: 0; background: #040604; color: #8af0a0; font: 13px var(--mono); text-transform: uppercase; letter-spacing: .04em }
+  .mp-lobby .mp-btn:hover:not(:disabled) { border-color: #8af0a0 }
+  .mp-lobby .mp-btn.primary { background: #8af0a0; color: #040604; border-color: #8af0a0 }
+  .mp-lobby .mp-btn.quiet { color: #5f9c6c }
+  .mp-lobby .mp-btn.invite { padding: 4px 10px; font-size: 12px }
+  .mp-lobby .mp-note { color: #5f9c6c; font: 13px var(--mono) }
+  #mp-ready.big { flex: 1 1 100%; padding: 14px; font-size: 18px; letter-spacing: .08em; background: #040604; color: #8af0a0; border: 2px solid #8af0a0 }
+  #mp-ready.big.on { background: #8af0a0; color: #040604 }
+  .mp-settings { display: grid; gap: 6px; margin: 4px 0 10px; font: 13px var(--mono) }
   .mp-settings .row { display: flex; gap: 6px; align-items: center }
-  .mp-settings .label { width: 9em; color: var(--dim) }
-  .mp-settings .value { color: var(--ink) }
-  .mp-settings .chip { padding: 3px 10px; font-size: 14px }
-  .mp-settings .chip.on { background: var(--ink); color: #120c0c }
+  .mp-settings .label { width: 11em; color: #5f9c6c; text-transform: uppercase; font-size: 12px }
+  .mp-settings .chip { padding: 3px 10px; border: 1px solid #2e5a38; background: #040604; color: #8af0a0; font: 13px var(--mono); cursor: pointer }
+  .mp-settings .chip:hover:not(:disabled) { border-color: #8af0a0 }
+  .mp-settings .chip.on { background: #8af0a0; color: #040604; border-color: #8af0a0 }
+  .mp-settings .chip:disabled { cursor: default }
+  .mp-settings .chip.off { opacity: .35; text-decoration: line-through }
+  .mp-settings .readonly { color: #4f8a5c; font-size: 12px; margin-top: 2px }
+  .mp-invite { position: absolute; inset: 56px 26px 26px; z-index: 2; display: grid; grid-template-rows: auto auto 1fr auto; gap: 8px; padding: 14px;
+               background: #040604; border: 1px solid #8af0a0 }
+  .mp-invite[hidden] { display: none }
+  .mp-invite .head { text-transform: uppercase; letter-spacing: .06em }
+  .mp-invite input { padding: 6px 8px; border: 1px solid #2e5a38; background: #0b160d; color: #8af0a0; font: 14px var(--mono) }
+  .mp-invite .list { overflow-y: auto; display: grid; gap: 4px; align-content: start }
+  .mp-invite .list .mp-btn { text-align: left; text-transform: none; font-size: 14px }
+  .mp-invite .note { color: #5f9c6c }
   .mp-seats { list-style: none; display: grid; gap: 8px; margin-bottom: 12px }
   .mp-seats li { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid #3a2758; border-radius: 3px; min-height: 64px }
   .mp-seats li.empty { border-style: dashed; color: var(--dim) }
@@ -577,6 +612,12 @@
         <p class="mp-code-line" id="mp-code-line"></p>
         <ol class="mp-seats" id="mp-seats-list"></ol>
         <div class="mp-settings" id="mp-settings"></div>
+        <div class="mp-invite" id="mp-invite" hidden>
+          <p class="head">Invite a Bored Together member</p>
+          <input id="mp-invite-find" placeholder="Search names" autocomplete="off" spellcheck="false" aria-label="Search members">
+          <div class="list" id="mp-invite-list"></div>
+          <button class="mp-btn quiet" id="mp-invite-close" type="button">Close</button>
+        </div>
         <p class="mp-note" id="mp-lobby-note" role="status"></p>
         <div class="mp-actions">
           <button class="mp-btn primary" id="mp-ready" type="button">Ready</button>
@@ -2084,14 +2125,30 @@ function drawRoom(room) {
   const mine = seats.find(s => s.seat === room.me) || {};
   const host = mine.user && mine.user === room.host || mpIsHost;
   $("#mp-code-line").replaceChildren();
-  if (room.code) $("#mp-code-line").append("Room code", el("b", "", room.code), " Friends join with this code from the Multiplayer button.");
+  if (room.code) {
+    const code = el("button", "mp-code", room.code);
+    code.type = "button";
+    code.title = "Copy the room code";
+    code.onclick = () => copyCode(room.code, code);
+    $("#mp-code-line").append("Room code ", code, el("span", "copied", ""), el("br"), "Click to copy it. Friends join with it from the Multiplayer button.");
+  }
   else $("#mp-code-line").textContent = "This room has no code right now.";
   const list = $("#mp-seats-list");
   list.replaceChildren();
   const cap = Math.max(2, Math.min(4, Number(room.capacity) || 4));
   for (let k = 0; k < cap; k++) {
     const s = seats[k], li = el("li", s ? "" : "empty");
-    if (!s) { li.append(el("span", "mp-buddy"), el("span", "", "Empty seat"), el("span", "state", "")); list.appendChild(li); continue; }
+    if (!s) {
+      li.append(el("span", "mp-buddy"), el("span", "", "Empty seat"));
+      if (host) {
+        const invite = el("button", "mp-btn invite", "Invite friend");
+        invite.type = "button";
+        invite.onclick = openInvite;
+        li.append(invite);
+      } else li.append(el("span", "state", ""));
+      list.appendChild(li);
+      continue;
+    }
     const isHost = s.user === room.host;
     const state = isHost ? "Host" : s.state === "ready" ? "Ready" : s.state === "invited" ? "Invited" : "Not ready";
     li.append(buddyNode(s.handle), el("span", "", String(s.handle || "Player") + (s.seat === room.me ? " (you)" : "")),
@@ -2103,7 +2160,10 @@ function drawRoom(room) {
   const joined = seats.filter(s => s.state === "joined" || s.state === "ready");
   const waiting = joined.filter(s => s.user !== room.host && s.state !== "ready");
   $("#mp-ready").hidden = host;
-  $("#mp-ready").textContent = mine.state === "ready" ? "Not ready" : "Ready";
+  $("#mp-ready").classList.add("big");
+  $("#mp-ready").classList.toggle("on", mine.state === "ready");
+  $("#mp-ready").setAttribute("aria-pressed", String(mine.state === "ready"));
+  $("#mp-ready").textContent = mine.state === "ready" ? "Ready. Click to unready" : "Click when you're ready";
   $("#mp-start").hidden = !host;
   $("#mp-newcode").hidden = !host;
   $("#mp-start").disabled = joined.length < 2 || waiting.length > 0;
@@ -2113,14 +2173,14 @@ function drawRoom(room) {
       : waiting.length ? "Waiting for everyone to be ready." : "Everyone is ready. Start when you like."
     : mine.state === "ready" ? "Ready. The host starts the game." : "Press Ready when you are.");
 }
-// The host's settings: buttons for the host, the same choices as plain text for everyone else.
+// The host's settings: the same rows for everyone, buttons for the host and read-only for everyone else.
+// Escalating HP (2/3/4 by round) needs 3 rounds, so it is greyed out for a 1-round table.
 function drawSettings(room, host) {
-  const box = $("#mp-settings"), cfg = mpParseSettings(room.config && room.config.map);
-  const current = room.config && /^r[13]-h[234e]-t(15|20|30)$/.test(room.config.map || "") ? cfg : MP_DEFAULT;
+  const box = $("#mp-settings");
+  const current = room.config && /^r[13]-h[234e]-t(15|20|30)$/.test(room.config.map || "") ? mpParseSettings(room.config.map) : MP_DEFAULT;
   box.replaceChildren();
-  if (!host) { box.append(el("span", "label", "Table"), el("span", "value", mpSettingsText(current))); return; }
   const rows = [
-    ["Rounds", "rounds", v => v === 1 ? "1" : "3"],
+    ["Rounds", "rounds", v => String(v)],
     ["Starting HP", "hp", v => v === "e" ? "Escalating" : String(v)],
     ["Turn timer", "timer", v => v + "s"]
   ];
@@ -2128,20 +2188,79 @@ function drawSettings(room, host) {
     const row = el("div", "row");
     row.append(el("span", "label", label));
     for (const v of MP_SETTINGS[key]) {
-      const b = el("button", "mp-btn chip" + (current[key] === v ? " on" : ""), show(v));
+      const on = current[key] === v, off = key === "hp" && v === "e" && current.rounds === 1;
+      const b = el("button", "chip" + (on ? " on" : "") + (off ? " off" : ""), show(v));
       b.type = "button";
-      b.setAttribute("aria-pressed", String(current[key] === v));
-      b.onclick = () => {
+      b.setAttribute("aria-pressed", String(on));
+      b.disabled = !host || off;
+      if (off) b.title = "Escalating HP needs 3 rounds.";
+      if (host && !off) b.onclick = () => {
         const next = { ...current, [key]: v };
-        // Three rounds start from escalating HP, one round from 3 HP; the host can still change it.
-        if (key === "rounds") next.hp = v === 3 ? "e" : 3;
+        // One round can't escalate: Escalating falls back to 3 HP. Three rounds from the 1-round default escalate.
+        if (key === "rounds" && v === 1 && next.hp === "e") next.hp = 3;
+        if (key === "rounds" && v === 3 && current.rounds === 1 && current.hp === 3) next.hp = "e";
         mpRoomCall("lobby", { config: { ...MP_ROOM, map: mpSettingsCode(next) } });
       };
       row.appendChild(b);
     }
     box.appendChild(row);
   }
+  if (!host) box.appendChild(el("p", "readonly", "The host picks the table."));
 }
+// The room code to the clipboard. A sandboxed frame usually may not write it, so the hub does it then.
+async function copyCode(text, button) {
+  let ok = false;
+  // Only try here when this frame is allowed to (else the browser logs a policy violation); the hub copies otherwise.
+  let allowed = true;
+  try { allowed = !(document.featurePolicy && document.featurePolicy.allowsFeature && !document.featurePolicy.allowsFeature("clipboard-write")); } catch {}
+  if (allowed) try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+  if (!ok) { const reply = await ask("copy", { text }, 2000); ok = !!(reply && reply.ok); }
+  const flash = button.nextSibling;
+  if (flash) flash.textContent = ok ? "Copied!" : "Couldn't copy it. The code is " + text + ".";
+  button.classList.toggle("flash", ok);
+  setTimeout(() => { if (flash) flash.textContent = ""; button.classList.remove("flash"); }, 1600);
+}
+// The host invites a Bored Together member into an empty seat (sql/shotgun_roulette_mp_invite.sql). The hub
+// lists members as names with opaque references; the invitation waits for them in Bored Together and in the
+// game's Multiplayer panel, like one made when the room was opened.
+async function openInvite() {
+  const panel = $("#mp-invite"), list = $("#mp-invite-list"), find = $("#mp-invite-find");
+  panel.hidden = false;
+  find.value = "";
+  list.replaceChildren(el("p", "note", "Loading members..."));
+  let members = [];
+  try { members = await mpLive.call("members"); }
+  catch (error) { list.replaceChildren(el("p", "note", error.message || "Couldn't load the members.")); return; }
+  const seated = new Set(((mpRoom && mpRoom.seats) || []).filter(s => s.state !== "left").map(s => s.handle));
+  const draw = () => {
+    const q = find.value.trim().toLowerCase();
+    const shown = members.filter(m => !seated.has(m.name) && m.name.toLowerCase().includes(q)).slice(0, 40);
+    list.replaceChildren(...(shown.length ? shown.map(m => {
+      const b = el("button", "mp-btn quiet", m.name);
+      b.type = "button";
+      b.onclick = () => sendInvite(m);
+      return b;
+    }) : [el("p", "note", members.length ? "Nobody by that name." : "No Bored Together members to invite yet.")]));
+  };
+  find.oninput = draw;
+  draw();
+  find.focus();
+}
+async function sendInvite(member) {
+  $("#mp-invite").hidden = true;
+  const note = $("#mp-lobby-note");
+  try {
+    const room = await mpLive.call("invite", { ref: member.ref });
+    if (room) drawRoom(room);
+    mpLobbyNote(member.name + " is invited. They join from Bored Together or the Multiplayer button.");
+  } catch (error) {
+    mpLobbyNote(/Unknown operation/i.test(error.message || "") ? "Inviting into an open room isn't switched on yet. Share the room code instead."
+      : error.message || "The invitation didn't go through.");
+  }
+  note.dataset.held = "1";
+  setTimeout(() => { delete note.dataset.held; }, 5000);
+}
+$("#mp-invite-close").onclick = () => { $("#mp-invite").hidden = true; };
 async function mpRoomCall(op, payload) {
   for (const b of document.querySelectorAll("#mp-lobby button")) b.disabled = true;
   try {

@@ -543,3 +543,23 @@ test('co-op pings: a room that is not co-op has no pings and asks for none; a pi
   for (const bad of [{ x: -1, y: 1 }, { x: 1, y: 300 }, { x: 1.5, y: 1 }, { x: 'a', y: 1 }, {}]) await assert.rejects(t2.call('ping', bad), /Nothing to ping/);
   assert.equal(c.calls.filter(x => x.action === 'ping').length, 1, 'bad ones never reached the server');
 });
+
+test('inviting into an open lobby: members come as references, never account ids, and an invite sends the real id', async t => {
+  const r = room();
+  const sent = [];
+  const base = r.rpc;
+  r.rpc = async (action, args) => {
+    if (action === 'invite') { sent.push(args); r.seats.push({ seat: 1, user: args.user, handle: 'Friend', state: 'invited', controller: 'human' }); return base('game', args); }
+    return base(action, args);
+  };
+  const people = [{ id: OWNER, handle: 'Me' }, { id: 'user-friend', handle: 'Friend' }, { id: 'user-other', handle: 'Other' }];
+  const s = await session(t, r, { extra: { together: async op => { assert.equal(op, 'people'); return people; } } });
+  await s.call('hello', {});
+  const members = await s.call('members', {});
+  assert.deepEqual(members.map(m => m.name), ['Friend', 'Other'], 'not yourself');
+  assert.ok(members.every(m => Object.keys(m).join() === 'ref,name' && !/user-/.test(m.ref)), 'only a reference and a name');
+  const g = await s.call('invite', { ref: members[0].ref });
+  assert.deepEqual(sent.map(a => a.user), ['user-friend']);
+  assert.equal(g.seats[1].state, 'invited');
+  await assert.rejects(s.call('invite', { ref: 'made-up' }), /Pick the member again/);
+});
