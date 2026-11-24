@@ -5,6 +5,9 @@ name: Publish Bored
 on:
   push:
     branches: [main]
+  schedule:
+    # The upstream reveal is available after midnight Eastern.
+    - cron: '25 5 * * *'
   workflow_dispatch:
 
 permissions:
@@ -23,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
     environment:
@@ -35,6 +38,8 @@ jobs:
           # The changelog generator needs complete history, not a shallow clone.
           fetch-depth: 0
       - uses: actions/configure-pages@v5
+      - name: Restore or build daily Krillion assets
+        run: bash scripts/krillion-publish.sh
       - name: Regenerate changelog from main history
         run: node scripts/changelog.mjs
       # The hub asks for game documents with this stamp in the query string, so

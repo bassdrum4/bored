@@ -4,10 +4,11 @@ const { readFileSync } = require('node:fs');
 const { stripTypeScriptTypes } = require('node:module');
 const vm = require('node:vm');
 const { randomUUID } = require('node:crypto');
+const { gzipSync } = require('node:zlib');
 const source = stripTypeScriptTypes(readFileSync('supabase/functions/krillion/index.ts', 'utf8'));
 const date = '2026-11-24';
 const book = { date, dayNumber: 1, source: 'test', prompts: Array.from({length:7}, (_,i)=>({id:String(i),text:'Name a planet '+i,answers:[{answer:'Mercury',tier:'schooler'}]})) };
-function harness({missingBook=false, failRead=0, failInsert=0}={}) {
+function harness({missingBook=false, failRead=0, failInsert=0, staticSnapshot=null}={}) {
   let handler, now=Date.parse(date+'T12:00:00Z'), reads=0, inserts=0, upstream=0;
   const rows=new Map();
   let bank=[];
@@ -16,6 +17,16 @@ function harness({missingBook=false, failRead=0, failInsert=0}={}) {
   const fetch=async(input,init={})=>{
     const url=new URL(input), path=url.pathname, method=init.method||'GET', q=url.searchParams;
     if(url.hostname==='krillion.io'){upstream++;return json(book);}
+    if(url.hostname==='bassdrum4.github.io'){
+      if(!staticSnapshot)return json({},404);
+      if(path.endsWith('/manifest.json'))return json(staticSnapshot.manifest);
+      const hit=path.match(/\/(\d)\/(\d+)\.json\.gz$/);
+      if(hit)return new Response(gzipSync(JSON.stringify(staticSnapshot.rounds[Number(hit[1])].shards[Number(hit[2])])));
+      const sheet=path.match(/\/(\d)\/sheet\.json$/);
+      if(sheet)return json(staticSnapshot.rounds[Number(sheet[1])].sheet);
+      return json({},404);
+    }
+    if(path.endsWith('/krillion_static_days'))return json({},201);
     if(path.endsWith('/krillion_books')){
       if(method==='POST')return missingBook?json({},522):json({},201);
       reads++;
@@ -57,7 +68,7 @@ function harness({missingBook=false, failRead=0, failInsert=0}={}) {
     }
     throw new Error('Unexpected URL '+url);
   };
-  vm.runInNewContext(source,{Deno:{env:{get:()=> 'https://db.test'},serve:fn=>{handler=fn}},fetch,Date:Clock,Intl,URL,Response,Headers,AbortSignal,crypto:{randomUUID},console,setTimeout:fn=>fn()});
+  vm.runInNewContext(source,{Deno:{env:{get:()=> 'https://db.test'},serve:fn=>{handler=fn}},fetch,Date:Clock,Intl,URL,Response,Headers,AbortSignal,DecompressionStream,crypto:{randomUUID},console,setTimeout:fn=>fn()});
   return {rows, advance:ms=>{now+=ms;}, stats:()=>({reads,inserts,upstream}), bank:()=>bank, call:async(path,body)=>{
     const req=new Request('https://db.test/functions/v1/krillion/'+path,body===undefined?{}:{method:'POST',body:JSON.stringify(body)});
     const res=await handler(req);return {status:res.status,body:await res.json()};
@@ -98,4 +109,32 @@ test('a retried answer returns saved state and does not score twice',async()=>{
   assert.equal(b.body.alreadyScored,true);
   assert.equal(b.body.state.score,30);
   assert.equal(h.rows.get(runId).results.length,1);
+});
+
+test('static snapshots use local matching and verify every score against static shards',async()=>{
+  const {compileRound,bucket}=await import('../scripts/krillion-static.mjs');
+  const {createMatcher}=await import('../src/games/content/krillion/static-match.mjs');
+  const answers=[{answer:'Mercury',tier:'schooler',aliases:['the quick planet']},{answer:'Venus',tier:'rare'},{answer:'Mars',tier:'plankton'},{answer:'Twenty Three',tier:'deepcut'}];
+  const compiled=compileRound(answers);
+  const match=createMatcher(answers);
+  assert.equal(match('Mercurry'),'mercury');
+  assert.equal(match('23'),'twentythree');
+  assert.equal(match('random nonsense'),null);
+  assert.equal(compiled.shards[bucket('quickplanet')].quickplanet[0],'Mercury');
+  const manifest={...book,staticAnswers:true,prompts:book.prompts.map(({id,text})=>({id,text}))};
+  const h=harness({staticSnapshot:{manifest,rounds:Array(7).fill(compiled)}});
+  const runId=randomUUID();
+  const start=await h.call('start',{runId});
+  assert.equal(start.status,200);
+  assert.equal(start.body.staticAnswers,true);
+  assert.equal(h.stats().reads,0);
+  h.advance(4000);
+  const falseMatch=await h.call('answer',{runId,round:0,answer:'nonsense',candidate:'venus'});
+  assert.equal(falseMatch.body.rejected,true);
+  const typo=await h.call('answer',{runId,round:0,answer:'Mercurry',candidate:match('Mercurry')});
+  assert.equal(typo.body.correction,'Mercury');
+  const accepted=await h.call('answer',{runId,round:0,answer:'Mercury',confirm:true,candidate:'venus'});
+  assert.equal(accepted.body.result.score,30);
+  assert.equal(h.bank().length,0);
+  assert.equal(h.stats().upstream,0);
 });
