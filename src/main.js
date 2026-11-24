@@ -79,7 +79,11 @@ let getawayLoaderTimer = 0;
 let documentLoaderTimer = 0;
 let documentLoaderToken = null;
 let documentLoaderStarted = 0;
-const MIN_LOADING_MS = 2000;
+// The loading screens cover a fetch, they are not something to watch. A short
+// floor keeps a half-painted hub or game from flashing by; two seconds here was
+// a pause the player felt on every single open, even when the game was already
+// on screen behind it.
+const MIN_LOADING_MS = 400;
 
 function resetGetawayLoader() {
   clearTimeout(getawayLoaderTimer);

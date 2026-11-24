@@ -133,17 +133,38 @@ document.addEventListener('keydown', event => {
     document.activeElement.blur();
   }
 });
+// The library draws one capture per game, and `loading="lazy"` still fetched all
+// seventy of them on load (about 230 KB of WebP/SVG decoded for cards below the
+// fold). The source is attached when a card comes within a screen of the
+// viewport instead: one shared observer, and an image leaves it once it has a src.
+let previewWatcher = null;
+function loadPreview(image, src) {
+  if (!('IntersectionObserver' in window)) { image.src = src; return; }
+  if (!previewWatcher) {
+    previewWatcher = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const target = entry.target;
+        previewWatcher.unobserve(target);
+        const pending = target.dataset.previewSrc;
+        if (pending) { target.src = pending; delete target.dataset.previewSrc; }
+      }
+    }, { rootMargin: '700px 0px' });
+  }
+  image.dataset.previewSrc = src;
+  previewWatcher.observe(image);
+}
 function previewFor(slug) {
   const preview = element('span', 'game-preview');
   preview.setAttribute('aria-hidden', 'true');
   if (PREVIEWS[slug]) {
     const image = element('img');
-    image.src = PREVIEWS[slug];
     image.alt = '';
     image.width = 384;
     image.height = 240;
     image.loading = 'lazy';
     image.decoding = 'async';
+    loadPreview(image, PREVIEWS[slug]);
     preview.appendChild(image);
   } else {
     preview.classList.add('external-preview');
