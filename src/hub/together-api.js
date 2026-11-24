@@ -45,7 +45,7 @@ export async function togetherRPC(action, args = {}) {
   // An event is a client-side funnel indicator only; the authoritative matches
   // and moves tables determine whether a match actually completed.
   const tracked = { enroll: 'bt_enroll', challenge: 'bt_challenge', queue_join: 'bt_random',
-    match: 'bt_open', move: 'bt_move', pool_move: 'bt_move', submit_run: 'bt_move',
+    move: 'bt_move', pool_move: 'bt_move', submit_run: 'bt_move',
     rematch: 'bt_rematch', delete: 'bt_delete', leave: 'bt_leave' }[action];
   if (tracked && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
     detail: { kind: tracked, game: result?.game || args.game || null, match_id: result?.id || args.match_id || null }
