@@ -10,16 +10,28 @@ const book = { date, dayNumber: 1, source: 'test', prompts: Array.from({length:7
 function harness({missingBook=false, failRead=0, failInsert=0}={}) {
   let handler, now=Date.parse(date+'T12:00:00Z'), reads=0, inserts=0, upstream=0;
   const rows=new Map();
+  let bank=[];
   class Clock extends Date { static now(){return now;} }
   const json=(data,status=200)=>Response.json(data,{status});
   const fetch=async(input,init={})=>{
     const url=new URL(input), path=url.pathname, method=init.method||'GET', q=url.searchParams;
     if(url.hostname==='krillion.io'){upstream++;return json(book);}
     if(path.endsWith('/krillion_books')){
+      if(method==='POST')return missingBook?json({},522):json({},201);
       reads++;
       if(failRead-->0)return json({},522);
-      if(method==='POST')return json({},522);
       return json(missingBook?[]:[{book}]);
+    }
+    if(path.endsWith('/krillion_answer_keys')){
+      if(method==='POST'){for(const row of JSON.parse(init.body))if(!bank.some(hit=>hit.date===row.date&&hit.prompt_id===row.prompt_id&&hit.key===row.key))bank.push(row);return json({},201);}
+      const found=bank.filter(row=>row.date===q.get('date')?.slice(3));
+      return json(found.slice(0,1).map(row=>({prompt_id:row.prompt_id})));
+    }
+    if(path.endsWith('/rpc/krillion_clear_bank')){const body=JSON.parse(init.body);bank=bank.filter(row=>row.date!==body.p_date);return json(null);}
+    if(path.endsWith('/rpc/krillion_match_answer')){
+      const body=JSON.parse(init.body);
+      const hit=bank.find(row=>row.date===body.p_date&&row.prompt_id===body.p_prompt&&row.key===body.p_key);
+      return json(hit?{answer:hit.answer,tier:hit.tier,quip:hit.quip,correction:!hit.own}:null);
     }
     if(path.endsWith('/krillion_runs')){
       const id=q.get('id')?.slice(3);
@@ -42,7 +54,7 @@ function harness({missingBook=false, failRead=0, failInsert=0}={}) {
     throw new Error('Unexpected URL '+url);
   };
   vm.runInNewContext(source,{Deno:{env:{get:()=> 'https://db.test'},serve:fn=>{handler=fn}},fetch,Date:Clock,Intl,URL,Response,Headers,AbortSignal,crypto:{randomUUID},console,setTimeout:fn=>fn()});
-  return {rows, advance:ms=>{now+=ms;}, stats:()=>({reads,inserts,upstream}), call:async(path,body)=>{
+  return {rows, advance:ms=>{now+=ms;}, stats:()=>({reads,inserts,upstream}), bank:()=>bank, call:async(path,body)=>{
     const req=new Request('https://db.test/functions/v1/krillion/'+path,body===undefined?{}:{method:'POST',body:JSON.stringify(body)});
     const res=await handler(req);return {status:res.status,body:await res.json()};
   }};

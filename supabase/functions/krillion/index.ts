@@ -23,11 +23,24 @@ const TIERS: Record<string, { name: string; score: number }> = {
 };
 
 type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
-type Prompt = { id: string; text: string; answers: Answer[] };
+type Prompt = { id: string; text: string };
 type Book = { date: string; dayNumber: number; source: string; title?: string; prompts: Prompt[] };
+type StoredBook = Book & { prompts: (Prompt & { answers?: Answer[] })[] };
 type PickedPrompt = { id: string; text: string; date: string };
 type Match = Answer & { correction: boolean };
 type Loaded = { book: Book; stale: boolean };
+type BankRow = {
+  date: string;
+  prompt_id: string;
+  key: string;
+  answer: string;
+  tier: string;
+  quip: string | null;
+  num: number | null;
+  own: boolean;
+  ord: number;
+};
+type RevealIndex = { prompts: string[]; starts: Int32Array; ends: Int32Array; prompt: Int32Array };
 type AnswerResult = {
   round: number;
   rawAnswer: string | null;
@@ -75,21 +88,14 @@ function resetAt(date: string) {
   return etDate(probe) === day ? probe.getTime() : Date.parse(day + 'T05:00:00Z');
 }
 
-function distance(a: string, b: string, limit = Infinity) {
-  if (Math.abs(a.length - b.length) > limit) return limit + 1;
-  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    const next = [i];
-    for (let j = 1; j <= b.length; j++) {
-      next[j] = Math.min(next[j - 1] + 1, row[j] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    if (Math.min(...next) > limit) return limit + 1;
-    row = next;
-  }
-  return row[b.length];
-}
-
-const QUALIFIER = 16;
+const COMMON_ALIASES: Record<string, string[]> = {
+  mashedpotatoes: ['mashed', 'mash'],
+  frenchfries: ['fries'],
+  bakedpotato: ['baked potato', 'jacket potato']
+};
+// A plain object also answers for its prototype, so an answer named
+// "Constructor" would read Object.prototype.constructor — not iterable.
+const commonFor = (word: string) => Object.hasOwn(COMMON_ALIASES, word) ? COMMON_ALIASES[word] : [];
 const ONES: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
@@ -108,50 +114,35 @@ function numberValue(text: unknown) {
 
 // Mirrors public/rules.mjs in OpenKrillion, including typo, plural, numeric and
 // natural-language qualifier matching. Keep the two in step if either changes.
-function matchAnswer(input: string, answers: Answer[]): Match | null {
+function matchFromRow(row: any): Match | null {
+  if (!row || typeof row.answer !== 'string' || !TIERS[row.tier]) return null;
+  return {
+    answer: row.answer,
+    tier: row.tier,
+    ...(typeof row.quip === 'string' && row.quip ? { quip: row.quip } : {}),
+    correction: row.correction === true
+  };
+}
+
+// The spelling rules live next to the bank in Postgres: a big day's round holds
+// a couple of hundred thousand keys, which is more than this runtime will hold
+// as objects.
+async function matchStored(date: string, promptId: string, input: string): Promise<Match | null> {
   const key = bare(input);
   if (!key || key.length > 256) return null;
-  const commonAliases: Record<string, string[]> = {
-    mashedpotatoes: ['mashed', 'mash'],
-    frenchfries: ['fries'],
-    bakedpotato: ['baked potato', 'jacket potato']
-  };
-  // A plain object also answers for its prototype, so an answer named
-  // "Constructor" would read Object.prototype.constructor — not iterable.
-  const commonFor = (word: string) => Object.hasOwn(commonAliases, word) ? commonAliases[word] : [];
-  const entries: { word: string; a: Answer; key: string }[] = answers.flatMap(answer =>
-    [answer.answer, ...(answer.aliases || []), ...commonFor(bare(answer.answer))]
-      .map(word => ({ word, a: answer, key: bare(word) }))
-  );
-  const exact = entries.find(entry => entry.key === key);
-  if (exact) return { ...exact.a, correction: key !== bare(exact.a.answer) };
-  if (key.length > 4 && key.endsWith('s')) {
-    const singular = entries.find(entry => entry.key === key.slice(0, -1));
-    if (singular) return { ...singular.a, correction: true };
-  }
-  const numeric = numberValue(input);
-  if (numeric !== null) {
-    const numericEntry = entries.find(entry => numberValue(entry.key) === numeric);
-    if (numericEntry) return { ...numericEntry.a, correction: numericEntry.key !== key };
-  }
   const allowance = key.length < 4 ? 0 : key.length < 8 ? 1 : 2;
-  const candidates = entries.map(entry => ({ ...entry, d: distance(key, entry.key, allowance) }))
-    .filter(entry => entry.d <= allowance)
-    .sort((a, b) => a.d - b.d);
-  // A typo equally close to two different answers lands on the lower-scoring
-  // one, so a misspelling is never worth more than the answer it might have meant.
-  if (candidates.length) {
-    const best = candidates.filter(entry => entry.d === candidates[0].d)
-      .sort((a, b) => (TIERS[a.a.tier]?.score ?? 0) - (TIERS[b.a.tier]?.score ?? 0))[0];
-    return { ...best.a, correction: true };
-  }
-  const qualified = entries
-    .filter(entry => entry.key.length >= 4 && key.length > entry.key.length && key.length - entry.key.length <= QUALIFIER && key.startsWith(entry.key))
-    .sort((a, b) => b.key.length - a.key.length)[0];
-  if (qualified && entries.filter(entry => entry.key !== qualified.key && key.startsWith(entry.key)).length === 0) {
-    return { ...qualified.a, correction: true };
-  }
-  return null;
+  const response = await sb('rpc/krillion_match_answer', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_date: date,
+      p_prompt: promptId,
+      p_key: key,
+      p_num: numberValue(input),
+      p_allowance: allowance
+    })
+  });
+  if (!response.ok) throw new HttpError('The answer could not be checked. Retry this round.', 503);
+  return matchFromRow(await response.json());
 }
 
 class HttpError extends Error {
@@ -198,23 +189,23 @@ async function sb(path: string, init: RequestInit = {}) {
   }
 }
 
-async function cachedBook(date: string): Promise<Book | null> {
+async function cachedBook(date: string): Promise<StoredBook | null> {
   const query = 'krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1';
   const response = await sb(query);
   if (!response.ok) throw new HttpError('The puzzle cache is temporarily unavailable.', 503);
   const rows = await response.json();
   const value = rows?.[0]?.book;
   if (!value) return null;
-  return (typeof value === 'string' ? JSON.parse(value) : value) as Book;
+  return (typeof value === 'string' ? JSON.parse(value) : value) as StoredBook;
 }
 
-async function latestBook(): Promise<Book | null> {
+async function latestBook(): Promise<StoredBook | null> {
   const response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
   if (!response.ok) return null;
   const rows = await response.json();
   const value = rows?.[0]?.book;
   if (!value) return null;
-  return (typeof value === 'string' ? JSON.parse(value) : value) as Book;
+  return (typeof value === 'string' ? JSON.parse(value) : value) as StoredBook;
 }
 
 async function storeBook(book: Book) {
@@ -231,41 +222,216 @@ async function storeBook(book: Book) {
   if (!response.ok) throw new Error('Cache write failed with HTTP ' + response.status + '.');
 }
 
-function validateReference(today: any, reveal: any, date: string): Book {
-  if (today?.date !== date || reveal?.date !== date || today.prompts?.length !== 7 || reveal.prompts?.length !== 7) {
-    throw new Error('Reference puzzle date or round count mismatch.');
+async function callBank<T>(name: string, args: Record<string, unknown>): Promise<T> {
+  const response = await sb('rpc/' + name, { method: 'POST', body: JSON.stringify(args) });
+  if (!response.ok) throw new Error('Answer bank call ' + name + ' failed with HTTP ' + response.status + '.');
+  return await response.json() as T;
+}
+
+const ANSWER_BATCH = 4_000;
+
+// Every spelling a round accepts: its own name, its aliases, and the handful of
+// common short forms the original client hard-coded.
+function bankRows(date: string, promptId: string, answer: any, nextOrd: () => number): BankRow[] {
+  const tier = String(answer?.tier || '');
+  const label = typeof answer?.answer === 'string' ? answer.answer.trim() : '';
+  if (!label || !TIERS[tier]) return [];
+  const ownKey = bare(label);
+  const words = [label, ...(Array.isArray(answer.aliases) ? answer.aliases : []), ...commonFor(ownKey)];
+  const rows: BankRow[] = [];
+  for (const word of words) {
+    if (typeof word !== 'string') continue;
+    const key = bare(word);
+    if (!key) continue;
+    rows.push({
+      date,
+      prompt_id: promptId,
+      key,
+      answer: label,
+      tier,
+      quip: typeof answer.quip === 'string' && answer.quip ? answer.quip : null,
+      num: numberValue(key),
+      own: key === ownKey,
+      ord: nextOrd()
+    });
   }
+  return rows;
+}
+
+async function writeBank(rows: BankRow[]) {
+  if (!rows.length) return;
+  const response = await sb('krillion_answer_keys?on_conflict=date,prompt_id,key', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify(rows)
+  });
+  if (!response.ok) throw new Error('Cache write failed with HTTP ' + response.status + '.');
+}
+
+async function clearBank(date: string) {
+  const response = await sb('rpc/krillion_clear_bank', { method: 'POST', body: JSON.stringify({ p_date: date }) });
+  if (!response.ok) throw new Error('The answer bank could not be cleared.');
+}
+
+async function bankMissing(date: string) {
+  const response = await sb('krillion_answer_keys?date=eq.' + encodeURIComponent(date) + '&select=prompt_id&limit=1');
+  if (!response.ok) throw new HttpError('The answer bank is temporarily unavailable.', 503);
+  const rows = await response.json();
+  return !(Array.isArray(rows) && rows.length);
+}
+
+async function fetchToday(date: string): Promise<{ dayNumber: number; prompts: Prompt[] }> {
+  const response = await fetch(REFERENCE + '/api/today',
+    { signal: AbortSignal.timeout(10_000), headers: { 'User-Agent': USER_AGENT } });
+  if (!response.ok) throw new Error('Reference service unavailable.');
+  const today = await response.json();
+  const prompts = Array.isArray(today?.prompts) ? today.prompts : [];
+  if (today?.date !== date || prompts.length !== 7) throw new Error('Reference puzzle date or round count mismatch.');
   return {
-    date,
     dayNumber: Number(today.dayNumber) || 0,
-    source: 'Reference snapshot from krillion.io',
-    prompts: today.prompts.map((prompt: any) => {
-      const source = reveal.prompts.find((entry: any) => entry.id === prompt.id && entry.text === prompt.text);
-      if (!source?.answers?.length) throw new Error('Missing reference answer set.');
-      return {
-        id: String(prompt.id),
-        text: String(prompt.text),
-        answers: source.answers
-          .filter((answer: any) => typeof answer.answer === 'string' && TIERS[answer.tier])
-          .map((answer: any) => ({
-            answer: answer.answer,
-            tier: answer.tier,
-            ...(answer.quip ? { quip: String(answer.quip) } : {}),
-            ...(Array.isArray(answer.aliases) ? { aliases: answer.aliases.filter((alias: unknown) => typeof alias === 'string') } : {})
-          }))
-      };
-    })
+    prompts: prompts.map((prompt: any) => ({ id: String(prompt.id), text: String(prompt.text) }))
   };
 }
 
-async function fetchReference(date: string): Promise<Book> {
-  const headers = { 'User-Agent': USER_AGENT };
-  const [todayResponse, revealResponse] = await Promise.all([
-    fetch(REFERENCE + '/api/today', { signal: AbortSignal.timeout(5_000), headers }),
-    fetch(REFERENCE + '/api/reveal?date=' + encodeURIComponent(date), { signal: AbortSignal.timeout(5_000), headers })
-  ]);
-  if (!todayResponse.ok || !revealResponse.ok) throw new Error('Reference service unavailable.');
-  return validateReference(await todayResponse.json(), await revealResponse.json(), date);
+async function fetchReveal(date: string): Promise<string> {
+  // A big day's reveal is 33 MB and takes the reference site a couple of
+  // seconds, so this hop is given more room than a database read.
+  const response = await fetch(REFERENCE + '/api/reveal?date=' + encodeURIComponent(date),
+    { signal: AbortSignal.timeout(90_000), headers: { 'User-Agent': USER_AGENT } });
+  if (!response.ok) throw new Error('Reference service unavailable.');
+  return await response.text();
+}
+
+function objectEnd(text: string, start: number) {
+  let depth = 0, inString = false, escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === 92) escaped = true;
+      else if (ch === 34) inString = false;
+      continue;
+    }
+    if (ch === 34) inString = true;
+    else if (ch === 123 || ch === 91) depth += 1;
+    else if (ch === 125 || ch === 93) {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  throw new Error('Reference answer is unterminated.');
+}
+
+// The reveal is one JSON document of 350k answers. Parsing it whole is more
+// object graph than the runtime holds, so the text is walked once to find where
+// each answer object starts and ends, and each one is parsed on its own.
+function indexReveal(text: string): RevealIndex {
+  const prompts: string[] = [];
+  const starts: number[] = [], ends: number[] = [], owner: number[] = [];
+  let depth = 0, inString = false, escaped = false;
+  let promptsDepth = 0, promptDepth = 0, answersDepth = 0, current = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === 92) escaped = true;
+      else if (ch === 34) inString = false;
+      continue;
+    }
+    if (ch === 34) { inString = true; continue; }
+    if (ch === 123) {
+      if (answersDepth && depth === answersDepth) {
+        const end = objectEnd(text, i);
+        starts.push(i);
+        ends.push(end);
+        owner.push(current);
+        i = end;
+        continue;
+      }
+      if (promptsDepth && depth === promptsDepth) {
+        promptDepth = depth + 1;
+        const id = /^\{"id":"([^"]{1,64})"/.exec(text.slice(i, i + 600));
+        prompts.push(id ? id[1] : '');
+        current = prompts.length - 1;
+      }
+      depth += 1;
+      continue;
+    }
+    if (ch === 91) {
+      depth += 1;
+      const tail = text.slice(Math.max(0, i - 11), i + 1);
+      if (tail.endsWith('"prompts":[')) promptsDepth = depth;
+      else if (promptDepth && depth === promptDepth + 1 && tail.endsWith('"answers":[')) answersDepth = depth;
+      continue;
+    }
+    if (ch === 125 || ch === 93) {
+      if (answersDepth && depth === answersDepth) answersDepth = 0;
+      if (promptDepth && depth === promptDepth) promptDepth = 0;
+      if (promptsDepth && depth === promptsDepth) promptsDepth = 0;
+      depth -= 1;
+    }
+  }
+  return { prompts, starts: Int32Array.from(starts), ends: Int32Array.from(ends), prompt: Int32Array.from(owner) };
+}
+
+async function ingestReference(date: string): Promise<Book> {
+  const [today, text] = await Promise.all([fetchToday(date), fetchReveal(date)]);
+  const index = indexReveal(text);
+  const wanted = new Map(today.prompts.map((prompt, position) => [prompt.id, position]));
+  const seen = new Set(index.prompts.filter(id => wanted.has(id)));
+  if (seen.size !== 7) throw new Error('Reference prompt set mismatch.');
+  await clearBank(date);
+  let ord = 0;
+  const filled = new Set<string>();
+  const nextOrd = () => ord++;
+  for (let at = 0; at < index.starts.length; at += ANSWER_BATCH) {
+    const rows: BankRow[] = [];
+    for (let i = at; i < Math.min(at + ANSWER_BATCH, index.starts.length); i++) {
+      let answer: any;
+      try { answer = JSON.parse(text.slice(index.starts[i], index.ends[i] + 1)); } catch { continue; }
+      const promptId = index.prompts[index.prompt[i]];
+      const filledRows = bankRows(date, promptId, answer, nextOrd);
+      if (filledRows.length) filled.add(promptId);
+      rows.push(...filledRows);
+    }
+    await writeBank(rows);
+  }
+  if (filled.size !== 7) throw new Error('Reference answer set is incomplete.');
+  return {
+    date,
+    dayNumber: today.dayNumber,
+    source: 'Reference snapshot from krillion.io',
+    prompts: today.prompts
+  };
+}
+
+// Days cached before the bank existed still carry their answers inside the
+// stored book. Their rows are written once, on the first dive that asks for
+// them, and the book is then kept as prompts only.
+async function ensureBank(date: string, cached: StoredBook): Promise<Book> {
+  const book: Book = {
+    date: String(cached.date || date),
+    dayNumber: Number(cached.dayNumber) || 0,
+    source: String(cached.source || ''),
+    ...(cached.title ? { title: String(cached.title) } : {}),
+    prompts: (cached.prompts || []).map(prompt => ({ id: String(prompt.id), text: String(prompt.text) }))
+  };
+  if (!(await bankMissing(date))) return book;
+  const legacy = (cached.prompts || []).some(prompt => Array.isArray(prompt.answers) && prompt.answers.length);
+  if (!legacy) return book;
+  await clearBank(date);
+  let ord = 0;
+  const nextOrd = () => ord++;
+  let rows: BankRow[] = [];
+  for (const prompt of cached.prompts || []) {
+    for (const answer of Array.isArray(prompt?.answers) ? prompt.answers : []) {
+      rows.push(...bankRows(date, String(prompt.id), answer, nextOrd));
+      if (rows.length >= ANSWER_BATCH) { await writeBank(rows); rows = []; }
+    }
+  }
+  await writeBank(rows);
+  await storeBook(book);
+  return book;
 }
 
 // Per-isolate cache keyed by requested date. Archive play can span several dates.
@@ -280,17 +446,17 @@ async function loadBook(date: string): Promise<Loaded> {
     const cached = await cachedBook(date);
     let loaded: Loaded;
     if (cached?.prompts?.length === 7) {
-      loaded = { book: cached, stale: false };
+      loaded = { book: await ensureBank(date, cached), stale: false };
     } else {
       try {
-        const fresh = await fetchReference(date);
+        const fresh = await ingestReference(date);
         // Never start a ranked run against a book that was not durably saved.
         await storeBook(fresh);
         loaded = { book: fresh, stale: false };
       } catch (error) {
         const latest = await latestBook();
         if (!latest?.prompts?.length) throw error;
-        loaded = { book: latest, stale: true };
+        loaded = { book: await ensureBank(String(latest.date || ''), latest), stale: true };
       }
     }
     // Do not pin an older fallback book as today's puzzle. Retry that shortly.
@@ -488,14 +654,17 @@ Deno.serve(async (req: Request) => {
         const comparison = run.mode === 'daily'
           ? dailyComparison(run, await dailyScores(run.date))
           : { population: 0, betterThan: null, dist: Array(71).fill(0) };
+        // A round can hold 195k answers; the sheet shows the deepest page of
+        // them and says how many landed in total.
+        const sheets = await Promise.all(book.prompts.map(prompt =>
+          callBank<{ total: number; answers: { answer: string; tier: string; quip: string | null; score: number }[] }>(
+            'krillion_review', { p_date: book.date, p_prompt: prompt.id, p_limit: 200 }).catch(() => ({ total: 0, answers: [] }))));
         return reply({
-          prompts: book.prompts.map(prompt => ({
+          prompts: book.prompts.map((prompt, index) => ({
             id: prompt.id,
             text: prompt.text,
-            answers: prompt.answers
-              .slice()
-              .sort((a, b) => TIERS[b.tier].score - TIERS[a.tier].score || a.answer.localeCompare(b.answer))
-              .map(answer => ({ ...answer, score: TIERS[answer.tier].score }))
+            total: sheets[index]?.total ?? 0,
+            answers: sheets[index]?.answers ?? []
           })),
           ...comparison
         });
@@ -560,7 +729,7 @@ Deno.serve(async (req: Request) => {
       const timely = receivedAt <= windowStart + ROUND_MS + 1_500;
       const raw = String(body.answer ?? '').trim().slice(0, 256);
       const prompt = book.prompts[round];
-      const match = raw && timely ? matchAnswer(raw, prompt.answers) : null;
+      const match = raw && timely ? await matchStored(book.date, prompt.id, raw) : null;
       if (!match && raw && !late && !body.timeout) {
         return reply({ rejected: true, message: `“${raw}”: no echo. try again` });
       }
@@ -628,11 +797,13 @@ Deno.serve(async (req: Request) => {
       const book = await bookForRun(run);
       const prompt = book.prompts[Number(run.round)];
       if (!prompt) throw new HttpError('This dive is over.', 409);
-      const gem = prompt.answers.find(answer => answer.tier === 'krillion') || prompt.answers[prompt.answers.length - 1];
+      const sheet = await callBank<{ count: number; deepest: string | null }>('krillion_hint',
+        { p_date: book.date, p_prompt: prompt.id });
+      if (!sheet?.count || !sheet.deepest) throw new HttpError('This dive is over.', 409);
       await updateRun(run.id, { hint_used: true });
       return reply({
         used: true,
-        hint: `${prompt.answers.length} answers land here. The deepest one starts with “${gem.answer[0].toUpperCase()}”.`
+        hint: `${sheet.count} answers land here. The deepest one starts with “${String(sheet.deepest)[0].toUpperCase()}”.`
       });
     }
 
