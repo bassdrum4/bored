@@ -19,3 +19,5 @@ Integration follow-up: the patched build is inlined in the game document so hub 
 
 ## Bored survival overhaul
 The default game is now a separately implemented, original-art 20-wave autobattler, with a new save key (bored.squaretato.save.v2). The prior MIT-declared version is retained at legacy.html for existing saves and provenance. No commercial game code, artwork, or audio was copied. Reference for generic mechanics: https://brotato.wiki.spellsandguns.com/Waves and https://brotato.wiki.spellsandguns.com/Shop. The gameplay is inspired by the standard wave/shop loop, not a claim of exact parity.
+
+Second pass: difficulty-tier schedule, material bag, rare elite crates, destructible trees, regeneration formula, weapon aiming graphics and browser smoke test. Reference: https://brotato.wiki.spellsandguns.com/Dangers, https://brotato.wiki.spellsandguns.com/Materials, https://brotato.wiki.spellsandguns.com/HP_Regeneration.
