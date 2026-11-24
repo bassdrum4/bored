@@ -12,7 +12,7 @@ if [ -n "$old" ]; then
   git fetch --no-tags --depth=1 origin "$ref"
   git archive FETCH_HEAD | tar -x -C "$data"
 fi
-if [ ! -f "$data/$date_et/manifest.json" ]; then
+if [ ! -f "$data/$date_et/manifest.json" ] && { [ -z "$old" ] || [ "$GITHUB_EVENT_NAME" = schedule ] || [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; }; then
   fresh="$RUNNER_TEMP/krillion-fresh"
   mkdir -p "$fresh"
   if node scripts/krillion-static.mjs "$fresh" "$date_et"; then
@@ -24,14 +24,18 @@ if [ ! -f "$data/$date_et/manifest.json" ]; then
     export GIT_INDEX_FILE="$RUNNER_TEMP/krillion-git-index"
     export GIT_DIR="$GITHUB_WORKSPACE/.git"
     export GIT_WORK_TREE="$data"
-    (
+    if ! (
+      set -e
       cd "$data"
       git read-tree --empty
       git add -f --all -- .
       tree="$(git write-tree)"
       commit="$(git -c user.name=github-actions -c user.email=github-actions@github.com commit-tree "$tree" -m "Krillion static snapshot $date_et")"
       git push --force-with-lease="$ref:$old" origin "$commit:$ref"
-    )
+    ); then
+      echo "::warning::Could not persist generated data; leaving existing server fallback in place"
+      rm -rf "$data/$date_et"
+    fi
     unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE
   else
     echo "::warning::Krillion upstream unavailable; keeping previous static assets and server fallback"
