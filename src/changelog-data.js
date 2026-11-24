@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 943,
+  "count": 945,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"88a3ef50","date":"2026-11-24","author":"Daniel Lowe","subject":"Repair browser regressions and invalidate leaderboard card cache on score updates","pr":339},
+  {"sha":"03c6771e","date":"2026-11-24","author":"Daniel Lowe","subject":"Add Squaretato survival arena","pr":337},
   {"sha":"af43d742","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix disposable DB migration isolation and Pages artifact registration race","pr":338},
   {"sha":"e592cfbf","date":"2026-11-24","author":"Daniel Lowe","subject":"Visual overhaul for GeoPeaks: alpine panorama, snow and forests","pr":336},
   {"sha":"232d7cd1","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix CI fixture setup and browser test timing regressions","pr":335},
