@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 892,
+  "count": 893,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"2fd653d","date":"2026-11-24","author":"Codebuff","subject":"Document past failures and their fixes for the next agent"},
+  {"sha":"54722d9","date":"2026-11-23","author":"Daniel Lowe","subject":"Fix Detroit launch boost expiry and daily popularity cache rollover"},
   {"sha":"685ca3e","date":"2026-11-23","author":"Daniel Lowe","subject":"Fix missing active-time telemetry in sandboxed and late-ready games","pr":312},
   {"sha":"01ce711","date":"2026-11-23","author":"Codebuff","subject":"Add the missing announcements base schema to the migrations"},
   {"sha":"a4d9e7d","date":"2026-11-23","author":"Codebuff","subject":"Let announcements ask: polls and open-ended questions"},
