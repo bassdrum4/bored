@@ -166,11 +166,15 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     count.hidden = !unread.length;
     count.textContent = unread.length > 9 ? '9+' : String(unread.length);
     $('announcement-toggle').setAttribute('aria-label', unread.length ? unread.length + ' unread announcements' : 'Announcements');
+    // The boot screen covers the hub for its first moment. A banner drawn under
+    // it can be neither read nor clicked, so it waits until the shell is up.
+    const boot = $('hub-loading');
+    const booting = Boolean(boot && !boot.hidden);
     const banner = $('announcement-banner');
-    banner.replaceChildren(...unread.slice(0, 1).map(e => card(e, true)));
-    banner.hidden = !unread.length;
+    banner.replaceChildren(...(booting ? [] : unread.slice(0, 1).map(e => card(e, true))));
+    banner.hidden = booting || !unread.length;
     reserveBannerSpace(banner);
-    if (!document.hidden && unread.length && !seenBannerImpressions.has(unread[0].id)) {
+    if (!booting && !document.hidden && unread.length && !seenBannerImpressions.has(unread[0].id)) {
       seenBannerImpressions.add(unread[0].id);
       track('announcement_impression', { surface: 'announcement', announcement_id: unread[0].id });
     }
@@ -325,6 +329,10 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
       render();
       void refresh({ force: true });
     });
+    // The shell hides its boot screen by setting `hidden`; the banner it was
+    // covering takes its place then.
+    const boot = $('hub-loading');
+    if (boot) new MutationObserver(() => render()).observe(boot, { attributes: true, attributeFilter: ['hidden'] });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
     setInterval(() => { if (!document.hidden) void refresh(); }, 120000);
     void refresh({ force: true });
