@@ -19,7 +19,7 @@ const SOURCE = [
   between('const ITEMS = {', 'const YOU = 0'),
   between('function rollLoad()', '// The chance the shell in the chamber'),
   line('const MP_POS ='),
-  between('const MP_SETTINGS =', 'const MP_POS ='),
+  between('// Multiplayer hands are 4 boxes', 'const MP_POS ='),
   'let M = null, mpMe = 0;',
   between('// A fixed 0-1 number per (seed, turn)', '/* The screen. */'),
   'this.api = { mpGame, mpRound, mpApply, mpCompose, mpUp, mpRoll, mpHostSeat, mpParseSettings, mpSettingsCode, mpRollLoad, setView(m, me) { M = m; mpMe = me; } };'
@@ -102,9 +102,10 @@ test('the rules: turns, blanks at yourself, damage, rounds, paralysis, leaving',
   s.apply({ seq: 1, seat: 0, type: 'load', args: { round: 2, n: 1, shells: [1, 0, 1], items: [[], [], []] } });
   s.apply({ seq: 2, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [1, 1, 1], items: [[], [], []] } });
   assert.equal(m.phase, 'load');
-  s.apply({ seq: 3, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [0, 1, 1, 0], items: [['potion', 'wave'], ['band'], ['scope', 'nonsense']] } });
+  s.apply({ seq: 3, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [0, 1, 1, 0], items: [['wave', 'potion'], ['band'], ['nonsense', 'scope']] } });
   assert.equal(m.phase, 'turn');
-  assert.equal(JSON.stringify(m.p.map(p => p.items.filter(Boolean))), JSON.stringify([['potion', 'wave'], ['band'], ['scope']]));
+  // Three still in: one item each, into 4 boxes; anything past the first, or not an item, is dropped.
+  assert.equal(JSON.stringify(m.p.map(p => p.items)), JSON.stringify([['wave', null, null, null], ['band', null, null, null], [null, null, null, null]]));
   const turn = () => m.turnNo;
   // Seat 1 can't shoot on seat 0's turn.
   s.apply({ seq: 4, seat: 1, type: 'shoot', args: { turn: turn(), target: 0 } });
@@ -113,7 +114,7 @@ test('the rules: turns, blanks at yourself, damage, rounds, paralysis, leaving',
   s.apply({ seq: 5, seat: 0, type: 'shoot', args: { turn: turn(), target: 0 } });
   assert.deepEqual([m.turn, m.shells.length, m.p[0].hp], [0, 3, 2]);
   // Thunder Wave on seat 1, then a live shot at seat 2: the turn moves clockwise to seat 1, who is paralyzed.
-  s.apply({ seq: 6, seat: 0, type: 'item', args: { turn: turn(), box: 1, target: 1 } });
+  s.apply({ seq: 6, seat: 0, type: 'item', args: { turn: turn(), box: 0, target: 1 } });
   assert.equal(m.p[1].para, true);
   s.apply({ seq: 7, seat: 0, type: 'shoot', args: { turn: turn(), target: 2 } });
   assert.equal(m.p[2].hp, 1);
@@ -201,12 +202,12 @@ test('reload rule, single player: the same, except for whoever started the load 
   assert.match(html, /function reload\(\) \{\s*\/\/[^\n]*\n\s*g\.loadStarter = g\.turn;/, 'every load records who starts it');
 });
 
-test('the 3D table gives every seat its own 4x2 item grid in its own quarter of the table', () => {
+test('the 3D table gives every seat its own 2x2 item grid in its own quarter of the table', () => {
   const slot = new Function('return ' + line('const SLOT =').replace('const SLOT =', '').replace(/;\s*$/, ''))();
   const ROT = { bottom: 0, right: Math.PI / 2, top: Math.PI, left: -Math.PI / 2 };
   const all = [];
   for (const [pos, a] of Object.entries(ROT)) {
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < 4; k++) {
       const [x, z] = slot(k);
       const w = [x * Math.cos(a) + z * Math.sin(a), -x * Math.sin(a) + z * Math.cos(a)];
       // Nearer to its own edge than to any other seat's: |along the seat's axis| beats |across it|.
@@ -269,5 +270,30 @@ test('multiplayer loads are 1/2 to 2/3 live, with a blank in every load', () => 
     const { total, live } = api.mpRollLoad();
     assert.ok(total >= 3 && total <= 8);
     assert.ok(live >= Math.ceil(total / 2) && live <= Math.max(Math.ceil(total / 2), Math.floor(total * 2 / 3)) && live < total, total + '/' + live);
+  }
+});
+
+test('multiplayer hands: 4 boxes, 2 items a load (1 with 3 or more in), one Thunder Wave at most, one log line each', () => {
+  const two = screen(['A', 'B'], 1, 0, 'r1-h3-t20'), m = two.m;
+  assert.deepEqual(m.p.map(p => p.items.length), [4, 4]);
+  let seq = 0;
+  const load = items => two.apply({ seq: ++seq, seat: 0, type: 'load', args: { round: m.round, n: m.loads + 1, shells: [0, 0, 1], items } });
+  load([['potion', 'band'], ['wave', 'wave']]);
+  const lines = m.ev.filter(e => e.t === 'log').map(e => e.text);
+  assert.ok(lines.includes('You: Potion, Choice Band.'), lines.join(' | '));
+  assert.ok(lines.includes('B: Thunder Wave.'), 'a second Thunder Wave is never held');
+  assert.deepEqual([...m.p[1].items], ['wave', null, null, null]);
+  // A full side loses the rest, on the same line.
+  const full = screen(['A', 'B'], 3, 0, 'r1-h3-t20');
+  full.m.p[0].items = ['potion', 'scope', 'eject', 'trick'];
+  full.apply({ seq: 1, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [0, 1, 1], items: [['band', 'potion'], []] } });
+  assert.ok(full.m.ev.some(e => e.text === 'You: Choice Band, Potion lost, side full.'));
+  // Host-side draws: never a second Band or Thunder Wave in one hand, and a 3+ table deals one each.
+  const four = screen(['A', 'B', 'C', 'D'], 2, 0, 'r1-h3-t20');
+  for (let k = 0; k < 300; k++) {
+    four.m.p[0].items = ['wave', 'band', null, null];
+    const deal = four.api.mpCompose(four.m).items;
+    assert.equal(deal[0].length, 1);
+    assert.ok(!deal[0].includes('wave') && !deal[0].includes('band'));
   }
 });
