@@ -112,19 +112,66 @@ export function isTransientError(error) {
   return Boolean(error?.transient);
 }
 
+// One circuit per hub, shared by all REST/auth callers. Do not replay writes:
+ // callers retain their own queues and decide when a failed operation is safe to retry.
+let outageFailures = 0, lastOutageFailure = 0, outageUntil = 0, outageDelay = 0;
+let outageGeneration = 0, outageProbe = false;
+function outageTicket() {
+  if (!outageUntil) return { generation: outageGeneration, probe: false };
+  if (Date.now() < outageUntil || outageProbe) {
+    const error = busyError({ status: 503 });
+    error.code = 'BORED_BACKEND_COOLDOWN';
+    error.retryAfter = Math.max(0, outageUntil - Date.now());
+    throw error;
+  }
+  outageProbe = true;
+  return { generation: outageGeneration, probe: true };
+}
+function settleOutage(ticket, failed) {
+  // Late responses from a pre-outage burst cannot close the circuit or extend it.
+  if (ticket.generation !== outageGeneration) return;
+  if (!failed) {
+    outageFailures = 0;
+    if (ticket.probe) {
+      outageUntil = 0; outageDelay = 0; outageProbe = false;
+      outageGeneration++;
+    }
+    return;
+  }
+  const now = Date.now();
+  outageFailures = now - lastOutageFailure > 15000 ? 1 : outageFailures + 1;
+  lastOutageFailure = now;
+  if (!ticket.probe && outageFailures < 2) return;
+  outageDelay = Math.min(60000, outageDelay ? outageDelay * 2 : 5000);
+  outageUntil = now + outageDelay + Math.floor(Math.random() * 1000);
+  outageProbe = false;
+  outageGeneration++;
+}
+
 export async function request(path, { method = 'GET', body, prefer, token, keepalive = false } = {}) {
   const headers = { apikey: API_KEY };
   headers.Authorization = 'Bearer ' + (token || session?.access_token || API_KEY);
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (prefer) headers.Prefer = prefer;
-  const res = await fetch(API_URL.replace(/\/+$/, '') + path, {
+  const ticket = outageTicket();
+  let res;
+  try {
+    res = await fetch(API_URL.replace(/\/+$/, '') + path, {
     method,
     headers,
     keepalive,
     body: body === undefined ? undefined : JSON.stringify(body)
-  });
+    });
+  } catch (cause) {
+    settleOutage(ticket, true);
+    const error = busyError({ status: 503 });
+    error.cause = cause;
+    throw error;
+  }
   if (!res.ok) {
-    const data = await responseBody(res);
+    let data;
+    try { data = await responseBody(res); } catch { data = undefined; }
+    settleOutage(ticket, [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527].includes(res.status) || (res.status >= 500 && data === undefined));
     let message = '';
     if (data && typeof data === 'object') message = data.msg || data.message || data.error_description || data.error || '';
     const error = data === undefined ? busyError(res) : new Error(message || 'That request was refused (' + res.status + ').');
@@ -138,8 +185,10 @@ export async function request(path, { method = 'GET', body, prefer, token, keepa
     if (!data || res.status === 408 || res.status === 429 || res.status >= 500) error.transient = true;
     throw error;
   }
-  if (res.status === 204) return null;
-  const data = await responseBody(res);
+  if (res.status === 204) { settleOutage(ticket, false); return null; }
+  let data;
+  try { data = await responseBody(res); } catch { data = undefined; }
+  settleOutage(ticket, data === undefined);
   // A 2xx that is an HTML page is an interstitial, never this API's answer.
   if (data === undefined) throw busyError(res);
   return data;
