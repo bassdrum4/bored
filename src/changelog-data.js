@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 945,
+  "count": 946,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f7f31718","date":"2026-11-24","author":"Daniel Lowe","subject":"Use actual Puppeteer collection evaluation for hub and preview checks","pr":340},
   {"sha":"88a3ef50","date":"2026-11-24","author":"Daniel Lowe","subject":"Repair browser regressions and invalidate leaderboard card cache on score updates","pr":339},
   {"sha":"03c6771e","date":"2026-11-24","author":"Daniel Lowe","subject":"Add Squaretato survival arena","pr":337},
   {"sha":"af43d742","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix disposable DB migration isolation and Pages artifact registration race","pr":338},
