@@ -197,3 +197,42 @@ test('shiny lines are kept in a shared store outside the save', async t => {
   assert.deepEqual(r, { merged: true, fresh1: true, plain: false, testWrites: 0 });
   assert.deepEqual(errors, []);
 });
+
+// Sssssssnakes: three optional rival fights, each at the top of its region's list once that Champion is beaten, set
+// by the Champion's rules but a little harder (RIVAL_USE of the clock for the reference team, BOSS_USE for a Champion).
+test('rival Sssssssnakes: listed after the Champion, set by the Champion\'s rules a little harder, and paid once', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const teams = await tab.evaluate(() => RIVALS.map(x => [REGIONS[x.r].name, x.team.map(m => m.name)]));
+  assert.deepEqual(teams, [
+    ['Johto', ['Snivy', 'Ekans', 'Silicobra']],
+    ['Unova', ['Servine', 'Arbok', 'Sandaconda', 'Milotic']],
+    ['Galar', ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme']]]);
+  for (const x of await tab.evaluate(() => RIVALS.map(x => ({ id: x.id, r: x.r, master: !!x.master })))) {
+    // Locked until the Champion is down, then the first row of that list.
+    const locked = await tab.evaluate(r => { S = fresh(); S.box[25] = { xp: 1e9 }; S.party = [25]; for (let q = 0; q < r; q++) { for (let k = 0; k < 4; k++) S.badges[q + '-' + k] = 1; S.champs[q] = 1; } for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; viewR = r; renderLocs(); return document.querySelector('#locs [data-loc]').disabled; }, x.r);
+    assert.equal(locked, true, `${x.id}: locked before the Champion`);
+    const row = await tab.evaluate(r => { S.champs[r] = 1; renderLocs(); const b = document.querySelector('#locs [data-loc]'); return { first: JSON.parse(b.dataset.loc).kind, text: b.textContent, open: !b.disabled }; }, x.r);
+    assert.deepEqual([row.first, row.open, row.text.startsWith('Rival Sssssssnakes')], ['rival', true, true]);
+    // The Champion's cap and timer rules; the reference team needs RIVAL_USE of the clock where the Champion's needs BOSS_USE.
+    const f = await tab.evaluate(r => {
+      const use = () => { const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
+        const P = refPool(B.r, 3, cap).sort((a, b) => vs(b) - vs(a)).slice(0, 6);
+        return B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i, B.tune) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) * bossBoost()), 0) / (B.bossTime * refDef(P)); };
+      startLoc({ kind: 'champ', r }); const champ = { cap: areaCap(), use: use() }; backToRoute();
+      startLoc({ kind: 'rival', r }); const rival = { cap: areaCap(), use: use(), L: B.L, clock: B.bossTime, want: rivalTime(RIVAL_AT[r]), said: document.querySelector('#log').textContent };
+      B.idx = B.queue.length - 1; B.foe.hp = 1; hit(10);
+      const before = { money: S.money, master: S.balls.master }; next();
+      return { champ, rival, paid: S.money - before.money, master: S.balls.master - before.master, won: rivalWon(RIVAL_AT[r].id), letter: inbox().some(m => m.id === 'rival-' + RIVAL_AT[r].id), ach: (checkAch(true), !!S.ach['rival-' + RIVAL_AT[r].id]), prize: rewardFor(champLevel(r) + CAP_OVER, r * 4 + 3, RIVAL_PAY) };
+    }, x.r);
+    assert.equal(f.rival.cap, f.champ.cap, `${x.id}: the Champion's level cap`);
+    assert.equal(f.rival.L, f.rival.cap);
+    assert.equal(f.rival.clock, f.rival.want, `${x.id}: the Champion's timer rule`);
+    assert.ok(Math.abs(f.champ.use - 0.97) < 0.01 && Math.abs(f.rival.use - 1.05) < 0.01, `${x.id}: champion ${f.champ.use.toFixed(3)}, rival ${f.rival.use.toFixed(3)}`);
+    assert.ok(f.rival.said.startsWith('Sssssssnakes: "'), 'a one-liner before the fight');
+    assert.deepEqual([f.paid, f.master, f.won, f.letter, f.ach], [f.prize, x.master ? 1 : 0, true, true, true]);
+    // A rematch pays a Champion rematch's and no Master Ball.
+    const again = await tab.evaluate(r => { const m = S.balls.master; startLoc({ kind: 'rival', r }); B.idx = B.queue.length - 1; B.foe.hp = 1; hit(10); const paid = S.money; next(); return [S.balls.master - m, S.money - paid === rewardFor(champLevel(r) + CAP_OVER, r * 4 + 3, RIVAL_REMATCH)]; }, x.r);
+    assert.deepEqual(again, [0, true]);
+  }
+  assert.deepEqual(errors, []);
+});
