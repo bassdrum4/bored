@@ -190,7 +190,7 @@ const DIFF = {
   normal: { speed: 112, react: .12,  err: 4.5, attack: .8 },
   hard:   { speed: 150, react: .055, err: 1.8, attack: .95 }
 };
-let cpuBuf = { tx: W * .86, ty: H / 2, t: 0 };
+let cpuBuf = { tx: W * .86, ty: H / 2, t: 0, stuck: 0, retreat: 0 };
 
 const $ = id => document.getElementById(id);
 
@@ -202,6 +202,7 @@ function resetPositions(){
   mallets[1].x = W * .84; mallets[1].y = H / 2; mallets[1].vx = mallets[1].vy = 0; mallets[1].target = null;
   ripples.length = 0; pointers.clear(); flashGoal = 0;
   pausedUntil = 0;
+  cpuBuf = { tx: W * .86, ty: H / 2, t: 0, stuck: 0, retreat: 0 };
   serveToken++;
   hud();
 }
@@ -253,7 +254,10 @@ function moveMallets(dt){
   for(let side = 0; side < 2; side++){
     const m = mallets[side];
     const ox = m.x, oy = m.y;
-    if(m.target && !isCpu(side)){
+    if(isCpu(side)){
+      // Move before measuring velocity so CPU strikes transfer momentum too.
+      cpuThink(dt);
+    } else if(m.target){
       const dx = m.target.x - m.x, dy = m.target.y - m.y;
       const dist = Math.hypot(dx, dy);
       const step = Math.min(dist, MALLET_MAX * dt);
@@ -271,6 +275,17 @@ function moveMallets(dt){
 
 function cpuThink(dt){
   const m = mallets[1], cfg = DIFF[difficulty] || DIFF.normal;
+  const corner = puck.x > W - 3 * (PUCK_R + MALLET_R) &&
+    (puck.y < 2 * (PUCK_R + MALLET_R) || puck.y > H - 2 * (PUCK_R + MALLET_R));
+  const trapped = corner && Math.hypot(puck.vx, puck.vy) < 35;
+  cpuBuf.stuck = trapped ? cpuBuf.stuck + dt : 0;
+  cpuBuf.retreat = Math.max(0, cpuBuf.retreat - dt);
+  if(cpuBuf.stuck > .8 && cpuBuf.retreat === 0){
+    // Break repeated contact, then bank the puck off the end/side wall.
+    cpuBuf.retreat = .45;
+    cpuBuf.stuck = 0;
+    cpuBuf.t = 0;
+  }
   cpuBuf.t -= dt;
   if(cpuBuf.t <= 0){
     cpuBuf.t = cfg.react;
@@ -278,7 +293,16 @@ function cpuThink(dt){
     const px = puck.x + puck.vx * (cfg.react + .04);
     const py = puck.y + puck.vy * (cfg.react + .04);
     const attacking = px > W * .46 && (puck.vx > -30 || px > W * .62);
-    if(attacking){
+    if(cpuBuf.retreat > 0){
+      cpuBuf.tx = W * .76;
+      cpuBuf.ty = H / 2;
+    } else if(trapped){
+      // Behind the puck toward the goal is unreachable at the end wall.
+      // Approach from the table interior instead for a legal bank shot.
+      const back = (PUCK_R + MALLET_R) * .90;
+      cpuBuf.tx = puck.x - back * .50;
+      cpuBuf.ty = puck.y + (puck.y < H / 2 ? 1 : -1) * back * .80;
+    } else if(attacking){
       // sit behind the puck, aimed at the far goal, and push through it
       const gy = H / 2 + err * .6;
       const ang = Math.atan2(gy - py, 0 - px);
@@ -554,8 +578,7 @@ function frame(now){
   last = now;
 
   if(phase === 'play'){
-    if(isCpu(1)) cpuThink(dt);
-    moveMallets(dt);
+    if(dt > 0) moveMallets(dt);
     const steps = 4, h = dt / steps;
     for(let i = 0; i < steps; i++){ if(phase !== 'play') break; stepPuck(h); }
     for(const r of ripples){ r.r += 26 * dt; r.t -= 1.7 * dt; }
@@ -585,7 +608,7 @@ for(const b of document.querySelectorAll('[data-diff]')){
 }
 $('btnRematch').addEventListener('click', () => {
   startGame(mode, false);
-  cpuBuf = { tx: W * .86, ty: H / 2, t: 0 };
+  cpuBuf = { tx: W * .86, ty: H / 2, t: 0, stuck: 0, retreat: 0 };
 });
 $('btnMenu').addEventListener('click', () => {
   phase = 'menu'; mode = null;
