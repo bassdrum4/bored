@@ -47,7 +47,7 @@ const TIERS: Record<string, { score: number; name: string }> = {
   krillion: { score: 100, name: 'One in a Krillion' }
 };
 
-type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
+type Answer = { answer: string; tier: string; quip?: string; aliases?: string[]; correction?: boolean };
 type Prompt = { id: string; text: string; answers: Answer[] };
 type Book = { date: string; staticAnswers?: boolean; prompts: Prompt[] };
 type MeterSeg = { tier: string; amt: number };
@@ -156,7 +156,10 @@ function matchAnswer(input: string, answers: Answer[]): Answer | null {
 
 const STATIC_BASE = 'https://bassdrum4.github.io/bored/krillion-data/';
 async function staticJson(path: string, gzip = false) {
-  for (const base of [STATIC_BASE, 'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/']) {
+  const date=path.split('/')[0];
+  const archived='https://raw.githubusercontent.com/bassdrum4/bored/krillion-archive-'+date+'/';
+  const recent=Date.parse(etDate())-Date.parse(date)<=2*86400000;
+  for (const base of recent ? [STATIC_BASE, 'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/',archived] : [archived]) {
     try {
       const res = await fetch(base + path, { signal: AbortSignal.timeout(4000) });
       if (!res.ok || !res.body) continue;
