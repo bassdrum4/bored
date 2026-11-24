@@ -10,6 +10,48 @@ to the Supabase project.
 
 ---
 
+## 2026-11-24 — CI red since the two-second boot screen: the banner sat under it
+
+**Symptom** — `Check Bored` failed in `tests/announcements.test.cjs`:
+
+```
+Waiting for selector `#announcement-dialog[open]` failed
+```
+
+at the `page.click('#announcement-toggle')` in "a signed-in player votes in a
+poll and answers an open-ended question". The Pages deploy stayed on
+`81ac19a`, the last commit before `c844aad` ("Keep loading screens up for two
+seconds and harden Roulette startup"), so `main` had stopped shipping.
+
+**Cause** — `c844aad` holds `#hub-loading` for `MIN_LOADING_MS` after boot
+instead of hiding it as soon as the hub is ready. Announcements render during
+boot, so the banner (z-index 45, above the boot screen) appeared while
+`#hub-loading` still covered the page: a real click on any header control, and
+puppeteer's synthetic one, landed on the boot screen instead.
+
+**Fix** — `render()` in `src/hub/announcements-ui.js` keeps the banner hidden
+while `#hub-loading` is not `hidden`, and a `MutationObserver` on that attribute
+renders again when the shell puts the boot screen away.
+
+**Rule for next time** — The banner is a viewport overlay above the boot screen,
+so anything that clicks through it must wait for `#hub-loading[hidden]` first;
+better, nothing new should be drawn under the boot screen. A red `Check Bored`
+on `main` also stops the Pages deploy: compare `version.json` with `git log`
+before assuming a push is live.
+
+**This was not the whole failure.** That job reported 30 failed tests and the
+same run on `c844aad`, before the banner work, already failed 29 of them with
+nothing to do with announcements. The banner fix removes the 30th
+(`a signed-in player votes in a poll and answers an open-ended question` is
+`ok 17` in the next run) and leaves the rest. Two examples of what is still
+red on `main`: `hub categories, search, sorting, empty state, and stored
+favorites` dies on `page.$eval('.card', els => els.map(...))` — `$eval` hands
+the callback one element, so the list assertions need `$$eval` — and most of
+the Poké Gacha, discovery and `bored.test.cjs` browser tests go with it.
+Someone has to work through that list; it is not a single shared cause.
+
+---
+
 ## 2026-11-24 — Announcement polls: one feature, five CI failures
 
 The poll/question work first landed as `a4d9e7d`. Its CI run `45291236352`

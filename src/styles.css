@@ -28,6 +28,7 @@ html[data-theme="dark"] .bt-hero-art img,
 html[data-theme="dark"] .bt-match-art img{filter:saturate(.7) brightness(.86)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);min-height:100vh;
+  padding-top:var(--announcement-space,0px);
   font:17px/1.5 Georgia,"Times New Roman",serif;
   -webkit-font-smoothing:antialiased}
 ::selection{background:var(--red);color:var(--paper)}
@@ -593,6 +594,7 @@ body.playing .bt-notice,.together-open .bt-notice{display:none}
   position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;
   transform:translateX(-50%);z-index:45;
   width:min(680px,calc(100vw - 24px));margin:0;
+  max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain;
   border:1px solid var(--banner-edge);border-top:4px solid var(--red);border-radius:4px;
   background:var(--banner-bg);color:var(--banner-ink);
   box-shadow:0 12px 36px var(--shadow);
@@ -603,7 +605,7 @@ body.playing #announcement-banner{display:none!important}
   font:10px/1.5 var(--mono);letter-spacing:.08em;color:var(--banner-eyebrow);
 }
 #announcement-banner .announcement-card h3{color:var(--banner-ink);font-size:21px;line-height:1.25}
-#announcement-banner .announcement-card p:not(.announcement-eyebrow){
+#announcement-banner .announcement-card .announcement-body{
   color:var(--banner-soft);font-size:14px;line-height:1.45;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
@@ -614,6 +616,21 @@ body.playing #announcement-banner{display:none!important}
 }
 #announcement-banner .announcement-actions a:hover,
 #announcement-banner .announcement-actions button:hover{background:var(--banner-hover);border-color:var(--banner-ink)}
+/* The card answers in place, so the banner carries the same poll buttons and
+   answer box as the dialog on its own dark surface. */
+#announcement-banner .announcement-response{gap:6px}
+#announcement-banner .announcement-poll{gap:4px}
+#announcement-banner .announcement-option{color:var(--banner-ink);border-color:var(--banner-rule);padding:6px 9px}
+#announcement-banner .announcement-option:hover,
+#announcement-banner .announcement-option:focus-visible{border-color:var(--banner-ink);background:var(--banner-hover)}
+#announcement-banner .announcement-option[aria-pressed="true"]{border-color:var(--banner-ink);background:var(--banner-hover)}
+#announcement-banner .announcement-tally{border-top-color:var(--banner-rule)}
+#announcement-banner .announcement-card .announcement-chosen .announcement-result-label{color:var(--banner-ink)}
+#announcement-banner .announcement-response textarea{
+  border-color:var(--banner-rule);background:var(--banner-hover);color:var(--banner-ink);
+}
+#announcement-banner .announcement-response textarea::placeholder{color:var(--banner-rule)}
+#announcement-banner .announcement-card .announcement-response-status{color:var(--banner-eyebrow)}
 #announcement-banner .announcement-dismiss{
   position:absolute;top:12px;right:12px;display:grid;place-items:center;
   width:34px;height:34px;border:1px solid var(--banner-rule);border-radius:2px;
@@ -663,10 +680,10 @@ body.playing #announcement-banner{display:none!important}
 #announcement-list>.announcement-card{padding:15px 0}
 @media(max-width:600px){
   #announcement-toggle{flex:1;justify-content:center}
-  #announcement-banner{top:calc(8px + env(safe-area-inset-top,0px));width:calc(100vw - 16px)}
+  #announcement-banner{top:calc(8px + env(safe-area-inset-top,0px));width:calc(100vw - 16px);max-height:calc(100vh - 16px)}
   #announcement-banner .announcement-card{padding:12px 48px 13px 14px}
   #announcement-banner .announcement-card h3{font-size:19px}
-  #announcement-banner .announcement-card p:not(.announcement-eyebrow){-webkit-line-clamp:2}
+  #announcement-banner .announcement-card .announcement-body{-webkit-line-clamp:2}
   #announcement-banner .announcement-dismiss{top:9px;right:8px}
 }
 
