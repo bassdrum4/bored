@@ -40,13 +40,28 @@ export function compileRound(raw) {
   review.sort((a,b)=>b.score-a.score||a.answer.localeCompare(b.answer));
   return { rows, shards, sheet:{total:labels.size,count:labels.size,deepest:deepest||last,answers:review.slice(0,200)} };
 }
-async function fetchJson(url) {
+async function fetchJson(url, maxBytes) {
   const response = await fetch(url,{headers:{'User-Agent':'BoredKrillion/1.0 (+https://bassdrum4.github.io/bored/)'},signal:AbortSignal.timeout(150000)});
   if (!response.ok) throw new Error('Upstream HTTP '+response.status);
-  return response.json();
+  if (!response.body) throw new Error('Missing upstream response');
+  const reader=response.body.getReader(), chunks=[];
+  let bytes=0;
+  try {
+    for (;;) {
+      const {done,value}=await reader.read();
+      if(done)break;
+      bytes+=value.byteLength;
+      if(bytes>maxBytes)throw new Error('Upstream response exceeds safe size');
+      chunks.push(Buffer.from(value));
+    }
+    return JSON.parse(Buffer.concat(chunks,bytes).toString('utf8'));
+  } finally { await reader.cancel().catch(()=>{}); }
 }
 export async function build(root, date, today, reveal) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (today.date && today.date !== date) || (reveal.date && reveal.date !== date) || !Number.isInteger(Number(today.dayNumber)) || today.prompts?.length !== 7 || reveal.prompts?.length !== 7) throw new Error('Daily snapshot does not match the requested date');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (today.date && today.date !== date) || (reveal.date && reveal.date !== date) || !Number.isSafeInteger(Number(today.dayNumber)) || Number(today.dayNumber)<1 || today.prompts?.length !== 7 || reveal.prompts?.length !== 7) throw new Error('Daily snapshot does not match the requested date');
+  const ids=today.prompts.map(p=>String(p.id||'')), revealIds=reveal.prompts.map(p=>String(p.id||''));
+  if(ids.some(id=>!id)||new Set(ids).size!==7||new Set(revealIds).size!==7||ids.some(id=>!revealIds.includes(id)))throw new Error('Prompt IDs do not match');
+  if(reveal.prompts.some(p=>!Array.isArray(p.answers))||reveal.prompts.reduce((sum,p)=>sum+p.answers.length,0)>1000000)throw new Error('Daily answer count exceeds safe limit');
   const dir=join(root,date);
   await mkdir(dir,{recursive:true});
   const manifest={date,dayNumber:Number(today.dayNumber),source:'Reference snapshot from krillion.io',staticAnswers:true,prompts:[]};
@@ -69,7 +84,7 @@ export async function build(root, date, today, reveal) {
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   const root=process.argv[2], date=process.argv[3]||etDate();
   if (!root) throw new Error('Usage: node scripts/krillion-static.mjs OUTPUT [YYYY-MM-DD]');
-  const [today,reveal]=await Promise.all([fetchJson('https://krillion.io/api/today'),fetchJson('https://krillion.io/api/reveal?date='+date)]);
+  const [today,reveal]=await Promise.all([fetchJson('https://krillion.io/api/today',1024*1024),fetchJson('https://krillion.io/api/reveal?date='+date,96*1024*1024)]);
   await build(root,date,today,reveal);
   console.log('Built static Krillion snapshot '+date);
 }
