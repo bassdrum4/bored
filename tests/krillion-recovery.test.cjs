@@ -28,9 +28,11 @@ function harness({missingBook=false, failRead=0, failInsert=0}={}) {
       return json(found.slice(0,1).map(row=>({prompt_id:row.prompt_id})));
     }
     if(path.endsWith('/rpc/krillion_clear_bank')){const body=JSON.parse(init.body);bank=bank.filter(row=>row.date!==body.p_date);return json(null);}
+    if(path.endsWith('/rpc/krillion_refresh')){const body=JSON.parse(init.body);return json({date:body.p_date,status:'queued'});}
     if(path.endsWith('/rpc/krillion_match_answer')){
       const body=JSON.parse(init.body);
-      const hit=bank.find(row=>row.date===body.p_date&&row.prompt_id===body.p_prompt&&row.key===body.p_key);
+      const key=String(body.p_input||'').trim().toLowerCase().replace(/^(the|a|an)\s+/,'').replace(/&/g,'and').replace(/[^a-z0-9]/g,'');
+      const hit=bank.find(row=>row.date===body.p_date&&row.prompt_id===body.p_prompt&&row.key===key);
       return json(hit?{answer:hit.answer,tier:hit.tier,quip:hit.quip,correction:!hit.own}:null);
     }
     if(path.endsWith('/krillion_runs')){

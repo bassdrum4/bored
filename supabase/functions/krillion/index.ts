@@ -40,7 +40,6 @@ type BankRow = {
   own: boolean;
   ord: number;
 };
-type RevealIndex = { prompts: string[]; starts: Int32Array; ends: Int32Array; prompt: Int32Array };
 type AnswerResult = {
   round: number;
   rawAnswer: string | null;
@@ -128,18 +127,12 @@ function matchFromRow(row: any): Match | null {
 // a couple of hundred thousand keys, which is more than this runtime will hold
 // as objects.
 async function matchStored(date: string, promptId: string, input: string): Promise<Match | null> {
-  const key = bare(input);
-  if (!key || key.length > 256) return null;
-  const allowance = key.length < 4 ? 0 : key.length < 8 ? 1 : 2;
+  if (!String(input || '').trim()) return null;
+  // The spelling rules and the spelling they are applied to live in the same
+  // function, so the stored bank and the player's answer normalise alike.
   const response = await sb('rpc/krillion_match_answer', {
     method: 'POST',
-    body: JSON.stringify({
-      p_date: date,
-      p_prompt: promptId,
-      p_key: key,
-      p_num: numberValue(input),
-      p_allowance: allowance
-    })
+    body: JSON.stringify({ p_date: date, p_prompt: promptId, p_input: input })
   });
   if (!response.ok) throw new HttpError('The answer could not be checked. Retry this round.', 503);
   return matchFromRow(await response.json());
@@ -280,129 +273,13 @@ async function bankMissing(date: string) {
   return !(Array.isArray(rows) && rows.length);
 }
 
-async function fetchToday(date: string): Promise<{ dayNumber: number; prompts: Prompt[] }> {
-  const response = await fetch(REFERENCE + '/api/today',
-    { signal: AbortSignal.timeout(10_000), headers: { 'User-Agent': USER_AGENT } });
-  if (!response.ok) throw new Error('Reference service unavailable.');
-  const today = await response.json();
-  const prompts = Array.isArray(today?.prompts) ? today.prompts : [];
-  if (today?.date !== date || prompts.length !== 7) throw new Error('Reference puzzle date or round count mismatch.');
-  return {
-    dayNumber: Number(today.dayNumber) || 0,
-    prompts: prompts.map((prompt: any) => ({ id: String(prompt.id), text: String(prompt.text) }))
-  };
-}
-
-async function fetchReveal(date: string): Promise<string> {
-  // A big day's reveal is 33 MB and takes the reference site a couple of
-  // seconds, so this hop is given more room than a database read.
-  const response = await fetch(REFERENCE + '/api/reveal?date=' + encodeURIComponent(date),
-    { signal: AbortSignal.timeout(90_000), headers: { 'User-Agent': USER_AGENT } });
-  if (!response.ok) throw new Error('Reference service unavailable.');
-  return await response.text();
-}
-
-function objectEnd(text: string, start: number) {
-  let depth = 0, inString = false, escaped = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text.charCodeAt(i);
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === 92) escaped = true;
-      else if (ch === 34) inString = false;
-      continue;
-    }
-    if (ch === 34) inString = true;
-    else if (ch === 123 || ch === 91) depth += 1;
-    else if (ch === 125 || ch === 93) {
-      depth -= 1;
-      if (depth === 0) return i;
-    }
-  }
-  throw new Error('Reference answer is unterminated.');
-}
-
-// The reveal is one JSON document of 350k answers. Parsing it whole is more
-// object graph than the runtime holds, so the text is walked once to find where
-// each answer object starts and ends, and each one is parsed on its own.
-function indexReveal(text: string): RevealIndex {
-  const prompts: string[] = [];
-  const starts: number[] = [], ends: number[] = [], owner: number[] = [];
-  let depth = 0, inString = false, escaped = false;
-  let promptsDepth = 0, promptDepth = 0, answersDepth = 0, current = -1;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text.charCodeAt(i);
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === 92) escaped = true;
-      else if (ch === 34) inString = false;
-      continue;
-    }
-    if (ch === 34) { inString = true; continue; }
-    if (ch === 123) {
-      if (answersDepth && depth === answersDepth) {
-        const end = objectEnd(text, i);
-        starts.push(i);
-        ends.push(end);
-        owner.push(current);
-        i = end;
-        continue;
-      }
-      if (promptsDepth && depth === promptsDepth) {
-        promptDepth = depth + 1;
-        const id = /^\{"id":"([^"]{1,64})"/.exec(text.slice(i, i + 600));
-        prompts.push(id ? id[1] : '');
-        current = prompts.length - 1;
-      }
-      depth += 1;
-      continue;
-    }
-    if (ch === 91) {
-      depth += 1;
-      const tail = text.slice(Math.max(0, i - 11), i + 1);
-      if (tail.endsWith('"prompts":[')) promptsDepth = depth;
-      else if (promptDepth && depth === promptDepth + 1 && tail.endsWith('"answers":[')) answersDepth = depth;
-      continue;
-    }
-    if (ch === 125 || ch === 93) {
-      if (answersDepth && depth === answersDepth) answersDepth = 0;
-      if (promptDepth && depth === promptDepth) promptDepth = 0;
-      if (promptsDepth && depth === promptsDepth) promptsDepth = 0;
-      depth -= 1;
-    }
-  }
-  return { prompts, starts: Int32Array.from(starts), ends: Int32Array.from(ends), prompt: Int32Array.from(owner) };
-}
-
-async function ingestReference(date: string): Promise<Book> {
-  const [today, text] = await Promise.all([fetchToday(date), fetchReveal(date)]);
-  const index = indexReveal(text);
-  const wanted = new Map(today.prompts.map((prompt, position) => [prompt.id, position]));
-  const seen = new Set(index.prompts.filter(id => wanted.has(id)));
-  if (seen.size !== 7) throw new Error('Reference prompt set mismatch.');
-  await clearBank(date);
-  let ord = 0;
-  const filled = new Set<string>();
-  const nextOrd = () => ord++;
-  for (let at = 0; at < index.starts.length; at += ANSWER_BATCH) {
-    const rows: BankRow[] = [];
-    for (let i = at; i < Math.min(at + ANSWER_BATCH, index.starts.length); i++) {
-      let answer: any;
-      try { answer = JSON.parse(text.slice(index.starts[i], index.ends[i] + 1)); } catch { continue; }
-      const promptId = index.prompts[index.prompt[i]];
-      const filledRows = bankRows(date, promptId, answer, nextOrd);
-      if (filledRows.length) filled.add(promptId);
-      rows.push(...filledRows);
-    }
-    await writeBank(rows);
-  }
-  if (filled.size !== 7) throw new Error('Reference answer set is incomplete.');
-  return {
-    date,
-    dayNumber: today.dayNumber,
-    source: 'Reference snapshot from krillion.io',
-    prompts: today.prompts
-  };
+// The daily book is fetched and scored by Postgres: a big day's reveal is 33 MB
+// and 350k answers, which is more work than an Edge Function's CPU budget
+// allows. The function asks for a refresh and reads what is already stored.
+async function requestRefresh(date: string) {
+  const response = await sb('rpc/krillion_refresh', { method: 'POST', body: JSON.stringify({ p_date: date }) });
+  await response.body?.cancel().catch(() => {});
+  if (!response.ok) throw new Error('Refresh request failed with HTTP ' + response.status + '.');
 }
 
 // Days cached before the bank existed still carry their answers inside the
@@ -448,16 +325,12 @@ async function loadBook(date: string): Promise<Loaded> {
     if (cached?.prompts?.length === 7) {
       loaded = { book: await ensureBank(date, cached), stale: false };
     } else {
-      try {
-        const fresh = await ingestReference(date);
-        // Never start a ranked run against a book that was not durably saved.
-        await storeBook(fresh);
-        loaded = { book: fresh, stale: false };
-      } catch (error) {
-        const latest = await latestBook();
-        if (!latest?.prompts?.length) throw error;
-        loaded = { book: await ensureBank(String(latest.date || ''), latest), stale: true };
-      }
+      // Ask Postgres for today's book, then answer from whatever is stored. A
+      // day's own book appears a minute or two later, when the harvest runs.
+      await requestRefresh(date).catch(() => {});
+      const latest = await latestBook();
+      if (!latest?.prompts?.length) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+      loaded = { book: await ensureBank(String(latest.date || ''), latest), stale: true };
     }
     // Do not pin an older fallback book as today's puzzle. Retry that shortly.
     books.set(date, { loaded, until: Date.now() + (loaded.stale ? 30_000 : 6 * 60 * 60_000) });
