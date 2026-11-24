@@ -48,8 +48,8 @@ test('discovery keeps its controls and fits small screens', async t => {
       return { src, ok: response.ok };
     })));
     assert.ok(previewResponses.every(row => row.ok), JSON.stringify(previewResponses.filter(row=>!row.ok)));
-    await page.$eval('#grid img:last-of-type', image => image.scrollIntoView({block:'center'}));
-    await page.waitForFunction(() => {const image=document.querySelector('#grid img:last-of-type');return image.complete && image.naturalWidth>0;});
+    await page.$eval('#grid img', images => images.at(-1).scrollIntoView({block:'center'}));
+    await page.waitForFunction(() => {const image=Array.from(document.querySelectorAll('#grid img')).at(-1);return image?.complete && image.naturalWidth>0;});
     await page.evaluate(() => window.scrollTo(0,0));
     // The entry document is hand-written markup: it carries no games and no
     // inlined script, so a game is downloaded only when its card is opened.
