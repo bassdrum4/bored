@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 940,
+  "count": 941,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"232d7cd1","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix CI fixture setup and browser test timing regressions","pr":335},
   {"sha":"88ec8e35","date":"2026-11-24","author":"Daniel Lowe","subject":"Complete Krillion static cutover, archive references and verified DB cleanup","pr":334},
   {"sha":"0b7ed990","date":"2026-11-24","author":"Daniel Lowe","subject":"Bring GeoPeaks closer to an open-mountain ski simulator","pr":333},
   {"sha":"20f81dd6","date":"2026-11-24","author":"Daniel Lowe","subject":"Make Krillion daily Actions publication fail-safe and read-only on ordinary deploys","pr":332},
