@@ -196,7 +196,7 @@
     #vbar { height: 80px }
   }
   #mountain {position:fixed;inset:0;pointer-events:none;z-index:14}
-  #mountain[hidden],#peaks button[hidden] {display:none}
+  #mountain[hidden],#peaks button[hidden],#gate[hidden],#vbar[hidden],#pause button[hidden] {display:none}
   #mountain .tools {position:absolute;top:56px;left:16px;right:16px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
   #mountain .tools>* {pointer-events:auto;background:var(--paper-dim);padding:9px;border-radius:4px}
   #mountain h2 {font-size:16px;margin-bottom:3px}
@@ -1822,7 +1822,7 @@ function disposeRun() {
   world.group = null;
   world.tracks = null;
   world.spray = null;
-  world.snowfall = null;
+  // Reuse scene-level snowfall instead of leaking a particle cloud every run.
   world.gates = [];
   world.finish = null;
   world.terrain = null;
@@ -1831,6 +1831,33 @@ function disposeRun() {
 
 let terrainCache=null;
 const overview={x:0,z:0,yaw:.65,pitch:.9,distance:2500,selected:0,spawn:null,lines:null,routes:[]};
+const replay={samples:[],best:null,cursor:0,next:0,mesh:null};
+const raceKey=()=> 'bored.geopeaks.ghost.'+game.peak.id+'.'+world.entryIndex+'.'+game.activity;
+function resetGhost(){
+  replay.samples=[];replay.best=null;replay.cursor=0;replay.next=0;
+  if(replay.mesh)replay.mesh.visible=false;
+  if(game.activity==='free'||!world.run||!game.peak)return;
+  try{const data=JSON.parse(localStorage.getItem(raceKey()));if(data&&Number.isFinite(data.score)&&Array.isArray(data.samples)&&data.samples.length>1&&data.samples.length<=7200&&data.samples.every(p=>Array.isArray(p)&&p.length===4&&p.every(Number.isFinite)))replay.best=data.samples}catch{}
+  if(!replay.mesh){const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(.35,1.15,4,8),new THREE.MeshBasicMaterial({color:0x55b9de,transparent:true,opacity:.48,depthWrite:false}));mesh.visible=false;runScene.add(mesh);replay.mesh=mesh;}
+}
+function updateGhost(){
+  if(game.activity==='free')return;
+  const p=game.player;
+  if(game.time>=replay.next&&replay.samples.length<7200){replay.samples.push([+game.time.toFixed(2),+p.x.toFixed(1),+p.y.toFixed(1),+p.z.toFixed(1)]);replay.next=game.time+.2}
+  const a=replay.best;
+  if(!a||!replay.mesh)return;
+  while(replay.cursor+1<a.length&&a[replay.cursor+1][0]<=game.time)replay.cursor++;
+  const i=replay.cursor;
+  if(i===a.length-1){replay.mesh.visible=false;return}
+  const q=a[i],r=a[i+1],f=clamp((game.time-q[0])/Math.max(.001,r[0]-q[0]),0,1);
+  replay.mesh.position.set(lerp(q[1],r[1],f),lerp(q[2],r[2],f)+1,lerp(q[3],r[3],f));replay.mesh.visible=true;
+}
+function saveGhost(){
+  if(replay.mesh)replay.mesh.visible=false;
+  if(game.activity==='free'||replay.samples.length<2||replay.samples.length>=7200)return;
+  const score=game.time+(game.activity==='slalom'?(game.gatesTotal-game.cleared)*5:0);
+  try{const old=JSON.parse(localStorage.getItem(raceKey()));if(!old||!Number.isFinite(old.score)||score<old.score)localStorage.setItem(raceKey(),JSON.stringify({score,samples:replay.samples}))}catch{}
+}
 function setQuality(value) {
   game.quality=value;renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,value==='low'?1:value==='high'?2:1.5));
   $('#pause-quality').textContent='Graphics: '+value;
@@ -1850,6 +1877,7 @@ function buildOverview(t,peak,entry,run){
     const points=route.points.map(p=>new THREE.Vector3(p.x,p.h+6,p.z));
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:diffInfo(e[1]).colour,fog:false})));
   });
+  overview.marker=new THREE.Mesh(new THREE.SphereGeometry(12,12,8),new THREE.MeshBasicMaterial({color:0xf28c28,fog:false}));overview.marker.visible=false;group.add(overview.marker);
   group.visible=false;world.group.add(group);overview.lines=group;
   overview.selected=overview.routes.some(r=>r.index===globe.runIndex)?globe.runIndex:(overview.routes[0]?.index??globe.runIndex);
   overview.spawn=null;
@@ -1869,18 +1897,18 @@ function renderOverviewList(){
 }
 function selectOverviewRun(index,focus){
   const found=overview.routes.find(r=>r.index===index);if(!found)return;
-  overview.selected=index;overview.spawn=null;
+  overview.selected=index;overview.spawn=null;if(overview.marker){const p=found.route.points[0];overview.marker.position.set(p.x,p.h+20,p.z);overview.marker.visible=true;}
   if(focus){const p=found.route.points[0];overview.x=p.x;overview.z=p.z;overview.distance=Math.max(650,Math.min(3000,found.route.distance*.8))}
   renderOverviewList();
 }
 function showMountain(reset=false){
   if(!world.terrain||!world.run){showPicker();return}
-  game.mode='mountain';
+  game.mode='mountain';if(replay.mesh)replay.mesh.visible=false;
   for(const id of ['picker','hud','ready','pause','result','veil'])$('#'+id).hidden=true;
   $('#mountain').hidden=false;$('#vig').style.opacity='0';
-  if(overview.lines)overview.lines.visible=true;if(world.skier)world.skier.visible=false;
+  if(overview.lines)overview.lines.visible=true;if(world.skier)world.skier.visible=false;if(world.gateGroup)world.gateGroup.visible=false;if(world.finish)world.finish.group.visible=false;if(world.snowfall)world.snowfall.pts.visible=false;
   if(reset){const p=world.run.points[0];overview.x=p.x;overview.z=p.z;overview.yaw=.65;overview.pitch=.9;overview.distance=Math.max(1400,Math.min(4500,world.run.distance*1.05))}
-  else{overview.x=game.player.x;overview.z=game.player.z;overview.spawn=null}
+  else{overview.x=game.player.x;overview.z=game.player.z;overview.spawn=null;if(overview.marker)overview.marker.visible=false;}
   $('#mountain-name').textContent=game.peak.area;
   $('#mountain-detail').textContent=overview.routes.length+' mapped runs within loaded terrain';
   renderOverviewList();
@@ -1906,12 +1934,13 @@ function pickMountainAt(cx,cy){
   if(!hit||!t.inside(hit.x,hit.z))return;
   let best=null,gap=Math.max(24,overview.distance*.014);
   for(const item of overview.routes)for(const p of item.route.points){const d=Math.hypot(p.x-hit.x,p.z-hit.z);if(d<gap){gap=d;best=item}}
-  if(best)selectOverviewRun(best.index,false);else{overview.spawn=hit;renderOverviewList()}
+  if(best)selectOverviewRun(best.index,false);else{overview.spawn=hit;renderOverviewList();if(overview.marker){overview.marker.position.set(hit.x,t.height(hit.x,hit.z)+20,hit.z);overview.marker.visible=true}}
 }
 function setActivityVisibility(){
+  if(world.snowfall)world.snowfall.pts.visible=true;
   if(world.gateGroup)world.gateGroup.visible=game.activity==='slalom';
   if(world.finish)world.finish.group.visible=game.activity!=='free';
-  $('#gate').hidden=game.activity!=='slalom';$('#pause-end').hidden=game.activity!=='free';
+  $('#gate').hidden=game.activity!=='slalom';$('#pause-end').hidden=game.activity!=='free';$('#pause-recover').hidden=game.activity!=='free';
   $('#vbar').hidden=game.activity==='free';
 }
 function startMountainActivity(activity){
@@ -2010,6 +2039,7 @@ function frame() {
 
 function resetPlayer() {
   const run = world.run;
+  resetGhost();
   const spawn=game.activity==='free'&&game.freeSpawn;
   const p=spawn?{...spawn,h:world.terrain.height(spawn.x,spawn.z)}:run.points[0];
   const next=run.points[Math.min(6,run.points.length-1)];
@@ -2165,6 +2195,7 @@ function stepPhysics(dt) {
   if (targetVert > game.vertical) game.vertical = targetVert;
   game.topSpeed = Math.max(game.topSpeed, pl.speed);
   game.time += dt;
+  updateGhost();
 
   // tracks and spray
   if (world.tracks) world.tracks.push(pl.x, ground, pl.z, rx, rz, pl.air);
@@ -2202,7 +2233,7 @@ function stepPhysics(dt) {
   }
 
   if(!pl.air&&pl.speed>2&&game.time-game.lastSafeTime>4){game.safeSpot={x:pl.x,z:pl.z,y:pl.y,heading:pl.heading};game.lastSafeTime=game.time}
-  const end=world.run.points[world.run.points.length-1];
+  const end=world.finish?.point||world.run.points[world.run.points.length-1];
   if(game.activity!=='free'&&Math.hypot(pl.x-end.x,pl.z-end.z)<65&&game.vertical>=world.run.drop*.7)finishRun();
   if(game.mode==='run'){game.idleTime=pl.speed<.8?game.idleTime+dt:0;if(game.idleTime>6&&game.idleTime-dt<=6)toast('Press R to restart or pause to recover')}
 }
@@ -2229,6 +2260,7 @@ function finishRun() {
   const note = game.activity==='free'?'Free ski completed.':snap.metres > previousBest
     ? (previousBest ? 'A new best, ' + (snap.metres - previousBest) + ' m further than before.' : 'Your first descent on record.')
     : 'Best is ' + game.best.toLocaleString('en-US') + ' m.';
+  saveGhost();
   let raceNote='';if(game.activity!=='free'){const score=game.time+(game.activity==='slalom'?(game.gatesTotal-game.cleared)*5:0);const key='bored.geopeaks.time.'+peak.id+'.'+world.entryIndex+'.'+game.activity;try{const best=Number(localStorage.getItem(key));if(!best||score<best){localStorage.setItem(key,String(score));raceNote='Personal best: '+clock(score)+'. '}else raceNote='Best time: '+clock(best)+'. '}catch{}if(game.activity==='slalom')raceNote+='Adjusted time: '+clock(score)+' (5s per missed gate). '}
   $('#result-note').textContent=raceNote+note;
   $('#result').hidden = false;
@@ -2336,7 +2368,7 @@ function clock(seconds) {
 function updateHud(force) {
   const pl = game.player;
   const running = world.run;
-  $('#hud-peak').textContent = running && running.name ? running.name : (game.peak ? game.peak.peak : '—');
+  $('#hud-peak').textContent = game.activity==='free'&&game.freeSpawn?'Off-piste':running&&running.name?running.name:(game.peak?game.peak.peak:'—');
   $('#hud-sub').textContent = game.peak
     ? game.peak.peak + ' · ' + game.peak.area + (running && running.diff ? ' · ' + diffInfo(running.diff).label : '')
     : '—';
@@ -2621,7 +2653,7 @@ function restartRun() {
 }
 
 function showPicker() {
-  $('#mountain').hidden=true;if(overview.lines)overview.lines.visible=false;
+  $('#mountain').hidden=true;if(overview.lines)overview.lines.visible=false;if(replay.mesh)replay.mesh.visible=false;
   game.mode = 'picker';
   $('#hud').hidden = true;
   $('#ready').hidden = true;
