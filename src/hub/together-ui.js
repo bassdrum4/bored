@@ -1,4 +1,4 @@
-import { hasIdentity, getSession, ensureProfile } from './backend.js';
+import { hasIdentity, getSession, ensureProfile, isTransientError } from './backend.js';
 import { togetherRPC, inviteRPC, liveRPC, CONSENT_VERSION } from './together-api.js';
 import { TOGETHER_GAMES, ORDER } from '../games/catalog.js';
 import { PREVIEWS } from '../games/discovery.js';
@@ -235,7 +235,19 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
           pending = { match_id: id, version: current.version, request_id: crypto.randomUUID(), move };
           writeStored(key, pending);
         }
-        const next = await togetherRPC(action, pending);
+        // The request id is saved, so the server treats a repeat as the same move.
+        // A gateway blip (or the pool function reporting one) is therefore retried
+        // here instead of asking the player to shoot again.
+        const transient = error => isTransientError(error) || /unexpected token|not valid json/i.test(String(error?.message || ''));
+        let next, attempt = 0;
+        for (;;) {
+          try { next = await togetherRPC(action, pending); break; }
+          catch (error) {
+            if (!transient(error) || attempt >= 2) throw error;
+            attempt += 1;
+            await new Promise(done => setTimeout(done, 350 * attempt));
+          }
+        }
         if (stamp !== generation) throw new Error('Your account changed.');
         removeStored(key);
         return next;

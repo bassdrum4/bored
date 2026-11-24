@@ -87,6 +87,31 @@ function forgetSession() {
   removeStored(SESSION_KEY);
 }
 
+// Supabase answers through Cloudflare. When its origin has a blip the gateway
+// replies with an HTML error page (520-527) instead of JSON, and JSON.parse of
+// that page put `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` in
+// front of the player. Read the body once, defensively, and let a response that
+// is not JSON become a readable, retryable failure.
+async function responseBody(res) {
+  if (typeof res.text === 'function') {
+    const text = await res.text();
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return undefined; }
+  }
+  try { return await res.json(); } catch { return undefined; }
+}
+
+function busyError(res) {
+  const error = new Error('The server is busy. Try again in a moment.');
+  error.status = res.status;
+  error.transient = true;
+  return error;
+}
+
+export function isTransientError(error) {
+  return Boolean(error?.transient);
+}
+
 export async function request(path, { method = 'GET', body, prefer, token, keepalive = false } = {}) {
   const headers = { apikey: API_KEY };
   headers.Authorization = 'Bearer ' + (token || session?.access_token || API_KEY);
@@ -99,24 +124,25 @@ export async function request(path, { method = 'GET', body, prefer, token, keepa
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   if (!res.ok) {
-    let message = res.status + ' ' + res.statusText;
-    let code, details;
-    try {
-      const data = await res.json();
-      message = data.msg || data.message || data.error_description || data.error || message;
-      code = data.code;
-      details = data.details;
-    } catch {}
-    const error = new Error(message);
+    const data = await responseBody(res);
+    let message = '';
+    if (data && typeof data === 'object') message = data.msg || data.message || data.error_description || data.error || '';
+    const error = data === undefined ? busyError(res) : new Error(message || 'That request was refused (' + res.status + ').');
     error.status = res.status;
-    error.code = code;
-    // PostgREST's DETAIL line. A function that refuses with a 409 puts what is stored there.
-    if (typeof details === 'string') error.details = details;
+    if (data && typeof data === 'object') {
+      error.code = data.code;
+      // PostgREST's DETAIL line. A function that refuses with a 409 puts what is stored there.
+      if (typeof data.details === 'string') error.details = data.details;
+    }
+    // A gateway blip, a rate limit or a timeout is worth repeating; a refusal is not.
+    if (!data || res.status === 408 || res.status === 429 || res.status >= 500) error.transient = true;
     throw error;
   }
   if (res.status === 204) return null;
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
+  const data = await responseBody(res);
+  // A 2xx that is an HTML page is an interstitial, never this API's answer.
+  if (data === undefined) throw busyError(res);
+  return data;
 }
 
 export async function loadRules() {
@@ -140,7 +166,8 @@ let refreshInFlight = null;
 
 function temporaryRefreshFailure(error) {
   const status = Number(error?.status);
-  return !status || status === 408 || status === 429 || status >= 500;
+  // A gateway page that failed to parse says nothing about the refresh token.
+  return Boolean(error?.transient) || !status || status === 408 || status === 429 || status >= 500;
 }
 
 export async function refreshSession() {
