@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 912,
+  "count": 914,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -13,6 +13,8 @@ export const CHANGELOG = [
   {"sha":"3abfdb76","date":"2026-11-24","author":"bassdrum4","subject":"Let guests vote in announcement polls"},
   {"sha":"68dddeec","date":"2026-11-24","author":"Codebuff","subject":"Record that GeoPeaks shipped without the browser suite"},
   {"sha":"f76f4449","date":"2026-11-24","author":"Codebuff","subject":"Add GeoPeaks: ski twelve real summits traced from open elevation data"},
+  {"sha":"83105063","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP lobby: CRT terminal look, invites, copyable code"},
+  {"sha":"e6cca5e0","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP: back to the one dithered render; 4-box hands; item shapes"},
   {"sha":"4d74ac63","date":"2026-11-24","author":"bassdrum4","subject":"Record that main's CI was already red before the banner work"},
   {"sha":"412aac49","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP test: a 3-round game can end on the most round wins after round 3"},
   {"sha":"cfae91ab","date":"2026-11-24","author":"Claude","subject":"Shotgun Roulette MP: host settings, faster pacing, the Remote"},
