@@ -39,6 +39,17 @@ better, nothing new should be drawn under the boot screen. A red `Check Bored`
 on `main` also stops the Pages deploy: compare `version.json` with `git log`
 before assuming a push is live.
 
+**This was not the whole failure.** That job reported 30 failed tests and the
+same run on `c844aad`, before the banner work, already failed 29 of them with
+nothing to do with announcements. The banner fix removes the 30th
+(`a signed-in player votes in a poll and answers an open-ended question` is
+`ok 17` in the next run) and leaves the rest. Two examples of what is still
+red on `main`: `hub categories, search, sorting, empty state, and stored
+favorites` dies on `page.$eval('.card', els => els.map(...))` — `$eval` hands
+the callback one element, so the list assertions need `$$eval` — and most of
+the Poké Gacha, discovery and `bored.test.cjs` browser tests go with it.
+Someone has to work through that list; it is not a single shared cause.
+
 ---
 
 ## 2026-11-24 — Announcement polls: one feature, five CI failures
