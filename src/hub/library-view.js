@@ -19,14 +19,15 @@ const searchInput = $('#q');
 const gameGrid = $('#grid');
 
 // Popularity is a public, aggregated seven-day ranking — never raw analytics.
-// Cache one ranking per server snapshot day, not per local midnight.
+// The database only recalculates on Mondays. Keep the last known ranks on
+// screen while checking the cheap snapshot daily, including on failed requests.
 const POPULARITY_CACHE_KEY = 'bored.popularity.v3';
 const cachedPopularity = readStored(POPULARITY_CACHE_KEY, null);
-let popularRankings = cachedPopularity?.day === popularityCacheDay()
-  ? popularityRanks(cachedPopularity.rows) : new Map();
+let popularRankings = popularityRanks(cachedPopularity?.rows);
+let popularityCheckedDay = cachedPopularity?.day;
 
 async function loadPopularity() {
-  if (popularRankings.size || !backendReady()) return;
+  if ((popularRankings.size && popularityCheckedDay === popularityCacheDay()) || !backendReady()) return;
   try {
     // A SECURITY DEFINER RPC returns only game names and aggregate ranks.
     // It cannot expose player identifiers or the protected analytics table.
@@ -35,14 +36,20 @@ async function loadPopularity() {
       method: 'POST', body: {}, token: ANON_TOKEN
     });
     if (!Array.isArray(rows)) return;
-    popularRankings = popularityRanks(rows);
+    const nextRanks = popularityRanks(rows);
+    if (!nextRanks.size) return;
+    const changed = nextRanks.size !== popularRankings.size ||
+      [...nextRanks].some(([slug, rank]) => popularRankings.get(slug) !== rank);
+    popularRankings = nextRanks;
+    popularityCheckedDay = snapshotDay;
     writeStored(POPULARITY_CACHE_KEY, { day: snapshotDay, rows });
+    if (!changed) return;
     // Preserve focus: never shuffle a card out from under a keyboard user.
     if (popularRankings.size && $('#sort').value === 'popular' &&
         !document.activeElement?.closest('#grid')) renderLibrary();
     if (popularRankings.size && !document.activeElement?.closest('#recent')) renderRecent();
   } catch {
-    // Offline or RPC not deployed yet: Popular falls back to catalog-newest.
+    // Keep the last known order. With no cached ranks, use catalog-newest.
   }
 }
 
@@ -267,7 +274,7 @@ function renderRecent() {
 }
 
 // All Games sorts independently of the welcome/history shelf; Popular uses the
-// same cached daily rankings and falls back to catalog order when offline.
+// same weekly rankings; retain the last known order when offline.
 
 function renderLibrary() {
   const filter = searchInput.value.trim().toLowerCase();

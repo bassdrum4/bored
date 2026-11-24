@@ -22,8 +22,8 @@ function detroitCalendarTime(now) {
   return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
 }
 
-// The server's daily snapshot is refreshed at 07:07 UTC. Before that
-// cutoff, the previous snapshot is still the current one.
+// Check the cached public snapshot at most once a day, after 07:07 UTC.
+// Its ranking changes only on Monday; daily checks allow recovery from a failed refresh.
 export function popularityCacheDay(now = Date.now()) {
   return new Date(now - (7 * 60 + 7) * 60000).toISOString().slice(0, 10);
 }
