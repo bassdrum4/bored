@@ -276,6 +276,12 @@
   .mp-lobby h2 { font: 400 30px/1.2 var(--display); margin-bottom: 4px }
   .mp-code-line { color: var(--dim); margin-bottom: 14px }
   .mp-code-line b { font: 600 22px var(--mono); color: var(--gold); letter-spacing: .14em; margin-left: 6px }
+  .mp-settings { display: grid; gap: 6px; margin: 4px 0 10px; color: var(--dim); font-size: 15px }
+  .mp-settings .row { display: flex; gap: 6px; align-items: center }
+  .mp-settings .label { width: 9em; color: var(--dim) }
+  .mp-settings .value { color: var(--ink) }
+  .mp-settings .chip { padding: 3px 10px; font-size: 14px }
+  .mp-settings .chip.on { background: var(--ink); color: #120c0c }
   .mp-seats { list-style: none; display: grid; gap: 8px; margin-bottom: 12px }
   .mp-seats li { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid #3a2758; border-radius: 3px; min-height: 64px }
   .mp-seats li.empty { border-style: dashed; color: var(--dim) }
@@ -570,6 +576,7 @@
         <h2>Multiplayer room</h2>
         <p class="mp-code-line" id="mp-code-line"></p>
         <ol class="mp-seats" id="mp-seats-list"></ol>
+        <div class="mp-settings" id="mp-settings"></div>
         <p class="mp-note" id="mp-lobby-note" role="status"></p>
         <div class="mp-actions">
           <button class="mp-btn primary" id="mp-ready" type="button">Ready</button>
@@ -697,7 +704,8 @@ const ITEMS = {
   band: { name: "Choice Band", art: "choice-band", tip: "Your next shot does 2 damage if it is live." },
   wave: { name: "Thunder Wave", art: "tm-electric", tip: "Paralyzes the opponent. They may be unable to move." },
   trick: { name: "Trick Room", art: "tm-psychic", tip: "Flip the shell in the chamber: live becomes blank, blank becomes live." },
-  orb: { name: "Griseous Orb", art: "griseous-orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." }
+  orb: { name: "Griseous Orb", art: "griseous-orb", tip: "Giratina only. Flips the shell in the chamber, like Trick Room." },
+  remote: { name: "Remote", art: "poke-radar", tip: "Multiplayer, 3 or more still in: reverses the turn order." }
 };
 const POOL = ["potion", "scope", "eject", "band", "wave", "trick"];
 // Thunder Wave turns up half as often as the other items.
@@ -962,11 +970,11 @@ const fx = {
     if (bolt) bolt.classList.add("breaking");
   },
   // Round over: the lights go out, the result shows in the dark, the lights come back.
-  async lightsOut(title, text) {
+  async lightsOut(title, text, hold = 1900) {
     $("#dark-title").textContent = title;
     $("#dark-text").textContent = text;
     $("#dark").classList.add("out");
-    await wait(1900);
+    await wait(hold);
     $("#dark").classList.remove("out");
     await wait(450);
   }
@@ -1745,18 +1753,34 @@ for (const mode of ["normal", "hard", "multiplayer"]) { drawBoard(mode); loadBoa
      expire {turn}                     30 seconds ran out: the turn's player shoots themself
      leave  {}                         the sender is out for good
    An action for a turn that is already over is ignored, so a late timer or a
-   second load never counts twice. Normal rules, no Giratina: first to 2 rounds,
-   2/3/4 HP, 2 items a load, clockwise turns, a blank at yourself keeps the turn.
+   second load never counts twice. Normal rules, no Giratina, with the host's
+   settings (rounds, starting HP, turn timer) carried in the room's `map` field as
+   a short code, which `start` copies to every screen. Live shells are 1/2 to 2/3
+   of a load, 2 items a load, the Remote reverses the turn order, a blank at
+   yourself keeps the turn.
    The paralysis roll comes from the room's seed and the turn number, so every
    screen rolls the same. Outside a live room, window.__boredLobby (the lobby
    bridge) opens rooms: create one, join by code, or answer an invitation. */
 let mpLive = null, mpLobby = null;
 try { mpLive = window.__boredLive || null; } catch {}
 try { mpLobby = window.__boredLobby || null; } catch {}
-const MP_TURN_MS = 30000;
+// The host's settings, in the room config's `map` text field (the only free text the live rooms keep):
+// "r1-h3-t20" = 1 round, 3 HP, a 20-second turn timer; h "e" = escalating 2/3/4 HP by round.
+const MP_SETTINGS = { rounds: [1, 3], hp: [2, 3, 4, "e"], timer: [15, 20, 30] };
+const MP_DEFAULT = { rounds: 1, hp: 3, timer: 20 };
+function mpParseSettings(code) {
+  const m = /^r([13])-h([234e])-t(15|20|30)$/.exec(String(code || ""));
+  // A room from before settings plays the rules it started with: first to 2, escalating HP, 30 seconds.
+  if (!m) return { rounds: 3, hp: "e", timer: 30 };
+  return { rounds: Number(m[1]), hp: m[2] === "e" ? "e" : Number(m[2]), timer: Number(m[3]) };
+}
+const mpSettingsCode = c => "r" + c.rounds + "-h" + c.hp + "-t" + c.timer;
+const mpSettingsText = c => (c.rounds === 1 ? "1 round" : "3 rounds") + ", " + (c.hp === "e" ? "2/3/4 HP by round" : c.hp + " HP") + ", " + c.timer + "s turns";
+// The host's turn timer, down to 15 seconds once only two are still in.
+const mpTurnMs = () => (M && mpLiving(M).length <= 2 ? Math.min(15, M.cfg.timer) : M ? M.cfg.timer : 20) * 1000;
 const MP_POS = { 2: ["bottom", "top"], 3: ["bottom", "left", "top"], 4: ["bottom", "left", "top", "right"] };
 const MP_ANGLE = { top: 0, right: 90, bottom: 180, left: 270 };
-const MP_ROOM = { unjoined: "drop", cpus: 0, timer: 0, mode: "ffa" };
+const MP_ROOM = { unjoined: "drop", cpus: 0, timer: 0, mode: "ffa", map: mpSettingsCode(MP_DEFAULT) };
 let M = null, mpMe = 0, mpRoom = null, mpIsHost = false, mpSeq = 0, mpBusy = false, mpSending = false, mpPick = null;
 let mpFinished = false, mpGunAt = 180, mpClock = { key: "" }, mpLoadClock = { key: "" }, mpExit = false;
 const mpQueue = [], mpOnline = {}, buddyOf = {}, mpView = [];
@@ -1773,19 +1797,21 @@ function mpRoll(seed, turn) {
 /* The rules. Pure state changes; each pushes what happened to m.ev for the screen. */
 const mpUp = (m, i) => !m.p[i].out && !m.p[i].left;
 const mpLiving = m => m.p.map((_, i) => i).filter(i => mpUp(m, i));
-const mpNext = (m, i) => { for (let k = 1; k <= m.n; k++) { const j = (i + k) % m.n; if (mpUp(m, j)) return j; } return i; };
+// The next player still in, the way the table is turning (the Remote reverses it).
+const mpNext = (m, i) => { for (let k = 1; k <= m.n; k++) { const j = ((i + k * (m.dir || 1)) % m.n + m.n) % m.n; if (mpUp(m, j)) return j; } return i; };
 const mpName = i => i === mpMe ? "You" : M ? M.names[i] : "Player";
 const mpSays = (i, you, they) => mpName(i) + " " + (i === mpMe ? you : they);
 const mpLog = (m, text, kind = "", seat = null) => m.ev.push({ t: "log", text, kind, seat });
-function mpGame(seats, seed) {
+function mpGame(seats, seed, settings) {
   const n = seats.length;
-  return { n, seed: Number(seed) || 1, names: seats.map((s, i) => String(s.handle || "Player " + (i + 1)).slice(0, 40)),
+  return { n, seed: Number(seed) || 1, cfg: settings || mpParseSettings(""), dir: 1, names: seats.map((s, i) => String(s.handle || "Player " + (i + 1)).slice(0, 40)),
     p: seats.map(() => ({ hp: 0, max: 0, items: emptyBoxes(), band: false, para: false, waveBan: -1, turns: 0, knows: null, out: false, left: false })),
     wins: Array(n).fill(0), round: 0, loads: 0, shells: [], loaded: [0, 0], turn: 0, turnNo: 0, phase: "load", resume: false, winner: null, ev: [] };
 }
 function mpRound(m) {
   m.round++;
-  const hp = RULES.hp[Math.min(m.round, 3) - 1];
+  m.dir = 1;
+  const hp = m.cfg.hp === "e" ? RULES.hp[Math.min(m.round, 3) - 1] : m.cfg.hp;
   for (const s of m.p) Object.assign(s, { hp, max: hp, items: emptyBoxes(), band: false, para: false, waveBan: -1, knows: null, out: s.left });
   // The first turn moves one seat clockwise each round.
   let first = (m.round - 1) % m.n;
@@ -1824,7 +1850,7 @@ function mpLoad(m, a) {
     if (!mpUp(m, i)) return;
     const got = [], lost = [];
     for (const key of (Array.isArray(a.items[i]) ? a.items[i] : []).slice(0, 2)) {
-      if (!POOL.includes(key)) continue;
+      if (!MP_POOL.includes(key)) continue;
       const box = s.items.indexOf(null);
       if (box < 0) lost.push(ITEMS[key].name); else { s.items[box] = key; got.push(ITEMS[key].name); }
     }
@@ -1876,6 +1902,11 @@ function mpItem(m, seat, a) {
       for (const s of m.p) if (s.knows !== null) s.knows = !s.knows;
       mpLog(m, mpName(seat) + " used Trick Room. The shell in the chamber flips.", "you", seat);
       break;
+    case "remote":
+      if (mpLiving(m).length < 3) return;
+      m.dir = -(m.dir || 1);
+      mpLog(m, mpName(seat) + " used the Remote. Turn order reversed: " + (m.dir > 0 ? "clockwise" : "counterclockwise") + " now.", "status", seat);
+      break;
     default: return;
   }
   m.ev.unshift({ t: "item", seat, box: a.box, key });
@@ -1918,7 +1949,14 @@ function mpRoundEnd(m, winner) {
   mpLog(m, mpSays(winner, "take round " + m.round + ".", "takes round " + m.round + "."), "round");
   m.ev.push({ t: "round", winner, round: m.round });
   const left = m.p.map((_, i) => i).filter(i => !m.p[i].left);
-  if (m.wins[winner] >= 2 || left.length <= 1) return mpOver(m, m.wins[winner] >= 2 ? winner : left[0]);
+  if (left.length <= 1) return mpOver(m, left.length ? left[0] : winner);
+  // One round: the last one alive wins. Three: first to 2, or after round 3 the most round wins
+  // (a tie at the top plays another round).
+  if (m.cfg.rounds === 1 || m.wins[winner] >= 2) return mpOver(m, winner);
+  if (m.round >= 3) {
+    const best = Math.max(...left.map(i => m.wins[i])), leaders = left.filter(i => m.wins[i] === best);
+    if (leaders.length === 1) return mpOver(m, leaders[0]);
+  }
   mpRound(m);
 }
 function mpOver(m, winner) {
@@ -1959,14 +1997,34 @@ function mpApply(m, action) {
   }
   return m.ev;
 }
+// Multiplayer draws from the same items plus the Remote, which only turns up with 3 or more still in.
+const MP_POOL = [...POOL, "remote"];
+function mpPickItem(hand, remote) {
+  const keys = MP_POOL.filter(key => key !== "remote" || remote), weight = key => key === "remote" ? 0.6 : POOL_WEIGHT[key];
+  const draw = exclude => {
+    const list = keys.filter(key => key !== exclude);
+    let roll = Math.random() * list.reduce((sum, key) => sum + weight(key), 0);
+    for (const key of list) { roll -= weight(key); if (roll < 0) return key; }
+    return list[list.length - 1];
+  };
+  const key = draw(null);
+  return key === "band" && hand.includes("band") ? draw("band") : key;
+}
+// Multiplayer loads run hotter than single player: 1/2 to 2/3 of the shells are live (at least one blank).
+function mpRollLoad() {
+  const total = rand(3, 8);
+  const low = Math.ceil(total / 2), high = Math.max(low, Math.min(total - 1, Math.floor(total * 2 / 3)));
+  return { total, live: rand(low, high) };
+}
 // The host's screen rolls each load: the shells, and two items for every seat still in.
 function mpCompose(m) {
-  const { total, live } = rollLoad();
+  const { total, live } = mpRollLoad();
+  const remote = mpLiving(m).length >= 3;
   const shells = shuffle(Array.from({ length: total }, (_, k) => k < live ? 1 : 0));
   const items = m.p.map((s, i) => {
     if (!mpUp(m, i)) return [];
     const hand = s.items.filter(Boolean), out = [];
-    for (let k = 0; k < 2; k++) { const key = pickItem(hand); hand.push(key); out.push(key); }
+    for (let k = 0; k < 2; k++) { const key = mpPickItem(hand, remote); hand.push(key); out.push(key); }
     return out;
   });
   return { round: m.round, n: m.loads + 1, shells, items };
@@ -2037,6 +2095,7 @@ function drawRoom(room) {
     list.appendChild(li);
   }
   loadBuddies(seats.map(s => s.handle), () => { if (mpRoom === room && !M) drawRoom(room); });
+  drawSettings(room, host);
   const joined = seats.filter(s => s.state === "joined" || s.state === "ready");
   const waiting = joined.filter(s => s.user !== room.host && s.state !== "ready");
   $("#mp-ready").hidden = host;
@@ -2049,6 +2108,35 @@ function drawRoom(room) {
     ? joined.length < 2 ? "Waiting for a friend to join. Two to four players."
       : waiting.length ? "Waiting for everyone to be ready." : "Everyone is ready. Start when you like."
     : mine.state === "ready" ? "Ready. The host starts the game." : "Press Ready when you are.");
+}
+// The host's settings: buttons for the host, the same choices as plain text for everyone else.
+function drawSettings(room, host) {
+  const box = $("#mp-settings"), cfg = mpParseSettings(room.config && room.config.map);
+  const current = room.config && /^r[13]-h[234e]-t(15|20|30)$/.test(room.config.map || "") ? cfg : MP_DEFAULT;
+  box.replaceChildren();
+  if (!host) { box.append(el("span", "label", "Table"), el("span", "value", mpSettingsText(current))); return; }
+  const rows = [
+    ["Rounds", "rounds", v => v === 1 ? "1" : "3"],
+    ["Starting HP", "hp", v => v === "e" ? "Escalating" : String(v)],
+    ["Turn timer", "timer", v => v + "s"]
+  ];
+  for (const [label, key, show] of rows) {
+    const row = el("div", "row");
+    row.append(el("span", "label", label));
+    for (const v of MP_SETTINGS[key]) {
+      const b = el("button", "mp-btn chip" + (current[key] === v ? " on" : ""), show(v));
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(current[key] === v));
+      b.onclick = () => {
+        const next = { ...current, [key]: v };
+        // Three rounds start from escalating HP, one round from 3 HP; the host can still change it.
+        if (key === "rounds") next.hp = v === 3 ? "e" : 3;
+        mpRoomCall("lobby", { config: { ...MP_ROOM, map: mpSettingsCode(next) } });
+      };
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  }
 }
 async function mpRoomCall(op, payload) {
   for (const b of document.querySelectorAll("#mp-lobby button")) b.disabled = true;
@@ -2103,7 +2191,7 @@ function mpBuildTable() {
 }
 function mpDrawSlots(i) {
   const v = mpView[i], s = M.p[i], mine = i === mpMe, open = mine && mpCanAct();
-  const sig = s.items.join() + "|" + open + "|" + (mine ? [s.hp >= s.max, s.band, mpWaveOk(M, i) && mpWaveTargets(M, i).length > 0, mpPick ? mpPick.box : -1].join() : "");
+  const sig = s.items.join() + "|" + open + "|" + (mine ? [s.hp >= s.max, s.band, mpWaveOk(M, i) && mpWaveTargets(M, i).length > 0, mpPick ? mpPick.box : -1, mpLiving(M).length].join() : "");
   if (v.zone.dataset.sig === sig) return;
   v.zone.dataset.sig = sig;
   v.zone.replaceChildren();
@@ -2121,7 +2209,7 @@ function mpDrawSlots(i) {
     item.setAttribute("aria-label", ITEMS[key].name + ". " + ITEMS[key].tip);
     if (mine) {
       item.disabled = !open || (key === "potion" && s.hp >= s.max) || (key === "band" && s.band) ||
-        (key === "wave" && !(mpWaveOk(M, i) && mpWaveTargets(M, i).length));
+        (key === "wave" && !(mpWaveOk(M, i) && mpWaveTargets(M, i).length)) || (key === "remote" && mpLiving(M).length < 3);
       item.onclick = () => mpUseItem(box);
     } else item.tabIndex = -1;
     item.onmouseenter = event => showTip(key, event);
@@ -2154,7 +2242,8 @@ function mpRender() {
     v.plate.classList.toggle("out", s.out);
     v.plate.classList.toggle("target", act && (mpPick ? waveTo.includes(i) : mpUp(M, i)));
   }
-  $("#mp-round").textContent = M.phase === "over" ? "Game over" : "Round " + M.round + ". First to 2.";
+  $("#mp-round").textContent = M.phase === "over" ? "Game over"
+    : "Round " + M.round + (M.cfg.rounds === 1 ? ", last one standing." : ", most of 3.") + (M.dir < 0 ? " Order reversed." : "");
   if (R3.ok) return mpRender3D(act);
   const choices = $("#mp-choices");
   choices.replaceChildren();
@@ -2191,7 +2280,9 @@ function mpRender3D(act) {
       el("span", "won", "W" + M.wins[i] + (flags.length ? " " + flags.join(" ") : "")));
     return row;
   }));
-  if (!mpBusy && M.phase === "turn") {
+  $("#mp-leave").textContent = M.p[mpMe].out && M.phase !== "over" ? "Leave (you're out)" : $("#mp-leave").dataset.confirm ? "Leave and be out" : "Leave game";
+  if (!mpBusy && M.phase === "turn" && M.p[mpMe].out) mpSay("You're out this round. Watching " + M.names[M.turn] + ". You can leave any time.");
+  else if (!mpBusy && M.phase === "turn") {
     const known = M.p[mpMe].knows;
     const seen = known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.");
     mpSay(act ? (mpPick ? "Click who gets the Thunder Wave. Right-click or Esc cancels."
@@ -2241,7 +2332,7 @@ async function mpAnimate(events, fast) {
       else if (e.t === "bang") await R3.bang(e.target, e.hp);
       else if (e.t === "click") { sfx.click(); await R3.blank(); }
       else if (e.t === "round") await fx.lightsOut(mpSays(e.winner, "take round " + e.round + ".", "takes round " + e.round + "."),
-        M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".");
+        M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".", 1000);
       continue;
     }
     const v = mpView[e.seat !== undefined ? e.seat : e.target];
@@ -2250,41 +2341,41 @@ async function mpAnimate(events, fast) {
         const row = $("#mp-shells");
         row.replaceChildren();
         const shells = [...Array(e.live).fill("live"), ...Array(e.blank).fill("blank")].map(kind => { const s = el("div", "shell"); s.innerHTML = shellArt(kind); return s; });
-        for (const s of shells) { row.appendChild(s); sfx.click(); await wait(90); }
-        await wait(1300);
+        for (const s of shells) { row.appendChild(s); sfx.click(); await wait(40); }
+        await wait(550);
         for (const s of shells) s.classList.add("gone");
         sfx.chk();
-        await wait(350);
+        await wait(200);
         row.replaceChildren();
         break;
       }
       case "item": {
         const node = v && v.zone.querySelector('.item[data-box="' + e.box + '"]');
-        if (node) { node.classList.add("glow"); await wait(e.seat === mpMe ? 0 : 380); node.classList.add("using"); await wait(520); }
+        if (node) { node.classList.add("glow"); node.classList.add("using"); setTimeout(() => node.classList.remove("glow"), 500); }
         break;
       }
       case "aim":
         $("#mp-gun").classList.add("lift");
         mpSetGun(MP_ANGLE[mpPos(e.target)]);
-        await wait(1100);
+        await wait(550);
         break;
       case "bang":
         fx.restart($("#mp-flash"), "on");
         fx.restart($("#scene"), "shaking");
         if (e.target === mpMe) fx.restart($("#redflash"), "on");
         if (v) { fx.restart(v.plate, "flinch"); mpDrawBolts(e.target, e.hp); v.plate.classList.toggle("out", e.hp <= 0); }
-        await wait(900);
+        await wait(650);
         $("#mp-gun").classList.remove("lift");
         break;
       case "click":
         sfx.click();
-        await wait(650);
+        await wait(400);
         $("#mp-gun").classList.remove("lift");
         break;
       case "round":
         $("#mp-choices").hidden = true;
         await fx.lightsOut(mpSays(e.winner, "take round " + e.round + ".", "takes round " + e.round + "."),
-          M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".");
+          M.names.map((name, i) => (i === mpMe ? "You" : name) + " " + M.wins[i]).join(", ") + ".", 1000);
         break;
     }
   }
@@ -2326,7 +2417,7 @@ $("#mp-result-close").onclick = () => mpLive.call("exit").catch(() => {});
 $("#mp-leave").onclick = async () => {
   const button = $("#mp-leave");
   if (!M || M.phase === "over" || M.p[mpMe].left) return mpLive.call("exit").catch(() => {});
-  if (!button.dataset.confirm) { button.dataset.confirm = "1"; button.textContent = "Leave and be out"; return; }
+  if (!button.dataset.confirm && !M.p[mpMe].out) { button.dataset.confirm = "1"; button.textContent = "Leave and be out"; return; }
   if (mpExit) return;
   mpExit = true;
   button.disabled = true;
@@ -2348,12 +2439,12 @@ function mpTick() {
   if (M.phase === "turn" && !mpBusy) {
     const key = M.turnNo + ":" + M.loads;
     if (mpClock.key !== key) mpClock = { key, at: now, sent: false };
-    const left = Math.max(0, MP_TURN_MS - (now - mpClock.at));
+    const left = Math.max(0, mpTurnMs() - (now - mpClock.at));
     timer.textContent = Math.ceil(left / 1000) + "s";
     timer.classList.toggle("low", left < 10000);
     // The turn's own screen sends it at once; the others wait a moment in case that screen has gone.
     const grace = M.turn === mpMe ? 0 : 2500 + rank * 1500;
-    if (!mpClock.sent && !M.p[mpMe].left && now - mpClock.at > MP_TURN_MS + grace) {
+    if (!mpClock.sent && !M.p[mpMe].left && now - mpClock.at > mpTurnMs() + grace) {
       mpClock.sent = true;
       mpLive.call("send", { type: "expire", args: { turn: M.turnNo } }).catch(() => { mpClock.sent = false; });
     }
@@ -2874,7 +2965,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   const itemOk = key => {
     const you = M.p[mpMe];
     return !((key === "potion" && you.hp >= you.max) || (key === "band" && you.band) ||
-      (key === "wave" && !(mpWaveOk(M, mpMe) && mpWaveTargets(M, mpMe).length)));
+      (key === "wave" && !(mpWaveOk(M, mpMe) && mpWaveTargets(M, mpMe).length)) || (key === "remote" && mpLiving(M).length < 3));
   };
   const seatOk = seat => seat !== null && seat !== undefined && mpCanAct() &&
     (mpPick ? mpWaveTargets(M, mpMe).includes(seat) : R3.holding && mpUp(M, seat));
@@ -2894,10 +2985,13 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       for (let k = 0; k < 8; k++) {
         const it = s.items[k], key = p ? p.items[k] : null;
         if (it.key !== key) {
-          it.key = key; it.using = 0;
+          // A used item lifts and fades out where it was, so it stays drawn for that.
+          const fading = !key && it.using && now() - it.using < 0.6;
+          it.key = key;
+          if (!fading) it.using = 0;
           if (key) { it.sprite.material.map = imageTex(ITEM_DIR + ITEMS[key].art + ".png"); it.sprite.material.opacity = MASK.item; it.sprite.material.needsUpdate = true; }
         }
-        it.sprite.visible = it.shadow.visible = !!key;
+        it.sprite.visible = it.shadow.visible = !!key || !!it.using;
       }
       const st = s.screen;
       const off = !p || p.left;
@@ -3008,26 +3102,26 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       g.position.set((k - (all.length - 1) / 2) * 0.19, 0, 1.3);
       return g;
     });
-    for (const g of list) { shells.add(g); sfx.click(); await wait(95); }
-    await wait(1300);
+    for (const g of list) { shells.add(g); sfx.click(); await wait(35); }
+    await wait(420);
     // Into the gun's port, one at a time in an order you can't follow, then it racks.
     const port = new T.Vector3();
     for (const g of shuffle([...list])) {
       gunBody.localToWorld(port.set(0, -0.06, 0.05));
-      await new Promise(done => tweens.push({ obj: g, from: g.position.clone(), to: port.clone(), t0: performance.now() / 1000, dur: 0.16, done }));
+      await new Promise(done => tweens.push({ obj: g, from: g.position.clone(), to: port.clone(), t0: performance.now() / 1000, dur: 0.07, done }));
       shells.remove(g); sfx.click();
-      await wait(40);
+      await wait(8);
     }
     anim.recoil = 0.55; sfx.chk();
-    await wait(160);
+    await wait(90);
     anim.recoil = 0.55; sfx.chk();
-    await wait(250);
+    await wait(120);
   };
   R3.useItem = async (seat, box) => {
     const it = sideOf(seat).items[box];
     if (!it || !it.key) return;
     it.using = now();
-    await wait(650);
+    // No wait: items are instant; the lift-and-fade plays on while the game moves on.
   };
   R3.aim = async (shooter, target) => {
     anim.aim = target; anim.aimShooter = shooter;
@@ -3037,7 +3131,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     const pos = mpPos(target);
     anim.yawGoal = pos === "left" ? 0.3 : pos === "right" ? -0.3 : 0;
     anim.pitchGoal = pos === "bottom" ? -0.1 : pos === "top" ? 0.05 : 0;
-    await wait(1000);
+    await wait(550);
   };
   R3.bang = async (target, hp) => {
     anim.flash = 2; anim.muzzle = 2; anim.shake = 0.5; anim.recoil = 1;
@@ -3046,10 +3140,10 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     st.hp = hp; st.drawn = 0;
     if (s.buddy) { s.flinch = now(); if (hp <= 0) s.out = true; }
     if (target === mpMe) anim.hit = 1;
-    await wait(950);
+    await wait(700);
     R3.endShot();
   };
-  R3.blank = async () => { anim.recoil = 0.45; await wait(700); R3.endShot(); };
+  R3.blank = async () => { anim.recoil = 0.45; await wait(420); R3.endShot(); };
   R3.endShot = () => { anim.atMeGoal = 0; anim.aim = null; anim.liftGoal = 0; anim.yawGoal = 0; anim.pitchGoal = 0; };
 
   /* Every frame. */
@@ -3063,8 +3157,8 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     // Held by me: the barrel follows whoever I'm pointing at, else away from me.
     if (R3.holding && anim.aim === null) anim.goal = angleTo(hover && hover.kind === "seat" ? DIR[mpPos(hover.seat)] : [0, -1]);
     const diff = ((anim.goal - anim.angle) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-    anim.angle += diff * Math.min(1, dt * 6);
-    anim.lift = ease(anim.lift, anim.liftGoal, dt * 7);
+    anim.angle += diff * Math.min(1, dt * 12);
+    anim.lift = ease(anim.lift, anim.liftGoal, dt * 12);
     anim.recoil = Math.max(0, anim.recoil - dt * 3.5);
     gunPivot.rotation.y = anim.angle;
     gunBody.position.set(0, anim.lift * 0.3, anim.recoil * 0.14);
@@ -3112,6 +3206,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const up = pos === "bottom" && hover && hover.kind === "item" && hover.box === s.items.indexOf(it) && hover.ok;
         it.lift = ease(it.lift, up ? 1 : 0, dt * 10);
         const using = it.using ? Math.min(1, (now() - it.using) / 0.6) : 0;
+        if (using >= 1 && !it.key) { it.using = 0; it.sprite.visible = it.shadow.visible = false; }
         it.sprite.position.y = 0.24 + it.lift * 0.09 + using * 0.5;
         const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
         it.sprite.scale.set(scale, scale, 1);
@@ -3232,7 +3327,8 @@ async function mpHello() {
   if (M) return;
   mpRoom = room;
   const seats = (room.start && room.start.seats) || [];
-  M = mpGame(seats, room.start && room.start.options && room.start.options.seed);
+  const options = (room.start && room.start.options) || {};
+  M = mpGame(seats, options.seed, mpParseSettings(options.map));
   mpMe = Number.isInteger(room.me) && room.me >= 0 && room.me < M.n ? room.me : 0;
   mpBuildTable();
   mpRound(M);

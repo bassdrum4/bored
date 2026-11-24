@@ -19,16 +19,17 @@ const SOURCE = [
   between('const ITEMS = {', 'const YOU = 0'),
   between('function rollLoad()', '// The chance the shell in the chamber'),
   line('const MP_POS ='),
+  between('const MP_SETTINGS =', 'const MP_POS ='),
   'let M = null, mpMe = 0;',
   between('// A fixed 0-1 number per (seed, turn)', '/* The screen. */'),
-  'this.api = { mpGame, mpRound, mpApply, mpCompose, mpUp, mpRoll, mpHostSeat, setView(m, me) { M = m; mpMe = me; } };'
+  'this.api = { mpGame, mpRound, mpApply, mpCompose, mpUp, mpRoll, mpHostSeat, mpParseSettings, mpSettingsCode, mpRollLoad, setView(m, me) { M = m; mpMe = me; } };'
 ].join('\n');
 
 // One screen: its own copy of the rules (a separate VM), and a seat to look from.
-function screen(seats, seed, me) {
+function screen(seats, seed, me, code) {
   const box = {};
   vm.runInNewContext(SOURCE, box);
-  const api = box.api, m = api.mpGame(seats.map(handle => ({ handle })), seed);
+  const api = box.api, m = api.mpGame(seats.map(handle => ({ handle })), seed, code === undefined ? undefined : api.mpParseSettings(code));
   api.setView(m, me);
   api.mpRound(m);
   return { api, m, apply: action => api.mpApply(m, JSON.parse(JSON.stringify(action))) };
@@ -211,4 +212,57 @@ test('the 3D table gives every seat its own 4x2 item grid in its own quarter of 
   }
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++)
     assert.ok(Math.hypot(all[i][0] - all[j][0], all[i][1] - all[j][1]) >= 0.5, 'boxes ' + i + ' and ' + j + ' are at least a slot apart');
+});
+
+test('host settings: the room code, one round, fixed HP, and rooms from before settings', () => {
+  const { api } = screen(['A', 'B'], 1, 0);
+  assert.equal(JSON.stringify(api.mpParseSettings('r1-h3-t20')), JSON.stringify({ rounds: 1, hp: 3, timer: 20 }));
+  assert.equal(JSON.stringify(api.mpParseSettings('r3-he-t15')), JSON.stringify({ rounds: 3, hp: 'e', timer: 15 }));
+  assert.equal(api.mpSettingsCode({ rounds: 3, hp: 4, timer: 30 }), 'r3-h4-t30');
+  assert.match(api.mpSettingsCode({ rounds: 3, hp: 'e', timer: 30 }), /^[a-z0-9-]{1,24}$/, 'fits the room config\'s map field');
+  assert.equal(JSON.stringify(api.mpParseSettings('pangaea')), JSON.stringify({ rounds: 3, hp: 'e', timer: 30 }), 'an older room keeps its old rules');
+
+  // One round, 3 HP: the last one standing wins the table at once.
+  const s = screen(['A', 'B', 'C'], 2, 0, 'r1-h3-t20'), m = s.m;
+  assert.deepEqual(m.p.map(p => p.hp), [3, 3, 3]);
+  let seq = 0;
+  const load = shells => s.apply({ seq: ++seq, seat: 0, type: 'load', args: { round: m.round, n: m.loads + 1, shells, items: [[], [], []] } });
+  const shoot = (seat, target) => s.apply({ seq: ++seq, seat, type: 'shoot', args: { turn: m.turnNo, target } });
+  load([1, 1, 1, 1, 1, 1, 1, 0]);
+  const fire = (target, who) => { assert.equal(m.turn, who); shoot(who, target); };
+  fire(1, 0); fire(2, 1); fire(1, 2); fire(1, 0);                    // B takes 3: out
+  assert.equal(m.p[1].out, true);
+  fire(2, 2); fire(2, 0);                                            // C takes 3: out
+  assert.deepEqual([m.phase, m.winner, m.round], ['over', 0, 1], 'one round, last one standing wins');
+
+  // Three rounds with fixed 4 HP: every round starts at 4.
+  const t = screen(['A', 'B'], 3, 0, 'r3-h4-t30');
+  assert.deepEqual(t.m.p.map(p => p.hp), [4, 4]);
+});
+
+test('the Remote reverses the turn order, only with 3 or more still in', () => {
+  const s = screen(['A', 'B', 'C', 'D'], 4, 0, 'r1-h3-t20'), m = s.m;
+  let seq = 0;
+  s.apply({ seq: ++seq, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [0, 0, 0, 1], items: [['remote'], [], [], []] } });
+  assert.equal(m.turn, 0);
+  s.apply({ seq: ++seq, seat: 0, type: 'item', args: { turn: m.turnNo, box: 0 } });
+  assert.equal(m.dir, -1);
+  s.apply({ seq: ++seq, seat: 0, type: 'shoot', args: { turn: m.turnNo, target: 1 } });   // a blank at B
+  assert.equal(m.turn, 3, 'counterclockwise: from seat 0 to seat 3');
+  // With only two still in, a Remote does nothing and stays in the box.
+  const two = screen(['A', 'B'], 5, 0, 'r1-h3-t20');
+  two.apply({ seq: 1, seat: 0, type: 'load', args: { round: 1, n: 1, shells: [0, 1, 1], items: [['remote'], []] } });
+  two.apply({ seq: 2, seat: 0, type: 'item', args: { turn: two.m.turnNo, box: 0 } });
+  assert.deepEqual([two.m.dir, two.m.p[0].items[0]], [1, 'remote']);
+  // A new round turns clockwise again.
+  assert.match(html, /m\.round\+\+;\s*m\.dir = 1;/);
+});
+
+test('multiplayer loads are 1/2 to 2/3 live, with a blank in every load', () => {
+  const { api } = screen(['A', 'B'], 1, 0);
+  for (let k = 0; k < 4000; k++) {
+    const { total, live } = api.mpRollLoad();
+    assert.ok(total >= 3 && total <= 8);
+    assert.ok(live >= Math.ceil(total / 2) && live <= Math.max(Math.ceil(total / 2), Math.floor(total * 2 / 3)) && live < total, total + '/' + live);
+  }
 });
