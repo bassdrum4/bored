@@ -76,20 +76,49 @@ const getawayLoaderTrack = $('#getaway-loading-track');
 const getawayLoaderFill = $('#getaway-loading-fill');
 const getawayLoaderPercent = $('#getaway-loading-percent');
 let getawayLoaderTimer = 0;
+let documentLoaderTimer = 0;
+let documentLoaderToken = null;
 
 function resetGetawayLoader() {
   clearTimeout(getawayLoaderTimer);
-  getawayLoaderTimer = 0;
+  clearTimeout(documentLoaderTimer);
+  getawayLoaderTimer = documentLoaderTimer = 0;
+  documentLoaderToken = null;
   getawayLoader.hidden = true;
 }
 
 function beginGetawayLoader() {
   resetGetawayLoader();
+  $('#game-loading-title').textContent = 'Getaway Shootout';
+  setBo($('#game-loading-bo'), 'bored');
+  getawayLoaderTrack.classList.remove('is-indeterminate');
+  getawayLoaderPercent.hidden = false;
   getawayLoaderText.textContent = 'Preparing the getaway…';
   getawayLoaderTrack.setAttribute('aria-valuenow', '0');
   getawayLoaderFill.style.width = '0%';
   getawayLoaderPercent.textContent = '0%';
   getawayLoader.hidden = false;
+}
+
+// Ordinary game documents have no reliable byte-progress API. The same host
+// screen stays visible through fetch and document startup, without fake percentages.
+function beginDocumentLoader(name, token) {
+  resetGetawayLoader();
+  documentLoaderToken = token;
+  $('#game-loading-title').textContent = name;
+  setBo($('#game-loading-bo'), 'bored');
+  getawayLoaderText.textContent = 'Downloading the game…';
+  getawayLoaderTrack.removeAttribute('aria-valuenow');
+  getawayLoaderTrack.classList.add('is-indeterminate');
+  getawayLoaderFill.style.width = '';
+  getawayLoaderPercent.hidden = true;
+  getawayLoader.hidden = false;
+}
+
+function finishDocumentLoader(token) {
+  if (token !== loadToken || token !== documentLoaderToken) return;
+  resetGetawayLoader();
+  if (menuPanel.hidden && !document.querySelector('dialog[open]')) gameFrame.focus();
 }
 
 function onGetawayLoading(data) {
@@ -99,6 +128,7 @@ function onGetawayLoading(data) {
     getawayLoaderText.textContent = 'Could not start the game. Use the menu to restart or go back.';
     getawayLoaderTrack.removeAttribute('aria-valuenow');
     getawayLoaderPercent.textContent = 'LOAD FAILED';
+    setBo($('#game-loading-bo'), 'shrug');
     return;
   }
   const progress = Number(data.progress);
@@ -333,6 +363,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (sandboxed) gameFrame.setAttribute('sandbox', 'allow-scripts');
   else gameFrame.removeAttribute('sandbox');
   activeSlug = previousSlug = slug;
+  const token = ++loadToken;
   // Opening a game is what "played today" means for invite credit. One write a
   // day, and one sync so a pending recruit moves to 2 of 2 without waiting.
   if (recordPlayDay()) void syncInvite().catch(() => {});
@@ -385,7 +416,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       'Getaway Shootout · Esc leaves · Shift+R restarts');
   } else {
     const native = NEW_GAMES.includes(slug);
-    const token = ++loadToken;
+    if (!native) beginDocumentLoader(name, token);
     const paint = source => {
       // The player may have left, or opened another game, while this one was on
       // its way. Dropping the response keeps a late document from painting over
@@ -425,6 +456,14 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
         '</style>' : '';
       // A sandboxed frame gets only the key bridge: no resume save or analytics,
       // which need same-origin storage it does not have.
+      // Signal document startup from inside the frame, including opaque sandbox
+      // origins. The launch token rejects messages from a superseded document.
+      if (!native) {
+        getawayLoaderText.textContent = 'Starting the game…';
+        head += '<scr' + 'ipt>document.addEventListener("DOMContentLoaded",function(){parent.postMessage({type:"bored:document-loaded",token:' + token + '},"*")},{once:true});<\/scr' + 'ipt>';
+        // A game with its own startup problem must not be permanently covered.
+        documentLoaderTimer = setTimeout(() => finishDocumentLoader(token), 12000);
+      }
       gameFrame.srcdoc = injectHead(html, adminPreview
         ? '<script>window.__boredPreviewAuthorized=true;</' + 'script>' + head
         : sandboxed ? ANALYTICS_FRAME_BRIDGE + head
@@ -439,6 +478,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     };
     const fail = () => {
       if (token !== loadToken) return;
+      resetGetawayLoader();
       gameFrame.srcdoc = frameStandIn(name + ' did not load.',
         'Couldn\'t grab that game. Check your connection and pick it again.');
       analytics.event('error', { code: 'load_failed' });
@@ -463,7 +503,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   // from the game itself: a drag begun in the first frame would be cancelled by
   // the blur, which loses the putt (Minigolf drops a drag on window blur).
   focusTimer = setTimeout(() => {
-    if (activeSlug === slug && menuPanel.hidden && document.activeElement !== gameFrame) gameFrame.focus();
+    if (activeSlug === slug && documentLoaderToken === null && menuPanel.hidden && document.activeElement !== gameFrame) gameFrame.focus();
   }, 60);
 }
 
@@ -1203,6 +1243,9 @@ addEventListener('message', event => {
   if (activeTracks) activeTracks.message(event);
   if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
+    case 'bored:document-loaded':
+      finishDocumentLoader(event.data.token);
+      break;
     case 'bored:getaway-loading':
       if (activeSlug === 'getaway-shootout' && event.origin === location.origin) onGetawayLoading(event.data);
       break;
@@ -1318,6 +1361,7 @@ void loadPopularity();
 // The shell's watchdog reads this. It also clears the watchdog's one retry so a
 // later reload can recover from a fresh load failure.
 window.__boredHubReady = true;
+$('#hub-loading').hidden = true;
 try { sessionStorage.removeItem('bored.boot-retry'); } catch {}
 const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
