@@ -177,6 +177,83 @@ test('a signed-in player votes in a poll and answers an open-ended question', as
   assert.deepEqual(errors, []);
 });
 
+test('a guest votes in a poll without signing in, once per browser', async t => {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium']
+    .filter(Boolean).find(p => fs.existsSync(p));
+  assert.ok(executablePath);
+  const site = await serve(root);
+  let browser;
+  t.after(async () => { await browser?.close(); await site.close(); });
+  browser = await puppeteer.launch({ executablePath, headless: true });
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+  const posts = [{
+    id: 'poll-guest', title: 'Which mode?', body: 'Pick one.', kind: 'poll',
+    options: ['More of this', 'Fewer games'], audience: 'everyone', recipient_id: null,
+    priority: 'normal', link_url: null, active: true,
+    published_at: new Date(Date.now() - 5000).toISOString(),
+    created_at: new Date().toISOString(), expires_at: null
+  }];
+  let voted = null;
+  const cors = {
+    'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS',
+    'access-control-allow-headers': 'apikey,authorization,content-type,prefer'
+  };
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    const url = req.url();
+    if (url.startsWith(site.origin)) return req.continue();
+    const reply = (status, body) => req.respond({
+      status, contentType: 'application/json', headers: cors,
+      body: body === undefined ? '' : JSON.stringify(body)
+    });
+    if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers: cors });
+    if (url.includes('/rest/v1/announcements?')) return reply(200, posts);
+    if (url.includes('/rest/v1/rpc/respond_to_announcement')) {
+      voted = JSON.parse(req.postData() || '{}');
+      return reply(200, { choice: voted.p_choice });
+    }
+    if (url.includes('/rest/v1/rpc/announcement_results')) {
+      return reply(200, [{ choice: 'More of this', votes: 3 }, { choice: 'Fewer games', votes: 1 }]);
+    }
+    return req.abort();
+  });
+  await page.goto(site.url, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#announcement-banner:not([hidden])', { timeout: 10000 });
+
+  // The banner's poll is live for a guest: answering does not need "Read more"
+  // or an account.
+  assert.equal(await page.$('#announcement-banner .announcement-response-hint'), null);
+  const options = await page.$$eval('#announcement-banner .announcement-option',
+    nodes => nodes.map(node => ({ text: node.textContent, disabled: node.disabled })));
+  assert.deepEqual(options, [
+    { text: 'More of this', disabled: false },
+    { text: 'Fewer games', disabled: false }
+  ]);
+
+  await page.click('#announcement-banner .announcement-option');
+  await page.waitForFunction(() => document.getElementById('announcement-status').textContent === 'Vote recorded.');
+  assert.equal(voted.p_announcement, 'poll-guest');
+  assert.equal(voted.p_choice, 'More of this');
+  assert.equal(voted.p_answer, null);
+  assert.match(voted.p_guest, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bored.announcements.guestVotes')));
+  assert.equal(saved['poll-guest'], 'More of this');
+
+  // The browser remembers which way it voted, so a reload shows the choice and
+  // the tally instead of asking again.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.getElementById('hub-loading')?.hidden === true &&
+    typeof document.getElementById('announcement-toggle').onclick === 'function');
+  await page.click('#announcement-toggle');
+  await page.waitForSelector('#announcement-dialog[open]');
+  await page.waitForSelector('#announcement-list .announcement-option[aria-pressed="true"]');
+  assert.equal(await page.$eval('#announcement-list .announcement-chosen .announcement-result-label',
+    node => node.textContent), 'More of this');
+  assert.deepEqual(errors, []);
+});
+
 test('an announcement can be a message, a poll or an open-ended question', () => {
   const html = fs.readFileSync(path.join(root, 'analytics.html'), 'utf8');
   const admin = fs.readFileSync(path.join(root, 'hub', 'announcement-admin.js'), 'utf8');
@@ -195,4 +272,8 @@ test('an announcement can be a message, a poll or an open-ended question', () =>
   assert.match(ui, /rpc\/announcement_results/);
   assert.match(ui, /announcement-option/);
   assert.match(ui, /announcement-response-hint/);
+  // Guests vote with the browser id the page keeps; only written answers ask
+  // for an account.
+  assert.match(ui, /p_guest/);
+  assert.match(ui, /guestVotes/);
 });
