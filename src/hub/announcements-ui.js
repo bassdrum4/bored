@@ -54,8 +54,8 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     return box;
   }
 
-  // Poll choices and written answers live inside the dialog; the banner stays a
-  // quiet notice with a "Read more" button so it never crowds a game.
+  // Poll choices and written answers sit in the card itself, in the banner and
+  // in the dialog, so answering never needs the "Read more" detour.
   function responseForm(item) {
     if (answerKind(item) === 'message') return null;
     const form = make('form', undefined, 'announcement-response');
@@ -122,11 +122,9 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     const article = make('article', undefined, 'announcement-card' + (item.priority === 'important' ? ' announcement-important' : ''));
     if (banner) article.append(make('p', 'FROM BORED / NEW ' +
       (kind === 'poll' ? 'POLL' : kind === 'question' ? 'QUESTION' : 'MESSAGE'), 'announcement-eyebrow'));
-    article.append(make('h3', item.title), make('p', item.body));
-    if (!banner) {
-      const form = responseForm(item);
-      if (form) article.append(form);
-    }
+    article.append(make('h3', item.title), make('p', item.body, 'announcement-body'));
+    const form = responseForm(item);
+    if (form) article.append(form);
     const actions = make('div', undefined, 'announcement-actions');
     if (item.link_url && /^#[a-z0-9][a-z0-9-]{0,49}$/.test(item.link_url)) {
       const link = make('a', 'Play →');
@@ -171,6 +169,7 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     const banner = $('announcement-banner');
     banner.replaceChildren(...unread.slice(0, 1).map(e => card(e, true)));
     banner.hidden = !unread.length;
+    reserveBannerSpace(banner);
     if (!document.hidden && unread.length && !seenBannerImpressions.has(unread[0].id)) {
       seenBannerImpressions.add(unread[0].id);
       track('announcement_impression', { surface: 'announcement', announcement_id: unread[0].id });
@@ -179,6 +178,23 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     list.replaceChildren(...visible.map(e => card(e)));
     if (!visible.length) list.append(make('p', 'No announcements right now.'));
   }
+  // The banner is a fixed overlay. Now that it carries answers it can grow past
+  // the start of the page, so hold its height open above the hub instead of
+  // letting it sit on the header and swallow clicks meant for the nav.
+  function reserveBannerSpace(banner) {
+    const root = document.documentElement;
+    if (banner.hidden) {
+      root.style.removeProperty('--announcement-space');
+      return;
+    }
+    // The player hides the banner without unmounting it: keep the space the
+    // page already has rather than collapsing it under the game.
+    if (!banner.offsetHeight) return;
+    // 12px above the banner and 12px under it, kept to at most one screen.
+    const space = Math.min(banner.offsetHeight + 24, Math.max(0, window.innerHeight - 16));
+    root.style.setProperty('--announcement-space', space + 'px');
+  }
+
   async function acknowledge(item) {
     if (read(item)) return;
     const who = current();
