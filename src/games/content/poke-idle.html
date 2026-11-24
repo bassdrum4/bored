@@ -72,7 +72,7 @@
   .ground { position: absolute; left: 50%; bottom: 14px; width: min(68%, 320px); height: 46px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
   .field[data-kind="gym"] .ground { background: var(--g-gym) }
   .field[data-kind="dungeon"] .ground { background: var(--g-dungeon) }
-  .field[data-kind="final"] .ground, .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground, .field[data-kind="darkest"] .ground, .field[data-kind="tower"] .ground, .field[data-kind="quest"] .ground, .field[data-kind="raid"] .ground { background: var(--g-champ); border-color: var(--gold) }
+  .field[data-kind="final"] .ground, .field[data-kind="rival"] .ground, .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground, .field[data-kind="darkest"] .ground, .field[data-kind="tower"] .ground, .field[data-kind="quest"] .ground, .field[data-kind="raid"] .ground { background: var(--g-champ); border-color: var(--gold) }
   #foe img { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); image-rendering: pixelated; transition: transform .06s }
   #foe:active img { transform: translateX(-50%) scale(.94) }
   #foe img.trainer, #foe:active img.trainer { left: 10px; top: 8px; bottom: auto; transform: none }
@@ -712,6 +712,8 @@ function areaCap(loc = S.loc) {
   // Red and the Battle Tower hold nobody back.
   if (!loc || loc.kind === "summit" || loc.kind === "tower") return 100;
   if (loc.kind === "final" || loc.kind === "daily") return levelCap();
+  // Sssssssnakes fights under that region's Champion's cap, whenever you come back.
+  if (loc.kind === "rival") return Math.min(100, champLevel(loc.r) + CAP_OVER);
   // Side quests, the Darkest Day, and the Ultra Wormhole and Area Zero come after a Champion: your level cap.
   if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || loc.kind === "quest" || loc.kind === "darkest") return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
@@ -1085,6 +1087,7 @@ function unlocked(loc) {
   if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
   if (kind === "daily") return S.party.length > 0;
+  if (kind === "rival") return !!RIVAL_AT[r] && !!S.champs[r];
   if (kind === "darkest") return !!S.champs[PIECES_FROM] && (S.pieces || 0) >= PIECES_NEED;
   if (kind === "tower") return !!S.champs[TOWER_FROM];
   if (kind === "raid") return !!raidMon();
@@ -1100,6 +1103,7 @@ function unlocked(loc) {
 function locName(loc) {
   if (loc.kind === "final") return "Prof Penguin's Lab";
   if (loc.kind === "daily") return "Daily boss";
+  if (loc.kind === "rival") return `Rival ${RIVAL_NAME}`;
   if (loc.r === TRAIN_R) return `${TRAIN_TYPES[loc.k]} training area`;
   const R = REGIONS[loc.r];
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
@@ -1167,11 +1171,11 @@ const refHit = (m, cap, foe) => hitStat(m, foe) * cap / 50 * hitRate(m) * truant
 // The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
 const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkFor(m), 0) / P.length / PARTY_BULK));
 const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + TAP_SHARE * P.reduce((s, m) => s + refHit(m, cap), 0)));
-function gymTuning(B, k, size, area = [B.r, k]) {
+function gymTuning(B, k, size, area = [B.r, k], use = BOSS_USE) {
   const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
   const P = refPool(...area, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
   const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) * bossBoost() + tap), 0);
-  return BOSS_USE * B.bossTime * refDef(P) / secs;
+  return use * B.bossTime * refDef(P) / secs;
 }
 // The Max Raid Den: the strongest team for its Gigantamax Pokémon you could have, at the cap, with bossProtein(), only
 // just wins idling (BOSS_USE).
@@ -1306,7 +1310,7 @@ const prestigeShiny = (p = S.prestige || 0) => Math.min(PRESTIGE_SHINY_MAX, 2 **
 const prestigeXp = () => S.prestige ? PRESTIGE_XP : 1;
 const nextShiny = () => prestigeShiny((S.prestige || 0) + 1);
 const canPrestige = () => !!(S && !S.pick && (S.pbeat || (S.beat && !S.prestige)));
-const PRESTIGE_RESETS = ["your Box and party", "money", "balls, items, Linking Cords and Protein", "badges and Champions", "dungeons and side quests", "dungeon tickets",
+const PRESTIGE_RESETS = ["your Box and party", "money", "balls, items, Linking Cords and Protein", "badges and Champions", "dungeons and side quests", "rival fights", "dungeon tickets",
   "Mega Stones, Max Soup and Gigantamax forms", "the Shiny Charm", "region progress: routes, Zygarde Cells, Wishing Pieces and Plates", "Prof Penguin's Lab: beat him again to prestige again"];
 const PRESTIGE_STAYS = ["achievements", "Mail", "your Battle Tower best", "stats counters (wins, taps, evolutions)", "the day you beat the game", "saved teams, as templates: loading one fills in the members you have",
   "your lifetime Pokédex, which is your leaderboard score", "every shiny line: the first one of a line you catch again comes out shiny", "special editions (SP), at the new level cap, in their SP look"];
@@ -1328,6 +1332,31 @@ function prestige() {
   for (const [k, b] of Object.entries(old.box)) if (b.special && SPECIALS[b.special]) S.box[k] = { xp: Math.pow(levelCap(), 3), shiny: false, special: b.special, look: "special" };
   B = null; viewR = 0; dexR = 0; detail = null; panel = "save";
   save(); showPick();
+}
+// ── Sssssssnakes, the first player who beat the game, as an optional rival: one fight each in Johto, Unova and Galar,
+// a row at the top of that region's list once its Champion is beaten. Each is set by that Champion's rules: his level
+// cap (areaCap), his timer (CHAMP_TIME, moved by the team's Attack and Speed against the region's bosses) and his tuning
+// (gymTuning: the best six that region offers, at the cap, with a quarter of the Protein), but a little harder: that team
+// needs RIVAL_USE of the clock idling, where the Champion's needs BOSS_USE (0.97). The team fights at the cap. The first
+// win of each pays RIVAL_PAY times a Champion's base pay (a Champion's first win is 30), the last one a Master Ball too,
+// and Sssssssnakes sends a letter. Rematches pay a Champion rematch's.
+const RIVAL_NAME = "Sssssssnakes", RIVAL_USE = 1.05, RIVAL_PAY = 100, RIVAL_REMATCH = 30;
+// His Zygarde in its 50% Forme (the usual one), by that name; the Hall of Fame's too.
+const ZYGARDE_50 = statForm(718, { name: "Zygarde 50% Forme", sprite: 718 }, "Dragon/Ground", [108, 100, 121, 81, 95, 95]);
+const RIVALS = [
+  { id: "early", r: 1, team: [495, 23, 843].map(mon), line: "You're the new one? Cute. I beat this whole game before you picked a starter." },
+  { id: "mid", r: 4, team: [496, 24, 844, 350].map(mon), line: "Still going? Fine. Let's see if you learned anything since Johto." },
+  { id: "late", r: 7, team: [...[497, 24, 844, 350].map(mon), ZYGARDE_50], master: 1, line: "This is my real team. Don't take it personally. Actually, do." }
+];
+const RIVAL_AT = Object.fromEntries(RIVALS.map(x => [x.r, x])), RIVAL = Object.fromEntries(RIVALS.map(x => [x.id, x]));
+const rivalWon = id => !!(S && S.rivals && S.rivals[id]);
+const rivalTime = x => fightTime(CHAMP_TIME, x.team, regionOffense(x.r), .8, 1.2);
+function rivalWin() {
+  const x = RIVAL_AT[B.r], first = !rivalWon(x.id), prize = rewardFor(B.L, B.i, first ? RIVAL_PAY : RIVAL_REMATCH);
+  S.money += prize; S.rivals = { ...(S.rivals || {}), [x.id]: 1 };
+  if (first && x.master) S.balls.master++;
+  if (first) S.mail.got["rival-" + x.id] = 1;
+  toast(first ? `You beat ${RIVAL_NAME}! +$${fmt(prize)}${x.master ? " and a Master Ball" : ""}. ${RIVAL_NAME} sent you a letter.` : `${RIVAL_NAME} rematch won. +$${fmt(prize)}.`);
 }
 function startLoc(loc) {
   if (!unlocked(loc)) return;
@@ -1355,6 +1384,7 @@ function startLoc(loc) {
   }
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
+  else if (loc.kind === "rival") { const x = RIVAL_AT[r]; B = { kind: "rival", r, i: r * 4 + 3, queue: x.team.slice(), L: areaCap(S.loc), base: CHAMP_TIME, time: rivalTime(x), idx: 0 }; }
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
   else {
     // A dungeon, or the Ultra Wormhole or Area Zero (x): the same run, with Ultra Beasts or Paradox Pokémon all the way.
@@ -1367,13 +1397,14 @@ function startLoc(loc) {
   if (B.kind !== "route") { B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def); }
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
+  else if (B.kind === "rival") B.tune = gymTuning(B, 3, 6, [B.r, 3], RIVAL_USE);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
   else if (B.kind === "raid") B.tune = raidTuning(B);
   else if (B.kind === "quest") B.tune = tierTuning(B, QUEST[B.q].tier, refArea(B.r, 3));
   else if (B.kind === "darkest") B.tune = tierTuning(B, 0, refArea(B.r, 3));
   else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
   else if (B.kind === "daily") B.tune = tierTuning(B, 5, dailyArea(B.r));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1386,7 +1417,7 @@ function spawn() {
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" || B.kind === "raid" ? CHAMP_HP : GYM_HP;
     mult = B.kind === "dungeon" && !boss ? (B.fodder || fodderHp(B.i)) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
-    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final") pay = CHAMP_HP;
+    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final" || B.kind === "rival") pay = CHAMP_HP;
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
@@ -1594,6 +1625,7 @@ function next() {
     toast(`You won the Max Raid! ${mon(n).name} can Gigantamax now: turn it on in its detail in Party & Box. +$${fmt(prize)}.${joined}` + gainCells(CELL_BOSS) + galar);
   }
   if (B.kind === "final") finalWin();
+  if (B.kind === "rival") rivalWin();
   if (B.kind === "daily") {
     const first = !dailyWon(), prize = rewardFor(B.L, B.i, 15); S.money += prize;
     S.daily = { ...(S.daily || {}), date: B.day, won: true };
@@ -1763,7 +1795,7 @@ function tick() {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
       B.time -= dt * clockRate(B.foe.m);
-      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
+      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : B.kind === "rival" ? `${RIVAL_NAME}: "Too ssslow. Come back when you're ready."` : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
     }
   }
   drawBattle();
@@ -1830,6 +1862,8 @@ function renderLocs() {
   $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("")
     + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
+  // Sssssssnakes sits at the very top of each of those regions' lists.
+  if (RIVAL_AT[r]) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
   // Prof Penguin's Lab sits at the top of every list.
   items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
   // Today's boss, the same for every player, under the Lab in every list.
@@ -2114,6 +2148,8 @@ const ACH = [
   { id: "weald", group: "Side quests", title: "Sword and shield", desc: "Beat Zacian and Zamazenta in the Slumbering Weald", need: 1, have: () => S.won && S.won.weald ? 1 : 0 },
   { id: "wormhole", group: "Side quests", title: "Beyond the wormhole", desc: "Catch all 11 Ultra Beasts", need: ULTRA_BEASTS.length, have: () => ULTRA_BEASTS.filter(n => S.box[n]).length },
   { id: "areazero", group: "Side quests", title: "Out of time", desc: "Catch all 20 Paradox Pokémon", need: PARADOX.length + PARADOX_LATE.length, have: () => [...PARADOX, ...PARADOX_LATE].filter(n => S.box[n]).length },
+  ...[["early", "Shed skin", "Johto"], ["mid", "Coiled", "Unova"], ["late", "Top of the food chain", "Galar"]]
+    .map(([id, title, at]) => ({ id: "rival-" + id, group: "Rival", title, desc: `Beat ${RIVAL_NAME} in ${at}`, need: 1, have: () => rivalWon(id) ? 1 : 0 })),
   { id: "graduation", group: "Prof Penguin", title: "Graduation", desc: "Beat Prof Penguin's final showdown", need: 1, have: () => S.beat ? 1 : 0 },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
@@ -2171,6 +2207,16 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "rival-late", rival: true, date: "After Galar", from: "Sssssssnakes", title: "Fine. Respect.",
+    body: `<p>You beat my real team. I'd call it luck, but I don't lose to luck.</p><p>Keep the Master Ball. You'll need it.</p><p>This isn't over.</p><p>Sssssssnakes</p>` },
+  { id: "rival-mid", rival: true, date: "After Unova", from: "Sssssssnakes", title: "Okay, okay",
+    body: `<p>Okay, you won. Don't let it go to your head: I was the first one to beat this game, remember.</p><p>Galar's next. Bring something better.</p><p>Sssssssnakes</p>` },
+  { id: "rival-early", rival: true, date: "After Johto", from: "Sssssssnakes", title: "Beginner's luck",
+    body: `<p>Fine, you won. Beginner's luck. My snakes were just warming up.</p><p>See you in Unova.</p><p>Sssssssnakes</p>` },
+  { id: "update-2026-11-24b", date: "Nov 24, 2026", from: "Prof Penguin", title: "A rival appears",
+    body: `<ul><li>Sssssssnakes, the first trainer ever to beat Poké Idle, wants a word: at the top of Johto's list once you beat Lance, Unova's once you beat Alder, and Galar's once you beat Leon.</li>
+      <li>Each fight is optional and a little harder than that region's Champion, at the Champion's level cap and on the Champion's timer. Bring types that hit those teams hard.</li>
+      <li>First wins pay a good chunk of money, and the Galar one a Master Ball. There's a Rival group in Achievements, and the Wiki's Rival page has the details.</li></ul>` },
   { id: "update-2026-11-24a", date: "Nov 24, 2026", from: "Prof Penguin", title: "Prestige",
     body: `<ul><li>Beaten me? Then you can <b>prestige</b>: the Prestige button is on the title screen's save card, and it shows exactly what resets and what stays before you choose.</li>
       <li>You start again from Kanto Route 1 with a new starter. For good: XP ×2, and shinies ×2 a prestige, up to ×8 (1 in 512). The Shiny Charm's ×3 stacks on top once you win it again.</li>
@@ -2324,7 +2370,8 @@ const MAIL = [
 ];
 const arcadeDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Detroit", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 // A letter with beat: true arrives when you beat Prof Penguin.
-const delivered = m => (m.beat ? !!S.beat : !m.day) || !!S.mail.got[m.id];
+// One with rival: true arrives when you first beat Sssssssnakes there (S.mail.got).
+const delivered = m => (m.beat ? !!S.beat : !m.day && !m.rival) || !!S.mail.got[m.id];
 function deliverMail(today = arcadeDay()) {
   if (!S) return;
   const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
@@ -2422,6 +2469,10 @@ function wikiSections() {
       <p><b>The break</b>: then your party is free for ${FINAL_BREAK}s. Load a saved team in Party & Box, or press Start phase 2.</p>
       <p><b>Phase 2</b>: his real team, picked against the party you bring when the break ends. Giratina in its Origin Forme leads, unless 3 or more of your party hit it 2× or harder. Then Tier 1 to 3 Pokémon your party hurts least (one Mega and one Gigantamax at most; his Arceus takes whichever Plate suits him), and last his own Mega Empoleon (Water/Steel, Tier 0, HP ${PROF_EMPOLEON.hp}, Def and Sp. Def ${PROF_EMPOLEON.def}). It's set so the best six of every tier, counting every matchup as even, only just win: cover many types so he can't counter all of you.</p>
       <p>Win the first time for his Mega Empoleon, a special edition (SP) of Empoleon: Water/Steel, Tier 1, total ${SPECIALS[PROF_SP].bst}. It's a permanent Mega: no Mega Stone, and it doesn't take your Mega slot. He also leaves you a letter, and the title screen remembers the day you beat the game.</p>` },
+    { id: "rival", group: "Side quests", title: `Rival ${RIVAL_NAME}`, html: `<p>${RIVAL_NAME} was the first trainer ever to beat Poké Idle, and now an optional rival: one fight each in Johto, Unova and Galar, at the top of that region's list once its Champion is beaten.</p>
+      <ul>${RIVALS.map(x => `<li><b>${REGIONS[x.r].name}</b> (after ${REGIONS[x.r].champ}): ${x.team.map(m => m.name).join(", ")}, at Lv ${Math.min(100, champLevel(x.r) + CAP_OVER)}.</li>`).join("")}</ul>
+      <p>Each one uses that Champion's rules: your party is held to the Champion's level cap, the clock starts at ${CHAMP_TIME}s and moves with the team's Attack and Speed (−20% to +20%) and your party's bulk, and the fight is set against the best six that region offers. It's a little harder: that team, with a quarter of your Protein (see Tiers), needs ${pct(RIVAL_USE)} of the clock idling where a Champion needs ${pct(BOSS_USE)}. A little more Protein, or a few taps, makes up the difference.</p>
+      <p>The first win of each pays ${RIVAL_PAY}× a Champion's base pay (a Champion's first win pays 30×), and the Galar fight a Master Ball too. A letter from ${RIVAL_NAME} follows each one. Rematches pay what a Champion rematch does. Each is an achievement in the Rival group. A prestige resets the fights, so the first-win prizes come again.</p>` },
     { id: "prestige", group: "Side quests", title: "Prestige", html: `<p>Once you've beaten Prof Penguin, the title screen's save card has a Prestige button. It asks first, with the list below. Prestige starts your journey over from Kanto Route 1 with a new starter, for bonuses that last. One prestige for each win over Prof Penguin, so beat him again to go again.</p>
       <p><b>Bonuses</b>: XP ×${PRESTIGE_XP} from Prestige 1 on. Shinies ×2 a prestige, up to ×${PRESTIGE_SHINY_MAX}: 1 in 4096, then ${[1, 2, 3].map(p => "1 in " + 4096 / prestigeShiny(p)).join(", ")}. The Shiny Charm's ×3 stacks on top once you win it again: at P3, 3 in 512. Your prestige shows as P1, P2 ... on the title screen, its save card and the Party header.</p>
       <p><b>Resets</b>: ${PRESTIGE_RESETS.join("; ")}.</p>
