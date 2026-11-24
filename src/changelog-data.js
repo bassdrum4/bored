@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 916,
+  "count": 917,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ccdfd8de","date":"2026-11-24","author":"bassdrum4","subject":"Stop holding the loading screens, and defer offscreen previews"},
   {"sha":"34f72055","date":"2026-11-24","author":"bassdrum4","subject":"Read Supabase gateway pages as outages, not JSON"},
   {"sha":"3abfdb76","date":"2026-11-24","author":"bassdrum4","subject":"Let guests vote in announcement polls"},
   {"sha":"68dddeec","date":"2026-11-24","author":"Codebuff","subject":"Record that GeoPeaks shipped without the browser suite"},
