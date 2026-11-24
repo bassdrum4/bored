@@ -1429,12 +1429,13 @@ async function refreshMedals(force = false) {
 }
 window.addEventListener('bored:identity', () => {
   const uid = getSession()?.user?.id || '';
-  if (uid !== medalUser) {
-    medalUser = uid;
-    void syncInvite().catch(() => {});
-    void renderInvites();
-  }
-  // A sign-in is exactly when a credit may have landed since the last read.
+  if (uid === medalUser) return;
+  medalUser = uid;
+  void syncInvite().catch(() => {});
+  void renderInvites();
+  // A sign-in is exactly when a credit may have landed since the last read, so
+  // this is the only place the one-minute medal cache is skipped. The boot's own
+  // guest identity is not a change, and repeating it bought a second read.
   void refreshMedals(true);
 });
 void refreshMedals();

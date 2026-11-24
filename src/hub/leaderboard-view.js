@@ -240,15 +240,29 @@ function renderLeaderboard() {
 
 // The daily days behind the streak column. It is decoration on the board, so a
 // failed or missing read simply means no fires rather than an error notice.
-async function loadStreaks(force) {
+// The board prints ten accounts, and their streak fires are the only reason the
+// daily board is read. Everything else it holds is never looked at.
+function shownHandles() {
+  const rows = state.lbCache.get('overall')?.rows || [];
+  return [...new Set(accountStandings(rows).slice(0, 10)
+    .map(row => String(row.handle || '').trim()).filter(Boolean))];
+}
+
+async function loadStreaks(force, handles = []) {
+  const stamp = handles.join('|').toLowerCase();
   const cached = state.lbCache.get('daily');
-  if (!force && cached && Date.now() - cached.at < 300000) return;
+  if (!force && cached && cached.stamp === stamp && Date.now() - cached.at < 300000) return;
+  if (!handles.length) {
+    state.lbCache.set('daily', { rows: [], at: Date.now(), stamp });
+    return;
+  }
   try {
     const rows = [];
     const pageSize = 1000;
     for (let offset = 0; offset < 20000; offset += pageSize) {
       const query = new URLSearchParams({
         select: 'challenge_id,handle',
+        handle: 'in.(' + handles.join(',') + ')',
         order: 'challenge_id.asc',
         limit: String(pageSize),
         offset: String(offset)
@@ -258,27 +272,33 @@ async function loadStreaks(force) {
       rows.push(...page);
       if (page.length < pageSize) break;
     }
-    state.lbCache.set('daily', { rows, at: Date.now() });
+    state.lbCache.set('daily', { rows, at: Date.now(), stamp });
   } catch {
-    state.lbCache.set('daily', { rows: [], at: Date.now() });
+    state.lbCache.set('daily', { rows: [], at: Date.now(), stamp });
   }
 }
 
 // Poké Gacha buddies, shown beside handles. Optional: if the view is not
 // deployed yet, or the request fails, the board simply has no sprites.
-async function loadBuddies(force) {
-  if (!force && state.buddies && Date.now() - state.buddies.at < 60000) return;
+async function loadBuddies(force, handles = []) {
+  const stamp = handles.join('|').toLowerCase();
+  if (!force && state.buddies && state.buddies.stamp === stamp && Date.now() - state.buddies.at < 60000) return;
   const map = new Map();
-  try {
-    const rows = await request('/rest/v1/buddy_board?select=handle,species,shiny,skin&limit=5000', { token: ANON_TOKEN });
-    for (const row of Array.isArray(rows) ? rows : []) {
-      const species = Number(row.species);
-      if (row.handle && Number.isInteger(species) && species >= 1 && species <= 1025)
-        map.set(String(row.handle).toLowerCase(), { species, shiny: row.shiny === true,
-          skin: typeof row.skin === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(row.skin) ? row.skin : null });
-    }
-  } catch {}
-  state.buddies = { map, at: Date.now() };
+  if (handles.length) {
+    try {
+      // A sprite is printed beside those ten names only, so the whole gacha board
+      // is not read to find them.
+      const query = new URLSearchParams({ select: 'handle,species,shiny,skin', handle: 'in.(' + handles.join(',') + ')' });
+      const rows = await request('/rest/v1/buddy_board?' + query, { token: ANON_TOKEN });
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const species = Number(row.species);
+        if (row.handle && Number.isInteger(species) && species >= 1 && species <= 1025)
+          map.set(String(row.handle).toLowerCase(), { species, shiny: row.shiny === true,
+            skin: typeof row.skin === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(row.skin) ? row.skin : null });
+      }
+    } catch {}
+  }
+  state.buddies = { map, at: Date.now(), stamp };
 }
 
 function buddyImage(key) {
@@ -363,7 +383,7 @@ async function loadLeaderboard(force = false, full = false) {
   const key = everyone ? 'overall' : 'top';
   const cached = state.lbCache.get(key);
   if (!force && cached && Date.now() - cached.at < 30000) {
-    if (everyone) { await loadStreaks(false); renderLeaderboard(); }
+    if (everyone) { await loadStreaks(false, shownHandles()); renderLeaderboard(); }
     return;
   }
   if (everyone) {
@@ -385,8 +405,9 @@ async function loadLeaderboard(force = false, full = false) {
   // Streaks and buddies are decoration on the page; the hub's three-per-board
   // read does not need either request.
   if (everyone) {
-    await loadStreaks(force);
-    await loadBuddies(force);
+    const displayed = shownHandles();
+    await loadStreaks(force, displayed);
+    await loadBuddies(force, displayed);
   }
   renderLeaderboard();
   // The library cards read the top of each board, so they redraw once it lands.

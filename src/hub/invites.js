@@ -89,7 +89,9 @@ export async function loadMedals(force = false) {
   if (!force && Date.now() - medalsAt < MEDALS_TTL) return medalStamp;
   medalFlight = (async () => {
     try {
-      const rows = await request('/rest/v1/recruiter_board?select=handle,credited&limit=5000', { token: ANON_TOKEN });
+      // Tier 0 is nothing to wear, so a row with no credit is never printed. The
+      // board grows for ever, so the server drops those rows instead of the hub.
+      const rows = await request('/rest/v1/recruiter_board?select=handle,credited&credited=gte.1&limit=5000', { token: ANON_TOKEN });
       const next = new Map();
       for (const row of Array.isArray(rows) ? rows : []) {
         const tier = inviteTier(row.credited);

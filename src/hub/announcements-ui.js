@@ -318,8 +318,14 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     const seq = ++generation, who = current();
     try {
       if (who && !(await freshSession())) throw Error('Session expired');
+      // Only what the banner can show: live, already published, not expired. The
+      // card applies the same three rules, so drafts and old announcements no
+      // longer travel with every load.
+      const now = encodeURIComponent(new Date().toISOString());
       const [messages, receipts, answers] = await Promise.all([
-        request('/rest/v1/announcements?select=id,title,body,kind,options,audience,recipient_id,priority,link_url,active,created_at,published_at,expires_at&order=created_at.desc&limit=100',
+        request('/rest/v1/announcements?select=id,title,body,kind,options,audience,recipient_id,priority,link_url,active,created_at,published_at,expires_at'
+          + '&active=eq.true&published_at=lte.' + now + '&or=(expires_at.is.null,expires_at.gt.' + now + ')'
+          + '&order=created_at.desc&limit=100',
           { token: who ? undefined : ANON_TOKEN }),
         who ? request('/rest/v1/announcement_reads?select=announcement_id&user_id=eq.' + encodeURIComponent(who) + '&limit=1000') : Promise.resolve([]),
         who ? request('/rest/v1/announcement_responses?select=announcement_id,choice,answer&user_id=eq.' + encodeURIComponent(who) + '&limit=200') : Promise.resolve([])
