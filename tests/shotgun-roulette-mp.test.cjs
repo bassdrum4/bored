@@ -85,7 +85,12 @@ test('every screen fed the same log holds the same game, 2 to 4 players', () => 
     assert.equal(state(late.m), state(first));
     assert.ok(first.winner >= 0 && first.winner < n);
     const standing = first.p.filter(p => !p.left).length;
-    assert.ok(first.wins[first.winner] >= 2 || standing === 1, 'a winner took 2 rounds or is the last one at the table');
+    // First to 2; or the last one at the table; or, after round 3, the only one with the most round wins
+    // among those still at the table (players who left take their wins with them).
+    const seated = first.p.map((_, i) => i).filter(i => !first.p[i].left);
+    const most = Math.max(...seated.map(i => first.wins[i]));
+    const leader = first.round >= 3 && first.wins[first.winner] === most && seated.filter(i => first.wins[i] === most).length === 1;
+    assert.ok(first.wins[first.winner] >= 2 || standing === 1 || leader, 'game ' + game + ': first to 2, last one at the table, or most wins after round 3');
   }
   assert.equal(finished, 150);
 });
