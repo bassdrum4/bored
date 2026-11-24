@@ -362,7 +362,10 @@
   body.r3 .mp-timer { font: 12px var(--mono); color: #8af0a0; min-width: 0 }
   body.r3 .mp-timer.low { color: #d0705f }
   .mp-status { display: none }
-  body.r3 .mp-status { display: block; grid-column: 1 / -1; white-space: pre; color: #4f8a5c; border-top: 1px solid #1d3a24; padding-top: 4px }
+  body.r3 .mp-status { display: block; grid-column: 1 / -1; color: #4f8a5c; border-top: 1px solid #1d3a24; padding-top: 4px }
+  .mp-status .row { display: grid; grid-template-columns: 1.2ch 13ch 6ch auto; gap: 0 6px; white-space: nowrap }
+  .mp-status .hp { color: #8af0a0; letter-spacing: .08em }
+  .mp-status s { color: #3a5a42; text-decoration-color: #d0705f }
   body.r3 .mp-log { top: 14px; left: 16px; width: 330px; height: 124px; padding: 6px 8px; border: 1px solid #1d3a24; border-radius: 0;
                     background: #040604; font: 11px/1.45 var(--mono); overflow: hidden }
   body.r3 .mp-log p { color: #4f8a5c; font-family: var(--mono) }
@@ -2152,12 +2155,16 @@ function mpRender() {
 function mpRender3D(act) {
   $("#mp-choices").hidden = true;
   R3.sync();
-  const rows = M.names.map((name, i) => {
-    const s = M.p[i];
+  // One row a player: turn marker, name (struck through when out), HP as bolts, rounds won, status.
+  $("#mp-status").replaceChildren(...M.names.map((name, i) => {
+    const s = M.p[i], row = el("div", "row");
     const flags = [s.left ? "LEFT" : s.out && "OUT", s.para && "PARA", s.band && "BAND", mpOnline[i] === false && !s.left && "AWAY"].filter(Boolean);
-    return (M.phase === "turn" && M.turn === i ? "> " : "  ") + (i === mpMe ? "YOU" : name).slice(0, 12).toUpperCase().padEnd(12) + " W" + M.wins[i] + (flags.length ? " " + flags.join(" ") : "");
-  });
-  $("#mp-status").textContent = rows.join("\n");
+    row.append(el("span", "mark", M.phase === "turn" && M.turn === i ? ">" : ""),
+      el(s.out ? "s" : "span", "name", (i === mpMe ? "YOU" : name).slice(0, 12).toUpperCase()),
+      el("span", "hp", "ϟ".repeat(s.out ? 0 : s.hp) + "·".repeat(Math.max(0, s.max - (s.out ? 0 : s.hp)))),
+      el("span", "won", "W" + M.wins[i] + (flags.length ? " " + flags.join(" ") : "")));
+    return row;
+  }));
   if (!mpBusy && M.phase === "turn") {
     const known = M.p[mpMe].knows;
     const seen = known === null || known === undefined ? "" : " The chamber is " + (known ? "live." : "blank.");
@@ -2352,11 +2359,18 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   const PAL = ["070505", "140b0b", "24110f", "3a1a17", "55251f", "2a1d14", "45311f", "6b4a30",
                "2c2f1a", "464a28", "6a6c3c", "8f8a60", "bfb38c", "d8ccaa", "24152e", "4a2d5e", "2f9c4c", "8af0a0"];
   // Item boxes, bottom side: a 2x2 block left of the charge box, one right of it (local x, z).
+  // Pokémon sprites and items are marked in the render target's alpha, so the post pass gives them a wider
+  // palette, lighter dither and a rim: Giratina 0.3 (cold purple rim), buddies 0.55 (warm rim), items and shells 0.8.
+  const MASK = { giratina: 0.3, buddy: 0.55, item: 0.8 };
+  const WIDE = ["c8a848", "e0c870", "3a5a8a", "7090b8", "a84838", "d07858", "6a4a8a", "9a78b8",
+                "707070", "a8a8a0", "d0d0c8", "c08890", "c87838", "4a8a88", "1c2440", "303030"];
+  const CAM = [0, 1.78, 4.15];
   const SLOT = k => [[-1.62, -1.1, 1.1, 1.62][(k < 4 ? 0 : 2) + k % 2], [1.12, 1.66][Math.floor((k % 4) / 2)]];
   let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
-  let gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
+  let redSpot, gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
   const spots = [], sides = {}, cache = {};
-  const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0 };
+  const anim = { angle: Math.PI, goal: Math.PI, lift: 0, liftGoal: 0, recoil: 0, shake: 0, flash: 0, muzzle: 0, hit: 0, yaw: 0, yawGoal: 0, pitch: 0, pitchGoal: 0, aim: null, aimShooter: null, gx: 0, lean: 0, atMe: 0, atMeGoal: 0 };
+  const tweens = [];
   let seed = 11;
   const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
   const now = () => performance.now() / 1000;
@@ -2405,14 +2419,14 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   }
   // Somebody with no buddy: a dark shape in the chair.
   const silhouette = () => paint(64, 64, g => {
-    g.fillStyle = "#6b4a30";
-    g.beginPath(); g.arc(32, 22, 13, 0, 7); g.fill();
-    g.fillRect(12, 36, 40, 28);
-    g.beginPath(); g.arc(32, 38, 20, Math.PI, 0); g.fill();
-    g.fillStyle = "#2a1d14";
-    g.beginPath(); g.arc(32, 22, 11, 0, 7); g.fill();
-    g.fillRect(14, 36, 36, 28);
-    g.beginPath(); g.arc(32, 38, 18, Math.PI, 0); g.fill();
+    g.fillStyle = "#4a4a48";
+    g.beginPath(); g.arc(32, 40, 20, Math.PI, 0); g.fill();
+    g.fillRect(12, 40, 40, 24);
+    g.beginPath(); g.arc(32, 20, 14, 0, 7); g.fill();
+    g.fillStyle = "#6e6e6a"; g.beginPath(); g.arc(32, 20, 14, Math.PI, 0); g.fill();
+    g.fillStyle = "#2a2a28"; g.fillRect(18, 19, 28, 3);
+    g.beginPath(); g.arc(32, 20, 4, 0, 7); g.fill();
+    g.fillStyle = "#8a8a84"; g.beginPath(); g.arc(32, 20, 2, 0, 7); g.fill();
   });
 
   /* Painted textures. */
@@ -2526,9 +2540,11 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   }
   // The charge screen: green bolts on black. Lost bolts flicker, then go dark.
   const BOLT_PTS = [[8, 0], [1, 12], [6, 12], [4, 22], [12, 8], [7, 8], [9, 0]];
-  function drawScreen(s, t) {
+  function drawScreen(s, t, shaky) {
     const st = s.screen, g = st.ctx;
     g.fillStyle = st.off ? "#030604" : "#06120a"; g.fillRect(0, 0, 64, 24);
+    // Somebody is pointing the gun at me: my screen stutters.
+    if (shaky && Math.random() < 0.35) { st.tex.needsUpdate = true; return; }
     if (!st.off) {
       const gap = 2, bw = 9, total = st.max * (bw + gap) - gap, x0 = Math.round((64 - total) / 2);
       for (let k = 0; k < st.max; k++) {
@@ -2586,7 +2602,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     gunPivot = new T.Group(); gunPivot.position.set(0, 0.24, 0); scene.add(gunPivot);
     gunBody = new T.Group(); gunPivot.add(gunBody);
     gunBody.scale.setScalar(1.35);
-    const gunMetal = lam({ color: 0x6e6860, flatShading: true }), gunWood = lam({ map: wood, color: 0xd8a888, flatShading: true });
+    const gunMetal = lam({ color: 0xa8a49c, flatShading: true }), gunWood = lam({ map: wood, color: 0xf0c090, flatShading: true });
     const part = (geo, mat, x, y, z, rx = 0) => { const m = add(geo, mat, x, y, z, gunBody); m.rotation.x = rx; m.userData.pick = { kind: "gun" }; gunParts.push(m); return m; };
     part(new T.CylinderGeometry(0.034, 0.034, 0.95, 7), gunMetal, 0, 0.03, -0.52, Math.PI / 2);
     part(new T.CylinderGeometry(0.028, 0.028, 0.62, 7), gunMetal, 0, -0.03, -0.4, Math.PI / 2);
@@ -2596,12 +2612,24 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     part(new T.BoxGeometry(0.09, 0.12, 0.48), gunWood, 0, -0.045, 0.52, 0.13);
     muzzle = new T.PointLight(0xffd9a0, 0, 7, 1); muzzle.position.set(0, 0.05, -1.05); gunBody.add(muzzle);
     shells = new T.Group(); scene.add(shells);
+    // A narrow pool of light on the turntable, so the gun is the brightest thing on the table.
+    const gunSpot = new T.SpotLight(0xffe2b8, 2.4, 7, 0.24, 0.45, 1);
+    gunSpot.position.set(0, 3.6, 0.5); gunSpot.target.position.set(0, 0.2, 0);
+    scene.add(gunSpot, gunSpot.target);
+    // A dim red spotlight finds whoever is being pointed at.
+    redSpot = new T.SpotLight(0xb03020, 0, 9, 0.26, 0.5, 1);
+    redSpot.position.set(0, 3.8, 0);
+    scene.add(redSpot, redSpot.target);
 
     // Per seat: a charge box set into the edge, eight item spots, a chair, the buddy, a name plate.
     const screenGeo = new T.PlaneGeometry(0.5, 0.2);
     for (const pos of Object.keys(DIR)) {
       const s = sides[pos], g = s.group;
-      const dev = new T.Group(); dev.position.set(0, 0, 1.94); g.add(dev);
+      // What a seat shows me turns to face my seat, so its screen and name read from here.
+      const facing = z => { const w = new T.Vector3(0, 0, z).applyAxisAngle(new T.Vector3(0, 1, 0), ROT[pos]); return Math.atan2(CAM[0] - w.x, CAM[2] - w.z) - ROT[pos]; };
+      const dev = new T.Group(); dev.position.set(0, 0, 1.94); dev.rotation.y = facing(1.94); g.add(dev);
+      if (pos !== "bottom") dev.scale.setScalar(1.3);
+      s.dev = dev;
       const body = box(0.62, 0.14, 0.32, metalMat, 0, 0.07, 0, dev);
       const lid = new T.Group(); lid.position.set(0, 0.17, 0); lid.rotation.x = 0.7; dev.add(lid);
       const housing = box(0.56, 0.05, 0.26, lam({ map: metal, color: 0x8a8070, flatShading: true }), 0, 0, 0, lid);
@@ -2617,7 +2645,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       s.items = [];
       for (let k = 0; k < 8; k++) {
         const [x, z] = SLOT(k);
-        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.4, fog: true }));
+        const sprite = new T.Sprite(new T.SpriteMaterial({ alphaTest: 0.35, opacity: MASK.item, fog: true }));
         const shadow = add(new T.PlaneGeometry(0.36, 0.2), new T.MeshBasicMaterial({ map: blobTex("#000", 0.9), transparent: true, depthWrite: false }), x, 0.006, z, g);
         shadow.rotation.x = -Math.PI / 2;
         sprite.scale.set(0.44, 0.44, 1);
@@ -2633,12 +2661,18 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         box(0.9, 0.08, 0.8, chairMat, 0, -0.42, 0, chair);
         box(0.9, 1.0, 0.08, chairMat, 0, 0.08, 0.38, chair);
         for (const x of [-0.4, 0.4]) box(0.06, 0.5, 0.06, chairMat, x, -0.7, -0.35, chair);
-        const buddy = add(new T.PlaneGeometry(1.45, 1.45), lam({ map: imageTex("", silhouette), alphaTest: 0.4, side: T.DoubleSide }), 0, 0.72, 2.92, g);
+        // The buddy stands upright behind the charge box, feet below the rim, hinged at the feet so it can fall.
+        const size = pos === "top" ? 1.9 : 1.6;
+        const yaw = new T.Group(); yaw.position.set(0, -0.06, 2.95); yaw.rotation.y = facing(2.95); g.add(yaw);
+        const fall = new T.Group(); yaw.add(fall);
+        const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, side: T.DoubleSide }), 0, size / 2, 0, fall);
         buddy.userData.pick = { kind: "seat", pos };
-        s.buddy = buddy; s.buddyKey = "";
+        Object.assign(s, { buddy, buddyKey: "", buddyFall: fall, buddyYaw: yaw, buddySize: size });
         // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
-        const plate = box(0.9, 0.05, 0.22, [darkWood, darkWood, new T.MeshBasicMaterial({ map: plateTex(""), color: 0x8a8270 }), darkWood, darkWood, darkWood], 0, 0.185, 2.47, g);
-        plate.rotation.y = Math.PI;
+        // A small sign on the rim, leaning back so the name faces me.
+        const sign = new T.Group(); sign.position.set(0, 0.2, 2.47); sign.rotation.y = facing(2.47); g.add(sign);
+        const plate = box(1.05, 0.05, 0.3, [darkWood, darkWood, new T.MeshBasicMaterial({ map: plateTex(""), color: 0x8a8270 }), darkWood, darkWood, darkWood], 0, 0.06, 0, sign);
+        plate.rotation.x = 0.95;
         plate.userData.pick = { kind: "seat", pos };
         s.plate = plate; s.plateName = null;
         s.faint = 0; s.flinch = -9;
@@ -2646,10 +2680,12 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       pickables.push(body, housing, screen, ...(s.buddy ? [s.buddy, s.plate] : []), ...s.items.map(it => it.sprite));
     }
     pickables.push(...gunParts);
+    // Every item sprite is fetched up front, so a new item never pops in late.
+    for (const key of POOL) imageTex(ITEM_DIR + ITEMS[key].art + ".png");
 
     // My buddy, peeking up from the bottom-left corner of my view.
-    myBuddy = new T.Mesh(new T.PlaneGeometry(0.17, 0.17), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.4, color: 0x9a9080, fog: false }));
-    myBuddy.position.set(-0.56, -0.33, -0.75);
+    myBuddy = new T.Mesh(new T.PlaneGeometry(0.25, 0.25), new T.MeshBasicMaterial({ map: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, color: 0xd8c8b0, fog: false }));
+    myBuddy.position.set(-0.6, -0.32, -0.8);
     myBuddy.rotation.z = 0.12;
     cam.add(myBuddy);
 
@@ -2667,17 +2703,18 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
     const cableMat = lam({ color: 0x15100e });
     for (let k = 0; k < 6; k++) {
-      const z = -3 + k * 0.9, sag = 0.6 + rnd() * 0.9;
-      const curve = new T.CatmullRomCurve3([new T.Vector3(-7, 4.2 + rnd(), z + rnd()), new T.Vector3(-2 + rnd() * 2, 3.6 - sag, z), new T.Vector3(2 + rnd() * 2, 3.7 - sag * 0.8, z + 0.4), new T.Vector3(7, 4.3, z - rnd())]);
+      // Strung high and toward me, so they never cross Giratina.
+      const z = -1.6 + k * 0.7, sag = 0.4 + rnd() * 0.6;
+      const curve = new T.CatmullRomCurve3([new T.Vector3(-7, 4.8 + rnd(), z + rnd()), new T.Vector3(-2 + rnd() * 2, 4.3 - sag, z), new T.Vector3(2 + rnd() * 2, 4.4 - sag * 0.8, z + 0.4), new T.Vector3(7, 4.9, z - rnd())]);
       scene.add(new T.Mesh(new T.TubeGeometry(curve, 24, 0.025, 4), cableMat));
     }
 
     // Walls, floor, speaker stacks and old radios in the shadows.
-    const brick = lam({ map: brickTex(), emissive: 0xffffff, emissiveMap: crackTex(), emissiveIntensity: 0.9 });
-    box(18, 9, 0.3, brick, 0, 2.5, -7.5);
+    const brick = lam({ map: brickTex(), emissive: 0xffffff, emissiveMap: crackTex(), emissiveIntensity: 0.22 });
+    box(20, 11, 0.3, brick, 0, 3.5, -10.5);
     const sideWall = lam({ map: brickTex() });
-    box(0.3, 9, 18, sideWall, -7.5, 2.5, 0);
-    box(0.3, 9, 18, sideWall, 7.5, 2.5, 0);
+    box(0.3, 11, 22, sideWall, -7.5, 3.5, -1);
+    box(0.3, 11, 22, sideWall, 7.5, 3.5, -1);
     const floor = add(new T.PlaneGeometry(18, 18), lam({ map: plankTex() }), 0, -1.2, 0);
     floor.rotation.x = -Math.PI / 2;
     const speakerMat = [darkWood, darkWood, darkWood, darkWood, lam({ map: speakerTex() }), darkWood];
@@ -2690,8 +2727,9 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
 
     // Giratina hosts from behind the far side, lit from below.
-    giratina = add(new T.PlaneGeometry(3.4, 3.4), lam({ map: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.4, side: T.DoubleSide }), 0, 2.4, -5.0);
-    const under = new T.PointLight(0x7a5a9a, 1.6, 7, 1); under.position.set(0, 0.2, -3.6); scene.add(under);
+    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false }), 0, 3.6, -8.6);
+    // Lit from below by the table's glow.
+    const under = new T.PointLight(0x9a7aa8, 1.8, 7, 1); under.position.set(0, 1.0, -6.6); scene.add(under);
 
     // Distortion World: purple fog at the floor, dark motes drifting up.
     const fogTex = blobTex("#5a3a6e", 0.6);
@@ -2709,28 +2747,45 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     // The post pass: palette, Bayer dither, vignette, grain, flashes.
     post = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
       uniforms: { tScene: { value: rt.texture }, uPal: { value: PAL.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) },
-                  uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 } },
+                  uRes: { value: new T.Vector2(W, H) }, uTime: { value: 0 }, uFlash: { value: 0 }, uHit: { value: 0 }, uEdge: { value: 0 },
+                  uWide: { value: WIDE.map(h => new T.Vector3(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255)) } },
       vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
       fragmentShader: [
-        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec2 uRes; uniform float uTime, uFlash, uHit; varying vec2 vUv;",
+        "uniform sampler2D tScene; uniform vec3 uPal[18]; uniform vec3 uWide[16]; uniform vec2 uRes; uniform float uTime, uFlash, uHit, uEdge; varying vec2 vUv;",
+        "float kind(float a){ return a < 0.42 ? 1.0 : a < 0.67 ? 2.0 : a < 0.9 ? 3.0 : 0.0; }",
         "float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }",
         "float bayer(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }",
         "float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }",
         "void main(){",
         "  vec2 px = floor(vUv * uRes);",
-        "  vec3 c = texture2D(tScene, vUv).rgb;",
+        "  vec4 src = texture2D(tScene, vUv);",
+        "  vec3 c = src.rgb; float m = kind(src.a);",
+        // A rim around the Pokémon: cold purple for Giratina, warm for buddies.
+        "  if (m == 0.0) {",
+        "    vec2 o = 1.0 / uRes; float g = 0.0, b = 0.0;",
+        "    float n1 = kind(texture2D(tScene, vUv + vec2(o.x, 0.0)).a), n2 = kind(texture2D(tScene, vUv - vec2(o.x, 0.0)).a);",
+        "    float n3 = kind(texture2D(tScene, vUv + vec2(0.0, o.y)).a), n4 = kind(texture2D(tScene, vUv - vec2(0.0, o.y)).a);",
+        "    if (n1 == 1.0 || n2 == 1.0 || n3 == 1.0 || n4 == 1.0) c = mix(c, vec3(0.44, 0.38, 0.66), 0.8);",
+        "    else if (n1 == 2.0 || n2 == 2.0 || n3 == 2.0 || n4 == 2.0) c = mix(c, vec3(0.66, 0.5, 0.32), 0.6);",
+        "  }",
         "  c += uFlash * vec3(0.6, 0.5, 0.36);",
         "  float d = length((vUv - 0.5) * vec2(1.0, 0.78));",
-        "  c *= mix(0.03, 1.0, smoothstep(0.72, 0.2, d));",
-        "  c += (hash(px + fract(uTime) * 97.0) - 0.5) * 0.045;",
+        "  c *= mix(m > 0.0 ? 0.25 : 0.03, 1.0, smoothstep(0.72, 0.2, d));",
+        "  c += (hash(px + fract(uTime) * 97.0) - 0.5) * (m > 0.0 ? 0.02 : 0.045);",
         "  c = mix(c, vec3(0.42, 0.12, 0.09), uHit * 0.5);",
-        "  c += (bayer(px) - 0.5) * 0.1;",
-        "  bool hp = c.g > 0.3 && c.g > c.r * 1.6 && c.g > c.b * 1.3;",
+        "  c = mix(c, vec3(0.36, 0.08, 0.06), uEdge * smoothstep(0.32, 0.7, d) * 0.85);",
+        "  c += (bayer(px) - 0.5) * (m > 0.0 ? 0.045 : 0.1);",
+        "  bool hp = m == 0.0 && c.g > 0.3 && c.g > c.r * 1.6 && c.g > c.b * 1.3;",
         "  vec3 best = uPal[0]; float bd = 99.0;",
         "  for (int i = 0; i < 18; i++) {",
         "    bool use = hp ? (i < 3 || i > 15) : (i < 16);",
         "    vec3 e = (c - uPal[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
         "    if (use && dd < bd) { bd = dd; best = uPal[i]; }",
+        "  }",
+        // Sprites, items and shells may also use the wider set.
+        "  if (m > 0.0) for (int i = 0; i < 16; i++) {",
+        "    vec3 e = (c - uWide[i]) * vec3(0.95, 1.15, 0.75); float dd = dot(e, e);",
+        "    if (dd < bd) { bd = dd; best = uWide[i]; }",
         "  }",
         "  gl_FragColor = vec4(best, 1.0);",
         "}"
@@ -2769,7 +2824,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const it = s.items[k], key = p ? p.items[k] : null;
         if (it.key !== key) {
           it.key = key; it.using = 0;
-          if (key) { it.sprite.material.map = imageTex(ITEM_DIR + ITEMS[key].art + ".png"); it.sprite.material.opacity = 1; it.sprite.material.needsUpdate = true; }
+          if (key) { it.sprite.material.map = imageTex(ITEM_DIR + ITEMS[key].art + ".png"); it.sprite.material.opacity = MASK.item; it.sprite.material.needsUpdate = true; }
         }
         it.sprite.visible = it.shadow.visible = !!key;
       }
@@ -2781,6 +2836,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         Object.assign(st, { off, max: p ? p.max : 0, hp: p ? p.hp : 0, drawn: 0 });
       }
       s.light.intensity = off ? 0 : 0.85;
+      s.dev.visible = !!p;
       if (s.buddy) {
         s.buddy.visible = !!p && !p.left;
         s.plate.visible = !!p;
@@ -2789,7 +2845,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const url = p ? buddyURL(name) : "";
         if (s.buddyKey !== url + "|" + name) {
           s.buddyKey = url + "|" + name;
-          s.buddy.material.map = url ? imageTex(url, silhouette) : imageTex("", silhouette);
+          s.buddy.material.map = s.buddy.material.emissiveMap = url ? imageTex(url, silhouette) : imageTex("", silhouette);
           s.buddy.material.needsUpdate = true;
         }
         s.out = !!(p && p.out);
@@ -2870,21 +2926,31 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   const SHELL_GEO = [];
   R3.load = async (live, blank) => {
     shells.clear();
-    if (!SHELL_GEO.length) SHELL_GEO.push(new T.CylinderGeometry(0.045, 0.045, 0.15, 8), new T.CylinderGeometry(0.05, 0.05, 0.045, 8));
-    const brass = new T.MeshLambertMaterial({ color: 0xc9a24a });
-    const list = [...Array(live).fill(0x9e2b2b), ...Array(blank).fill(0x6f7c8c)].map((color, k, all) => {
+    if (!SHELL_GEO.length) SHELL_GEO.push(new T.CylinderGeometry(0.05, 0.05, 0.17, 10), new T.CylinderGeometry(0.056, 0.056, 0.05, 10),
+      new T.CylinderGeometry(0.062, 0.062, 0.012, 10), new T.CylinderGeometry(0.038, 0.05, 0.02, 10));
+    const mat = (color, glow = 0) => new T.MeshLambertMaterial({ color, emissive: glow, opacity: MASK.item });
+    const brass = mat(0xd8b058), rim = mat(0xa88838);
+    const list = [...Array(live).fill([0xb83a30, 0x7a2018, 0x5a1810]), ...Array(blank).fill([0x9a9a94, 0x5a5a56, 0x34342f])].map(([color, crimp, glow], k, all) => {
       const g = new T.Group();
-      const hull = new T.Mesh(SHELL_GEO[0], new T.MeshLambertMaterial({ color })); hull.position.y = 0.1;
-      const base = new T.Mesh(SHELL_GEO[1], brass); base.position.y = 0.022;
-      g.add(hull, base);
-      g.position.set((k - (all.length - 1) / 2) * 0.17, 0, 1.28);
+      const parts = [[SHELL_GEO[0], mat(color, glow), 0.135], [SHELL_GEO[3], mat(crimp), 0.23], [SHELL_GEO[1], brass, 0.03], [SHELL_GEO[2], rim, 0.006]];
+      for (const [geo, m, y] of parts) { const mesh = new T.Mesh(geo, m); mesh.position.y = y; g.add(mesh); }
+      g.position.set((k - (all.length - 1) / 2) * 0.19, 0, 1.3);
       return g;
     });
-    for (const g of list) { shells.add(g); sfx.click(); await wait(90); }
+    for (const g of list) { shells.add(g); sfx.click(); await wait(95); }
     await wait(1300);
-    for (const g of shuffle([...list])) { shells.remove(g); sfx.click(); await wait(80); }
-    anim.recoil = 0.5; sfx.chk();
-    await wait(300);
+    // Into the gun's port, one at a time in an order you can't follow, then it racks.
+    const port = new T.Vector3();
+    for (const g of shuffle([...list])) {
+      gunBody.localToWorld(port.set(0, -0.06, 0.05));
+      await new Promise(done => tweens.push({ obj: g, from: g.position.clone(), to: port.clone(), t0: performance.now() / 1000, dur: 0.16, done }));
+      shells.remove(g); sfx.click();
+      await wait(40);
+    }
+    anim.recoil = 0.55; sfx.chk();
+    await wait(160);
+    anim.recoil = 0.55; sfx.chk();
+    await wait(250);
   };
   R3.useItem = async (seat, box) => {
     const it = sideOf(seat).items[box];
@@ -2894,6 +2960,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   };
   R3.aim = async (shooter, target) => {
     anim.aim = target; anim.aimShooter = shooter;
+    if (target === mpMe) anim.atMeGoal = 1;
     anim.goal = angleTo(DIR[mpPos(target)]);
     anim.liftGoal = 1;
     const pos = mpPos(target);
@@ -2912,7 +2979,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     R3.endShot();
   };
   R3.blank = async () => { anim.recoil = 0.45; await wait(700); R3.endShot(); };
-  R3.endShot = () => { anim.aim = null; anim.liftGoal = 0; anim.yawGoal = 0; anim.pitchGoal = 0; };
+  R3.endShot = () => { anim.atMeGoal = 0; anim.aim = null; anim.liftGoal = 0; anim.yawGoal = 0; anim.pitchGoal = 0; };
 
   /* Every frame. */
   const ease = (from, to, k) => from + (to - from) * Math.min(1, k);
@@ -2931,16 +2998,30 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     gunPivot.rotation.y = anim.angle;
     gunBody.position.set(0, anim.lift * 0.3, anim.recoil * 0.14);
     gunBody.rotation.x = anim.lift * 0.08 + anim.recoil * 0.12;
-    const gunGlow = hover && hover.kind === "gun" ? 0x3a2a18 : R3.holding ? 0x1e1408 : 0;
+    const gunGlow = hover && hover.kind === "gun" ? 0x4a3420 : R3.holding ? 0x2a1c0e : 0x140e08;
     for (const m of gunParts) m.material.emissive.setHex(gunGlow);
     muzzle.intensity = anim.muzzle > 0 ? 7 : 0;
+    // The red spot: on whoever I'm pointing at, or whoever is being aimed at.
+    const marked = anim.aim !== null ? anim.aim : hover && hover.kind === "seat" ? hover.seat : null;
+    if (marked !== null && M && marked !== mpMe) {
+      const d = DIR[mpPos(marked)];
+      redSpot.target.position.set(d[0] * 2.95, 0.6, d[1] * 2.95);
+      redSpot.intensity = ease(redSpot.intensity, 2.4, dt * 8);
+    } else redSpot.intensity = ease(redSpot.intensity, 0, dt * 8);
+    anim.atMe = ease(anim.atMe, anim.atMeGoal, dt * 5);
+    for (let i = tweens.length - 1; i >= 0; i--) {
+      const w = tweens[i], k = Math.min(1, (t - w.t0) / w.dur);
+      w.obj.position.lerpVectors(w.from, w.to, k);
+      w.obj.scale.setScalar(1 - k * 0.5);
+      if (k >= 1) { tweens.splice(i, 1); w.done(); }
+    }
     // Camera: low at my edge, breathing, turning a little toward whoever is aimed at.
     anim.yaw = ease(anim.yaw, anim.yawGoal, dt * 4);
     anim.pitch = ease(anim.pitch, anim.pitchGoal, dt * 4);
     anim.shake = Math.max(0, anim.shake - dt);
     const sh = anim.shake * 0.09;
-    cam.position.set(Math.sin(t * 0.5) * 0.025 + (Math.random() - 0.5) * sh, 1.62 + Math.sin(t * 0.83) * 0.014 + (Math.random() - 0.5) * sh, 3.55);
-    cam.lookAt(0, -0.05, -0.75);
+    cam.position.set(CAM[0] + Math.sin(t * 0.5) * 0.025 + (Math.random() - 0.5) * sh, CAM[1] + Math.sin(t * 0.83) * 0.014 + (Math.random() - 0.5) * sh, CAM[2]);
+    cam.lookAt(0, 0.2, -0.9);
     cam.rotateY(anim.yaw);
     cam.rotateX(anim.pitch);
     // Spotlights flicker now and then.
@@ -2952,7 +3033,8 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     let k = 0;
     for (const pos of Object.keys(DIR)) {
       const s = sides[pos];
-      if (t - s.screen.drawn > 0.11) { drawScreen(s, now()); s.screen.drawn = t; }
+      const shaky = pos === "bottom" && anim.atMe > 0.5;
+      if (t - s.screen.drawn > (shaky ? 0.05 : 0.11)) { drawScreen(s, now(), shaky); s.screen.drawn = t; }
       const hovered = hover && hover.kind === "seat" && hover.seat === s.seat;
       s.housing.material.emissive.setHex(hovered ? 0x3a2a14 : 0);
       for (const it of s.items) {
@@ -2963,27 +3045,26 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         const scale = 0.44 * (1 + it.lift * 0.12 + using * 0.3);
         it.sprite.scale.set(scale, scale, 1);
         it.sprite.material.color.setScalar(1 + it.lift * 0.35);
-        it.sprite.material.opacity = 1 - using;
-        it.sprite.material.transparent = using > 0;
+        it.sprite.material.opacity = MASK.item * (1 - using);
       }
       if (!s.buddy) continue;
       s.plate.material[2].color.setHex(hovered ? 0xffffff : M && M.phase === "turn" && M.turn === s.seat ? 0xd8ccaa : 0x8a8270);
       s.faint = ease(s.faint, s.out ? 1 : 0, dt * 2.2);
       const flinching = t - s.flinch < 0.32 && now() - s.flinch < 0.32;
       const b = s.buddy;
-      b.quaternion.copy(cam.quaternion);
-      b.rotateZ(-s.faint * 1.3);
-      b.position.set((flinching ? (Math.random() - 0.5) * 0.12 : 0) + s.faint * 0.3, 0.72 + Math.sin(t * 2 + k * 1.7) * 0.035 * (1 - s.faint) - s.faint * 0.45, 2.92);
+      s.buddyFall.rotation.z = -s.faint * 1.4;
+      s.buddyFall.position.x = flinching ? (Math.random() - 0.5) * 0.1 : 0;
+      b.position.y = s.buddySize / 2 + Math.sin(t * 2 + k * 1.7) * 0.03 * (1 - s.faint);
       if (flinching) b.material.color.setRGB(1.4, 0.45, 0.4);
       else b.material.color.setScalar(hovered ? 1.35 : 1 - s.faint * 0.7);
       k++;
     }
-    myBuddy.position.y = -0.335 + Math.sin(t * 1.7) * 0.008;
+    myBuddy.position.y = -0.32 + Math.sin(t * 1.7) * 0.01;
     // Giratina floats, and leans toward whoever holds the gun.
     const hd = holderDir();
     anim.gx = ease(anim.gx, hd[0] * 0.6, dt * 1.5);
     anim.lean = ease(anim.lean, -hd[0] * 0.1, dt * 1.5);
-    giratina.position.set(anim.gx, 1.75 + Math.sin(t * 0.45) * 0.14, -4.6 - hd[1] * 0.2);
+    giratina.position.set(anim.gx, 3.42 + Math.sin(t * 0.45) * 0.1, -8.6 - hd[1] * 0.2);
     giratina.rotation.z = anim.lean;
     // Fog and motes drift.
     for (const f of fogs) f.mesh.position.set(f.x + Math.sin(t * 0.1 + f.p) * 1.2, f.mesh.position.y, f.z + Math.cos(t * 0.08 + f.p) * 0.9);
@@ -2995,6 +3076,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     u.uTime.value = t;
     u.uFlash.value = anim.flash > 0 ? 1 : 0;
     u.uHit.value = anim.hit;
+    u.uEdge.value = anim.atMe;
     anim.hit = Math.max(0, anim.hit - dt * 2.5);
     if (anim.flash > 0) anim.flash--;
     if (anim.muzzle > 0) anim.muzzle--;
