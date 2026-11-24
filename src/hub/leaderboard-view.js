@@ -89,6 +89,21 @@ function ownValue(spec, all, mineKey) {
   return Number.isFinite(onBoard) && onBoard > 0 ? onBoard : bestValue(spec);
 }
 
+/**
+ * A player's Trackbound career pace in basis points — hundredths of a percent
+ * of author time — or 0 when they have not synced all fifteen tracks. Trackmania
+ * prints the pace rather than the career total, which caps at 65 for every full
+ * career and stops telling players apart.
+ */
+function careerPace(all, key) {
+  const row = key && all.find(entry => entry.game === TRACKBOUND_PACE_ID &&
+    String(entry.handle || '').toLowerCase() === key);
+  const basisPoints = Number(row?.value);
+  return Number.isInteger(basisPoints) && basisPoints > 0 ? basisPoints : 0;
+}
+
+const paceText = basisPoints => (basisPoints / 100).toFixed(2) + '%';
+
 function renderLeaderboard() {
   const list = $('#lb-list');
   const empty = $('#lb-empty');
@@ -150,10 +165,6 @@ function renderLeaderboard() {
     button.onclick = () => {
       state.lbOpenPlayer = open ? '' : key;
       renderLeaderboard();
-      // Only fetch the detailed records when a player actually opens a
-      // Trackbound entry; homepage and multiplayer never make this request.
-      if (!open && all.some(entry => entry.game === 'trackbound' &&
-          String(entry.handle || '').toLowerCase() === key)) void loadCareerDetails();
     };
     const detail = element('ul', 'lb-breakdown');
     detail.hidden = !open;
@@ -165,51 +176,48 @@ function renderLeaderboard() {
       for (const entry of own) {
         const spec = LB_GAMES.find(g => g.id === entry.game);
         if (!spec) continue;
-        const value = Number(entry.value);
         const line = element('li', 'lb-line');
-        // The number on the row is the viewer's own best, since that is the one
-        // they can act on; the other player's best reads under it, with the
-        // verdict, so the row is still one game wide at 320px.
-        // A stored best can be the string '0', and Minesweeper reads Infinity
-        // until a board is cleared; neither is a run to print.
-        const raw = Number(key === mineKey ? value : ownValue(spec, all, mineKey));
-        const mine = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 0;
-        const score = mine ? element('span', 'lb-line-score', formatScore(mine, spec))
-          : element('span', 'lb-line-score empty', 'no score');
-        line.append(element('span', 'lb-line-name', spec.name), score);
-        if (key !== mineKey) {
-          const verdict = !mine ? ''
-            : mine === value ? ' · tied'
-              : (spec.lower ? mine < value : mine > value) ? " · you're ahead" : " · you're behind";
-          const versus = element('span', 'lb-line-versus');
-          versus.append('them ', element('b', '', formatScore(value, spec)), verdict);
-          line.append(versus);
-        }
         if (spec.id === 'trackbound') {
-          const pace = all.find(row => row.game === TRACKBOUND_PACE_ID &&
-            String(row.handle || '').toLowerCase() === key);
-          const detailsRow = (state.lbCache.get('career')?.rows || []).find(row =>
-            String(row.handle || '').toLowerCase() === key);
-          const records = Array.isArray(detailsRow?.records) ? detailsRow.records : [];
-          const basisPoints = Number(pace?.value);
-          const ready = Number.isInteger(basisPoints) && basisPoints > 0;
-          line.appendChild(element('span', 'lb-career-pace',
-            ready ? 'Career pace ' + (basisPoints / 100).toFixed(2) + '% of author · 15/15 tracks'
-              : 'Career pace pending · ' + (detailsRow ? records.length + '/15 tracks synced' : 'open the game to sync tracks')));
-          if (records.length) {
-            const details = element('details', 'lb-pace-details');
-            details.appendChild(element('summary', '', 'Best campaign times (' + records.length + '/15)'));
-            const times = element('ul', 'lb-pace-list');
-            for (const best of records) {
-              const ms = Number(best.ms);
-              const author = Number(best.author_ms);
-              if (!Number.isInteger(ms) || ms <= 0 || typeof best.name !== 'string') continue;
-              times.appendChild(element('li', '', best.name + ' · ' + (ms / 1000).toFixed(3) +
-                's' + (Number.isInteger(author) && author > 0
-                  ? ' / ' + (author / 1000).toFixed(3) + 's author' : '')));
-            }
-            details.appendChild(times);
-            line.appendChild(details);
+          // Trackmania reads as its career pace: the percent of author time the
+          // fifteen-track career averages to. One line, no times list — the
+          // percent already says how fast the career is.
+          const ownPace = careerPace(all, key);
+          const score = ownPace ? element('span', 'lb-line-score', paceText(ownPace))
+            : element('span', 'lb-line-score empty', 'no pace');
+          if (ownPace) score.setAttribute('aria-label', paceText(ownPace) + ' of author time');
+          line.append(element('span', 'lb-line-name', spec.name), score);
+          if (key !== mineKey) {
+            const myPace = careerPace(all, mineKey);
+            const verdict = !myPace || !ownPace ? ''
+              : myPace === ownPace ? ' · tied'
+                : myPace < ownPace ? " · you're ahead" : " · you're behind";
+            const versus = element('span', 'lb-line-versus');
+            versus.append('them ', element('b', '', ownPace ? paceText(ownPace) : 'no pace'), verdict);
+            line.append(versus);
+          }
+          if (!ownPace) {
+            line.appendChild(element('span', 'lb-career-pace',
+              'Career pace pending · open the game to sync tracks'));
+          }
+        } else {
+          // The number on the row is the viewer's own best, since that is the one
+          // they can act on; the other player's best reads under it, with the
+          // verdict, so the row is still one game wide at 320px.
+          // A stored best can be the string '0', and Minesweeper reads Infinity
+          // until a board is cleared; neither is a run to print.
+          const value = Number(entry.value);
+          const raw = Number(key === mineKey ? value : ownValue(spec, all, mineKey));
+          const mine = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 0;
+          const score = mine ? element('span', 'lb-line-score', formatScore(mine, spec))
+            : element('span', 'lb-line-score empty', 'no score');
+          line.append(element('span', 'lb-line-name', spec.name), score);
+          if (key !== mineKey) {
+            const verdict = !mine ? ''
+              : mine === value ? ' · tied'
+                : (spec.lower ? mine < value : mine > value) ? " · you're ahead" : " · you're behind";
+            const versus = element('span', 'lb-line-versus');
+            versus.append('them ', element('b', '', formatScore(value, spec)), verdict);
+            line.append(versus);
           }
         }
         const play = element('button', 'lb-play', 'Play');
@@ -313,28 +321,6 @@ function buddyImage(key) {
   img.width = 24; img.height = 24;
   img.loading = 'lazy';
   return img;
-}
-
-// Detailed times are intentionally lazy. The ordinary leaderboard view already
-// includes the tiny computed pace score, so landing on the homepage makes no
-// new network requests and existing multiplayer tests remain isolated.
-let careerLoading = null;
-async function loadCareerDetails() {
-  const cached = state.lbCache.get('career');
-  if (cached && Date.now() - cached.at < 60000) return;
-  if (careerLoading) return careerLoading;
-  careerLoading = (async () => {
-    try {
-      const rows = await request('/rest/v1/rpc/trackbound_campaign_board', {
-        method: 'POST', body: {}, token: ANON_TOKEN
-      });
-      state.lbCache.set('career', { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
-    } catch {
-      state.lbCache.set('career', { rows: [], at: Date.now() });
-    }
-    renderLeaderboard();
-  })();
-  try { await careerLoading; } finally { careerLoading = null; }
 }
 
 // A full read is in flight only when the board is actually open; the hub's own
