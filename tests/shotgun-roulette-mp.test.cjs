@@ -151,3 +151,64 @@ test('round HP goes 2, 3, 4 and the first player moves clockwise each round', ()
   assert.equal(m.phase, 'over');
   assert.equal(Math.max(...m.wins), 2);
 });
+
+test('reload rule, multiplayer: a last-shell blank at yourself keeps the gun for the next load, every time', () => {
+  const s = screen(['A', 'B', 'C'], 3, 0), m = s.m;
+  let seq = 0;
+  const load = (shells, items = [[], [], []]) => s.apply({ seq: ++seq, seat: 0, type: 'load', args: { round: m.round, n: m.loads + 1, shells, items } });
+  const shoot = (seat, target) => s.apply({ seq: ++seq, seat, type: 'shoot', args: { turn: m.turnNo, target } });
+  const logs = [];
+  const watch = () => logs.push(...m.ev.filter(e => e.t === 'log').map(e => e.text));
+  // Load 1, started by seat 0. Seat 1 fires the last shell, a blank at themself: seat 1 starts load 2.
+  load([1, 0, 0]);
+  shoot(0, 1); assert.equal(m.turn, 1);
+  shoot(1, 1); shoot(1, 1); watch();
+  assert.deepEqual([m.phase, m.turn], ['load', 1]);
+  assert.match(logs.join(' '), /Blank! You keep the gun|Blank! B keeps the gun for the next load\./);
+  // Load 2, started by seat 1, who ejects the live shell and blanks out the load again: still seat 1 (no limit).
+  load([1, 0, 0], [[], ['eject'], []]);
+  assert.equal(m.turn, 1);
+  s.apply({ seq: ++seq, seat: 1, type: 'item', args: { turn: m.turnNo, box: 0 } });
+  shoot(1, 1); shoot(1, 1); watch();
+  assert.deepEqual([m.phase, m.turn], ['load', 1], 'the starter of the load keeps the gun again');
+  // Load 3: the last shell is live at someone else, so the next player clockwise starts.
+  load([0, 0, 1]);
+  shoot(1, 1); shoot(1, 1); shoot(1, 0); watch();
+  assert.deepEqual([m.phase, m.turn, m.p[0].hp], ['load', 2, 1]);
+  assert.doesNotMatch(logs.join(' '), /already started/, 'multiplayer never says the single-player exception');
+});
+
+test('reload rule, single player: the same, except for whoever started the load that just ended', () => {
+  const source = html.slice(html.indexOf('function nextTurn('), html.indexOf('// Resolve a shot by side i'));
+  const box = { g: null };
+  vm.runInNewContext(source + '\nthis.nextTurn = nextTurn;', box);
+  const YOU = 0, FOE = 1;
+  box.g = { shells: [], loadStarter: FOE };
+  assert.equal(box.nextTurn(YOU, true, false), YOU, 'a last blank at yourself, and Giratina started the load: you keep the gun');
+  box.g = { shells: [], loadStarter: YOU };
+  assert.equal(box.nextTurn(YOU, true, false), FOE, 'you started this load too: the gun passes');
+  box.g = { shells: [], loadStarter: FOE };
+  assert.equal(box.nextTurn(YOU, true, true), FOE, 'a live last shell passes as before');
+  assert.equal(box.nextTurn(YOU, false, false), FOE, 'a last blank at Giratina passes as before');
+  box.g = { shells: [true], loadStarter: YOU };
+  assert.equal(box.nextTurn(YOU, true, false), YOU, 'mid-load, a blank at yourself always keeps the turn');
+  assert.match(html, /function reload\(\) \{\s*\/\/[^\n]*\n\s*g\.loadStarter = g\.turn;/, 'every load records who starts it');
+});
+
+test('the 3D table gives every seat its own 4x2 item grid in its own quarter of the table', () => {
+  const slot = new Function('return ' + line('const SLOT =').replace('const SLOT =', '').replace(/;\s*$/, ''))();
+  const ROT = { bottom: 0, right: Math.PI / 2, top: Math.PI, left: -Math.PI / 2 };
+  const all = [];
+  for (const [pos, a] of Object.entries(ROT)) {
+    for (let k = 0; k < 8; k++) {
+      const [x, z] = slot(k);
+      const w = [x * Math.cos(a) + z * Math.sin(a), -x * Math.sin(a) + z * Math.cos(a)];
+      // Nearer to its own edge than to any other seat's: |along the seat's axis| beats |across it|.
+      const toward = [Math.sin(a), Math.cos(a)], along = w[0] * toward[0] + w[1] * toward[1];
+      assert.ok(along > Math.abs(w[0] * toward[1] - w[1] * toward[0]), pos + ' box ' + k + ' sits in front of its own seat');
+      all.push(w);
+    }
+  }
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++)
+    assert.ok(Math.hypot(all[i][0] - all[j][0], all[i][1] - all[j][1]) >= 0.5, 'boxes ' + i + ' and ' + j + ' are at least a slot apart');
+});

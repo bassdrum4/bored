@@ -1033,11 +1033,13 @@ function liveChance(i) {
   return g.shells.filter(Boolean).length / g.shells.length;
 }
 const paralysisHolds = () => Math.random() < PARALYSIS;
-// Who goes next after side i fires. A blank at yourself keeps the turn, except
-// when it was the last shell: whoever did not fire the last shell goes first
-// on the new load. (Paralysis is untouched by a reload; it carries over.)
+// Who goes next after side i fires. A blank at yourself keeps the turn. (Paralysis
+// is untouched by a reload; it carries over.)
+// The last shell: a blank fired at yourself lets you start the next load too, unless you
+// started the load that just ended (that would chain loads forever); otherwise the side
+// that didn't fire it starts.
 function nextTurn(i, atSelf, live) {
-  if (!g.shells.length) return 1 - i;
+  if (!g.shells.length) return atSelf && !live && g.loadStarter !== i ? i : 1 - i;
   return atSelf && !live ? i : 1 - i;
 }
 // Resolve a shot by side i: takes the shell, applies damage, clears what anyone knew.
@@ -1080,6 +1082,8 @@ function deal(i, count) {
   if (lost.length) log((i === YOU ? "Your" : "Giratina's") + " side is full, " + lost.join(" and ") + (lost.length > 1 ? " are" : " is") + " lost.");
 }
 function reload() {
+  // Whose turn the new load starts on (the reload turn rule reads it).
+  g.loadStarter = g.turn;
   const { total, live } = rollLoad();
   g.shells = shuffle(Array.from({ length: total }, (_, k) => k < live));
   g.loaded = [live, total - live];
@@ -1164,7 +1168,10 @@ async function fire(i, atSelf) {
   if (!alive(id)) return;
   if (g.s[YOU].hp <= 0 || g.s[FOE].hp <= 0) return endRound(g.s[YOU].hp <= 0 ? FOE : YOU);
   const next = nextTurn(i, atSelf, live);
-  if (!g.shells.length) log("That was the last shell. " + (next === YOU ? "You go" : "Giratina goes") + " first on the new load.");
+  if (!g.shells.length && atSelf && !live) log(next === i
+      ? (i === YOU ? "Blank! You keep the gun for the next load." : "Blank! Giratina keeps the gun for the next load.")
+      : (i === YOU ? "Blank! ...but you already started this load, the gun passes." : "Blank! ...but Giratina already started this load, the gun passes."));
+  else if (!g.shells.length) log("That was the last shell. " + (next === YOU ? "You go" : "Giratina goes") + " first on the new load.");
   else if (next === i) log(i === YOU ? "You keep the turn." : "Giratina keeps the turn.");
   g.turn = next;
   return beginTurn();
@@ -1894,9 +1901,11 @@ function mpShoot(m, seat, target) {
   if (them.hp <= 0) { them.out = true; mpLog(m, mpSays(target, "fainted. You're out this round.", "fainted and is out this round."), "round"); }
   const standing = mpLiving(m);
   if (standing.length <= 1) return mpRoundEnd(m, standing[0]);
-  m.turn = !m.shells.length || !(self && !live) ? mpNext(m, seat) : seat;
+  // A blank at yourself keeps the gun, the last shell included (no limit in multiplayer).
+  m.turn = self && !live ? seat : mpNext(m, seat);
   if (!m.shells.length) {
-    mpLog(m, "That was the last shell. " + mpSays(m.turn, "go", "goes") + " first on the new load.");
+    mpLog(m, self && !live ? "Blank! " + mpSays(seat, "keep the gun for the next load.", "keeps the gun for the next load.")
+      : "That was the last shell. " + mpSays(m.turn, "go", "goes") + " first on the new load.");
     Object.assign(m, { phase: "load", resume: false });
   } else {
     if (m.turn === seat) mpLog(m, mpSays(seat, "keep the turn.", "keeps the turn."));
@@ -2382,7 +2391,13 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
   const WIDE = ["c8a848", "e0c870", "3a5a8a", "7090b8", "a84838", "d07858", "6a4a8a", "9a78b8",
                 "707070", "a8a8a0", "d0d0c8", "c08890", "c87838", "4a8a88", "1c2440", "303030"];
   const CAM = [0, 1.78, 4.15];
-  const SLOT = k => [[-1.62, -1.1, 1.1, 1.62][(k < 4 ? 0 : 2) + k % 2], [1.12, 1.66][Math.floor((k % 4) / 2)]];
+  // Giratina's height, worked out from my eye at CAM: at z -10 the line over the far buddy's head is y 1.36
+  // and the top of the screen y 4.94, so a 3.3 plane centred at 3.15 sits between them and never covers a buddy.
+  const GIRATINA_Y = 3.15;
+  // Item boxes: one 4x2 grid per seat, centred in front of that player in the seat's own frame (local x, z;
+  // +z is toward the player). Boxes 0-3 are the row nearest the player, 4-7 the row toward the turntable.
+  // Each seat's grid stays inside its own quarter of the table, so no two seats ever share a spot.
+  const SLOT = k => [[-0.84, -0.28, 0.28, 0.84][k % 4], [1.86, 1.34][Math.floor(k / 4)]];
   let T = null, renderer, rt, scene, cam, post, last = 0, hover = null, mouseIn = false, pickables = [];
   let redSpot, gunPivot, gunBody, gunParts = [], muzzle, shells, giratina, myBuddy, dust, fogs = [];
   const spots = [], sides = {}, cache = {};
@@ -2468,19 +2483,19 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       g.setLineDash([5, 9]); g.beginPath(); g.arc(C, C, 1.4 * U, 0, 7); g.stroke(); g.setLineDash([]);
       for (const pos of ["bottom", "left", "top", "right"]) {
         g.save(); g.translate(C, C); g.rotate(-ROT[pos]);
-        line(-0.12 * U, 1.22 * U, -0.12 * U, 1.72 * U); line(0.12 * U, 1.22 * U, 0.12 * U, 1.72 * U);
         line(0.86 * U, 0.86 * U, 2.1 * U, 2.1 * U);
-        line(-0.62 * U, 1.06 * U, -0.84 * U, 2.1 * U); line(0.62 * U, 1.06 * U, 0.84 * U, 2.1 * U);
+        line(-1.16 * U, 1.08 * U, -1.16 * U, 2.14 * U); line(1.16 * U, 1.08 * U, 1.16 * U, 2.14 * U);
         g.lineWidth = 2;
         for (let k = 0; k < 8; k++) {
           const [x, z] = SLOT(k);
           g.globalAlpha = 0.4 + rnd() * 0.3;
           g.strokeRect((x - 0.23) * U, (z - 0.23) * U, 0.46 * U, 0.46 * U);
         }
-        g.globalAlpha = 0.55; g.strokeRect(-0.4 * U, 1.74 * U, 0.8 * U, 0.42 * U);
+        g.globalAlpha = 0.5; g.strokeRect(-1.12 * U, 1.07 * U, 2.24 * U, 1.06 * U);
         g.globalAlpha = 0.45; g.fillStyle = "#d8ccaa"; g.font = "bold 11px monospace"; g.textAlign = "center";
-        g.fillText("STAY IN YOUR ZONE", -1.36 * U, 2.08 * U);
-        g.fillText("NO SWITCHING OUT", 1.36 * U, 2.08 * U);
+        g.font = "bold 8px monospace";
+        g.fillText("STAY IN", -1.62 * U, 1.9 * U); g.fillText("YOUR ZONE", -1.62 * U, 2.02 * U);
+        g.fillText("NO", 1.62 * U, 1.9 * U); g.fillText("SWITCHING OUT", 1.62 * U, 2.02 * U);
         g.lineWidth = 2.5;
         g.restore();
       }
@@ -2644,7 +2659,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       const s = sides[pos], g = s.group;
       // What a seat shows me turns to face my seat, so its screen and name read from here.
       const facing = z => { const w = new T.Vector3(0, 0, z).applyAxisAngle(new T.Vector3(0, 1, 0), ROT[pos]); return Math.atan2(CAM[0] - w.x, CAM[2] - w.z) - ROT[pos]; };
-      const dev = new T.Group(); dev.position.set(0, 0, 1.94); dev.rotation.y = facing(1.94); g.add(dev);
+      const dev = new T.Group(); dev.position.set(0, 0.16, 2.4); dev.rotation.y = facing(2.4); g.add(dev);
       if (pos !== "bottom") dev.scale.setScalar(1.3);
       s.dev = dev;
       const body = box(0.62, 0.14, 0.32, metalMat, 0, 0.07, 0, dev);
@@ -2656,7 +2671,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
       screen.rotation.x = -Math.PI / 2;
       screen.position.y = 0.026;
       s.screen = { ctx: canvas.getContext("2d"), tex: screenTex, off: true, max: 0, hp: null, dying: {}, drawn: 0 };
-      s.light = new T.PointLight(0x3cbf5a, 0, 1.8, 1); s.light.position.set(0, 0.5, 1.9); g.add(s.light);
+      s.light = new T.PointLight(0x3cbf5a, 0, 1.8, 1); s.light.position.set(0, 0.6, 2.2); g.add(s.light);
       s.housing = housing;
       for (const m of [body, housing, screen]) m.userData.pick = { kind: "seat", pos };
       s.items = [];
@@ -2679,7 +2694,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         box(0.9, 1.0, 0.08, chairMat, 0, 0.08, 0.38, chair);
         for (const x of [-0.4, 0.4]) box(0.06, 0.5, 0.06, chairMat, x, -0.7, -0.35, chair);
         // The buddy stands upright behind the charge box, feet below the rim, hinged at the feet so it can fall.
-        const size = pos === "top" ? 1.9 : 1.6;
+        const size = pos === "top" ? 1.75 : 1.6;
         const yaw = new T.Group(); yaw.position.set(0, -0.06, 2.95); yaw.rotation.y = facing(2.95); g.add(yaw);
         const fall = new T.Group(); yaw.add(fall);
         const buddy = add(new T.PlaneGeometry(size, size), lam({ map: imageTex("", silhouette), emissive: 0x6a5a48, emissiveMap: imageTex("", silhouette), alphaTest: 0.25, opacity: MASK.buddy, side: T.DoubleSide }), 0, size / 2, 0, fall);
@@ -2687,7 +2702,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
         Object.assign(s, { buddy, buddyKey: "", buddyFall: fall, buddyYaw: yaw, buddySize: size });
         // The painted name reads in the dark (unlit), dim until it's their turn or you point at them.
         // A small sign on the rim, leaning back so the name faces me.
-        const sign = new T.Group(); sign.position.set(0, 0.2, 2.47); sign.rotation.y = facing(2.47); g.add(sign);
+        const sign = new T.Group(); sign.position.set(1.0, 0.2, 2.42); sign.rotation.y = facing(2.42); g.add(sign);
         const plate = box(1.05, 0.05, 0.3, [darkWood, darkWood, new T.MeshBasicMaterial({ map: plateTex(""), color: 0x8a8270 }), darkWood, darkWood, darkWood], 0, 0.06, 0, sign);
         plate.rotation.x = 0.95;
         plate.userData.pick = { kind: "seat", pos };
@@ -2744,7 +2759,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     }
 
     // Giratina hosts from behind the far side, lit from below.
-    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false }), 0, 3.6, -8.6);
+    giratina = add(new T.PlaneGeometry(3.3, 3.3), lam({ map: imageTex(SPRITE_DIR + "10007.png"), emissive: 0x4a4258, emissiveMap: imageTex(SPRITE_DIR + "10007.png"), alphaTest: 0.12, opacity: MASK.giratina, side: T.DoubleSide, fog: false }), 0, 3.8, -10);
     // Lit from below by the table's glow.
     const under = new T.PointLight(0x9a7aa8, 1.8, 7, 1); under.position.set(0, 1.0, -6.6); scene.add(under);
 
@@ -3081,7 +3096,7 @@ const R3 = { ok: false, holding: false, start: () => Promise.resolve(false) };
     const hd = holderDir();
     anim.gx = ease(anim.gx, hd[0] * 0.6, dt * 1.5);
     anim.lean = ease(anim.lean, -hd[0] * 0.1, dt * 1.5);
-    giratina.position.set(anim.gx, 3.42 + Math.sin(t * 0.45) * 0.1, -8.6 - hd[1] * 0.2);
+    giratina.position.set(anim.gx, GIRATINA_Y + Math.sin(t * 0.45) * 0.08, -10 - hd[1] * 0.2);
     giratina.rotation.z = anim.lean;
     // Fog and motes drift.
     for (const f of fogs) f.mesh.position.set(f.x + Math.sin(t * 0.1 + f.p) * 1.2, f.mesh.position.y, f.z + Math.cos(t * 0.08 + f.p) * 0.9);
