@@ -241,6 +241,19 @@ export function createRouletteBridge({ onChange = () => {}, claims = null, log =
         }
       }
 
+      // The multiplayer lobby's room code, copied for the player: a sandboxed frame usually may not write
+      // to the clipboard itself. Only something shaped like a room code is ever written.
+      case 'copy': {
+        const text = typeof data.text === 'string' ? data.text : '';
+        if (!/^[A-Z0-9]{4,8}$/.test(text)) return { ok: false, reason: 'text' };
+        try {
+          await navigator.clipboard.writeText(text);
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, reason: 'clipboard' };
+        }
+      }
+
       case 'board':
         try {
           return { ok: true, rows: await rouletteBoard(data.mode) };

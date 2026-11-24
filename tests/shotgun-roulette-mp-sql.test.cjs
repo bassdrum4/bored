@@ -68,3 +68,39 @@ test('Shotgun Roulette live rooms: lobby by code, ready check, 2-4 humans, no CP
   // A Civ Lite room never counts toward the Shotgun Roulette board.
   assert.equal((await top()).length, 3);
 });
+
+test('sql/shotgun_roulette_mp_invite.sql: the host invites a member into an open room', async () => {
+  const db = await database();
+  for (const u of [A, B, C, D]) await enroll(db, u);
+  const rpc = (user, action, args = {}) => as(db, user, async () => (await db.query('select public.bt_live_rpc($1,$2::jsonb) result', [action, JSON.stringify(args)])).rows[0].result);
+  const INVITE = fs.readFileSync(path.join(__dirname, '../sql/shotgun_roulette_mp_invite.sql'), 'utf8');
+  await db.exec(SQL);
+  const room = await rpc(A, 'create', { game: 'shotgun-roulette', capacity: 3, config: ROOM });
+  await assert.rejects(rpc(A, 'invite', { id: room.id, user: B }), /Unknown operation/, 'not before the SQL');
+  await db.exec(INVITE);
+  await db.exec(INVITE); // safe to run twice
+
+  const after = await rpc(A, 'invite', { id: room.id, user: B });
+  assert.deepEqual(after.seats.map(s => [s.handle, s.state]), [['WackyPenguin', 'joined'], ['BananaWizard', 'invited']]);
+  // The invitation is waiting for B, like one made at creation, and B joins from it.
+  const theirs = (await rpc(B, 'list')).find(g => g.id === room.id);
+  assert.equal(theirs.seats.find(s => s.handle === 'BananaWizard').state, 'invited');
+  await rpc(B, 'join', { id: room.id });
+  assert.equal((await rpc(B, 'game', { id: room.id })).seats.find(s => s.handle === 'BananaWizard').state, 'joined');
+
+  await assert.rejects(rpc(A, 'invite', { id: room.id, user: B }), /already in this room/);
+  await assert.rejects(rpc(A, 'invite', { id: room.id, user: A }), /already in this room/);
+  await assert.rejects(rpc(B, 'invite', { id: room.id, user: C }), /Only the host/);
+  await rpc(A, 'invite', { id: room.id, user: C });
+  await assert.rejects(rpc(A, 'invite', { id: room.id, user: D }), /room is full/, 'three seats: host, B, invited C');
+  // Someone who left can be invited back into their old seat.
+  await rpc(B, 'leave_lobby', { id: room.id });
+  const back = await rpc(A, 'invite', { id: room.id, user: B });
+  assert.equal(back.seats.find(s => s.handle === 'BananaWizard').state, 'invited');
+  // Not once the game has started.
+  await rpc(B, 'join', { id: room.id });
+  await rpc(B, 'lobby_set', { id: room.id, ready: true });
+  await rpc(A, 'kick', { id: room.id, seat: back.seats.find(s => s.handle === 'QuietOwl').seat }).catch(() => {});
+  await rpc(A, 'start', { id: room.id });
+  await assert.rejects(rpc(A, 'invite', { id: room.id, user: D }), /already started/);
+});

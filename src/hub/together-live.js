@@ -1,5 +1,5 @@
 import { hasIdentity, getSession, freshSession, realtimeURL } from './backend.js';
-import { liveRPC } from './together-api.js';
+import { liveRPC, togetherRPC } from './together-api.js';
 import { subscribeChanges } from './realtime.js';
 
 // Games that can be played live in Bored Together: everyone in the room plays the same game at the same time,
@@ -75,14 +75,15 @@ function seatsKey(seats) {
 //   subscribe(options)   Realtime for the action table, or null when there is none
 //   emit(event)          what the page is told: game, actions, presence, net
 //   exit() / reload()    close this screen / open it again from the last snapshot
-export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reload, notify, clock = Date.now, uuid = () => crypto.randomUUID(), timers = {}, intervals = {} }) {
+export function createLiveSession({ id, owner, rpc, together = togetherRPC, subscribe, emit, exit, reload, notify, clock = Date.now, uuid = () => crypto.randomUUID(), timers = {}, intervals = {} }) {
   const every = intervals.every || { lobby: 2000, fallback: 1000, heartbeat: 10000, presence: 9000 };
   const later = timers.setTimeout || setTimeout, clear = timers.clearTimeout || clearTimeout;
   const repeat = timers.setInterval || setInterval, stopRepeat = timers.clearInterval || clearInterval;
   let game = null, delivered = null, head = 0, stopped = false, active = false, socketOpen = false, realtime = null;
   let syncing = null, again = false, lobbyTimer = 0, fallbackTimer = 0, beatTimer = 0;
   let online = true, failures = 0, seats = '', seatsAt = 0, reloads = [];
-  let pingHead = null, pinging = null;   // co-op map pings: the newest one heard, and a poll under way
+  let pingHead = null, pinging = null;
+  let memberRefs = new Map();   // the members the page was last shown, by opaque reference   // co-op map pings: the newest one heard, and a poll under way
   const buffer = new Map();
 
   const tell = event => { if (!stopped) { try { emit(event); } catch (error) { /* the page's problem */ } } };
@@ -335,6 +336,24 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
       // The host's two lobby tools for a room code: a new code (the old one stops working) and removing a player
       // (who stays out for as long as the room's code lasts). The server checks it is the host and the lobby.
       case 'new-code': { const g = await api('new_code', {}); setGame(g, false); return g; }
+      // Inviting into the open lobby (sql/shotgun_roulette_mp_invite.sql): the page gets Bored Together members as
+      // display names with opaque references, never an account id, and invites by reference.
+      case 'members': {
+        const list = await together('people'), out = [];
+        memberRefs = new Map();
+        for (const person of Array.isArray(list) ? list : []) {
+          if (!person || !person.id || person.id === owner || out.length >= 200) continue;
+          const ref = uuid();
+          memberRefs.set(ref, person.id);
+          out.push({ ref, name: String(person.handle || 'Player').slice(0, 40) });
+        }
+        return out;
+      }
+      case 'invite': {
+        const user = typeof p.ref === 'string' ? memberRefs.get(p.ref) : null;
+        if (!user) throw new Error('Pick the member again.');
+        const g = await api('invite', { user }); setGame(g, false); return g;
+      }
       case 'kick': {
         const seat = p.seat;
         if (!Number.isInteger(seat) || seat < 0 || seat > 7) throw new Error('Nobody to remove.');
