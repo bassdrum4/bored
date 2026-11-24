@@ -406,7 +406,7 @@ test('browser regressions', async t => {
     assert.equal(await text(page, '#count'), String(catalog.total));
     // Popular is the default, but Newest preserves catalog order on demand.
     assert.equal(await page.$eval('#sort', el => el.value), 'popular');
-    const unfeatured = (await page.$eval('.card', els => els.map(el => el.dataset.slug))).filter(slug => !catalog.featured.includes(slug));
+    const unfeatured = (await page.$$eval('.card', els => els.map(el => el.dataset.slug))).filter(slug => !catalog.featured.includes(slug));
     const fresh = catalog.fresh.filter(slug => !catalog.featured.includes(slug));
     assert.deepEqual(unfeatured.slice(0, fresh.length).sort(), fresh.slice().sort(), 'NEW games stay at the top after explicitly featured games');
     await page.select('#sort', 'original');
