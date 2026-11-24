@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 901,
+  "count": 902,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f6393cb2","date":"2026-11-24","author":"bassdrum4","subject":"Answer announcements in the banner instead of opening it"},
   {"sha":"c844aad1","date":"2026-11-24","author":"Daniel Lowe","subject":"Keep loading screens up for two seconds and harden Roulette startup"},
   {"sha":"81ac19a6","date":"2026-11-24","author":"Daniel Lowe","subject":"Unify Bored loading screens with Bo and paper styling"},
   {"sha":"bf30960f","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Krillion daily timeouts and recover interrupted dives","pr":315},
