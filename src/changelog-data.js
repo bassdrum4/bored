@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 894,
+  "count": 895,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d49b4a2","date":"2026-11-24","author":"Daniel Lowe","subject":"Keep all four NEW releases together at the top of Popular"},
   {"sha":"eb358d0","date":"2026-11-24","author":"Daniel Lowe","subject":"Keep popularity ordering stable during the week"},
   {"sha":"2fd653d","date":"2026-11-24","author":"Codebuff","subject":"Document past failures and their fixes for the next agent"},
   {"sha":"54722d9","date":"2026-11-23","author":"Daniel Lowe","subject":"Fix Detroit launch boost expiry and daily popularity cache rollover"},
