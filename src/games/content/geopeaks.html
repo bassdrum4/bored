@@ -195,6 +195,24 @@
     #picker .top p { display: none }
     #vbar { height: 80px }
   }
+  #mountain {position:fixed;inset:0;pointer-events:none;z-index:14}
+  #mountain[hidden],#peaks button[hidden] {display:none}
+  #mountain .tools {position:absolute;top:56px;left:16px;right:16px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+  #mountain .tools>* {pointer-events:auto;background:var(--paper-dim);padding:9px;border-radius:4px}
+  #mountain h2 {font-size:16px;margin-bottom:3px}
+  #mountain .hint {position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center;width:min(430px,90%);padding:9px;background:var(--paper-dim);border-radius:4px}
+  #mountain .runs {position:absolute;top:130px;right:16px;width:min(250px,42vw);max-height:calc(100% - 205px);overflow:auto;pointer-events:auto;background:var(--paper-dim);border-radius:4px;padding:8px}
+  #mountain .runs button {display:flex;align-items:center;gap:7px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--hair);padding:7px 4px}
+  #mountain .runs button[aria-current=true] {background:rgba(194,65,12,.12)}
+  #mountain .runs i {width:8px;height:8px;border-radius:50%;flex:none}
+  #mountain .actions {position:absolute;bottom:80px;left:16px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;background:var(--paper-dim);padding:8px;border-radius:4px}
+  #mountain .actions button {background:var(--paper);text-align:left}
+  #run-tools {position:absolute;top:125px;right:16px;display:flex;gap:4px;pointer-events:auto}
+  #run-tools button {background:var(--paper-dim);padding:6px 8px}
+  #pause .actions {flex-wrap:wrap}
+  #pause .actions button {min-width:100px}
+  #peak-search {width:100%;padding:6px;margin-bottom:4px;border:1px solid var(--hair);font:inherit;background:var(--paper)}
+  @media(max-width:620px){#mountain .tools{left:10px;right:10px}#mountain .runs{right:10px;max-height:36vh;top:142px}#mountain .actions{left:10px;bottom:85px}#run-tools{top:110px;right:10px}#peak-search{min-width:120px;max-width:120px;align-self:start}}
 </style>
 </head>
 <body>
@@ -212,7 +230,7 @@
 <section id="picker" hidden aria-label="Choose a peak">
   <div class="top">
     <h1>GeoPeaks</h1>
-    <p>Real summits, real pistes. Drag the globe, pick a mountain, ski a mapped run.</p>
+    <p>Explore real mountains. Choose a resort, then ski anywhere or race a marked run.</p>
   </div>
   <nav id="peaks" aria-label="Peaks"></nav>
   <div id="card" class="pane">
@@ -227,11 +245,17 @@
       <dt>Run length</dt><dd id="card-len">—</dd>
       <dt>Difficulty</dt><dd id="card-grade">—</dd>
     </dl>
-    <button class="go" id="card-go" type="button">Drop in</button>
+    <button class="go" id="card-go" type="button">Explore mountain</button>
   </div>
   <p class="foot">Runs: OpenStreetMap contributors (ODbL). Elevation: Mapzen / AWS open terrain tiles. Coastlines: Natural Earth.</p>
 </section>
 
+<section id="mountain" hidden aria-label="Mountain map">
+  <div class="tools"><div><h2 id="mountain-name">Mountain</h2><span id="mountain-detail">Choose a starting point</span></div><button id="mountain-globe" type="button">World map</button></div>
+  <div class="runs" id="mountain-runs" aria-label="Ski runs"></div>
+  <div class="actions"><strong id="mountain-selected">Selected run</strong><button id="mountain-free" type="button">Free ski</button><button id="mountain-race" type="button">Timed run</button><button id="mountain-slalom" type="button">Slalom</button><button id="mountain-zoom-in" type="button">Zoom in +</button><button id="mountain-zoom-out" type="button">Zoom out −</button></div>
+  <div class="hint">Drag to orbit · right drag to pan · scroll to zoom · click a piste to select it or click the snow to choose a free-ski starting point.</div>
+</section>
 <section id="hud" hidden aria-label="Run">
   <div id="run-name" class="slab"><b id="hud-peak">—</b><span id="hud-sub">—</span></div>
   <div id="time-box" class="slab"><b id="hud-time">0:00.0</b><span>descent</span></div>
@@ -242,7 +266,7 @@
   <div id="vbar"><i id="hud-fill"></i><span id="hud-vert">0 m</span></div>
   <div id="map-wrap" class="pane"><canvas id="map" width="232" height="232"></canvas></div>
   <div id="gate"><b class="slab" id="hud-gate">GATE 1 / 9</b></div>
-  <div id="toast"></div>
+  <div id="run-tools"><button id="run-camera" type="button" title="Change camera (C)">Camera</button><button id="run-pause" type="button" title="Pause (P)">Pause</button></div><div id="toast"></div>
   <div id="pad">
     <button type="button" data-key="tuck">TUCK</button>
     <button type="button" data-key="brake">BRAKE</button>
@@ -268,7 +292,7 @@
     <div class="actions">
       <button id="pause-resume" type="button">Resume</button>
       <button id="pause-restart" type="button">Restart</button>
-      <button id="pause-peaks" type="button">Peaks</button>
+      <button id="pause-peaks" type="button">Mountain map</button><button id="pause-recover" type="button">Reset to safe spot</button><button id="pause-end" type="button">End free ski</button><button id="pause-quality" type="button">Graphics: auto</button>
     </div>
   </div>
 </section>
@@ -288,7 +312,7 @@
     </dl>
     <div class="actions">
       <button class="go" id="result-again" type="button">Ski again</button>
-      <button id="result-peaks" type="button">Peaks</button>
+      <button id="result-peaks" type="button">Mountain map</button>
     </div>
   </div>
 </section>
@@ -483,7 +507,7 @@ async function loadTerrain(peak, onProgress) {
   const jobs = [];
   for (let ty = 0; ty < TILE_SPAN; ty++) {
     for (let tx = 0; tx < TILE_SPAN; tx++) {
-      jobs.push((async () => {
+      jobs.push(async () => {
         const data = await decodeTile(TILE_URL(ZOOM, tx0 + tx, ty0 + ty));
         const ox = tx * TILE_PX, oy = ty * TILE_PX;
         for (let y = 0; y < TILE_PX; y++) {
@@ -494,7 +518,7 @@ async function loadTerrain(peak, onProgress) {
             heights[row] = data[src] * 256 + data[src + 1] + data[src + 2] / 256 - 32768;
           }
         }
-      })());
+      });
     }
   }
   // Gentle concurrency: sixteen requests at once is rude and slow on mobile.
@@ -504,7 +528,7 @@ async function loadTerrain(peak, onProgress) {
     const next = () => {
       if (done === total) return resolve();
       while (cursor < total && cursor - done < 5) {
-        const job = jobs[cursor++];
+        const job = jobs[cursor++]();
         job.then(() => { done++; onProgress && onProgress(done, total); next(); }, reject);
       }
     };
@@ -612,6 +636,7 @@ function runFromOsm(terrain, peak, entry) {
     const p = project(pair[0], pair[1], ZOOM);
     return { x: (p.x - origin.x) * mpp, z: (p.y - origin.y) * mpp };
   });
+  if (line.some(p => !terrain.inside(p.x,p.z))) return null;
   // Skiers go downhill: some ways are drawn from the bottom up.
   const last = line[line.length - 1];
   if (terrain.height(last.x, last.z) > terrain.height(line[0].x, line[0].z) + 20) line.reverse();
@@ -642,7 +667,7 @@ function runFromOsm(terrain, peak, entry) {
   if (route.length < 8) return null;
   const drop = route[0].h - lowH;
   const distance = route[route.length - 1].d;
-  if (drop < 90 || distance < 500) return null;
+  if (drop < 15 || distance < 100) return null;
   return {
     points: route, drop, distance, startH: route[0].h,
     avgGrade: drop / distance, target: drop * 0.98,
@@ -1661,7 +1686,7 @@ function setGlobeFocus(index, instant) {
 
 function renderPeakList() {
   const nav = $('#peaks');
-  nav.innerHTML = '';
+  const query=nav.querySelector('input')?.value||'';nav.innerHTML='';const search=document.createElement('input');search.id='peak-search';search.placeholder='Search mountains';search.value=query;search.setAttribute('aria-label','Search mountains');nav.append(search);const filter=()=>{for(const btn of nav.querySelectorAll('button'))btn.hidden=!btn.textContent.toLowerCase().includes(search.value.toLowerCase())};search.oninput=filter;
   PEAKS.forEach((peak, i) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1670,7 +1695,7 @@ function renderPeakList() {
       (i === todayIndex() ? ' <span class="today">TODAY</span>' : '') + '</span>';
     b.onclick = () => setGlobeFocus(i);
     nav.appendChild(b);
-  });
+  });filter();
 }
 
 function todayIndex() {
@@ -1724,6 +1749,7 @@ function renderRunList(runs) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const game = {
+  activity:'slalom', cameraMode:'chase', freeSpawn:null, quality:'auto', safeSpot:null,
   mode: 'boot',          // boot | picker | loading | ready | run | pause | done | error
   peak: null,
   time: 0,
@@ -1803,11 +1829,106 @@ function disposeRun() {
   world.run = null;
 }
 
-async function startPeak(index, runIndex) {
+let terrainCache=null;
+const overview={x:0,z:0,yaw:.65,pitch:.9,distance:2500,selected:0,spawn:null,lines:null,routes:[]};
+function setQuality(value) {
+  game.quality=value;renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,value==='low'?1:value==='high'?2:1.5));
+  $('#pause-quality').textContent='Graphics: '+value;
+  try{localStorage.setItem('bored.geopeaks.quality',value)}catch{}
+}
+function cycleCamera(){
+  const modes=['chase','first','wide'];game.cameraMode=modes[(modes.indexOf(game.cameraMode)+1)%modes.length];
+  $('#run-camera').textContent=game.cameraMode==='first'?'First person':game.cameraMode==='wide'?'Wide':'Chase';
+  try{localStorage.setItem('bored.geopeaks.camera',game.cameraMode)}catch{}
+}
+function buildOverview(t,peak,entry,run){
+  const group=new THREE.Group();overview.routes=[];
+  peakRuns(peak).forEach((e,index)=>{
+    const route=e===entry?run:runFromOsm(t,peak,e);
+    if(!route||!route.osm)return;
+    overview.routes.push({index,route});
+    const points=route.points.map(p=>new THREE.Vector3(p.x,p.h+6,p.z));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:diffInfo(e[1]).colour,fog:false})));
+  });
+  group.visible=false;world.group.add(group);overview.lines=group;
+  overview.selected=overview.routes.some(r=>r.index===globe.runIndex)?globe.runIndex:(overview.routes[0]?.index??globe.runIndex);
+  overview.spawn=null;
+}
+function renderOverviewList(){
+  const list=$('#mountain-runs');list.replaceChildren();
+  for(const {index,route} of overview.routes){
+    const btn=document.createElement('button'),dot=document.createElement('i');
+    dot.style.background=diffInfo(route.diff).colour;
+    btn.append(dot,document.createTextNode(route.name+' · '+(route.distance/1000).toFixed(1)+' km'));
+    btn.setAttribute('aria-current',String(index===overview.selected&&!overview.spawn));
+    btn.onclick=()=>selectOverviewRun(index,true);list.append(btn);
+  }
+  const selected=overview.routes.find(r=>r.index===overview.selected);
+  $('#mountain-selected').textContent=overview.spawn?'Off-piste start · '+Math.round(world.terrain.height(overview.spawn.x,overview.spawn.z))+' m':selected?.route.name||world.run.name||'Summit';
+  $('#mountain-race').disabled=!!overview.spawn;$('#mountain-slalom').disabled=!!overview.spawn;
+}
+function selectOverviewRun(index,focus){
+  const found=overview.routes.find(r=>r.index===index);if(!found)return;
+  overview.selected=index;overview.spawn=null;
+  if(focus){const p=found.route.points[0];overview.x=p.x;overview.z=p.z;overview.distance=Math.max(650,Math.min(3000,found.route.distance*.8))}
+  renderOverviewList();
+}
+function showMountain(reset=false){
+  if(!world.terrain||!world.run){showPicker();return}
+  game.mode='mountain';
+  for(const id of ['picker','hud','ready','pause','result','veil'])$('#'+id).hidden=true;
+  $('#mountain').hidden=false;$('#vig').style.opacity='0';
+  if(overview.lines)overview.lines.visible=true;if(world.skier)world.skier.visible=false;
+  if(reset){const p=world.run.points[0];overview.x=p.x;overview.z=p.z;overview.yaw=.65;overview.pitch=.9;overview.distance=Math.max(1400,Math.min(4500,world.run.distance*1.05))}
+  else{overview.x=game.player.x;overview.z=game.player.z;overview.spawn=null}
+  $('#mountain-name').textContent=game.peak.area;
+  $('#mountain-detail').textContent=overview.routes.length+' mapped runs within loaded terrain';
+  renderOverviewList();
+}
+function updateOverviewCamera(){
+  const t=world.terrain,y=t.height(overview.x,overview.z),d=overview.distance,f=d*Math.cos(overview.pitch);
+  camera.position.set(overview.x+Math.sin(overview.yaw)*f,y+d*Math.sin(overview.pitch),overview.z+Math.cos(overview.yaw)*f);
+  camera.position.y=Math.max(camera.position.y,t.height(camera.position.x,camera.position.z)+80);
+  camera.up.set(0,1,0);camera.lookAt(overview.x,y,overview.z);camera.updateMatrixWorld();
+}
+function pickMountainAt(cx,cy){
+  const rect=$('#gl').getBoundingClientRect(),ray=new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2((cx-rect.left)/rect.width*2-1,1-(cy-rect.top)/rect.height*2),camera);
+  const t=world.terrain,o=ray.ray.origin,v=ray.ray.direction;
+  let last=0,hit=null;
+  for(let d=0;d<=16000;d+=Math.max(8,overview.distance/180)){
+    const x=o.x+v.x*d,z=o.z+v.z*d;
+    if(o.y+v.y*d<=t.height(x,z)){
+      let lo=last,hi=d;for(let i=0;i<12;i++){const m=(lo+hi)/2;if(o.y+v.y*m>t.height(o.x+v.x*m,o.z+v.z*m))lo=m;else hi=m}
+      hit={x:o.x+v.x*hi,z:o.z+v.z*hi};break;
+    }last=d;
+  }
+  if(!hit||!t.inside(hit.x,hit.z))return;
+  let best=null,gap=Math.max(24,overview.distance*.014);
+  for(const item of overview.routes)for(const p of item.route.points){const d=Math.hypot(p.x-hit.x,p.z-hit.z);if(d<gap){gap=d;best=item}}
+  if(best)selectOverviewRun(best.index,false);else{overview.spawn=hit;renderOverviewList()}
+}
+function setActivityVisibility(){
+  if(world.gateGroup)world.gateGroup.visible=game.activity==='slalom';
+  if(world.finish)world.finish.group.visible=game.activity!=='free';
+  $('#gate').hidden=game.activity!=='slalom';$('#pause-end').hidden=game.activity!=='free';
+  $('#vbar').hidden=game.activity==='free';
+}
+function startMountainActivity(activity){
+  if(game.mode!=='mountain')return;
+  game.activity=activity;game.freeSpawn=activity==='free'&&overview.spawn?{...overview.spawn}:null;
+  globe.runIndex=overview.selected;
+  if(world.entryIndex!==overview.selected&&!game.freeSpawn){startPeak(globe.selected,overview.selected,true);return}
+  $('#mountain').hidden=true;if(overview.lines)overview.lines.visible=false;
+  if(world.skier)world.skier.visible=true;
+  setActivityVisibility();$('#hud').hidden=false;buildMap(world.terrain,world.run);showReady();dropIn();
+}
+async function startPeak(index, runIndex,direct=false) {
   const peak = PEAKS[index];
   const entry = peakRuns(peak)[runIndex == null ? globe.runIndex : runIndex] || null;
   game.peak = peak;
-  game.mode = 'loading';
+  if(!direct){game.freeSpawn=null;game.activity='slalom'}
+  game.mode = 'loading';$('#mountain').hidden=true;
   $('#picker').hidden = true;
   $('#hud').hidden = true;
   $('#ready').hidden = true;
@@ -1817,17 +1938,18 @@ async function startPeak(index, runIndex) {
   veil('Reading elevation · ' + peak.peak, 0.02);
 
   try {
-    const terrain = await loadTerrain(peak, (done, total) => {
+    const terrain = terrainCache?.peak===peak?terrainCache:await loadTerrain(peak, (done, total) => {
       if (total) veil('Reading elevation · ' + (done || 0) + ' of ' + total + ' tiles', (done || 0) / total * 0.55);
       else veil('Reading elevation · ' + peak.peak, 0.55);
     });
+    terrainCache=terrain;
     veil(entry ? 'Laying the piste · ' + (entry[0] || 'run') : 'Tracing the fall line…', 0.6);
     await frame();
     // A real piste first; the traced fall line is the fallback for summits the
     // open map has not given a run.
     let run = entry ? runFromOsm(terrain, peak, entry) : null;
     if (!run) { run = traceRun(terrain, peak); run.name = peak.run; run.diff = ''; }
-    if (!run || run.drop < 110) throw new Error('No line off this summit.');
+    if (!run || run.drop < 15) throw new Error('No line off this summit.');
 
     veil('Shaping the mountain…', 0.66);
     await frame();
@@ -1835,7 +1957,7 @@ async function startPeak(index, runIndex) {
     world.group = new THREE.Group();
     runScene.add(world.group);
     world.terrain = terrain;
-    world.run = run;
+    world.run = run;world.entryIndex=runIndex==null?globe.runIndex:runIndex;
 
     const mesh = buildTerrainMesh(terrain, run);
     world.group.add(mesh);
@@ -1848,7 +1970,7 @@ async function startPeak(index, runIndex) {
     world.group.add(buildRouteMarks(terrain, run));
 
     const gateData = buildGates(terrain, run);
-    gateData.gates.forEach(g => world.group.add(g));
+    world.gateGroup=new THREE.Group();gateData.gates.forEach(g=>world.gateGroup.add(g));world.group.add(world.gateGroup);
     world.gates = gateData.positions;
     game.gatesTotal = gateData.gates.length;
 
@@ -1863,12 +1985,11 @@ async function startPeak(index, runIndex) {
       runScene.add(world.skier);
     }
 
-    buildMap(terrain, run);
+    buildMap(terrain, run);buildOverview(terrain,peak,entry,run);
     resetPlayer();
     veil('Ready', 1);
     $('#veil').hidden = true;
-    $('#hud').hidden = false;
-    showReady();
+    if(direct){$('#hud').hidden=false;setActivityVisibility();showReady();dropIn()}else showMountain(true);
   } catch (err) {
     showError(err);
   }
@@ -1889,9 +2010,11 @@ function frame() {
 
 function resetPlayer() {
   const run = world.run;
-  const p = run.points[0];
-  const next = run.points[Math.min(6, run.points.length - 1)];
-  const heading = Math.atan2(next.x - p.x, next.z - p.z);
+  const spawn=game.activity==='free'&&game.freeSpawn;
+  const p=spawn?{...spawn,h:world.terrain.height(spawn.x,spawn.z)}:run.points[0];
+  const next=run.points[Math.min(6,run.points.length-1)];
+  const heading=spawn?rad(bestDescent(world.terrain,p)):Math.atan2(next.x-p.x,next.z-p.z);
+  game.startHeight=p.h;game.safeSpot={x:p.x,z:p.z,y:p.h,heading};game.lastSafeTime=0;
   Object.assign(game.player, {
     x: p.x, z: p.z, y: p.h, heading, dir: heading, speed: 0, vy: 0, air: false, yawRate: 0
   });
@@ -1935,7 +2058,8 @@ function dropIn() {
   resetPlayer();
   // A push off the lip, so a gentle summit does not feel like standing still.
   game.player.speed = 4;
-  game.mode = 'run';
+  if(world.skier)world.skier.visible=true;
+  game.mode = 'run';setActivityVisibility();
   toast('Drop');
 }
 
@@ -2037,7 +2161,7 @@ function stepPhysics(dt) {
 
   // distance and vertical
   game.distance += pl.speed * dt;
-  const targetVert = world.run.startH - ground;
+  const targetVert = game.startHeight - ground;
   if (targetVert > game.vertical) game.vertical = targetVert;
   game.topSpeed = Math.max(game.topSpeed, pl.speed);
   game.time += dt;
@@ -2059,7 +2183,7 @@ function stepPhysics(dt) {
   // A gate counts only when you actually ski through it, within 13 m of the
   // two panels. Sailing past one is a miss, not a free pass — but it never
   // locks the gates after it, so a bad line still finishes.
-  while (game.gate < world.gates.length) {
+  while (game.activity==='slalom' && game.gate < world.gates.length) {
     const g = world.gates[game.gate];
     const gap = Math.hypot(g.x - pl.x, g.z - pl.z);
     if (gap < 13) {
@@ -2077,23 +2201,19 @@ function stepPhysics(dt) {
     break;
   }
 
-  // finish
-  if (game.vertical >= world.run.target) finishRun();
-
-  // stuck in a flat valley or standing still too long: the run is over
-  if (game.mode === 'run') {
-    if (pl.speed < 0.8) game.idleTime += dt; else game.idleTime = 0;
-    if (game.idleTime > 7 && game.vertical > 25) finishRun();
-  }
+  if(!pl.air&&pl.speed>2&&game.time-game.lastSafeTime>4){game.safeSpot={x:pl.x,z:pl.z,y:pl.y,heading:pl.heading};game.lastSafeTime=game.time}
+  const end=world.run.points[world.run.points.length-1];
+  if(game.activity!=='free'&&Math.hypot(pl.x-end.x,pl.z-end.z)<65&&game.vertical>=world.run.drop*.7)finishRun();
+  if(game.mode==='run'){game.idleTime=pl.speed<.8?game.idleTime+dt:0;if(game.idleTime>6&&game.idleTime-dt<=6)toast('Press R to restart or pause to recover')}
 }
 
 function finishRun() {
   if (game.mode !== 'run') return;
-  game.mode = 'done';
+  game.mode = 'done';if(world.skier)world.skier.visible=true;
   const previousBest = game.best;
   snap.metres = Math.round(game.vertical);
-  snap.finished = true;
-  if (snap.metres > game.best) { game.best = snap.metres; writeBest(game.best); }
+  snap.finished = game.activity!=='free';
+  if (snap.finished && snap.metres > game.best) { game.best = snap.metres; writeBest(game.best); }
 
   const peak = game.peak;
   const run = world.run;
@@ -2105,12 +2225,12 @@ function finishRun() {
   $('#result-dist').textContent = (game.distance / 1000).toFixed(2) + ' km';
   const grade = game.distance > 40 ? game.vertical / game.distance * 100 : world.run.avgGrade * 100;
   $('#result-grade').textContent = Math.round(grade) + '%';
-  $('#result-gates').textContent = game.cleared + ' of ' + game.gatesTotal +
-    (game.missed ? ' · ' + game.missed + ' missed' : '');
-  const note = snap.metres > previousBest
+  $('#result-gates').textContent=game.activity==='slalom'?game.cleared+' of '+game.gatesTotal+(game.missed?' · '+game.missed+' missed':''):'—';
+  const note = game.activity==='free'?'Free ski completed.':snap.metres > previousBest
     ? (previousBest ? 'A new best, ' + (snap.metres - previousBest) + ' m further than before.' : 'Your first descent on record.')
     : 'Best is ' + game.best.toLocaleString('en-US') + ' m.';
-  $('#result-note').textContent = note;
+  let raceNote='';if(game.activity!=='free'){const score=game.time+(game.activity==='slalom'?(game.gatesTotal-game.cleared)*5:0);const key='bored.geopeaks.time.'+peak.id+'.'+world.entryIndex+'.'+game.activity;try{const best=Number(localStorage.getItem(key));if(!best||score<best){localStorage.setItem(key,String(score));raceNote='Personal best: '+clock(score)+'. '}else raceNote='Best time: '+clock(best)+'. '}catch{}if(game.activity==='slalom')raceNote+='Adjusted time: '+clock(score)+' (5s per missed gate). '}
+  $('#result-note').textContent=raceNote+note;
   $('#result').hidden = false;
 }
 
@@ -2197,7 +2317,8 @@ function updateCamera(dt) {
   placeSkier(dt);
   // Higher and further back than a first-person trail: a chase camera has to
   // show the next hundred metres of piste, not the back of a jacket.
-  chaseCamera(dt, 7.2, 3.0, 6.5);
+  if(world.skier)world.skier.visible=game.cameraMode!=='first';
+  if(game.cameraMode==='first'){const p=game.player,fx=Math.sin(p.heading),fz=Math.cos(p.heading);camera.position.set(p.x,p.y+1.65,p.z);camera.up.set(0,1,0);camera.lookAt(p.x+fx*30,p.y-2,p.z+fz*30)}else if(game.cameraMode==='wide')chaseCamera(dt,15,6,5);else chaseCamera(dt,7.2,3,6.5);
   const vig = Math.min(0.85, Math.max(0, (game.player.speed - 12) / 34));
   $('#vig').style.opacity = String(vig);
 }
@@ -2219,7 +2340,8 @@ function updateHud(force) {
   $('#hud-sub').textContent = game.peak
     ? game.peak.peak + ' · ' + game.peak.area + (running && running.diff ? ' · ' + diffInfo(running.diff).label : '')
     : '—';
-  $('#hud-time').textContent = clock(game.time);
+  $('#hud-time').textContent=clock(game.time);
+  $('#time-box span').textContent=game.activity==='free'?'Free ski · '+Math.round(game.distance)+' m':(game.activity==='race'?'Timed run':'Slalom')+' · '+Math.round(clamp(game.vertical/Math.max(1,world.run?.drop||1),0,1)*100)+'%';
   $('#hud-speed').textContent = String(Math.round(pl.speed * 3.6));
   $('#hud-alt').textContent = String(Math.round(pl.y));
   const t = world.terrain;
@@ -2286,6 +2408,7 @@ function buildMap(terrain, run) {
     if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
     if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
   }
+  if(game.activity==='free'){minX=terrain.minX;maxX=terrain.maxX;minZ=terrain.minZ;maxZ=terrain.maxZ}
   const pad = 700;
   minX -= pad; maxX += pad; minZ -= pad; maxZ += pad;
   const spanX = maxX - minX, spanZ = maxZ - minZ;
@@ -2340,7 +2463,10 @@ function toast(text) {
 function wireInput() {
   const canvas = $('#gl');
   window.addEventListener('keydown', event => {
-    const key = event.key;
+    const key=event.key;
+    if(event.target.matches?.('input,select,textarea')||game.mode==='mountain'||game.mode==='picker')return;
+    if(key==='c'||key==='C'){cycleCamera();return}
+    if(key==='Escape'&&(game.mode==='run'||game.mode==='pause')){togglePause();return}
     if (key === 'ArrowLeft' || key === 'a' || key === 'A') { input.left = true; event.preventDefault(); }
     else if (key === 'ArrowRight' || key === 'd' || key === 'D') { input.right = true; event.preventDefault(); }
     else if (key === 'ArrowUp' || key === 'w' || key === 'W') { input.tuck = true; event.preventDefault(); }
@@ -2368,7 +2494,9 @@ function wireInput() {
   });
 
   // pointer steering: the side you hold is the way you lean
-  let pointerDown = false;
+  let pointerDown=false,mapDrag=null;
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  canvas.addEventListener('wheel',e=>{if(game.mode==='mountain'){e.preventDefault();overview.distance=clamp(overview.distance*Math.exp(e.deltaY*.001),250,7500)}},{passive:false});
   const steerFrom = event => {
     const rect = canvas.getBoundingClientRect();
     const t = (event.clientX - rect.left) / rect.width;
@@ -2376,6 +2504,7 @@ function wireInput() {
     if (Math.abs(input.stick) < 0.08) input.stick = 0;
   };
   canvas.addEventListener('pointerdown', event => {
+    if(game.mode==='mountain'){mapDrag={id:event.pointerId,x:event.clientX,y:event.clientY,moved:0,pan:event.button===2||event.shiftKey};canvas.setPointerCapture(event.pointerId);return}
     if (game.mode === 'picker') { globe.drag = { x: event.clientX, y: event.clientY, moved: 0, id: event.pointerId }; return; }
     if (game.mode !== 'run') return;
     pointerDown = true;
@@ -2383,6 +2512,13 @@ function wireInput() {
     steerFrom(event);
   });
   canvas.addEventListener('pointermove', event => {
+    if(mapDrag&&mapDrag.id===event.pointerId){
+      const dx=event.clientX-mapDrag.x,dy=event.clientY-mapDrag.y;mapDrag.moved+=Math.abs(dx)+Math.abs(dy);
+      if(mapDrag.pan){const k=overview.distance*.0015;overview.x+=(-dx*Math.cos(overview.yaw)-dy*Math.sin(overview.yaw))*k;overview.z+=(dx*Math.sin(overview.yaw)-dy*Math.cos(overview.yaw))*k}
+      else{overview.yaw-=dx*.006;overview.pitch=clamp(overview.pitch+dy*.005,.28,1.48)}
+      const t=world.terrain;overview.x=clamp(overview.x,t.minX+200,t.maxX-200);overview.z=clamp(overview.z,t.minZ+200,t.maxZ-200);
+      mapDrag.x=event.clientX;mapDrag.y=event.clientY;return
+    }
     if (globe.drag && globe.drag.id === event.pointerId) {
       const dx = event.clientX - globe.drag.x, dy = event.clientY - globe.drag.y;
       globe.drag.moved += Math.abs(dx) + Math.abs(dy);
@@ -2396,6 +2532,7 @@ function wireInput() {
     if (pointerDown) steerFrom(event);
   });
   const release = event => {
+    if(mapDrag&&mapDrag.id===event.pointerId){const click=mapDrag.moved<6&&!mapDrag.pan&&event.type==='pointerup';mapDrag=null;if(click)pickMountainAt(event.clientX,event.clientY);return}
     pointerDown = false;
     input.stick = 0;
     if (globe.drag && globe.drag.id === event.pointerId) {
@@ -2421,13 +2558,24 @@ function wireInput() {
   }
 
   $('#card-go').onclick = () => startPeak(globe.selected, globe.runIndex);
+  $('#mountain-globe').onclick=showPicker;
+  $('#mountain-free').onclick=()=>startMountainActivity('free');
+  $('#mountain-race').onclick=()=>startMountainActivity('race');
+  $('#mountain-slalom').onclick=()=>startMountainActivity('slalom');
+  $('#mountain-zoom-in').onclick=()=>{overview.distance=clamp(overview.distance*.75,250,7500)};
+  $('#mountain-zoom-out').onclick=()=>{overview.distance=clamp(overview.distance*1.33,250,7500)};
+  $('#run-camera').onclick=cycleCamera;$('#run-pause').onclick=()=>togglePause();
+  $('#pause-quality').onclick=()=>{const q=['auto','low','high'];setQuality(q[(q.indexOf(game.quality)+1)%q.length])};
+  $('#pause-recover').onclick=()=>{const p=game.safeSpot;if(p){Object.assign(game.player,p,{dir:p.heading,speed:4,vy:0,air:false,yawRate:0});game.camX=game.camY=game.camZ=null;game.idleTime=0}togglePause()};
+  $('#pause-end').onclick=()=>{if(game.activity==='free'){$('#pause').hidden=true;game.mode='run';finishRun()}};
   $('#ready-go').onclick = dropIn;
   $('#pause-resume').onclick = () => togglePause();
   $('#pause-restart').onclick = () => { $('#pause').hidden = true; restartRun(); };
-  $('#pause-peaks').onclick = () => { $('#pause').hidden = true; showPicker(); };
+  $('#pause-peaks').onclick=()=>showMountain();
   $('#result-again').onclick = () => { $('#result').hidden = true; dropIn(); };
-  $('#result-peaks').onclick = () => { $('#result').hidden = true; showPicker(); };
+  $('#result-peaks').onclick=()=>showMountain();
   $('#veil-retry').onclick = () => {
+    if(!renderer){location.reload();return}
     if (game.peak) startPeak(PEAKS.indexOf(game.peak), globe.runIndex);
     else { $('#veil').hidden = true; showPicker(); }
   };
@@ -2465,7 +2613,7 @@ function togglePause(force) {
 
 function restartRun() {
   if (!world.run) return;
-  resetPlayer();
+  resetPlayer();game.player.speed=4;$('#pause').hidden=true;
   game.mode = 'run';
   $('#ready').hidden = true;
   $('#result').hidden = true;
@@ -2473,6 +2621,7 @@ function restartRun() {
 }
 
 function showPicker() {
+  $('#mountain').hidden=true;if(overview.lines)overview.lines.visible=false;
   game.mode = 'picker';
   $('#hud').hidden = true;
   $('#ready').hidden = true;
@@ -2530,6 +2679,7 @@ function loop(now) {
     return;
   }
 
+  if(game.mode==='mountain'){updateOverviewCamera();renderer.clear();if(world.sky)world.sky.position.copy(camera.position);renderer.render(runScene,camera);return}
   if (game.mode === 'run') {
     stepPhysics(dt);
     updateCamera(dt);
@@ -2580,7 +2730,7 @@ async function boot() {
     return;
   }
 
-  makeRenderer();
+  makeRenderer();try{const c=localStorage.getItem('bored.geopeaks.camera');if(['chase','first','wide'].includes(c))game.cameraMode=c;const q=localStorage.getItem('bored.geopeaks.quality');if(['auto','low','high'].includes(q))game.quality=q}catch{}setQuality(game.quality);
 
   const alt = rad(SUN_ALT), az = rad(SUN_AZ);
   sunDir.x = Math.cos(alt) * Math.sin(az);
