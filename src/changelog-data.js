@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 925,
+  "count": 926,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"dca2a5ee","date":"2026-11-24","author":"bassdrum4","subject":"Score Krillion's dives against a bank in Postgres"},
   {"sha":"046f055d","date":"2026-11-24","author":"bassdrum4","subject":"Flush queued telemetry when a tab hides, and expire product events after 90 days"},
   {"sha":"2df2b375","date":"2026-11-24","author":"bassdrum4","subject":"Dress inviter names in their tier instead of a badge beside them"},
   {"sha":"26d5bf58","date":"2026-11-24","author":"Codebuff","subject":"Give GeoPeaks a skier and a chase camera that cannot enter the slope"},
