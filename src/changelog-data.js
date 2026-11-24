@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 927,
+  "count": 928,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"03e331df","date":"2026-11-24","author":"bassdrum4","subject":"Build Krillion's daily bank in Postgres instead of the Edge Function"},
   {"sha":"16eeffb0","date":"2026-11-24","author":"Codebuff","subject":"Give GeoPeaks the real pistes instead of an invented line"},
   {"sha":"dca2a5ee","date":"2026-11-24","author":"bassdrum4","subject":"Score Krillion's dives against a bank in Postgres"},
   {"sha":"046f055d","date":"2026-11-24","author":"bassdrum4","subject":"Flush queued telemetry when a tab hides, and expire product events after 90 days"},
