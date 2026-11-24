@@ -23,3 +23,5 @@ The default game is now a separately implemented, original-art 20-wave autobattl
 Second pass: difficulty-tier schedule, material bag, rare elite crates, destructible trees, regeneration formula, weapon aiming graphics and browser smoke test. Reference: https://brotato.wiki.spellsandguns.com/Dangers, https://brotato.wiki.spellsandguns.com/Materials, https://brotato.wiki.spellsandguns.com/HP_Regeneration.
 
 Third pass: quadratic XP threshold with +1 HP per level, shop inflation/rarity curves, enemy growth/limits and additional enemy types, boss early completion, endless toggle and per-character win records. Reference: https://brotato.wiki.spellsandguns.com/Experience, https://brotato.wiki.spellsandguns.com/Shop, https://brotato.wiki.spellsandguns.com/Enemies.
+
+Fourth pass: special-effect items (shop discounts/free rerolls, interest, XP modifiers, extra trees, pickup radius, healing, pierce, bounce, burn, explosions, turret structures and emergency revival); live weapon damage and cooldown in shops. All assets remain procedural and no backend required.
