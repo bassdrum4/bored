@@ -18,11 +18,11 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
   assert.deepEqual(timeSlice(1000, 100000, 0, state), { activeMs: 2000, visibleMs: 2000 });
   assert.deepEqual(cleanSnapshot({ slug: 'snake', input: 'private words', score: 20, won: true, token: 'secret', infinite: Infinity, nested: { email: 'x' } }), { score: 20, won: true });
   assert.deepEqual(prepareAnalyticsRows([
-    { _table:'product_events', id:'1', user_id:'stale-user', kind:'visit' }
-  ], 'current-user'), [{ id:'1', user_id:'current-user', kind:'visit' }]);
+    { _table:'product_events', id:'1', user_id:'stale-user', kind:'announcement_impression' }
+  ], 'current-user'), [{ id:'1', user_id:'current-user', kind:'announcement_impression' }]);
   assert.deepEqual(prepareAnalyticsRows([
-    { _table:'product_events', id:'2', user_id:'stale-user', kind:'visit' }
-  ], null), [{ id:'2', user_id:null, kind:'visit' }]);
+    { _table:'product_events', id:'2', user_id:'stale-user', kind:'announcement_impression' }
+  ], null), [{ id:'2', user_id:null, kind:'announcement_impression' }]);
 });
 
 test('game runtime diagnostics retain type and source coordinates without private text', async () => {
@@ -230,17 +230,16 @@ test('retention cohorts, meaningful play, and returning visitor calculations', a
     game:'snake', kind, received_at:day+'T14:00:00Z', active_ms:active, details
   });
   const events = [
-    make('2026-10-05','s1','start'),make('2026-10-05','s1','interaction'),
+    make('2026-10-05','s1','start'),
     make('2026-10-05','s1','end',65000),
     make('2026-10-12','s2','start'),make('2026-10-12','s2','end',62000)
   ];
   const visits=['2026-10-05','2026-10-12'].map((day,i)=>({
     user_id:'u1',visitor_id:'11111111-1111-4111-8111-111111111111',
-    kind:'visit',received_at:day+'T13:00:00Z'
+    kind:'announcement_impression',received_at:day+'T13:00:00Z'
   }));
   const result=summarizeEngagement(events,visits,[{rating:5}],new Date('2026-10-21T14:00:00Z'));
   assert.equal(result.meaningful,2);
-  assert.equal(result.interacting,1);
   assert.deepEqual(result.retention,{eligible:1,returned:1});
   assert.deepEqual(result.repeatGame,{eligible:1,returned:1});
   assert.equal(result.uniqueVisitors,1);
@@ -317,7 +316,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
       totals: { launches:3,meaningful:1,browsers:2,active_ms:25000,error_sessions:1 },
       games: [{ game:'snake',launches:2,sessions:2,meaningful:1,browsers:1,active_ms:20000,median_active_ms:10000,errors:0 }],
       sources: [{ source:'library',launches:2,meaningful:1,active_ms:20000 }],
-      ui_events: [{ kind:'card_impression',game:'snake',surface:'library',action_name:null,events:2,browsers:2 }],
+      ui_events: [{ kind:'library_action',game:'snake',surface:'library',action_name:null,events:2,browsers:2 }],
       site: { visits:5,browsers:2 }
     };
     const popularityFixture = { games: [
@@ -341,7 +340,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   await page.evaluate(() => closeGame());
   await page.waitForFunction(() => document.querySelector('#player').hidden);
   await new Promise(r => setTimeout(r, 200));
-  // This local browser suite must not record visits, starts, checkpoints or
+  // This local browser suite must not record starts, results or
   // game errors in production, even with the user's preference initially on.
   assert.equal(writes.length, 0);
   if (await page.$eval('#claim-dialog', n => n.open)) await page.click('#claim-cancel');
@@ -364,13 +363,13 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   assert.equal(await page.$eval('#totals strong',n=>n.textContent), '25 s');
   // The new admin-only tab renders from the same protected endpoint set.
   await page.click('[data-view="engagement"]');
-  assert.equal(await page.$$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 8);
+  assert.equal(await page.$$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 7);
   assert.match(await page.$eval('#engagement-together', n => n.textContent), /Organic matches/);
   assert.match(await page.$eval('#engagement-feedback', n => n.textContent), /Responses/);
   await page.click('[data-view="history"]');
   assert.match(await page.$eval('#history-totals', n => n.textContent), /Standalone launches/);
   assert.match(await page.$eval('#history-games', n => n.textContent), /snake/i);
-  assert.match(await page.$eval('#history-ui', n => n.textContent), /card_impression/);
+  assert.match(await page.$eval('#history-ui', n => n.textContent), /library_action/);
   assert.match(await page.$eval('#history-cohorts', n => n.textContent), /2026-10-30/);
   await page.click('[data-view="overview"]');
   assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),2);
