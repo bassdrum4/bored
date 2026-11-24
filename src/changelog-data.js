@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 931,
+  "count": 932,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1cae0934","date":"2026-11-24","author":"Daniel Lowe","subject":"Prevent cascading backend outages and bound scheduled database work","pr":326},
   {"sha":"03649500","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Air Hockey corner stalls, Ticket to Ride draws, and Overpass time","pr":325},
   {"sha":"3326093f","date":"2026-11-24","author":"bassdrum4","subject":"Keep Krillion's daily dive starting on big answer days"},
   {"sha":"11e38d1f","date":"2026-11-24","author":"bassdrum4","subject":"Print Trackmania's career pace on the leaderboard, not its points"},
