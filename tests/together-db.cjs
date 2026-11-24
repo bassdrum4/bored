@@ -5,6 +5,12 @@ const root = path.resolve(__dirname, '..');
 const consent = { consent_version:'2026-10-26-v3' };
 const ids = Array.from({length:7},(_,i)=>`00000000-0000-4000-8000-00000000000${i+1}`);
 
+// These fixtures build only the multiplayer schema, not unrelated analytics,
+ // cloud saves, cron, or storage-maintenance infrastructure.
+function togetherMigrationFiles(dir) {
+  const unrelated = /engagement_and_retention_analytics|bored_analytics_funnels_rollups|low_io_storage_tuning|drop_unused_telemetry_indexes|product_events_retention|prune_analytics_events|krillion_verified_static_cleanup/;
+  return fs.readdirSync(dir).filter(f=>f.endsWith('.sql') && !unrelated.test(f)).sort();
+}
 // Production SQL, real PostgreSQL WASM execution, isolated auth fixtures. Nothing
 // in this suite contacts production or inserts demo accounts into Supabase.
 async function database() {
@@ -17,7 +23,7 @@ async function database() {
       select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     create table public.profiles(id uuid primary key references auth.users(id),handle text);`);
   await db.exec(fs.readFileSync(path.join(root,'scripts/bored-together.sql'),'utf8'));
-  for (const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(f=>f.endsWith('.sql') && !f.includes('engagement_and_retention_analytics') && !f.includes('bored_analytics_funnels_rollups')).sort()) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
+  for (const file of togetherMigrationFiles(path.join(root,'supabase/migrations'))) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
   const handles = ['WackyPenguin','BananaWizard','QuietOwl','NeverJoined','FourthPlayer','FifthPlayer','Anonymous'];
   for(let i=0;i<ids.length;i++) {
     await db.query('insert into auth.users values($1,$2,$3)',[ids[i],`student${i+1}@example.test`,i===6]);
@@ -56,4 +62,4 @@ async function poolHandler(db,enqueue=fn=>fn()){
  const {createPoolHandler}=await import('../supabase/functions/together-pool/handler.js');
  return createPoolHandler({authorize:async auth=>{const id=auth.replace('Bearer ','');return ids.includes(id)?{id,is_anonymous:id===ids[6]}:null;},readMatch:(auth,id)=>enqueue(()=>call(db,auth.replace('Bearer ',''),'match',{match_id:id})),commitShot:shot=>enqueue(()=>serviceCommit(db,shot))});
 }
-module.exports={database,call,as,ids,consent,enroll,dashboard,challenge,move,inviteCall,serviceCommit,poolHandler};
+module.exports={togetherMigrationFiles,database,call,as,ids,consent,enroll,dashboard,challenge,move,inviteCall,serviceCommit,poolHandler};
