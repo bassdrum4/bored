@@ -6,7 +6,7 @@
 <title>Shotgun Roulette</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap" media="print" onload="this.media='all'">
 <style>
   /* The Distortion World card room. The scene is a fixed 1280x720 stage scaled to
      the frame; everything on the table lives in one 3D plane. */
@@ -16,7 +16,11 @@
           --tilt: 62deg; }
   * { margin: 0; padding: 0; box-sizing: border-box }
   html, body { height: 100%; overflow: hidden; background: #000; color-scheme: dark }
-  body { visibility: hidden; color: var(--ink); font: 17px/1.5 Georgia, "Times New Roman", serif }
+  body { color: var(--ink); font: 17px/1.5 Georgia, "Times New Roman", serif }
+  #startup-error { position: fixed; inset: 0; z-index: 10000; display: grid; place-content: center; gap: 12px;
+    padding: 24px; text-align: center; background: var(--void); color: var(--ink); font: 15px/1.5 var(--mono) }
+  #startup-error[hidden] { display: none }
+  #startup-error button { justify-self: center; padding: 8px 14px; background: var(--void); border: 1px solid var(--gold) }
   button { font: inherit; color: inherit; touch-action: manipulation }
   button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px }
   img { image-rendering: pixelated }
@@ -382,6 +386,21 @@
 </style>
 </head>
 <body>
+<div id="startup-error" role="alert" hidden>
+  <strong>Shotgun Roulette could not start.</strong>
+  <span>Return to Bored and open the game again.</span>
+  <button type="button" id="startup-back">Back to Bored</button>
+</div>
+<script>
+  // Independent of the game script: a startup exception must not strand the player on black.
+  document.getElementById('startup-back').onclick = function () {
+    if (parent === window) location.reload();
+    else parent.postMessage({type:'bored:close'}, '*');
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.__boredSnapshot !== 'function') document.getElementById('startup-error').hidden = false;
+  }, {once:true});
+</script>
 <div class="stage" id="stage">
   <div class="scene" id="scene">
     <div class="haze"></div>
@@ -631,8 +650,6 @@
    Opened on its own (not from the arcade), test games still work; real bets
    get no answer and say so. */
 {
-document.body.style.visibility = "visible";
-
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 // The inviter's medal, beside a name on the board. The hub sends the tier with
