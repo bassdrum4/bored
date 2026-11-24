@@ -43,9 +43,14 @@ function answerWorker(){
   }
   return staticWorker;
 }
+function staticRound(){
+  if(!game||game.completed)return null;
+  const p=game.prompts?.[game.round];
+  return p?.staticDate?{date:p.staticDate,round:p.staticRound}:game.staticAnswers?{date:game.date,round:game.round}:null;
+}
 function warmStaticRound(){
-  if(!game?.staticAnswers||game.mode!=='daily'||game.completed)return;
-  try{answerWorker().postMessage({date:game.date,round:game.round});}catch{}
+  const target=staticRound();if(!target)return;
+  try{answerWorker().postMessage(target);}catch{}
 }
 async function staticCandidate(input){
   try{
@@ -54,12 +59,12 @@ async function staticCandidate(input){
       const finish=value=>{clearTimeout(timer);staticWaiters.delete(id);resolve(value);};
       const timer=setTimeout(()=>finish(null),900);
       staticWaiters.set(id,finish);
-      worker.postMessage({id,date:game.date,round:game.round,input});
+      worker.postMessage({id,...staticRound(),input});
     });
   }catch{return null;}
 }
 async function api(path,data){if(classSet)return classSet(path,data);
-  if(path==='answer'&&game?.staticAnswers&&game.mode==='daily'&&data?.answer){
+  if(path==='answer'&&staticRound()&&data?.answer){
     const candidate=await staticCandidate(data.answer);
     if(candidate)data={...data,candidate};
   }

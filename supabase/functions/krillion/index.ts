@@ -23,7 +23,7 @@ const TIERS: Record<string, { name: string; score: number }> = {
 };
 
 type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
-type Prompt = { id: string; text: string };
+type Prompt = { id: string; text: string; staticDate?: string; staticRound?: number; bankDate?: string };
 type Book = { date: string; dayNumber: number; source: string; title?: string; staticAnswers?: boolean; prompts: Prompt[] };
 type StoredBook = Book & { prompts: (Prompt & { answers?: Answer[] })[] };
 type PickedPrompt = { id: string; text: string; date: string };
@@ -142,15 +142,21 @@ async function matchStored(date: string, promptId: string, input: string): Promi
 // server still owns the timer, accepted answer, tier, score and run state.
 const STATIC_BASE = 'https://bassdrum4.github.io/bored/krillion-data/';
 async function staticJson(path: string, gzip = false) {
-  const res = await fetch(STATIC_BASE + path, { signal: AbortSignal.timeout(4000) });
-  if (!res.ok || !res.body) throw new HttpError('The static answer file is temporarily unavailable.', 503);
-  return gzip ? await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json() : await res.json();
+  const date=path.split('/')[0];
+  const archived='https://raw.githubusercontent.com/bassdrum4/bored/krillion-archive-'+date+'/';
+  const recent=Date.parse(etDate())-Date.parse(date)<=2*86400000;
+  for (const base of recent ? [STATIC_BASE, 'https://raw.githubusercontent.com/bassdrum4/bored/krillion-data/',archived] : [archived]) {
+    try {
+      const res = await fetch(base + path, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok || !res.body) continue;
+      return gzip ? await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json() : await res.json();
+    } catch { /* Pages may lag the generated branch. */ }
+  }
+  throw new HttpError('The static answer file is temporarily unavailable.', 503);
 }
 async function staticBook(date: string): Promise<Book | null> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  // Older, database-backed archive days should not cost an extra network hop.
-  const age = Date.parse(etDate()) - Date.parse(date);
-  if (age < 0 || age > 2 * 86400000) return null;
+  if (date > etDate()) return null;
   try {
     const b = await staticJson(date + '/manifest.json');
     if (b?.date !== date || b.staticAnswers !== true || !Number.isInteger(b.dayNumber) ||
@@ -257,7 +263,7 @@ async function cachedBook(date: string): Promise<StoredBook | null> {
 }
 
 async function latestBook(): Promise<StoredBook | null> {
-  const response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
+  const response = await sb('krillion_books?select=book&order=date.desc&limit=1');
   if (!response.ok) return null;
   const rows = await response.json();
   const value = rows?.[0]?.book;
@@ -407,6 +413,9 @@ async function loadBook(date: string): Promise<Loaded> {
           body:JSON.stringify([{date}])
         });
         await noted.body?.cancel().catch(()=>{});
+        // Metadata only: the archive refs contain the answer data. This also
+        // makes new static prompts eligible for practice dives.
+        await storeBook(snapshot);
       } catch {}
       const loaded = { book: snapshot, stale: false };
       books.set(date, {loaded,until:Date.now()+60*60_000});
@@ -441,7 +450,7 @@ const publicBook = (loaded: Loaded) => ({
   ...(loaded.book.title ? { title: loaded.book.title } : {}),
   sample: false,
   ...(loaded.book.staticAnswers ? {staticAnswers:true} : {}),
-  prompts: loaded.book.prompts.map(prompt => ({ id: prompt.id, text: prompt.text })),
+  prompts: loaded.book.prompts.map(prompt => ({ id: prompt.id, text: prompt.text, ...(prompt.staticDate ? {staticDate:prompt.staticDate,staticRound:prompt.staticRound} : {}) })),
   resetsAt: resetAt(loaded.book.date),
   source: loaded.book.source,
   stale: loaded.stale
@@ -472,7 +481,8 @@ async function bookForRun(run: Run): Promise<Book> {
     prompts: picked.map(entry => {
       const prompt = books.get(entry.date)?.prompts.find(candidate => candidate.id === entry.id);
       if (!prompt) throw new HttpError('This dive lost its prompts. Start a new one.', 503);
-      return prompt;
+      const source = books.get(entry.date)!;
+      return { ...prompt, bankDate: entry.date, ...(source.staticAnswers ? {staticDate:entry.date,staticRound:source.prompts.indexOf(prompt)} : {}) };
     })
   };
 }
@@ -625,9 +635,9 @@ Deno.serve(async (req: Request) => {
           : { population: 0, betterThan: null, dist: Array(71).fill(0) };
         // A round can hold 195k answers; the sheet shows the deepest page of
         // them and says how many landed in total.
-        const sheets = await Promise.all(book.prompts.map((prompt,index) => book.staticAnswers ? staticSheet(book,index).catch(()=>({total:0,answers:[]})) :
+        const sheets = await Promise.all(book.prompts.map((prompt,index) => (book.staticAnswers || prompt.staticDate) ? staticSheet({...book,date:prompt.staticDate || book.date},prompt.staticRound ?? index).catch(()=>({total:0,answers:[]})) :
           callBank<{ total: number; answers: { answer: string; tier: string; quip: string | null; score: number }[] }>(
-            'krillion_review', { p_date: book.date, p_prompt: prompt.id, p_limit: 200 }).catch(() => ({ total: 0, answers: [] }))));
+            'krillion_review', { p_date: prompt.bankDate || book.date, p_prompt: prompt.id, p_limit: 200 }).catch(() => ({ total: 0, answers: [] }))));
         return reply({
           prompts: book.prompts.map((prompt, index) => ({
             id: prompt.id,
@@ -700,7 +710,7 @@ Deno.serve(async (req: Request) => {
       const timely = receivedAt <= windowStart + ROUND_MS + 1_500;
       const raw = String(body.answer ?? '').trim().slice(0, 256);
       const prompt = book.prompts[round];
-      const match = raw && timely ? (book.staticAnswers ? await matchStatic(book,round,raw,body.candidate) : await matchStored(book.date, prompt.id, raw)) : null;
+      const match = raw && timely ? ((book.staticAnswers || prompt.staticDate) ? await matchStatic({...book,date:prompt.staticDate || book.date},prompt.staticRound ?? round,raw,body.candidate) : await matchStored(prompt.bankDate || book.date, prompt.id, raw)) : null;
       if (!match && raw && !late && !body.timeout) {
         return reply({ rejected: true, message: `“${raw}”: no echo. try again` });
       }
@@ -768,8 +778,8 @@ Deno.serve(async (req: Request) => {
       const book = await bookForRun(run);
       const prompt = book.prompts[Number(run.round)];
       if (!prompt) throw new HttpError('This dive is over.', 409);
-      const sheet = book.staticAnswers ? await staticSheet(book,Number(run.round)) : await callBank<{ count: number; deepest: string | null }>('krillion_hint',
-        { p_date: book.date, p_prompt: prompt.id });
+      const sheet = (book.staticAnswers || prompt.staticDate) ? await staticSheet({...book,date:prompt.staticDate || book.date},prompt.staticRound ?? Number(run.round)) : await callBank<{ count: number; deepest: string | null }>('krillion_hint',
+        { p_date: prompt.bankDate || book.date, p_prompt: prompt.id });
       if (!sheet?.count || !sheet.deepest) throw new HttpError('This dive is over.', 409);
       await updateRun(run.id, { hint_used: true });
       return reply({
