@@ -469,7 +469,10 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === 'GET') {
       if (path === '/' || path === '/today') {
-        return reply(publicBook(await loadBook(etDate())));
+        const date = etDate(receivedAt);
+        const loaded = await loadBook(date);
+        if (loaded.stale || loaded.book.date !== date) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+        return reply(publicBook(loaded));
       }
       if (path === '/health') return reply({ ok: true, rounds: 7 });
       if (path === '/party/rooms') return reply({ rooms: [], seats: [] });
@@ -574,12 +577,22 @@ Deno.serve(async (req: Request) => {
         promptText: prompt.text
       };
       const results = [...run.results.filter(entry => entry.round !== round), result].sort((a, b) => a.round - b.round);
-      const updated = await updateRun(run.id, {
-        round: round + 1,
-        round_start: null,
-        completed: round + 1 >= book.prompts.length,
-        results
+      // An earlier request might have committed after the browser timed out.
+      // Conditional scoring prevents a late retry from overwriting that result.
+      const response = await sb('krillion_runs?id=eq.' + encodeURIComponent(run.id) + '&round=eq.' + round + '&completed=eq.false', {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ round: round + 1, round_start: null, completed: round + 1 >= book.prompts.length, results })
       });
+      if (!response.ok) throw new HttpError('The answer could not be saved. Retry this round.', 503);
+      const rows = await response.json();
+      if (!rows?.[0]) {
+        const current = await readRun(run.id);
+        if (!current) throw new HttpError('Dive not found.', 404);
+        return reply({ state: stateFor(current, book), alreadyScored: true });
+      }
+      const updated = rows[0] as Run;
+      if (updated.completed) dailyCache = null;
       return reply({ result, state: stateFor(updated, book) });
     }
 
