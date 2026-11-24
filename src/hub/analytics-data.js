@@ -84,21 +84,19 @@ export function summarizeEngagement(events, productEvents = [], survey = [], cut
   const identity = e => e.user_id ? 'u:' + e.user_id : e.visitor_id ? 'v:' + e.visitor_id : null;
   const sessions = new Map();
   for (const e of events) {
-    if (!e.session_id || !['start','checkpoint','interaction','end','daily_complete','error'].includes(e.kind)) continue;
+    if (!e.session_id || !['start','summary','end','daily_complete','error'].includes(e.kind)) continue;
     const key = e.session_id + ':' + (e.user_id || 'guest');
     if (!sessions.has(key)) sessions.set(key, { game:e.game, who:identity(e), date:dateOf(e.received_at),
       active:0, loaded:false, interacted:false, finished:false });
     const s = sessions.get(key);
     s.active += Number(e.active_ms) || 0;
-    s.loaded ||= e.kind === 'checkpoint' && e.details?.loaded === true;
-    s.interacted ||= e.kind === 'interaction';
-    s.finished ||= e.kind === 'daily_complete' || (e.kind === 'checkpoint' && e.details?.round_finished === true);
+    s.loaded ||= e.details?.loaded === true;
+    s.finished ||= e.kind === 'daily_complete' || e.details?.round_finished === true;
   }
   const games = new Map(), people = new Map();
-  let loaded = 0, interacting = 0, meaningful = 0;
+  let loaded = 0, meaningful = 0;
   for (const s of sessions.values()) {
     loaded += Number(s.loaded);
-    interacting += Number(s.interacted);
     s.meaningful = s.active >= 60000 || s.finished;
     meaningful += Number(s.meaningful);
     if (!games.has(s.game)) games.set(s.game, { game:s.game, sessions:0, meaningful:0, players:new Set(),
@@ -140,8 +138,8 @@ export function summarizeEngagement(events, productEvents = [], survey = [], cut
     }
   }
   const visitors = new Map();
-  for (const e of productEvents) {
-    if (e.kind !== 'visit') continue;
+  for (const e of events) {
+    if (e.kind !== 'start') continue;
     const who = identity(e);
     if (!who) continue;
     const day = dateOf(e.received_at);
@@ -160,7 +158,7 @@ export function summarizeEngagement(events, productEvents = [], survey = [], cut
   const ratings = survey.filter(e => Number.isInteger(Number(e.rating)) && e.rating>=1 && e.rating<=5);
   const average = ratings.length ? ratings.reduce((n,e)=>n+Number(e.rating),0)/ratings.length : null;
   return {
-    sessions:sessions.size, loaded, interacting, meaningful, identifiedEngaged:people.size,
+    sessions:sessions.size, loaded, meaningful, identifiedEngaged:people.size,
     uniqueVisitors:visitors.size, visitorsByDay:[...visitorDays.values()].sort((a,b)=>a.day.localeCompare(b.day)),
     retention:{eligible,returned:nextWeekReturns},repeatGame:{eligible:repeatEligible,returned:repeatReturns},
     games:[...games.values()].map(g=>({game:g.game,sessions:g.sessions,meaningful:g.meaningful,
