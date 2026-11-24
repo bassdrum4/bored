@@ -4,8 +4,8 @@
 // Popular ranks the last seven days of plays, so a game nobody has opened yet
 // has no rank at all and used to be pushed under every ranked game — where it
 // stayed, because nobody could see it to play it. A launch inside the boost
-// window is lifted above the ranked games until it has had a few days to earn
-// a rank of its own.
+// window can be lifted above ranked games. The hub instead passes its explicit
+// NEW-badge list, keeping all four new arrivals together until the next release.
 
 export const NEW_GAME_BOOST_DAYS = 3;
 
@@ -56,16 +56,21 @@ export function isNewGame(slug, launches, now = Date.now(), days = NEW_GAME_BOOS
 }
 
 /**
- * Popular order: boosted launches first (newest launch first), then ranked games
+ * Popular order: editorial pins, then NEW-badged games in catalog release order,
+ * then ranked games (or date-based boosts when no explicit fresh list is supplied). Ranked games
  * by rank, then everything without a rank in catalog order. With no rankings and
  * no launches in their window the list is returned untouched, which is the
  * offline fallback the library relies on.
  */
 export function sortPopularGames(games, ranks, options = {}) {
-  const { launches, featuredUntil, now = Date.now(), days = NEW_GAME_BOOST_DAYS } = options;
+  const { launches, freshGames, featuredUntil, now = Date.now(), days = NEW_GAME_BOOST_DAYS } = options;
   const boost = new Map();
-  for (const [slug] of games) {
-    if (isNewGame(slug, launches, now, days)) boost.set(slug, launchTime(slug, launches));
+  if (Array.isArray(freshGames)) {
+    freshGames.forEach((slug, index) => boost.set(slug, freshGames.length - index));
+  } else {
+    for (const [slug] of games) {
+      if (isNewGame(slug, launches, now, days)) boost.set(slug, launchTime(slug, launches));
+    }
   }
   const featured = new Set(games.filter(([slug]) => isFeatured(slug, featuredUntil, now)).map(([slug]) => slug));
   if (!ranks?.size && !boost.size && !featured.size) return games;

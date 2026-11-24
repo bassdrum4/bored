@@ -1,10 +1,10 @@
-import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, LAUNCHED, FEATURED_UNTIL, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
+import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, FEATURED_UNTIL, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
 import { DISCOVERY, PREVIEWS, inCollection } from '../games/discovery.js';
 import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { readStored, writeStored } from './store.js';
 import { backendReady, request, ANON_TOKEN } from './backend.js';
-import { popularityRanks, sortPopularGames, isNewGame, isFeatured, popularityCacheDay } from './popularity.js';
+import { popularityRanks, sortPopularGames, isFeatured, popularityCacheDay } from './popularity.js';
 import { addMedal } from './invites.js';
 
 export function createLibraryView({ state, openGame, saveLibrary, track = () => {} }) {
@@ -247,12 +247,11 @@ function renderRecent() {
   const hasHistory = state.recentGames.length > 0 || state.favorites.size > 0;
   // New visitors get four playable starting points rather than an empty history shelf.
   // Rankings are aggregated, never individual player histories. Offline has a fixed fallback.
-  // A launch still inside its boost window belongs here even before it has a
-  // rank, otherwise a new game is never offered and never earns one.
+  // Every NEW-badged launch belongs here even before it has a rank.
   const popular = sortPopularGames(
     ORDER.filter(([slug]) => !EXTERNS[slug] &&
-      (popularRankings.has(slug) || isNewGame(slug, LAUNCHED) || isFeatured(slug, FEATURED_UNTIL))),
-    popularRankings, { launches: LAUNCHED, featuredUntil: FEATURED_UNTIL }
+      (popularRankings.has(slug) || FRESH_GAMES.includes(slug) || isFeatured(slug, FEATURED_UNTIL))),
+    popularRankings, { freshGames: FRESH_GAMES, featuredUntil: FEATURED_UNTIL }
   ).slice(0, SHELF_LIMIT).map(([slug]) => slug);
   const starterGames = [...new Set([...popular, 'clicker', 'block-blast', 'quickdraw', '2048'])].slice(0, SHELF_LIMIT);
   const shown = hasHistory
@@ -265,7 +264,7 @@ function renderRecent() {
       ? (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
         ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
         : 'Favorite')
-      : (isNewGame(slug, LAUNCHED) ? 'Just added' : popularRankings.has(slug) ? 'Popular right now' : 'Easy to jump into'))));
+      : (FRESH_GAMES.includes(slug) ? 'Just added' : popularRankings.has(slug) ? 'Popular right now' : 'Easy to jump into'))));
   watchImpressions([...$('#recent-list').querySelectorAll('.shelf-play')], 'recent');
   $('#favorites-all').hidden = !state.favorites.size;
   $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
@@ -293,7 +292,7 @@ function renderLibrary() {
   });
   const sortMode = $('#sort').value;
   if (sortMode === 'az') state.visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
-  else if (sortMode === 'popular') sortPopularGames(state.visibleGames, popularRankings, { launches: LAUNCHED, featuredUntil: FEATURED_UNTIL });
+  else if (sortMode === 'popular') sortPopularGames(state.visibleGames, popularRankings, { freshGames: FRESH_GAMES, featuredUntil: FEATURED_UNTIL });
 
   for (const [slug, name] of state.visibleGames) {
     const row = element('div', 'row');

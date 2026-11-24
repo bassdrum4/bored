@@ -74,3 +74,16 @@ test('popularity cache rolls over at the server snapshot cutoff, not midnight', 
   assert.equal(popularityCacheDay(Date.parse('2026-11-24T07:06:59Z')), '2026-11-23');
   assert.equal(popularityCacheDay(Date.parse('2026-11-24T07:07:00Z')), '2026-11-24');
 });
+
+test('the four NEW-badged games stay together above weekly rankings until another release', async () => {
+  const { sortPopularGames } = await import('../src/hub/popularity.js');
+  const { ORDER, FRESH_GAMES, LAUNCHED } = await import('../src/games/catalog.js');
+  const ranks = new Map([['krillion', 1], ['trackbound', 2]]);
+  const fresh = [...FRESH_GAMES];
+  for (const now of [Date.parse('2026-11-24T10:44:00Z'), Date.parse('2026-12-02T12:00:00Z')]) {
+    assert.deepEqual(sortPopularGames(ORDER.slice(), ranks, {freshGames: fresh, launches: LAUNCHED, now}).slice(0, fresh.length).map(([slug]) => slug), fresh);
+  }
+  const featuredUntil = {[fresh[fresh.length - 1]]: '2026-11-25T05:00:00Z'};
+  const pinned = sortPopularGames(ORDER.slice(), ranks, {freshGames: fresh, featuredUntil, now: Date.parse('2026-11-24T10:44:00Z')});
+  assert.deepEqual(pinned.slice(0, fresh.length).map(([slug]) => slug), [fresh[fresh.length - 1], ...fresh.slice(0, -1)]);
+});

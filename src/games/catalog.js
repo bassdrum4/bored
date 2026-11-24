@@ -34,10 +34,8 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
 export const FRESH_GAMES = ["ballistic-chickens", "getaway-shootout", "shotgun-roulette", "crossword"];
-// When each game first arrived. Popular ranks the last seven days of plays, so a
-// game nobody has opened yet has no rank and used to sit under every ranked
-// game; a launch inside the boost window is shown above them instead. Only
-// recent launches matter, and `games:add` stamps every new game here.
+// When each game first arrived. `games:add` stamps each release here.
+// Popular promotes the FRESH_GAMES list above its weekly rankings.
 // Temporary editorial pin, expiring at midnight Detroit time November 25.
 export const FEATURED_UNTIL = Object.freeze({ crossword: '2026-11-25T05:00:00Z' });
 export const LAUNCHED = {
