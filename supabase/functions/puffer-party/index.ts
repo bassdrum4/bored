@@ -276,7 +276,7 @@ async function loadBook(): Promise<Book> {
     let response = await sb('krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1');
     let rows = response.ok ? await response.json() : [];
     if (!rows?.[0]?.book) {
-      response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
+      response = await sb('krillion_books?select=book&order=date.desc&limit=1');
       rows = response.ok ? await response.json() : [];
     }
     const value = rows?.[0]?.book;
