@@ -115,3 +115,43 @@ test('with no session it never opens a socket', async t => {
   await wait(150);
   assert.equal(server.state.connections, 0);
 });
+
+test('presence snapshots and diffs deduplicate tabs, buffer early changes and remove departures', async () => {
+  const { createPresenceState } = await load();
+  const state = createPresenceState();
+  const meta = (ref,ticket) => ({ phx_ref:ref,ticket });
+  state.change({ joins:{ b:{metas:[meta('2','alice')]}} });
+  assert.equal(state.tickets(),null);
+  state.snapshot({ a:{metas:[meta('1','alice')]},c:{metas:[meta('3','bob')] } });
+  assert.deepEqual(state.tickets(),['alice','bob']);
+  state.change({leaves:{a:{metas:[meta('1','alice')]}}});
+  assert.deepEqual(state.tickets(),['alice','bob']);
+  state.change({joins:{b:{metas:[{...meta('4','alice-new'),phx_ref_prev:'2'}]}},leaves:{b:{metas:[meta('2','alice')]}}});
+  assert.deepEqual(state.tickets(),['alice-new','bob']);
+  state.reset();
+  assert.equal(state.tickets(),null);
+});
+
+test('private presence tracks after join, refreshes ticket and re-tracks after reconnect', async t => {
+  const { subscribeChanges } = await load();
+  const server = await createMockRealtime();
+  const updates = [];
+  const socket = subscribeChanges({
+    url: server.url, topic:'bored-online-v1', private:true, getToken:async()=> 'test-token',
+    onPresence: value => updates.push(value), retry:[20], heartbeatMs:100, joinWaitMs:500
+  });
+  t.after(async()=>{socket.close(); await server.close();});
+  socket.trackPresence('ticket-one');
+  await until(()=>server.state.tracks.length===1);
+  assert.equal(server.state.joins[0].payload.config.private,true);
+  assert.equal(server.state.joins[0].payload.config.presence.enabled,true);
+  assert.deepEqual(server.state.tracks[0],{type:'presence',event:'track',payload:{ticket:'ticket-one'}});
+  server.presence('presence_state',{a:{metas:[{phx_ref:'a1',ticket:'ticket-one'}]}});
+  await until(()=>updates.some(x=>x?.[0]==='ticket-one'));
+  socket.trackPresence('ticket-two');
+  await until(()=>server.state.tracks.length===2);
+  server.drop();
+  await until(()=>updates.includes(null));
+  await until(()=>server.state.tracks.length===3);
+  assert.equal(server.state.tracks[2].payload.ticket,'ticket-two');
+});
