@@ -22,7 +22,7 @@ async function fixture(t,configured=true){
   const uid=randomUUID(),mod=randomUUID();
   const jwt=id=>'x.'+Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.x';
   let enabled=true,bans={},reports=[],checks=0;
-  const chat=createChat({configured,verify:async token=>{const id=JSON.parse(Buffer.from(token.split('.')[1],'base64url')).sub;return {id,handle:id===mod?'Admin':'Penguin'};},isAdmin:async token=>token===jwt(mod),store:async(action,args)=>{
+  const chat=createChat({configured,verify:async token=>{const id=JSON.parse(Buffer.from(token.split('.')[1],'base64url')).sub;return {id,handle:id===mod?'Admin':'Penguin'};},isAdmin:async token=>JSON.parse(Buffer.from(token.split('.')[1],'base64url')).sub===mod,store:async(action,args)=>{
     if(action==='state')return {enabled,bans:{...bans}};
     if(action==='report')reports.push(args);
     if(action==='reports')return reports;
