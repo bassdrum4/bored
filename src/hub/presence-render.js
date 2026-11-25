@@ -4,7 +4,7 @@ import { backendReady, freshSession, getSession, hasIdentity, request } from './
 const GUEST='guest', PREF='bored.presence.guest.visible', KEY='bored.presence.guest.key';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const HEARTBEAT=60000, AUTH_RENEW=18*60000;
-let ephemeralKey='', ephemeralPref=true;
+let ephemeralKey='', ephemeralPref=null;
 
 export function renderSocketUrl(origin) {
   try {
@@ -17,7 +17,7 @@ export function renderSocketUrl(origin) {
 function liveSite(){
   try{return location.protocol==='https:' && location.hostname==='bassdrum4.github.io' && /^\/bored(?:\/|$)/.test(location.pathname);}catch{return false;}
 }
-function guestVisible(){try{return localStorage.getItem(PREF)!=='off';}catch{return ephemeralPref;}}
+function guestVisible(){if(ephemeralPref!==null)return ephemeralPref;try{return localStorage.getItem(PREF)!=='off';}catch{return true;}}
 function guestId(){
   let id=ephemeralKey;
   try{id=localStorage.getItem(KEY)||id;}catch{}
@@ -163,8 +163,7 @@ export function mountRenderPresence(){
     if(!owner||!eligible||saving||visible===null)return;
     const id=owner,desired=setting.checked,before=visible;
     if(id===GUEST){
-      ephemeralPref=desired;
-      try{localStorage.setItem(PREF,desired?'on':'off');}catch{}
+      try{localStorage.setItem(PREF,desired?'on':'off');ephemeralPref=null;}catch{ephemeralPref=desired;}
       epoch++;stop();paused=false;void refreshPreference();return;
     }
     epoch++;const v=epoch;
