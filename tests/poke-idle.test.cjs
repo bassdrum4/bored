@@ -340,6 +340,9 @@ test('Story Mode: its own save, the opening scenes, ×2 XP and shinies, no prest
   await tab.click('[data-start="7"]');
   const story = await tab.evaluate(() => ({ mode: S.mode, scene: sceneNow && sceneNow.id, odds: shinyOdds() * 4096, charm: (S.charm = 1, shinyOdds() * 4096), prestige: (S.beat = '2026-11-24', S.pbeat = 1, canPrestige()), tab: !$('#tabs [data-tab=story]').hidden, from: S.box[7].from }));
   assert.deepEqual(story, { mode: 'story', scene: 'open-2', odds: 2, charm: 6, prestige: false, tab: true, from: 0 });
+  const fields = await tab.evaluate(() => { save(); const st = readSlot(STORY_KEY).story; return { keys: Object.keys(st).sort(), life: Object.keys(st.lifeDex) }; });
+  assert.deepEqual(fields.keys, ['ch', 'cleared', 'clues', 'epilogue', 'eternatusStolen', 'frozen', 'giratinaDebt', 'liberated', 'lifeDex', 'picks', 'roulette', 'seen', 'silvally', 'y3Count', 'year'], 'every story field is in the save from day one');
+  assert.deepEqual(fields.life, ['7'], 'the Story lifetime dex');
   await tab.evaluate(() => { S.charm = 0; delete S.beat; delete S.pbeat; });
   await tab.click('#scene [data-scene=next]'); await tab.click('#scene [data-scene=next]');
   const book = await tab.evaluate(() => ({ seen: S.story.seen, tab, text: $('#t-story').textContent, rereads: [...document.querySelectorAll('#t-story [data-reread]')].map(b => b.dataset.reread) }));
