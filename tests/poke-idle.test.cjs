@@ -365,7 +365,7 @@ test('Story Mode: its own save, the opening scenes, ×2 XP and shinies, no prest
   // The Classic board doesn't move while Story is open; Story's progress rides along.
   const snap = await tab.evaluate(() => { save(); return __boredSnapshot(); });
   assert.deepEqual([snap.score, snap.lifeDex, snap.caught, snap.finished], [3, 2, 2, true]);
-  assert.deepEqual(snap.story, { year: 1, chapter: 0, regionsLiberated: 0, lifeDex: 2 });
+  assert.deepEqual(snap.story, { year: 1, chapter: 0, regionsLiberated: 0, lifeDex: 2, ranked: 100000002 });
   // Switching back: the Classic save is just as it was, and the Story save waits.
   await tab.evaluate(() => { showTitle(); go('switch'); });
   const back = await tab.evaluate(() => ({ slot, mode: S.mode || null, money: S.money, box: Object.keys(S.box), story: readSlot(STORY_KEY).mode, menu: [...document.querySelectorAll('#menu [data-go]')].map(b => b.textContent) }));
@@ -401,7 +401,7 @@ test('Story chapters: rows after the Champion that wait for what they need, scen
   assert.deepEqual(got.ch, { 't-1': 1 });
   assert.deepEqual(got.clue, { t: 1 });
   assert.deepEqual(got.after.map(x => [x.text, x.open]), [['Test onedone', true], ['Test twostory', true]]);
-  assert.deepEqual(got.snap, { year: 1, chapter: 1, regionsLiberated: 1, lifeDex: 2 });
+  assert.deepEqual(got.snap, { year: 1, chapter: 1, regionsLiberated: 1, lifeDex: 2, ranked: 100010002 });
   assert.deepEqual(got.bond, [1, null], 'only the party member that fought bonds');
   assert.equal(got.peak, 100);
   assert.deepEqual(errors, []);
@@ -456,7 +456,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
   assert.deepEqual(got.signatures, ['— Sssssnakes', '— Ssssssnakes', '— Sssssssnakes', '— Sssnakes'], 'a different number of s\u2019s every time');
   assert.ok(got.mail.indexOf('story-started') < got.mail.indexOf('story-snakes-end'), 'the last letter sits under Penguin\u2019s');
   assert.deepEqual(got.gens, [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 7], 'each admin team from its region\u2019s generation, the finale\u2019s all Generation 9');
-  assert.deepEqual(got.progress, { year: 1, chapter: 23, regionsLiberated: 9, lifeDex: got.progress.lifeDex });
+  assert.deepEqual(got.progress, { year: 1, chapter: 23, regionsLiberated: 9, lifeDex: got.progress.lifeDex, ranked: 100230000 + got.progress.lifeDex });
   assert.deepEqual(got.seen, [true, true, true, true]);
   assert.deepEqual(errors, []);
 });
@@ -768,5 +768,18 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
   assert.deepEqual([got.all, got.none], [true, true]);
   assert.deepEqual([got.y2, got.epi], [true, 1]);
   assert.equal(got.real, null, 'the real Story save is never made');
+  assert.deepEqual(errors, []);
+});
+
+test('Story\'s ranked number: progress always outranks the dex, and Year 3 counts regions liberated before chapters', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    const save = (year, ch, dex, lib = 0) => { const s = fresh(); s.mode = 'story'; s.story = { ...freshStory(), year };
+      CHAPTERS.slice(0, ch).forEach(c => { s.story.ch[c.id] = 1; }); for (let i = 1; i <= dex; i++) s.lifeDex[i] = 1;
+      if (lib) { s.story.ch = {}; CHAPTERS.filter(c => c.liberates).slice(0, lib).forEach(c => { s.story.ch[c.id] = 1; }); } return storyProgress(s).ranked; };
+    return { a: save(1, 3, 1025) < save(1, 4, 1), b: save(1, 23, 1025) < save(2, 0, 1), c: save(3, 9, 1025, 1) < save(3, 1, 1, 2), max: save(3, 23, 1025, 9) };
+  });
+  assert.deepEqual([got.a, got.b, got.c], [true, true, true]);
+  assert.ok(got.max < 400000000, 'fits the board\'s max_value');
   assert.deepEqual(errors, []);
 });
