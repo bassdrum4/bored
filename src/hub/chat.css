@@ -6,7 +6,8 @@
 .bored-chat-header strong {margin-right:auto}
 .bored-chat button {font:inherit;font-size:.8rem; color:inherit; background:transparent; border:1px solid currentColor; border-radius:3px; padding:.3rem .5rem; cursor:pointer}
 .bored-chat button:disabled {opacity:.5;cursor:default}
-#bored-chat-status,.bored-chat-note {font-size:.75rem;opacity:.8;margin:0;line-height:1.4}
+#bored-chat-status {font-size:.75rem;opacity:.8;margin:0;line-height:1.4}
+#bored-chat-status:empty {display:none}
 #bored-chat-list {flex:1; min-height:0;overflow:auto;overscroll-behavior:contain; padding:0 .3rem}
 .bored-chat-message {padding:.4rem 0;border-bottom:1px solid #8883;overflow-wrap:anywhere}
 .bored-chat-meta {font-size:.78rem}
