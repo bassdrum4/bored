@@ -49,7 +49,7 @@ export function createChat({verify,isAdmin,store,configured,moderateText=moderat
   function prune(){
     const now=Date.now();
     while(messages.length&&(messages.length>LIMIT||messages[0].at<now-DAY))messages.shift();
-    while(events.length>LIMIT*2)events.shift();
+    while(events.length>LIMIT*2||events[0]?.created<now-DAY)events.shift();
   }
   function frame(cursor){
     prune();
@@ -77,7 +77,7 @@ export function createChat({verify,isAdmin,store,configured,moderateText=moderat
     }
   }
   function publish(type,value){
-    events.push({seq:++seq,type,...value});prune();
+    events.push({seq:++seq,type,created:Date.now(),...value});prune();
     if(!flushTimer){flushTimer=setTimeout(flush,250);flushTimer.unref?.();}
   }
   function blocked(id,s){return Date.parse(s.bans[id]||'')>Date.now();}
@@ -126,14 +126,14 @@ export function createChat({verify,isAdmin,store,configured,moderateText=moderat
       if(blocked(a.id,s))return out(403,{error:'You are muted in chat.'});
       const text=cleanMessage(m.text),handle=cleanMessage(a.handle);
       if(!text||!handle)return out(400,{error:'Message or display name is not allowed. No links or personal contact details.'});
-      if(inflight.has(a.id)||inflight.size>=12)return out(429,{error:'Chat is busy. Try again.'});
+      if(inflight.has(a.id)||inflight.size>=12||!rate(rates,'global:send',120,60000))return out(429,{error:'Chat is busy. Try again.'});
       inflight.add(a.id);
       try{
-        if(!await moderateText(handle+': '+text))return out(422,{error:'Message did not pass moderation.'});
+        if(!await moderateText(text))return out(422,{error:'Message did not pass moderation.'});
         const current=await control();
         if(!current.enabled||blocked(a.id,current))return out(403,{error:'Chat is unavailable.'});
         const parent=messages.find(x=>x.id===m.reply);
-        const msg={id:randomUUID(),author:a.id,handle:a.handle,text,at:Date.now(),reply:parent?{id:parent.id,handle:parent.handle}:null};
+        const msg={id:randomUUID(),author:a.id,handle,text,at:Date.now(),reply:parent?{id:parent.id,handle:parent.handle}:null};
         messages.push(msg);publish('message',{message:publicMessage(msg)});return out(200,{ok:true,id:msg.id});
       }catch{return out(503,{error:'Moderation unavailable. Message not sent.'});}finally{inflight.delete(a.id);}
     }
