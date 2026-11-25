@@ -508,3 +508,47 @@ test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the
   assert.equal(got.megaT3, 3);
   assert.deepEqual(errors, []);
 });
+
+test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay Mode changes nothing that counts', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(`(${storyAllChamps})()`);
+  const got = await tab.evaluate(() => {
+    localStorage.setItem(KEY, JSON.stringify({ ...fresh(), box: { 1: { xp: 125, shiny: false } }, party: [1] }));
+    for (const c of CHAPTERS) S.story.ch[c.id] = 1;
+    S.story.epilogue = 1; S.story.picks = { 1: 249 }; S.charm = 1; S.box[249] = { xp: 1e6, shiny: false }; S.money = 777; save();
+    const core = () => { const x = JSON.parse(localStorage.getItem(STORY_KEY)); return JSON.stringify([x.box, x.story, x.money, x.balls, x.stones, x.party, x.lifeDex]); };   // not its timestamps
+    const main = core(), shinyBefore = localStorage.getItem(SHINY_KEY);
+    enter('battle'); viewR = 1; renderLocs();
+    const rows = () => [...document.querySelectorAll('#locs .loc')].map(b => ({ text: b.textContent, open: !b.disabled }));
+    const year2 = rows().find(x => x.text.startsWith('Year 2'));
+    const red = rows().find(x => x.text.startsWith('Mt. Silver'));
+    const ach = achs().filter(a => a.group === 'Story').map(a => [a.id, a.have()]);
+    showTitle();
+    const menu = [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go);
+    go('replay');
+    const inReplay = { slot, replay: S.replay, picks: { ...S.story.picks }, ch: Object.keys(S.story.ch).length, menu: [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go), snap: __boredSnapshot() };
+    // Play the Johto pick the other way: no catch, no money kept, the main save untouched.
+    enter('battle'); while (sceneNow) endScene();
+    S.box[999] = { xp: 1e6, shiny: true }; S.story.ch['johto-rival'] = 1; S.story.ch['johto-admin'] = 1; save();   // the replay starts every chapter over
+    startLoc({ kind: 'chapter', r: 1, x: 'johto-pick' }); while (sceneNow) endScene();
+    pickClick({ dataset: { pick: '250' } }); pickClick({ dataset: { pick: 'mine' } }); while (sceneNow) endScene();
+    B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next(); while (sceneNow) endScene();
+    const replayPick = { done: chDone('johto-pick'), caught: !!S.box[250] };
+    showTitle(); go('endreplay');
+    return { year2, red, ach, menu, inReplay, replayPick, after: { slot, gone: localStorage.getItem(REPLAY_KEY), same: core() === main, shiny: localStorage.getItem(SHINY_KEY) === shinyBefore },
+      classicAch: (slot = KEY, S = readSlot(KEY), achs().some(a => a.group === 'Story')), wiki: wikiSections().some(x => x.id === 'story'), classicMail: inbox().some(m => m.id === 'update-story-mode') };
+  });
+  assert.deepEqual(got.year2, { text: 'Year 2: The Huntcoming soon', open: false }, 'Year 2 shows, but YEAR2_READY is false');
+  assert.equal(got.red.open, true, 'Red can still be fought');
+  assert.deepEqual(got.ach.map(([, h]) => h), [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  assert.ok(got.menu.includes('replay'));
+  assert.deepEqual([got.inReplay.slot, got.inReplay.replay, got.inReplay.picks, got.inReplay.ch], ['bored.poke-idle.story.replay', 1, {}, 0]);
+  assert.ok(got.inReplay.menu.includes('endreplay') && !got.inReplay.menu.includes('new'));
+  assert.equal(got.inReplay.snap.caught, 1, 'the board still reports the Classic save');
+  assert.equal(got.inReplay.snap.story.chapter, 23, 'and the main Story save, not the replay');
+  assert.deepEqual(got.replayPick, { done: true, caught: false });
+  assert.deepEqual(got.after, { slot: 'bored.poke-idle.story', gone: null, same: true, shiny: true });
+  assert.equal(got.classicAch, false, 'no Story achievements in Classic');
+  assert.ok(got.wiki && got.classicMail);
+  assert.deepEqual(errors, []);
+});

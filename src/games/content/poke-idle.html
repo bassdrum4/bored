@@ -719,9 +719,9 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 // The real save (Classic), Story Mode's own save, and a separate slot for the test account (below). Which slot is
 // open is remembered in SLOT_KEY: "real", "story" or "test". Only the Classic save goes to the Bored account (sync,
 // below, reads KEY itself), and the leaderboard always reports Classic (see __boredSnapshot).
-const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", STORY_KEY = "bored.poke-idle.story", SLOT_KEY = "bored.poke-idle.slot";
-const SLOT_NAME = { [KEY]: "real", [TEST_KEY]: "test", [STORY_KEY]: "story" };
-let slot = (() => { try { const v = localStorage.getItem(SLOT_KEY); return v === "test" ? TEST_KEY : v === "story" ? STORY_KEY : KEY; } catch { return KEY; } })();
+const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", STORY_KEY = "bored.poke-idle.story", REPLAY_KEY = "bored.poke-idle.story.replay", SLOT_KEY = "bored.poke-idle.slot";
+const SLOT_NAME = { [KEY]: "real", [TEST_KEY]: "test", [STORY_KEY]: "story", [REPLAY_KEY]: "replay" };
+let slot = (() => { try { const v = localStorage.getItem(SLOT_KEY); return v === "test" ? TEST_KEY : v === "story" ? STORY_KEY : v === "replay" ? REPLAY_KEY : KEY; } catch { return KEY; } })();
 const setSlotPref = k => { try { localStorage.setItem(SLOT_KEY, SLOT_NAME[k]); } catch {} };
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
 const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, prestige: 0, lifeDex: {}, lifeShiny: {}, last: Date.now() });
@@ -1122,6 +1122,7 @@ function unlocked(loc) {
   const { kind, r, k } = loc;
   if (kind === "chapter") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
   if (isStory() && STORY_HIDDEN.has(kind)) return false;
+  if (kind === "year2") return YEAR2_READY && isStory() && !!S.story.epilogue && !S.replay;
   if (kind === "story") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
   if (kind === "summit") return isStory() ? chDone(SILVER_AFTER) : Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
@@ -1150,6 +1151,7 @@ function locName(loc) {
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
   if (loc.kind === "dungeon") return loc.x ? TRIP[loc.x].place : `${R.name} dungeon`;
+  if (loc.kind === "year2") return `Year 2: ${YEARS[2]}`;
   if (loc.kind === "chapter" || loc.kind === "story") return CHAPTER[loc.x] ? CHAPTER[loc.x].name : "Story";
   if (loc.kind === "summit") return "Mt. Silver";
   if (loc.kind === "darkest") return "Energy Plant";
@@ -1427,6 +1429,7 @@ function hofWin() {
 }
 function startLoc(loc) {
   if (loc.kind === "chapter") return runChapter(CHAPTER[loc.x]);
+  if (loc.kind === "year2") return void toast(`Year 2: ${YEARS[2]} isn't here yet.`);
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
@@ -1521,8 +1524,8 @@ function defeat() {
   if (f.wild && B.r === PLATES_FROM && Math.random() < 1 / PLATE_ODDS) text += gainPlates(1);
   const boss = ((f.wild && B.kind === "dungeon") || B.catchIt) && B.idx === B.queue.length - 1;
   if ((boss || (f.wild && f.shiny)) && S.set.manual && BALLS.some(b => S.balls[b.id] > 0)) { say(text); startManual(f, boss); return; }
-  if (boss) text += bossThrows(f);
-  else if (f.wild) {
+  if (boss) text += S.replay ? (B.bossCaught = true, " It's a replay: no catch, the chapter goes on.") : bossThrows(f);
+  else if (f.wild && !S.replay) {
     const ball = chooseBall(f);
     if (ball) {
       S.balls[ball.id]--;
@@ -1772,7 +1775,7 @@ const lineKey = n => familyOf(n)[0];
 function readShinyLines() { try { const v = JSON.parse(localStorage.getItem(SHINY_KEY)); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } }
 const lineRecorded = n => !!readShinyLines()[lineKey(n)];
 function recordShinyLines() {
-  if (!S || !S.box || S.test || slot === TEST_KEY) return;
+  if (!S || !S.box || S.test || S.replay || slot === TEST_KEY) return;
   const store = readShinyLines(); let added = false;
   for (const k of Object.keys(S.box)) if (S.box[k].shiny && !store[lineKey(+k)]) { store[lineKey(+k)] = 1; added = true; }
   if (added) try { localStorage.setItem(SHINY_KEY, JSON.stringify(store)); } catch {}
@@ -1963,6 +1966,7 @@ function renderLocs() {
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Sssssssnakes sits at the very top of each of those regions' lists.
   if (RIVAL_AT[r] && !isStory()) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
+  if (isStory() && S.story.epilogue && !S.replay) items.push({ kind: "year2", r, note: YEAR2_READY ? "begin" : "coming soon" });
   // Prof Penguin's Lab sits at the top of every list.
   const hofRow = HOF_READY && !isStory() ? { kind: "hof", r: HOF_R, note: !labBeaten() ? "after Prof Penguin" : `${RIVAL_NAME}, first graduate${hofWon() ? " · won" : ""}`, done: hofWon() } : null;
   if (!isStory()) items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
@@ -2253,6 +2257,9 @@ const ACH = [
   { id: "areazero", group: "Side quests", title: "Out of time", desc: "Catch all 20 Paradox Pokémon", need: PARADOX.length + PARADOX_LATE.length, have: () => [...PARADOX, ...PARADOX_LATE].filter(n => S.box[n]).length },
   ...[["early", "Shed skin", "Johto"], ["mid", "Coiled", "Unova"], ["late", "Top of the food chain", "Galar"]]
     .map(([id, title, at]) => ({ id: "rival-" + id, group: "Rival", title, desc: `Beat ${RIVAL_NAME} in ${at}`, need: 1, have: () => rivalWon(id) ? 1 : 0 })),
+  ...REGIONS.map((R, r) => ({ id: "story-" + R.name.toLowerCase(), group: "Story", story: true, title: R.name + " thawed", desc: `Finish ${R.name}'s Year 1 chapters, legend and all`, need: 1,
+    have: () => chDone(r === 8 ? "paldea-pick" : LEGENDS[r]) ? 1 : 0 })),
+  { id: "story-year1", group: "Story", story: true, title: "The Long Freeze", desc: "Clear Year 1: beat Red on Mt. Silver", need: 1, have: () => S.story && S.story.epilogue ? 1 : 0 },
   { id: "graduation", group: "Prof Penguin", title: "Graduation", desc: "Beat Prof Penguin's final showdown", need: 1, have: () => S.beat ? 1 : 0 },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
@@ -2278,9 +2285,11 @@ const ACH = [
   const at = ACH.map((a, i) => a.group === "Side quests" ? i : -1).filter(i => i >= 0), sorted = at.map(i => ACH[i]).sort((a, b) => rank(a) - rank(b));
   at.forEach((i, j) => { ACH[i] = sorted[j]; });
 }
+// The Story group only shows in Story saves.
+const achs = () => ACH.filter(a => !a.story || isStory());
 function checkAch(quiet) {
   if (!S || !S.ach) return [];
-  const now = Date.now(), got = ACH.filter(a => !S.ach[a.id] && a.have() >= a.need);
+  const now = Date.now(), got = achs().filter(a => !S.ach[a.id] && a.have() >= a.need);
   for (const a of got) S.ach[a.id] = now;
   if (!got.length) return got;
   const msg = got.length === 1 ? `Achievement: ${got[0].title}` : `${got.length} achievements: ${got.map(a => a.title).join(", ")}`;
@@ -2290,10 +2299,10 @@ function checkAch(quiet) {
 }
 function renderAch() {
   if (!S) return;
-  const done = ACH.filter(a => S.ach[a.id]).length;
-  $("#achsum").innerHTML = `<b>${done}/${ACH.length}</b> earned. Just for show: they don't change the game.`;
+  const done = achs().filter(a => S.ach[a.id]).length;
+  $("#achsum").innerHTML = `<b>${done}/${achs().length}</b> earned. Just for show: they don't change the game.`;
   let html = "", group = null;
-  for (const a of ACH) {
+  for (const a of achs()) {
     if (a.group !== group) { group = a.group; html += `<div class="ach-group">${esc(group)}</div>`; }
     const at = S.ach[a.id], have = Math.min(a.have(), a.need);
     html += `<div class="ach${at ? " got" : ""}"><span><b>${esc(a.title)}</b> · ${esc(a.desc)}</span>` +
@@ -2310,6 +2319,12 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "update-story-mode", story: true, date: "Nov 25, 2026", from: "Prof Penguin", title: "Story Mode, Year 1",
+    body: `<ul><li><b>New game</b> now asks: Classic or <b>Story</b>. Each has its own save, and you switch between them on the title screen. Your Classic save stays as it is.</li>
+      <li>Year 1 is <b>The Long Freeze</b>. Snow in Kanto three weeks early, legends waking up, and a cheerful outfit called Team Thaw that always seems to get there first.</li>
+      <li>Story has ×2 XP and ×2 shinies, your shiny lines carry over from Classic, and there's no prestige. Its gyms and Champions follow League rules: no Tier 0 to 2, one Tier 3, two Tier 4s.</li>
+      <li>After each Champion come the chapters: Team Thaw's admins, Sssssssnakes, and a legend to catch (pick one of two; the other goes elsewhere). The Story tab keeps every scene and clue.</li>
+      <li>Beat Red after the finale and you can replay Year 1, other picks and all, without touching your save. The Wiki's Story Mode page has the details.</li></ul>` },
   { id: "story-started", chapter: true, date: "Year 1", from: "Prof Penguin", title: "It's started",
     body: `<p>It's started. Go.</p>` },
   { id: "story-memo", chapter: true, date: "Year 1", from: "(no sender)", title: "INTERNAL",
@@ -2590,6 +2605,12 @@ function wikiSections() {
       <p>The ace is a Mega Hydrapple nobody else has: ${HOF_ACE.types.join("/")}, HP ${HOF_ACE.hp}, Attack ${HOF_ACE.atk}, Defense ${HOF_ACE.def}, Sp. Atk ${HOF_ACE.spa}, Sp. Def ${HOF_ACE.spd}, Speed ${HOF_ACE.spe} (${HOF_ACE.bst}). Gigantamax Sandaconda has a Gigantamax's doubled HP.</p>
       <p>It's set the way Prof Penguin's phase 2 is: the best six of every tier (Eternamax, one Mega, one Gigantamax), with every matchup counted as 1×, at the cap with a quarter of your Protein, would need ${pct(HOF_USE)} of the clock idling, where his phase 2 needs ${pct(FINAL_USE)}. It's harder than his phase 2: you know the team ahead, so bring one built on its weaknesses (Ice hits half of it four times over). Even the best of those, with a quarter of your Protein, only just wins idling; more Protein or a few taps give you room.</p>
       <p>Win the first time for the SP Mega Hydrapple: ${SPECIALS[HOF_SP].types.join("/")}, Tier 2, total ${SPECIALS[HOF_SP].bst}, a permanent Mega that doesn't take your Mega slot. A prestige resets the Hall of Fame; the SP comes with you.</p>` }] : []),
+    { id: "story", group: "Story Mode", title: "Story Mode: Year 1", html: `<p><b>New game</b> asks Classic or Story. Story has its own save on this device (not in your Bored account yet), and the title screen switches between the two. Starting one over never touches the other.</p>
+      <p><b>Rules.</b> XP ×${STORY_XP} and shinies ×${STORY_SHINY} (1 in ${4096 / STORY_SHINY}; the Shiny Charm's ×3 on top). No prestige. Shiny lines are shared with Classic: the first catch of a line you've had shiny in either mode comes out shiny. A Pokémon below the highest level it ever reached gets ×${REMEMBER} XP until it's back there (❄ in Party &amp; Box); in Story that replaces the catch-up bonus.</p>
+      <p><b>League rules</b>, for Story's gyms and Champions: no Tier 0, 1 or 2, at most one Tier 3 and at most two Tier 4s. Mascot legends and Mega pseudo forms are both Tier 3. A party that breaks them gets a notice that loads a saved team that fits.</p>
+      <p><b>Chapters</b> come after each Champion: in Johto, Unova and Galar ${RIVAL_NAME} first, then a Team Thaw admin (a little harder than the Champion, at the Champion's level cap), then the legend: Mewtwo in Kanto, and a pick of two everywhere else. You catch it the usual way; if it gets away, try again from the list. Prizes: ${CHAPTERS.filter(c => c.prize && c.prize.stone).map(c => REGIONS[c.r].name).join(", ")} give Mega pseudo stones, the others a Master Ball, and Prof Penguin gives you a Key Stone after Kanto. Alola has an optional rescue.</p>
+      <p><b>The finale</b>, in Paldea: all three admins in a row at Lv 100, ${FINAL_TIME}s each with a ${FINAL_BREAK}s break to change your party between them. Run out of time anywhere and it starts over. It opens after every other region's legend and ${FINALE_DEX} Pokémon in your Story dex. Then Paldea's pick, and Red on Mt. Silver for the Shiny Charm.</p>
+      <p><b>The Story tab</b> keeps every scene you've seen, to read again, and the clues you've found. <b>Replay Year 1</b> (title screen, after Red) plays the chapters again with a copy of your Box, for the story and the other picks: nothing in it is caught or counts, and it's thrown away when you end it. Year 2 is coming.</p>` },
     { id: "rival", group: "Side quests", title: `Rival ${RIVAL_NAME}`, html: `<p>${RIVAL_NAME} was the first trainer ever to beat Poké Idle, and now an optional rival: one fight each in Johto, Unova and Galar, at the top of that region's list once its Champion is beaten.</p>
       <ul>${RIVALS.map(x => `<li><b>${REGIONS[x.r].name}</b> (after ${REGIONS[x.r].champ}): ${x.team.map(m => m.name).join(", ")}, at Lv ${Math.min(100, champLevel(x.r) + CAP_OVER)}.</li>`).join("")}</ul>
       <p>Each one uses that Champion's rules: your party is held to the Champion's level cap, the clock starts at ${CHAMP_TIME}s and moves with the team's Attack and Speed (−20% to +20%) and your party's bulk, and the fight is set against the best six that region offers. It's a little harder: that team, with a quarter of your Protein (see Tiers), needs ${pct(RIVAL_USE)} of the clock idling where a Champion needs ${pct(BOSS_USE)}. A little more Protein, or a few taps, makes up the difference.</p>
@@ -3076,7 +3097,9 @@ function migrateSave() {
 // its Champion. A chapter has a type (scene, admin, legend, rival, pick, finale), what it waits for (after: "champ" or
 // other chapter ids) and scenes before and after (pre, post). S.story.ch keeps the ones you've finished.
 const STORY_XP = 2, STORY_SHINY = 2, REMEMBER = 2;
-const YEARS = { 1: "The Long Freeze" };
+const YEARS = { 1: "The Long Freeze", 2: "The Hunt" };
+// Year 2 is built later. Until YEAR2_READY, its row shows (after Red) but can't be started, and nothing resets.
+const YEAR2_READY = false;
 const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
@@ -3092,6 +3115,21 @@ function newGame(k) {
   try { localStorage.removeItem(k); } catch {}
   S = null; B = null; showPick();
 }
+// Replay Year 1, after Red: a copy of your Story Box and teams in its own slot (REPLAY_KEY), every gym and Champion
+// done and every chapter open again, so you can play the story and the other mascot picks. Chapter fights hold the
+// party to that Champion's level cap and the League rules apply. Nothing in it counts: no catches, no shiny lines,
+// nothing for the leaderboard, and the whole slot is thrown away when you end it.
+function startReplay() {
+  const m = S; save();
+  const copy = o => JSON.parse(JSON.stringify(o || {})), R = fresh();
+  Object.assign(R, { mode: "story", replay: 1, story: { ...freshStory(), seen: { ...m.story.seen }, clues: { ...m.story.clues } }, box: copy(m.box), party: m.party.slice(), teams: copy(m.teams || []),
+    stones: { ...m.stones }, gfactor: { ...m.gfactor }, key: m.key, band: m.band, mega: m.mega, gmax: m.gmax, set: { ...m.set }, lifeDex: { ...m.lifeDex }, tut: { seen: {}, off: 1 }, items: { ...m.items }, full: 1 });
+  REGIONS.forEach((_, r) => { R.champs[r] = 1; for (let k = 0; k < 4; k++) { R.badges[r + "-" + k] = 1; R.kills[r + "-" + k] = KILLS_FOR_GYM; } });
+  R.loc = { kind: "route", r: 0, k: 3 };
+  slot = REPLAY_KEY; setSlotPref(REPLAY_KEY); S = R; save(); boot();
+  titleMsg = "Replay started: every Year 1 chapter is open again. Nothing in it counts."; renderTitle();
+}
+function endReplay() { try { localStorage.removeItem(REPLAY_KEY); } catch {} S = null; B = null; useSlot(STORY_KEY); }
 function startStory() { S.mode = "story"; S.story = freshStory(); for (const id of preSeen.splice(0)) S.story.seen[id] = 1; }
 // Tracking from day one, in both modes, for the years to come: from (the region a Pokémon was caught in), bond (it won
 // a battle in the active party) and peak (the highest level it ever reached).
@@ -3447,7 +3485,7 @@ function chapterRows(r) {
 function runChapter(c) {
   if (!c || !(chapterOpen(c) || chDone(c.id))) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
-  if (chDone(c.id) && c.type !== "scene") { playScene(c.pre, () => playScene(c.post)); return; }
+  if (chDone(c.id) && c.type !== "scene" && c.type !== "red") { playScene(c.pre, () => playScene(c.post)); return; }
   const go = CHAPTER_RUN[c.type];
   playScene(c.pre, () => go ? go(c) : finishChapter(c));
 }
@@ -3558,6 +3596,7 @@ const HOW = [
   "Speed sets how often each Pokémon hits, and your party's HP, Defense and Sp. Def stretch the timer in boss fights.",
   "Beat Steven for a Key Stone: each region's dungeon then drops its own generation's Mega Stones. Beat Leon for a Dynamax Band and win Gigantamax in Galar's Max Raid Den.",
   "Drag Pokémon in Party & Box to rearrange your team or swap someone in from the Box.",
+  "New game asks Classic or Story. Story Mode has its own save, chapters after each Champion and its own rules: the Wiki's Story Mode page has them.",
   "Someone waits on Mt. Silver once every Champion is beaten, and the Battle Tower opens after Paldea. The Wiki tab has every rule, plus a Pokédex of every Pokémon."
 ];
 // ── Test account. Hold, hold, tap, tap, tap on the title screen's "Poké Idle" (Morse --...: a hold is 350ms or
@@ -3607,8 +3646,9 @@ $("#testdoor").onsubmit = e => {
   else $("#testmsg").textContent = "That's not it.";
 };
 function renderTitle() {
-  const other = otherSlot(), items = MENU[S ? "save" : "fresh"].concat(slot === TEST_KEY ? [["back", "Back to my save"]] : other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []);
-  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
+  const other = otherSlot(), items = MENU[S ? "save" : "fresh"].filter(([id]) => !(slot === REPLAY_KEY && id === "new")).concat(slot === TEST_KEY ? [["back", "Back to my save"]] : slot === REPLAY_KEY ? [["endreplay", "End the replay"]]
+    : [...(other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []), ...(isStory() && S.story.epilogue ? [["replay", readSlot(REPLAY_KEY) ? "Back to the replay" : "Replay Year 1"]] : [])]);
+  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === REPLAY_KEY ? "Replaying Year 1. Nothing here counts, and it's thrown away when you end it." : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
   $("#t-prest").hidden = !(S && S.prestige); $("#t-prest").textContent = S && S.prestige ? "P" + S.prestige : ""; $("#t-prest").title = S && S.prestige ? "Prestige " + S.prestige : "";
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
@@ -3633,7 +3673,7 @@ function saveCard() {
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
     ...(isStory() ? [["Story", `Year ${S.story.year}: ${YEARS[S.story.year]}, ${chaptersDone()} of ${CHAPTERS.length} chapters`], ["Story dex", `${lifeDex()} ever caught`]] : []),
     ...(!isStory() && (S.prestige || S.beat) ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${achs().filter(a => S.ach[a.id]).length} of ${achs().length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "") +
@@ -3646,6 +3686,8 @@ function go(id) {
   if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail" || id === "ach") return enter(id);
   if (id === "back") return useSlot(KEY);
   if (id === "switch" && otherSlot()) return useSlot(otherSlot());
+  if (id === "replay" && isStory()) return readSlot(REPLAY_KEY) ? useSlot(REPLAY_KEY) : startReplay();
+  if (id === "endreplay") return endReplay();
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
   panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();
   if (panel === "load") $("#t-code").focus();
@@ -3727,7 +3769,7 @@ function syncText() {
   if (SYNC.state === "start") return "Checking your Bored account…";
   if (!SYNC.acct) return "Sign in to Bored and your save follows you to any device.";
   if (slot === TEST_KEY) return "The test account stays on this device; your own save is in your Bored account.";
-  if (slot === STORY_KEY) return "Story Mode stays on this device for now. Your Classic save is the one in your Bored account.";
+  if (slot === STORY_KEY || slot === REPLAY_KEY) return "Story Mode stays on this device for now. Your Classic save is the one in your Bored account.";
   if (SYNC.ask) return "Two different saves: pick the one to keep.";
   if (syncTheirs(localSave() && localSave().s)) return "This save belongs to another Bored account on this browser, so it stays on this device.";
   if (SYNC.error) return "Couldn't reach your Bored account. Trying again.";
@@ -3883,6 +3925,7 @@ syncBoot();
 // Story's own progress rides along in story ({ year, chapter, regionsLiberated, lifeDex }) for the Story board to come.
 window.__boredSnapshot = () => {
   if (slot === STORY_KEY) return classicSnapshot(readSlot(KEY), S);
+  if (slot === REPLAY_KEY) return classicSnapshot(readSlot(KEY), readSlot(STORY_KEY));
   const day = bossDay().date, boss = { date: day, won: !!(S && S.daily && S.daily.date === day && S.daily.won) };
   if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, lifeDex: 0, badges: 0, tower: 0, prestige: 0, ranked: 0, boss: { date: day, won: false }, finished: false };
   if (S) recordLife();
