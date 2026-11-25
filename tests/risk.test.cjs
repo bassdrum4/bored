@@ -239,6 +239,26 @@ test('Bored Together deploys each seat in turn before the first real turn',()=>{
   assert.equal(state.reserves,3,'later turns are ordinary income only');
 });
 
+test('Bored Together conceals enemy opening troop counts without altering ownership or solo play',()=>{
+  const state={phase:'SETUP'};
+  const context=vm.createContext({state,ONLINE:{},myPlayerIndex:1});
+  vm.runInContext(['riskOpeningArmiesHidden','riskArmyLabel'].map(functionSource).join('\n'),context);
+  const label=(owner,armies)=>vm.runInContext('riskArmyLabel('+owner+','+armies+')',context);
+  assert.equal(label(0,19),'?');
+  assert.equal(label(1,12),12);
+  assert.equal(label(-1,0),0);
+  context.myPlayerIndex=0;
+  assert.equal(label(0,19),19);
+  assert.equal(label(1,12),'?');
+  state.phase='REINFORCE';
+  assert.equal(label(1,12),12);
+  state.phase='SETUP'; context.ONLINE=null;
+  assert.equal(label(1,12),12);
+  assert.match(html,/ctx\.fillText\(riskArmyLabel\(t\.owner, t\.armies\), x, y\)/);
+  assert.match(html,/\$\{riskArmyLabel\(t\.owner, t\.armies\)\}/);
+  assert.match(html,/\$\{riskArmyLabel\(i, armies\)\}/);
+});
+
 test('Risk only scores finished human world conquest',()=>{
   assert.match(html, /return \{slug:"risk", turns, won, finished:state\?\.phase === "GAME_OVER", cpu:true\}/);
   assert.match(html, /Object\.values\(state\.territories \|\| \{\}\)\.every\(t => t\.owner === 0\)/);
