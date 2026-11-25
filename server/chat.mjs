@@ -1,6 +1,18 @@
 import {randomUUID,createHash} from 'node:crypto';
 import {UUID} from './core.mjs';
 const DAY=86400000, LIMIT=200, BATCH=50;
+// Modern Supabase server keys are opaque API keys, not bearer JWTs.
+export function createChatStore(url,key,fetcher=fetch){
+  if(typeof key!=='string'||!/^sb_secret_\S+$/.test(key))return null;
+  return async(action,args)=>{
+    const r=await fetcher(url+'/rest/v1/rpc/bored_chat_control',{
+      method:'POST',headers:{apikey:key,'content-type':'application/json'},
+      body:JSON.stringify({action,args}),signal:AbortSignal.timeout(8000),redirect:'error'
+    });
+    if(!r.ok)throw Error('Chat storage unavailable');
+    return r.json();
+  };
+}
 export function cleanMessage(raw){
   if(typeof raw!=='string')return '';
   const s=raw.normalize('NFKC').replace(/[\p{Cf}\p{Cc}]/gu,' ').trim().replace(/\s+/g,' ');
