@@ -2234,6 +2234,9 @@ function buy(id, q) {
 // what it has already done without a pile of toasts.
 const dexCount = () => Object.keys(S.box).length, shinyCount = () => Object.values(S.box).filter(b => b.shiny).length;
 const topLevel = () => Math.max(1, ...Object.keys(S.box).map(Number).map(level));
+// A Story achievement: earned only in a Story save, from its story block.
+const storyAch = (id, title, type, desc, when, more = {}) => ({ id, group: "Story", story: true, type, title, desc, need: 1,
+  have: () => isStory() && S.story && when(S.story) ? 1 : 0, ...more });
 const ACH = [
   ...[[2, "First catch", "Catch a Pokémon"], [10, "Collector", "10 in your Pokédex"], [50, "Getting serious", "50 in your Pokédex"], [100, "Triple digits", "100 in your Pokédex"],
     [250, "Quarter way", "250 in your Pokédex"], [500, "Halfway there", "500 in your Pokédex"], [750, "Nearly there", "750 in your Pokédex"], [1025, "Gotta catch 'em all", "Every Pokémon, all 1025"]]
@@ -2280,9 +2283,32 @@ const ACH = [
   { id: "areazero", group: "Side quests", title: "Out of time", desc: "Catch all 20 Paradox Pokémon", need: PARADOX.length + PARADOX_LATE.length, have: () => [...PARADOX, ...PARADOX_LATE].filter(n => S.box[n]).length },
   ...[["early", "Shed skin", "Johto"], ["mid", "Coiled", "Unova"], ["late", "Top of the food chain", "Galar"]]
     .map(([id, title, at]) => ({ id: "rival-" + id, group: "Rival", title, desc: `Beat ${RIVAL_NAME} in ${at}`, need: 1, have: () => rivalWon(id) ? 1 : 0 })),
-  ...REGIONS.map((R, r) => ({ id: "story-" + R.name.toLowerCase(), group: "Story", story: true, title: R.name + " thawed", desc: `Finish ${R.name}'s Year 1 chapters, legend and all`, need: 1,
-    have: () => chDone(r === 8 ? "paldea-pick" : LEGENDS[r]) ? 1 : 0 })),
-  { id: "story-year1", group: "Story", story: true, title: "The Long Freeze", desc: "Clear Year 1: beat Red on Mt. Silver", need: 1, have: () => S.story && S.story.epilogue ? 1 : 0 },
+  // Story Mode (Story saves only). type: story, discovery and choice show as usual; hidden shows as "???" until it's
+  // earned; secret isn't listed at all until then (the group says "+N secret"). replayOk ones can also be earned
+  // through Replay Mode. Year 2 and 3 add theirs here when they ship.
+  storyAch("st_start", "One Pokémon and a Notebook", "story", "Start a Story save", () => true),
+  storyAch("st_badge", "Stay Safe Out There", "discovery", "Find the melting-snowflake badge clue", st => st.clues.badge),
+  storyAch("st_reread", "Write It Down", "discovery", "Reread a scene from the Story tab", st => st.reread),
+  storyAch("st_mewtwo", "Containment Variance", "story", "Catch Mewtwo in the Kanto chapter", () => chDone("kanto-legend")),
+  storyAch("st_r1", "Better Coffee", "story", "Beat Sssssssnakes in Johto", () => chDone("johto-rival")),
+  storyAch("st_grounded", "Grounded", "story", "Finish the Johto legend chapter", () => chDone("johto-pick")),
+  storyAch("st_clash", "For Science", "story", "Finish the Hoenn legend chapter", () => chDone("hoenn-pick")),
+  storyAch("st_he", "He Always Did", "hidden", "Hear what Rime says about your pick in Sinnoh", st => st.seen["sinnoh-483"] || st.seen["sinnoh-484"]),
+  storyAch("st_r2", "Good Scouting", "story", "Beat Sssssssnakes in Unova", () => chDone("unova-rival")),
+  storyAch("st_list", "Someone Wrote the List", "story", "Get Prof Penguin's chart of the freeze in Kalos", () => !!S.mail.got["story-kalos"]),
+  storyAch("st_memo1", "Paper Trail", "story", "Find Memo #1 in Alola", st => st.clues.memo),
+  storyAch("st_null", "Unit 1", "discovery", "Free Type: Null at Aether Paradise", st => st.silvally >= 1),
+  storyAch("st_silvally", "No More Mask", "discovery", "Earn Type: Null's trust until it evolves", st => st.silvally === 2),
+  storyAch("st_r3", "If They're Lying", "story", "Beat Sssssssnakes in Galar", () => chDone("galar-rival")),
+  storyAch("st_started", "It's Started", "story", "Win the Paldea finale", () => chDone("paldea-finale")),
+  storyAch("st_red", "…", "story", "Beat Red on Mt. Silver", () => chDone("johto-silver")),
+  storyAch("st_y1", "Two Words", "story", "Clear Year 1", st => st.epilogue),
+  storyAch("ch_lugia", "Of Course You'd Pick the Cold", "choice", "Pick Lugia in Johto", st => st.pickLinesSeen["johto-249"], { replayOk: true }),
+  storyAch("ch_hooh", "We'll Need It", "choice", "Pick Ho-Oh in Johto", st => st.pickLinesSeen["johto-250"], { replayOk: true }),
+  storyAch("ch_dialga", "Time, Like Him", "choice", "Pick Dialga in Sinnoh", st => st.pickLinesSeen["sinnoh-483"], { replayOk: true }),
+  storyAch("ch_palkia", "Space, Unlike Him", "choice", "Pick Palkia in Sinnoh", st => st.pickLinesSeen["sinnoh-484"], { replayOk: true }),
+  storyAch("ch_both", "Both Halves", "choice", "See both picks of one region (your save and Replay count)", st => pickChapters().some(c => c.mons.every(n => st.pickLinesSeen[pickLine(c, n)])), { replayOk: true }),
+  storyAch("ch_every", "Every Version", "choice", "See both picks in all eight regions", st => pickChapters().every(c => c.mons.every(n => st.pickLinesSeen[pickLine(c, n)])), { replayOk: true }),
   { id: "graduation", group: "Prof Penguin", title: "Graduation", desc: "Beat Prof Penguin's final showdown", need: 1, have: () => S.beat ? 1 : 0 },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
@@ -2310,8 +2336,13 @@ const ACH = [
 }
 // The Story group only shows in Story saves.
 const achs = () => ACH.filter(a => !a.story || isStory());
+// Shown in the count: every type but secret.
+const achCounted = () => achs().filter(a => a.type !== "secret");
 function checkAch(quiet) {
   if (!S || !S.ach) return [];
+  // Replay gives no achievements: its save is thrown away. The replayOk ones come to the main save from what the
+  // replay records there (story.pickLinesSeen), the next time it opens.
+  if (S.replay) return [];
   const now = Date.now(), got = achs().filter(a => !S.ach[a.id] && a.have() >= a.need);
   for (const a of got) S.ach[a.id] = now;
   if (!got.length) return got;
@@ -2322,13 +2353,20 @@ function checkAch(quiet) {
 }
 function renderAch() {
   if (!S) return;
-  const done = achs().filter(a => S.ach[a.id]).length;
-  $("#achsum").innerHTML = `<b>${done}/${achs().length}</b> earned. Just for show: they don't change the game.`;
+  const counted = achCounted(), done = counted.filter(a => S.ach[a.id]).length;
+  $("#achsum").innerHTML = `<b>${done}/${counted.length}</b> earned. Just for show: they don't change the game.`;
   let html = "", group = null;
   for (const a of achs()) {
-    if (a.group !== group) { group = a.group; html += `<div class="ach-group">${esc(group)}</div>`; }
-    const at = S.ach[a.id], have = Math.min(a.have(), a.need);
-    html += `<div class="ach${at ? " got" : ""}"><span><b>${esc(a.title)}</b> · ${esc(a.desc)}</span>` +
+    const at = S.ach[a.id];
+    if (a.group !== group) {
+      group = a.group;
+      const secret = achs().filter(x => x.group === group && x.type === "secret" && !S.ach[x.id]).length;
+      html += `<div class="ach-group">${esc(group)}${secret ? ` <span class="muted small">+${secret} secret</span>` : ""}</div>`;
+    }
+    // A secret one isn't listed until it's earned; a hidden one is "???" until then.
+    if (a.type === "secret" && !at) continue;
+    const veiled = a.type === "hidden" && !at, have = Math.min(a.have(), a.need);
+    html += `<div class="ach${at ? " got" : ""}"><span><b>${veiled ? "???" : esc(a.title)}</b> · ${veiled ? "Keep playing." : esc(a.desc)}</span>` +
       (at ? `<span class="when">${new Date(at).toLocaleDateString()}</span>` : `<span><span class="count" style="display:block">${fmt(Math.floor(have))} / ${fmt(a.need)}</span><span class="bar"><i style="width:${100 * have / a.need}%"></i></span></span>`) + `</div>`;
   }
   $("#achlist").innerHTML = html;
@@ -2662,6 +2700,7 @@ function wikiSections() {
       <p><b>Chapters</b> come after each Champion: in Johto, Unova and Galar ${RIVAL_NAME} first, then a Team Thaw admin (a little harder than the Champion, at the Champion's level cap), then the legend: Mewtwo in Kanto, and a pick of two everywhere else. You catch it the usual way; if it gets away, try again from the list. Prizes: ${CHAPTERS.filter(c => c.prize && c.prize.stone).map(c => REGIONS[c.r].name).join(", ")} give Mega pseudo stones, the others a Master Ball, and Prof Penguin gives you a Key Stone after Kanto. Alola has an optional chapter, The Mask: free a Type: Null, then win 10 battles with it in your party (its detail shows Trust: X/10) and it evolves into Silvally.</p>
       <p><b>The finale</b>, in Paldea: all three admins in a row at Lv 100, ${FINAL_TIME}s each with a ${FINAL_BREAK}s break to change your party between them. Run out of time anywhere and it starts over. It opens after every other region's legend and ${FINALE_DEX} Pokémon in your Story dex. Then Paldea's pick, and Red on Mt. Silver for the Shiny Charm.</p>
       <p><b>The Story tab</b> keeps every scene you've seen, to read again, and the clues you've found. <b>Replay Year 1</b> (title screen, after Red) plays the year again from Kanto with a copy of your Box, at Year 1's level caps, for the story and the other picks: nothing in it is caught or counts, and it's thrown away when you end it. Year 2 is coming.</p>
+      <p><b>Achievements.</b> Story saves have their own group: ${ACH.filter(a => a.story && ["story", "discovery", "choice"].includes(a.type)).map(a => `${esc(a.title)} (${esc(a.desc)})`).join("; ")}. There are hidden achievements.</p>
       <p><b>Levels.</b> In Story a Pokémon above the level cap fights at the cap, shown as "Lv 90 (fights at 24)", and gains no XP until the cap passes it. The cap is in the party header.</p>` },
     { id: "rival", group: "Side quests", title: `Rival ${RIVAL_NAME}`, html: `<p>${RIVAL_NAME} was the first trainer ever to beat Poké Idle, and now an optional rival: one fight each in Johto, Unova and Galar, at the top of that region's list once its Champion is beaten.</p>
       <ul>${RIVALS.map(x => `<li><b>${REGIONS[x.r].name}</b> (after ${REGIONS[x.r].champ}): ${x.team.map(m => m.name).join(", ")}, at Lv ${Math.min(100, champLevel(x.r) + CAP_OVER)}.</li>`).join("")}</ul>
@@ -2686,7 +2725,7 @@ function wikiSections() {
     { id: "regional", group: "Collection", title: "Regional forms", html: `<p>${VARIANTS.length} regional forms live in their own regions: Alolan in Alola, Galarian in Galar, Paldean in Paldea, and Hisuian in Sinnoh, which was Hisui long ago. They turn up on that region's routes like any wild Pokémon; Galarian Articuno, Zapdos and Moltres are among the Galar dungeon's legendaries.</p><p>A form belongs to its species, so catching an Alolan Rattata gives you Rattata (if you didn't have it) with its Alolan form, and picking the form in the detail keeps its level. Evolving the usual Pokémon inside a regional form's region gives that form, Pikachu into Alolan Raichu in Alola for one, and each form evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone. Forms aren't Pokédex entries, so they don't change your leaderboard score. Pokédex → Forms shows which you have.</p>` },
     { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm, and each prestige doubles that, up to ×${PRESTIGE_SHINY_MAX} (see Prestige). Shinies go by evolution line: once you have a shiny of any stage, every member of its line you have is shiny, branches included (all of Eevee's), and any you get later comes out shiny too. A look you picked stays: an SP edition stays SP. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>Your lifetime Pokédex: one point for every species this save has ever had and one more for each one it's ever had shiny, up to 2050. A prestige keeps it, so it never goes down. It posts to the arcade board when you're signed in.</p>` },
-    { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
+    { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.filter(a => !a.story).length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
     { id: "mail", group: "Collection", title: "Mail", html: `<p>Update notes and gifts arrive in the Mail tab; the tab and the title screen show how many are new. Each gift can be claimed once per save, between battles.</p>` },
     { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Signed in on Bored, it also goes to your Bored account: at most once a minute while you play, and whenever you leave or switch tabs. Open Poké Idle on another device and it picks up where you left off. If two devices both played since they last met (two tabs at once, or one offline), you choose which save to keep. The test account never leaves the device.</p><p>Without an account, Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases your save (in your account too, when you're signed in), so copy the code first if you might want it back.</p>` }
   ];
@@ -3161,7 +3200,7 @@ const otherSlot = () => ({ [KEY]: STORY_KEY, [STORY_KEY]: KEY, [TEST_KEY]: TEST_
 // The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). silvally: 0 not
 // freed, 1 freed (Type: Null, its trust in nullTrust, up to TRUST_NEED), 2 evolved. The fields after epilogue are
 // reserved for the years to come and stay unused in Year 1, so later years need no migration.
-const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, nullTrust: 0, lifeDex: {}, epilogue: 0,
+const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, nullTrust: 0, lifeDex: {}, epilogue: 0, reread: 0, pickLinesSeen: {},
   liberated: {}, frozen: {}, eternatusStolen: 0, y3Recovered: 0, cleared: {}, giratinaDebt: 0, roulette: null });
 let newFor = null, pickFrom = null;
 // New game in a mode: that slot is emptied and the starter screen opens for it. Back to title goes back to the save
@@ -3581,10 +3620,10 @@ function storyWin() {
 // then it's the main Story save, once ever (story.replayGot). The list is empty in Year 1. Year 3 adds one: knocking out
 // Prof Penguin's Giratina with your own Origin Giratina in a replay of the Year 3 finale (a secret achievement, a hidden
 // letter and the Griseous Orb SP look).
-const REPLAY_REWARDS = new Set();
+const REPLAY_REWARDS = new Set(), REPLAY_PREFIXES = ["pickline:"];
 function storyReward(id, give) {
   if (!S.replay) return give(S), true;
-  if (!REPLAY_REWARDS.has(id)) return false;
+  if (!REPLAY_REWARDS.has(id) && !REPLAY_PREFIXES.some(p => id.startsWith(p))) return false;
   const main = readSlot(STORY_KEY); if (!main || !main.story || (main.story.replayGot || {})[id]) return false;
   give(main); main.story.replayGot = { ...(main.story.replayGot || {}), [id]: 1 };
   try { localStorage.setItem(STORY_KEY, JSON.stringify(main)); } catch {}
@@ -3620,7 +3659,7 @@ function renderPick() {
 function pickClick(b) {
   const v = b.dataset.pick, c = pickNow.c;
   if (v === "later") { pickNow = null; $("#scene").hidden = true; return; }
-  if (v === "mine") { const n = pickNow.n; pickNow = null; $("#scene").hidden = true; S.story.picks[c.r] = n; save(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
+  if (v === "mine") { const n = pickNow.n; pickNow = null; $("#scene").hidden = true; S.story.picks[c.r] = n; notePickLine(c, n); save(); checkAch(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
   pickNow.n = +v; renderPick();
 }
 // ── The League rules, for Story's gyms and Champions: no Tier 0 to 2, at most one Tier 3 and two Tier 4s.
@@ -3722,6 +3761,14 @@ function jumpPoints() {
 }
 const JUMP_LATER = ["Year 2: Begin Year 2 and the level reset", "Year 2 chapters", "Year 3: the Box freeze and picking one", "Year 3: thawing region by region"];
 const pickChapters = () => CHAPTERS.filter(c => c.type === "pick");
+// Every pick you've made, here or in Replay ("johto-249"), for the choice achievements. The only thing a replay keeps:
+// it's written to the main Story save through storyReward's allowlist.
+const pickLine = (c, n) => `${REGIONS[c.r].name.toLowerCase()}-${n}`;
+function notePickLine(c, n) {
+  const k = pickLine(c, n);
+  S.story.pickLinesSeen = { ...(S.story.pickLinesSeen || {}), [k]: 1 };
+  if (S.replay) storyReward("pickline:" + k, T => { T.story.pickLinesSeen = { ...(T.story.pickLinesSeen || {}), [k]: 1 }; });
+}
 // Jump: the test save's story starts over, then everything before point i is marked done as if it had been played:
 // badges and Champions, chapters, version picks (picks: region -> dex number, or "random"), the scenes, clues and
 // letters on the way, the Key Stone, The Mask, Red. The Box, items and money stay as they are.
@@ -3871,7 +3918,7 @@ function renderStory() {
 }
 $("#t-story").onclick = e => {
   const t = e.target.closest("[data-test]"); if (t && S.test) return testTool(t.dataset.test, t);
-  const b = e.target.closest("[data-reread]"); if (b) playScene(b.dataset.reread);
+  const b = e.target.closest("[data-reread]"); if (b) { if (!S.story.reread) { S.story.reread = 1; save(); checkAch(); } playScene(b.dataset.reread); }
 };
 $("#t-story").onchange = e => { const t = e.target.closest("[data-test-set]"); if (t && S.test) testTool("set", t); };
 
@@ -3996,7 +4043,7 @@ function saveCard() {
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
     ...(isStory() ? [["Story", `Year ${S.story.year}: ${YEARS[S.story.year]}, ${chaptersDone()} of ${CHAPTERS.length} chapters`], ["Story dex", `${lifeDex()} ever caught`]] : []),
     ...(!isStory() && (S.prestige || S.beat) ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${achs().filter(a => S.ach[a.id]).length} of ${achs().length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${achCounted().filter(a => S.ach[a.id]).length} of ${achCounted().length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "") +

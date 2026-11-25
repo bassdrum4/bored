@@ -343,7 +343,7 @@ test('Story Mode: its own save, the opening scenes, ×2 XP and shinies, no prest
   const story = await tab.evaluate(() => ({ mode: S.mode, scene: sceneNow && sceneNow.id, odds: shinyOdds() * 4096, charm: (S.charm = 1, shinyOdds() * 4096), prestige: (S.beat = '2026-11-24', S.pbeat = 1, canPrestige()), tab: !$('#tabs [data-tab=story]').hidden, from: S.box[7].from }));
   assert.deepEqual(story, { mode: 'story', scene: 'open-2', odds: 2, charm: 6, prestige: false, tab: true, from: 0 });
   const fields = await tab.evaluate(() => { save(); const st = readSlot(STORY_KEY).story; return { keys: Object.keys(st).sort(), life: Object.keys(st.lifeDex) }; });
-  assert.deepEqual(fields.keys, ['ch', 'cleared', 'clues', 'epilogue', 'eternatusStolen', 'frozen', 'giratinaDebt', 'liberated', 'lifeDex', 'nullTrust', 'picks', 'roulette', 'seen', 'silvally', 'y3Recovered', 'year'], 'every story field is in the save from day one');
+  assert.deepEqual(fields.keys, ['ch', 'cleared', 'clues', 'epilogue', 'eternatusStolen', 'frozen', 'giratinaDebt', 'liberated', 'lifeDex', 'nullTrust', 'pickLinesSeen', 'picks', 'reread', 'roulette', 'seen', 'silvally', 'y3Recovered', 'year'], 'every story field is in the save from day one');
   assert.deepEqual(fields.life, ['7'], 'the Story lifetime dex');
   await tab.evaluate(() => { S.charm = 0; delete S.beat; delete S.pbeat; });
   await tab.click('#scene [data-scene=skip]');
@@ -571,7 +571,7 @@ test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay M
   });
   assert.deepEqual(got.year2, { text: 'Year 2: The Huntcoming soon', open: false }, 'Year 2 shows, but YEAR2_READY is false');
   assert.equal(got.red.open, true, 'Red can still be fought');
-  assert.deepEqual(got.ach.map(([, h]) => h), [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  assert.ok(['st_start', 'st_mewtwo', 'st_r1', 'st_started', 'st_red', 'st_y1'].every(id => got.ach.find(([k, h]) => k === id && h === 1)), 'the Year 1 story achievements are earned');
   assert.ok(got.menu.includes('replay'));
   assert.deepEqual([got.inReplay.slot, got.inReplay.replay, got.inReplay.picks, got.inReplay.ch], ['bored.poke-idle.story.replay', 1, {}, 0]);
   assert.equal(got.inReplay.banner, 'This is a replay. Nothing here changes your save.');
@@ -781,5 +781,50 @@ test('Story\'s ranked number: progress always outranks the dex, and Year 3 count
   });
   assert.deepEqual([got.a, got.b, got.c], [true, true, true]);
   assert.ok(got.max < 400000000, 'fits the board\'s max_value');
+  assert.deepEqual(errors, []);
+});
+
+test('Story achievements: types and display rules, Story only, Replay awards only the replayOk choices, and the wiki keeps hidden ones hidden', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    const rows = () => [...document.querySelectorAll('#achlist .ach')].map(r => r.textContent);
+    const head = () => [...document.querySelectorAll('#achlist .ach-group')].map(h => h.textContent).find(t => t.startsWith('Story'));
+    // Classic: no Story group.
+    slot = KEY; S = fresh(); S.box[1] = { xp: 125 }; S.party = [1]; enter('ach');
+    const classic = { story: !!head(), count: $('#achsum').textContent };
+    // Story: a hidden one shows as ??? until earned; a secret one isn't listed, and the header counts it.
+    ACH.push({ id: 'sc_test', group: 'Story', story: true, type: 'secret', title: 'Test Secret', desc: 'A secret', need: 1, have: () => 0 });
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[1] = { xp: 125 }; S.party = [1]; save(); checkAch(true); openTab('ach');
+    const before = { rows: rows(), head: head(), sum: $('#achsum').textContent };
+    S.story.seen['sinnoh-483'] = 1; checkAch(true); renderAch();
+    const after = rows();
+    // Rereading a scene from the Story tab.
+    S.story.seen['open-1'] = 1; openTab('story'); while (sceneNow) endScene(); document.querySelector('#t-story [data-reread]').click(); while (sceneNow) endScene();
+    const reread = !!S.ach.st_reread;
+    // Replay: the pick there counts toward Both Halves on the main save; nothing is earned in the replay itself.
+    S.story.picks[1] = 249; S.story.pickLinesSeen['johto-249'] = 1; S.story.epilogue = 1; for (const c of CHAPTERS) S.story.ch[c.id] = 1; checkAch(true); save();
+    const mainBoth = !!S.ach.ch_both;
+    startReplay(); S.story.ch['johto-rival'] = 1; S.story.ch['johto-admin'] = 1;
+    pickNow = { c: CHAPTER['johto-pick'], n: 250 }; pickClick({ dataset: { pick: 'mine' } }); while (sceneNow) endScene();
+    const replayAch = Object.keys(S.ach).filter(k => /^(st|ch)_/.test(k)).length;
+    showTitle(); go('endreplay');
+    const back = { both: !!S.ach.ch_both, hooh: !!S.ach.ch_hooh, seen: { ...S.story.pickLinesSeen } };
+    const wiki = wikiSections().find(x => x.id === 'story').html;
+    ACH.pop();
+    return { classic, before, after, reread, mainBoth, replayAch, back, wiki };
+  });
+  assert.equal(got.classic.story, false, 'no Story group in Classic');
+  assert.ok(got.before.head.includes('+1 secret'), 'the header counts the unearned secret: ' + got.before.head);
+  assert.ok(!got.before.rows.some(r => r.includes('Test Secret')), 'a secret one is not listed');
+  assert.ok(got.before.rows.some(r => r.startsWith('??? · Keep playing.')), 'a hidden one is ???');
+  assert.ok(!got.before.rows.some(r => r.includes('He Always Did')));
+  assert.ok(got.after.some(r => r.startsWith('He Always Did')), 'earned: revealed');
+  assert.match(got.before.sum, /^\d+\/\d+ earned/);
+  assert.equal(got.reread, true, 'Write It Down');
+  assert.equal(got.mainBoth, false);
+  assert.equal(got.replayAch, 0, 'Replay gives no achievements itself');
+  assert.deepEqual(got.back.seen, { 'johto-249': 1, 'johto-250': 1 }, 'the replay’s pick is kept on the main save');
+  assert.deepEqual([got.back.both, got.back.hooh], [true, true], 'Both Halves and the other pick, earned on the main save');
+  assert.ok(got.wiki.includes('There are hidden achievements.') && got.wiki.includes('Write It Down') && !got.wiki.includes('He Always Did'));
   assert.deepEqual(errors, []);
 });
