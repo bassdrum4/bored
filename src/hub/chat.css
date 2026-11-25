@@ -1,0 +1,24 @@
+.bored-chat-toggle {font:inherit; color:inherit; background:transparent; border:1px solid currentColor; border-radius:3px; padding:.35rem .6rem; cursor:pointer; font-size:.85rem}
+.bored-chat[hidden],.bored-chat [hidden],.bored-chat-toggle[hidden] {display:none!important}
+.bored-chat {position:fixed; z-index:500; right:1rem; top:4rem; bottom:1rem; width:min(23rem,calc(100vw - 2rem)); max-height:38rem; display:flex; flex-direction:column; background:var(--paper,#f5f2ea); color:var(--ink,#242019); border:1px solid currentColor; border-radius:4px; box-shadow:0 8px 24px #0003; padding:.85rem; box-sizing:border-box; font:inherit; gap:.55rem}
+.bored-chat-header,.bored-chat-meta,#bored-chat-form,#bored-chat-reply,#bored-chat-admin {display:flex; align-items:center; gap:.5rem}
+.bored-chat-header {border-bottom:1px solid currentColor;padding-bottom:.5rem}
+.bored-chat-header strong {margin-right:auto}
+.bored-chat button {font:inherit;font-size:.8rem; color:inherit; background:transparent; border:1px solid currentColor; border-radius:3px; padding:.3rem .5rem; cursor:pointer}
+.bored-chat button:disabled {opacity:.5;cursor:default}
+#bored-chat-status,.bored-chat-note {font-size:.75rem;opacity:.8;margin:0;line-height:1.4}
+#bored-chat-list {flex:1; min-height:0;overflow:auto;overscroll-behavior:contain; padding:0 .3rem}
+.bored-chat-message {padding:.4rem 0;border-bottom:1px solid #8883;overflow-wrap:anywhere}
+.bored-chat-meta {font-size:.78rem}
+.bored-chat-meta time {margin-left:auto;opacity:.6;font-variant-numeric:tabular-nums}
+.bored-chat-message p {margin:.25rem 0;font-size:.9rem;line-height:1.4}
+.bored-chat-message small {opacity:.75;font-size:.75rem}
+.bored-chat-menu {position:relative}
+.bored-chat-menu summary {list-style:none;cursor:pointer;padding:0 .25rem;font-size:1rem}
+.bored-chat-menu summary::-webkit-details-marker{display:none}
+.bored-chat-menu[open] {display:flex; flex-direction:column; gap:.25rem}
+#bored-chat-input {flex:1;min-width:0; font:inherit; color:inherit; background:transparent;border:1px solid currentColor; border-radius:3px;padding:.55rem}
+#bored-chat-reply {font-size:.75rem;justify-content:space-between}
+.bored-chat-reports {max-height:35%;overflow:auto;font-size:.8rem;border:1px solid currentColor;padding:.4rem}
+.bored-chat-reports p {overflow-wrap:anywhere}
+@media(max-width:520px){.bored-chat{right:.4rem;left:.4rem;width:auto;top:3.7rem;bottom:.4rem;max-height:none}}
