@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import {randomUUID} from 'node:crypto';
-import {createChat,cleanMessage,moderate} from './chat.mjs';
+import {createChat,cleanMessage,moderate,createChatStore} from './chat.mjs';
 const origin='https://bassdrum4.github.io';
 test('local checks reject contact details, links, oversize and profanity',()=>{
   for(const s of ['https://example.com','me@example.com','123-456-7890','a'.repeat(301),'fuck','  '])assert.equal(cleanMessage(s),'');
@@ -70,4 +70,19 @@ test('SSE broadcasts moderated messages and nothing on rejection',async t=>{
   assert.equal((await f.post({mode:'send',jwt:f.user,text:'flagged'})).status,422);
   await f.post({mode:'send',jwt:f.user,text:'chess?'});
   assert.equal((await frame()).events[0].message.text,'chess?');
+});
+
+test('modern chat storage sends secret only as apikey and rejects legacy credentials',async()=>{
+  let seen;
+  const store=createChatStore('https://example.supabase.co','sb_secret_test',async(url,opts)=>{
+    seen={url,opts};return {ok:true,json:async()=>({enabled:false,bans:{}})};
+  });
+  assert.deepEqual(await store('state',{}),{enabled:false,bans:{}});
+  assert.equal(seen.url,'https://example.supabase.co/rest/v1/rpc/bored_chat_control');
+  assert.deepEqual(seen.opts.headers,{apikey:'sb_secret_test','content-type':'application/json'});
+  assert.equal(seen.opts.redirect,'error');
+  assert.deepEqual(JSON.parse(seen.opts.body),{action:'state',args:{}});
+  for(const key of [undefined,'','sb_publishable_test','eyJ.legacy.jwt'])assert.equal(createChatStore('https://example.supabase.co',key),null);
+  const denied=createChatStore('https://example.supabase.co','sb_secret_test',async()=>({ok:false}));
+  await assert.rejects(denied('state',{}),/Chat storage unavailable/);
 });
