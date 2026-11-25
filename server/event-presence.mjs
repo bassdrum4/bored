@@ -49,9 +49,10 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     for(const s of sessions.values())if(!s.identity.guest&&s.identity.id===id)remove(s,{t:'off'});
   }
   function flush(){
+    let countsFrame,namedFrame;
     for(const s of sessions.values()){
       const c=s.connection;if(!c)continue;
-      const frame=snapshot(s);
+      const frame=s.watch?(namedFrame??=snapshot(s)):(countsFrame??=snapshot(s));
       if(frame.cursor===c.cursor)continue;
       c.cursor=frame.cursor;
       if(c.mode==='poll')detach(s,frame);
@@ -113,7 +114,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
         if(c.res.writableLength>65536){c.res.destroy();continue;}
         if(now-c.last>=keepaliveMs){c.res.write(': keepalive\n\n');c.last=now;}
         s.at=now;
-      }else if(now-s.at>ttlMs)remove(s);
+      }else if(now-s.at>ttlMs||(!s.identity.guest&&s.identity.expires<=now))remove(s);
     }
     for(const [key,value] of auth)if(value.until<=now)auth.delete(key);
   },Math.min(5000,keepaliveMs));sweep.unref?.();
