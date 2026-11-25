@@ -25,3 +25,6 @@ Second pass: difficulty-tier schedule, material bag, rare elite crates, destruct
 Third pass: quadratic XP threshold with +1 HP per level, shop inflation/rarity curves, enemy growth/limits and additional enemy types, boss early completion, endless toggle and per-character win records. Reference: https://brotato.wiki.spellsandguns.com/Experience, https://brotato.wiki.spellsandguns.com/Shop, https://brotato.wiki.spellsandguns.com/Enemies.
 
 Fourth pass: special-effect items (shop discounts/free rerolls, interest, XP modifiers, extra trees, pickup radius, healing, pierce, bounce, burn, explosions, turret structures and emergency revival); live weapon damage and cooldown in shops. All assets remain procedural and no backend required.
+
+
+Character and leaderboard pass: 21 original portrait SVGs, distinct gameplay passives and inventory limits. Shared leaderboard encodes completed wave count first, then Danger level, then kills; a completed run or standard victory is required. Caps are 500 waves and 9,999 kills for score packing. The hub's existing score path handles guest claims, personal bests and signed-in sync; no custom leaderboard service.
