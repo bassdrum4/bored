@@ -61,10 +61,8 @@ test('game finder stays optional and plays through the existing hub', async t =>
   await page.waitForFunction(() => document.querySelectorAll('#grid .card').length > 25);
 
   assert.ok(await page.evaluate(() =>
-    document.querySelector('#daily').offsetTop <
-    document.querySelector('#game-finder').offsetTop &&
-    document.querySelector('#game-finder').offsetTop <
-    document.querySelector('#library').offsetTop));
+    document.querySelector('#daily').offsetTop < document.querySelector('#library').offsetTop &&
+    document.querySelector('#library').contains(document.querySelector('#game-finder'))));
   assert.equal(await page.$eval('#game-finder', node => node.hidden), false);
   await page.click('#game-finder-open');
   assert.equal(await page.$eval('#game-finder-dialog', node => node.open), true);

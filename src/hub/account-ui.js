@@ -21,9 +21,12 @@ function renderAccount() {
   const state = $('#account-state');
   const action = $('#account-action');
   const rename = $('#account-rename');
+  const label = $('#profile-label');
+  label.textContent = guest ? 'Sign in / Account' : (getHandle() || suggestedHandle());
   state.replaceChildren();
   if (!backendReady()) {
     state.textContent = 'The leaderboard is down. Your local bests still work.';
+    label.textContent = 'Account';
     action.hidden = true;
     rename.hidden = true;
     return;
@@ -239,8 +242,12 @@ function initAccount() {
   $('#claim-dialog').addEventListener('click', event => {
     if (event.target === $('#claim-dialog')) closeClaimDialog();
   });
-  $('#account-action').onclick = () => { if (hasIdentity()) signOutUser(); else openAuthDialog('signin'); };
-  $('#account-rename').onclick = () => openAuthDialog('name');
+  const profile = $('#profile-menu');
+  $('#account-action').onclick = () => { profile.open = false; if (hasIdentity()) signOutUser(); else openAuthDialog('signin'); };
+  $('#account-rename').onclick = () => { profile.open = false; openAuthDialog('name'); };
+  profile.addEventListener('click', event => { if (event.target.closest('a')) profile.open = false; });
+  document.addEventListener('pointerdown', event => { if (profile.open && !profile.contains(event.target)) profile.open = false; });
+  profile.addEventListener('keydown', event => { if (event.key === 'Escape' && profile.open) { profile.open = false; profile.querySelector('summary').focus(); } });
   $('#auth-cancel').onclick = closeAuthDialog;
   $('#auth-toggle').onclick = () => openAuthDialog(authMode === 'signup' ? 'signin' : 'signup');
   $('#auth-form').addEventListener('submit', submitAuth);
