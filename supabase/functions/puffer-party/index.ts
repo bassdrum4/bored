@@ -191,10 +191,10 @@ function etDate(now = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
 }
 
-// A live room is read more than once a second per diver, so the day's book and
-// the room's ratings stay in the isolate instead of costing a database round
-// trip on every poll and every answer. Both are re-read when they can change:
-// the book after its TTL, the ratings whenever applyRatings writes them.
+// A live room is read more than once a second per diver, so the day's answer
+// sheet and the room's ratings stay in the isolate instead of costing a fetch
+// on every poll and every answer. Both are re-read when they can change: the
+// sheet after its TTL, the ratings whenever applyRatings writes them.
 let bookCache: { requestedDate: string; at: number; book: Book } | null = null;
 let pendingBook: { requestedDate: string; job: Promise<Book> } | null = null;
 // A valid daily book cannot change during the day; fallbacks are retried quickly.
@@ -209,15 +209,19 @@ async function loadBook(): Promise<Book> {
   if (bookCache?.requestedDate === date && Date.now() - bookCache.at < ttl) return bookCache.book;
   if (pendingBook?.requestedDate === date) return pendingBook.job;
   const job = (async (): Promise<Book> => {
-    let response = await sb('krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1');
-    let rows = response.ok ? await response.json() : [];
-    if (!rows?.[0]?.book) {
-      response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
-      rows = response.ok ? await response.json() : [];
-    }
-    const value = rows?.[0]?.book;
-    const book = typeof value === 'string' ? JSON.parse(value) : value;
-    if (!book?.prompts?.length || book.prompts.length !== ROUNDS)
+    // The reference site is the only copy of the day's prompts and answers, so
+    // the room reads it directly instead of a database mirror.
+    const headers = { 'User-Agent': 'BoredKrillion/1.0 (+https://bassdrum4.github.io/bored/)' };
+    const today = await fetch('https://krillion.io/api/today', { headers, signal: AbortSignal.timeout(15_000) });
+    const day = today.ok ? await today.json().catch(() => null) : null;
+    if (!day?.date || !Array.isArray(day.prompts) || day.prompts.length !== ROUNDS)
+      throw new HttpError('Puffer Party is between dives. Try again shortly.', 503);
+    const reveal = await fetch('https://krillion.io/api/reveal?date=' + encodeURIComponent(day.date), {
+      headers,
+      signal: AbortSignal.timeout(120_000)
+    });
+    const book = reveal.ok ? await reveal.json().catch(() => null) as Book | null : null;
+    if (!book?.prompts?.length || book.prompts.length !== ROUNDS || book.prompts.some(prompt => !Array.isArray(prompt?.answers) || !prompt.answers.length))
       throw new HttpError('Puffer Party is between dives. Try again shortly.', 503);
     bookCache = { requestedDate: date, at: Date.now(), book };
     return book;

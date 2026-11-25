@@ -1,9 +1,11 @@
 // Krillion, served as a Bored Edge Function.
 //
-// This is the API the original OpenKrillion client expects. The reference site
-// has no CORS headers, so the answer book is fetched and cached here, and each
-// run, daily or unlimited, is kept in Postgres. The client only receives prompts until it has
-// finished the dive; answer checks happen on this side.
+// The reference site has no CORS headers, and a big day's answer sheet is tens
+// of megabytes — more object graph than an Edge Function can hold. So this
+// function is a pipe: it hands the browser the day's prompts and streams the
+// reveal back untouched. The browser checks answers with the same rules the
+// game ships, and the function keeps only the run, so the clock, the daily
+// board and the sounding still belong to the server.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,24 +24,9 @@ const TIERS: Record<string, { name: string; score: number }> = {
   krillion: { name: 'One in a Krillion', score: 100 }
 };
 
-type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
 type Prompt = { id: string; text: string };
-type Book = { date: string; dayNumber: number; source: string; title?: string; prompts: Prompt[] };
-type StoredBook = Book & { prompts: (Prompt & { answers?: Answer[] })[] };
-type PickedPrompt = { id: string; text: string; date: string };
-type Match = Answer & { correction: boolean };
-type Loaded = { book: Book; stale: boolean };
-type BankRow = {
-  date: string;
-  prompt_id: string;
-  key: string;
-  answer: string;
-  tier: string;
-  quip: string | null;
-  num: number | null;
-  own: boolean;
-  ord: number;
-};
+type Today = { date: string; dayNumber: number; resetsAt: number; prompts: Prompt[] };
+type Scored = { answer: string; tier: string; quip: string | null };
 type AnswerResult = {
   round: number;
   rawAnswer: string | null;
@@ -52,6 +39,7 @@ type AnswerResult = {
 type Run = {
   id: string;
   date: string;
+  day_number: number;
   mode: string;
   round: number;
   round_start: number | string | null;
@@ -59,21 +47,20 @@ type Run = {
   completed: boolean;
   results: AnswerResult[];
   hint_used: boolean;
-  prompts?: PickedPrompt[];
+  prompts: Prompt[];
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const REFERENCE = 'https://krillion.io';
+const REFERENCE = 'https://krillion.io/api/';
 const USER_AGENT = 'BoredKrillion/1.0 (+https://bassdrum4.github.io/bored/)';
+const ROUNDS = 7;
 const ROUND_MS = 25_000;
 const PREVIEW_MS = 3_000;
-const RUN_COLUMNS = 'id,date,mode,round,round_start,paused_at,completed,results,hint_used,prompts';
-const ARCHIVE_TITLE = 'The Open Water';
-
-const normalize = (value: unknown) => String(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
-const stripArticle = (value: unknown) => String(value).trim().replace(/^(?:the|a|an)\s+/i, '');
-const bare = (value: unknown) => normalize(stripArticle(value));
+// The browser matches the answer before it posts, which costs a few hundred
+// milliseconds on the biggest rounds of the day.
+const ANSWER_GRACE_MS = 4_000;
+const RUN_COLUMNS = 'id,date,day_number,mode,round,round_start,paused_at,completed,results,hint_used,prompts';
 
 function etDate(now = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
@@ -85,57 +72,6 @@ function resetAt(date: string) {
   const day = next.toISOString().slice(0, 10);
   const probe = new Date(day + 'T04:00:00Z');
   return etDate(probe) === day ? probe.getTime() : Date.parse(day + 'T05:00:00Z');
-}
-
-const COMMON_ALIASES: Record<string, string[]> = {
-  mashedpotatoes: ['mashed', 'mash'],
-  frenchfries: ['fries'],
-  bakedpotato: ['baked potato', 'jacket potato']
-};
-// A plain object also answers for its prototype, so an answer named
-// "Constructor" would read Object.prototype.constructor — not iterable.
-const commonFor = (word: string) => Object.hasOwn(COMMON_ALIASES, word) ? COMMON_ALIASES[word] : [];
-const ONES: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
-  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
-  sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19
-};
-const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
-
-function numberValue(text: unknown) {
-  const key = normalize(stripArticle(String(text)));
-  if (/^\d{1,3}$/.test(key)) return Number(key);
-  if (key in ONES) return ONES[key];
-  const compound = key.match(/^(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(one|two|three|four|five|six|seven|eight|nine)?$/);
-  if (compound) return TENS[compound[1]] + (compound[2] ? ONES[compound[2]] : 0);
-  return null;
-}
-
-// Mirrors public/rules.mjs in OpenKrillion, including typo, plural, numeric and
-// natural-language qualifier matching. Keep the two in step if either changes.
-function matchFromRow(row: any): Match | null {
-  if (!row || typeof row.answer !== 'string' || !TIERS[row.tier]) return null;
-  return {
-    answer: row.answer,
-    tier: row.tier,
-    ...(typeof row.quip === 'string' && row.quip ? { quip: row.quip } : {}),
-    correction: row.correction === true
-  };
-}
-
-// The spelling rules live next to the bank in Postgres: a big day's round holds
-// a couple of hundred thousand keys, which is more than this runtime will hold
-// as objects.
-async function matchStored(date: string, promptId: string, input: string): Promise<Match | null> {
-  if (!String(input || '').trim()) return null;
-  // The spelling rules and the spelling they are applied to live in the same
-  // function, so the stored bank and the player's answer normalise alike.
-  const response = await sb('rpc/krillion_match_answer', {
-    method: 'POST',
-    body: JSON.stringify({ p_date: date, p_prompt: promptId, p_input: input })
-  });
-  if (!response.ok) throw new HttpError('The answer could not be checked. Retry this round.', 503);
-  return matchFromRow(await response.json());
 }
 
 class HttpError extends Error {
@@ -169,7 +105,7 @@ async function sb(path: string, init: RequestInit = {}) {
   headers.set('Authorization', 'Bearer ' + SERVICE_KEY);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   // Bound each database hop. Only reads and explicitly idempotent writes retry.
-  const safe = !init.method || init.method === 'GET' || path.startsWith('krillion_books?on_conflict=date') || path === 'krillion_runs?on_conflict=id';
+  const safe = !init.method || init.method === 'GET' || path === 'krillion_runs?on_conflict=id';
   for (let attempt = 0; ; attempt++) {
     try {
       const response = await fetch(SUPABASE_URL + '/rest/v1/' + path, { ...init, headers, signal: AbortSignal.timeout(4_000) });
@@ -182,217 +118,58 @@ async function sb(path: string, init: RequestInit = {}) {
   }
 }
 
-async function cachedBook(date: string): Promise<StoredBook | null> {
-  const query = 'krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1';
-  const response = await sb(query);
-  if (!response.ok) throw new HttpError('The puzzle cache is temporarily unavailable.', 503);
-  const rows = await response.json();
-  const value = rows?.[0]?.book;
-  if (!value) return null;
-  return (typeof value === 'string' ? JSON.parse(value) : value) as StoredBook;
-}
+// The reference site's own day payload: seven prompts and a reset time, a few
+// hundred bytes. It is re-read once a minute so a rolled-over day is picked up.
+let dayCache: { at: number; day: Today } | null = null;
 
-async function latestBook(): Promise<StoredBook | null> {
-  const response = await sb('krillion_books?select=book&order=fetched_at.desc&limit=1');
-  if (!response.ok) return null;
-  const rows = await response.json();
-  const value = rows?.[0]?.book;
-  if (!value) return null;
-  return (typeof value === 'string' ? JSON.parse(value) : value) as StoredBook;
-}
-
-async function storeBook(book: Book) {
-  const response = await sb('krillion_books?on_conflict=date', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify([{
-      date: book.date,
-      day_number: book.dayNumber,
-      source: book.source,
-      book
-    }])
+async function loadToday(): Promise<Today> {
+  const now = Date.now();
+  if (dayCache && now - dayCache.at < 60_000) return dayCache.day;
+  const response = await fetch(REFERENCE + 'today', {
+    headers: { 'User-Agent': USER_AGENT },
+    signal: AbortSignal.timeout(15_000)
   });
-  if (!response.ok) throw new Error('Cache write failed with HTTP ' + response.status + '.');
-}
-
-async function callBank<T>(name: string, args: Record<string, unknown>): Promise<T> {
-  const response = await sb('rpc/' + name, { method: 'POST', body: JSON.stringify(args) });
-  if (!response.ok) throw new Error('Answer bank call ' + name + ' failed with HTTP ' + response.status + '.');
-  return await response.json() as T;
-}
-
-const ANSWER_BATCH = 4_000;
-
-// Every spelling a round accepts: its own name, its aliases, and the handful of
-// common short forms the original client hard-coded.
-function bankRows(date: string, promptId: string, answer: any, nextOrd: () => number): BankRow[] {
-  const tier = String(answer?.tier || '');
-  const label = typeof answer?.answer === 'string' ? answer.answer.trim() : '';
-  if (!label || !TIERS[tier]) return [];
-  const ownKey = bare(label);
-  const words = [label, ...(Array.isArray(answer.aliases) ? answer.aliases : []), ...commonFor(ownKey)];
-  const rows: BankRow[] = [];
-  for (const word of words) {
-    if (typeof word !== 'string') continue;
-    const key = bare(word);
-    if (!key) continue;
-    rows.push({
-      date,
-      prompt_id: promptId,
-      key,
-      answer: label,
-      tier,
-      quip: typeof answer.quip === 'string' && answer.quip ? answer.quip : null,
-      num: numberValue(key),
-      own: key === ownKey,
-      ord: nextOrd()
-    });
-  }
-  return rows;
-}
-
-async function writeBank(rows: BankRow[]) {
-  if (!rows.length) return;
-  const response = await sb('krillion_answer_keys?on_conflict=date,prompt_id,key', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
-    body: JSON.stringify(rows)
-  });
-  if (!response.ok) throw new Error('Cache write failed with HTTP ' + response.status + '.');
-}
-
-async function clearBank(date: string) {
-  const response = await sb('rpc/krillion_clear_bank', { method: 'POST', body: JSON.stringify({ p_date: date }) });
-  if (!response.ok) throw new Error('The answer bank could not be cleared.');
-}
-
-async function bankMissing(date: string) {
-  const response = await sb('krillion_answer_keys?date=eq.' + encodeURIComponent(date) + '&select=prompt_id&limit=1');
-  if (!response.ok) throw new HttpError('The answer bank is temporarily unavailable.', 503);
-  const rows = await response.json();
-  return !(Array.isArray(rows) && rows.length);
-}
-
-// A day's bank fills one prompt at a time after its reveal lands, so the dive is
-// only offered once every prompt is scored; a half-filled day would reject
-// correct answers on the prompts still building.
-async function bankReady(date: string): Promise<boolean> {
-  try {
-    const response = await sb('rpc/krillion_bank_ready', { method: 'POST', body: JSON.stringify({ p_date: date }) });
-    if (!response.ok) return true;
-    return (await response.json()) === true;
-  } catch {
-    return true;
-  }
-}
-
-// The daily book is fetched and scored by Postgres: a big day's reveal is 33 MB
-// and 350k answers, which is more work than an Edge Function's CPU budget
-// allows. The function asks for a refresh and reads what is already stored.
-async function requestRefresh(date: string) {
-  const response = await sb('rpc/krillion_refresh', { method: 'POST', body: JSON.stringify({ p_date: date }) });
-  await response.body?.cancel().catch(() => {});
-  if (!response.ok) throw new Error('Refresh request failed with HTTP ' + response.status + '.');
-}
-
-// Days cached before the bank existed still carry their answers inside the
-// stored book. Their rows are written once, on the first dive that asks for
-// them, and the book is then kept as prompts only.
-async function ensureBank(date: string, cached: StoredBook): Promise<Book> {
-  const book: Book = {
-    date: String(cached.date || date),
-    dayNumber: Number(cached.dayNumber) || 0,
-    source: String(cached.source || ''),
-    ...(cached.title ? { title: String(cached.title) } : {}),
-    prompts: (cached.prompts || []).map(prompt => ({ id: String(prompt.id), text: String(prompt.text) }))
+  if (!response.ok) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+  const raw = await response.json().catch(() => null);
+  const prompts = Array.isArray(raw?.prompts) ? raw.prompts : [];
+  if (prompts.length !== ROUNDS) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(raw?.date)) ? String(raw.date) : etDate(now);
+  const day: Today = {
+    date,
+    dayNumber: Number(raw?.dayNumber) || 0,
+    resetsAt: Number(raw?.resetsAt) || resetAt(date),
+    prompts: prompts.map((prompt: any, index: number) => ({
+      id: String(prompt?.id || `p${index + 1}`),
+      text: String(prompt?.text || '')
+    }))
   };
-  if (!(await bankMissing(date))) return book;
-  const legacy = (cached.prompts || []).some(prompt => Array.isArray(prompt.answers) && prompt.answers.length);
-  if (!legacy) return book;
-  await clearBank(date);
-  let ord = 0;
-  const nextOrd = () => ord++;
-  let rows: BankRow[] = [];
-  for (const prompt of cached.prompts || []) {
-    for (const answer of Array.isArray(prompt?.answers) ? prompt.answers : []) {
-      rows.push(...bankRows(date, String(prompt.id), answer, nextOrd));
-      if (rows.length >= ANSWER_BATCH) { await writeBank(rows); rows = []; }
-    }
-  }
-  await writeBank(rows);
-  await storeBook(book);
-  return book;
+  dayCache = { at: now, day };
+  return day;
 }
 
-// Per-isolate cache keyed by requested date. Archive play can span several dates.
-const books = new Map<string, { loaded: Loaded; until: number }>();
-const loadingBooks = new Map<string, Promise<Loaded>>();
-async function loadBook(date: string): Promise<Loaded> {
-  const hit = books.get(date);
-  if (hit && Date.now() < hit.until) return hit.loaded;
-  const inflight = loadingBooks.get(date);
-  if (inflight) return inflight;
-  const job = (async (): Promise<Loaded> => {
-    const cached = await cachedBook(date);
-    let loaded: Loaded;
-    if (cached?.prompts?.length === 7) {
-      loaded = { book: await ensureBank(date, cached), stale: false };
-    } else {
-      // Ask Postgres for today's book, then answer from whatever is stored. A
-      // day's own book appears a minute or two later, when the harvest runs.
-      await requestRefresh(date).catch(() => {});
-      const latest = await latestBook();
-      if (!latest?.prompts?.length) throw new HttpError('Today’s dive is temporarily unavailable.', 503);
-      loaded = { book: await ensureBank(String(latest.date || ''), latest), stale: true };
-    }
-    // Do not pin an older fallback book as today's puzzle. Retry that shortly.
-    books.set(date, { loaded, until: Date.now() + (loaded.stale ? 30_000 : 6 * 60 * 60_000) });
-    if (books.size > 20) books.delete(books.keys().next().value!);
-    return loaded;
-  })();
-  loadingBooks.set(date, job);
-  try { return await job; }
-  finally { loadingBooks.delete(date); }
-}
-
-const publicBook = (loaded: Loaded) => ({
-  date: loaded.book.date,
-  dayNumber: loaded.book.dayNumber,
-  ...(loaded.book.title ? { title: loaded.book.title } : {}),
-  sample: false,
-  prompts: loaded.book.prompts.map(prompt => ({ id: prompt.id, text: prompt.text })),
-  resetsAt: resetAt(loaded.book.date),
-  source: loaded.book.source,
-  stale: loaded.stale
-});
-
-// A practice dive keeps only the identity of the prompts it drew, so the answer
-// book for those prompts stays in Postgres and is scored here like the daily's.
-async function bookForRun(run: Run): Promise<Book> {
-  const picked = Array.isArray(run.prompts)
-    ? run.prompts.filter(entry => entry && typeof entry.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(entry.date)))
-    : [];
-  if (picked.length !== 7) {
-    const loaded = await loadBook(run.date);
-    if (loaded.stale || loaded.book.date !== run.date) throw new HttpError('The dive book is temporarily unavailable.', 503);
-    return loaded.book;
-  }
-  const books = new Map<string, Book>();
-  await Promise.all([...new Set(picked.map(entry => entry.date))].map(async date => {
-    const loaded = await loadBook(date);
-    if (loaded.stale || loaded.book.date !== date) throw new HttpError('The archive book is temporarily unavailable.', 503);
-    books.set(date, loaded.book);
-  }));
+// A dive's own state is the whole public answer to "where am I": the prompts it
+// was served, its clock and its scored rounds. Nothing is looked up again.
+function stateFor(run: Run) {
+  const results = Array.isArray(run.results) ? run.results : [];
+  const prompts = Array.isArray(run.prompts) ? run.prompts : [];
   return {
-    date: run.date,
-    dayNumber: 0,
-    source: 'Archive dive',
-    title: ARCHIVE_TITLE,
-    prompts: picked.map(entry => {
-      const prompt = books.get(entry.date)?.prompts.find(candidate => candidate.id === entry.id);
-      if (!prompt) throw new HttpError('This dive lost its prompts. Start a new one.', 503);
-      return prompt;
-    })
+    date: String(run.date),
+    dayNumber: Number(run.day_number) || 0,
+    sample: false,
+    stale: false,
+    source: 'krillion.io',
+    prompts: prompts.map(prompt => ({ id: String(prompt?.id), text: String(prompt?.text) })),
+    resetsAt: resetAt(String(run.date)),
+    runId: run.id,
+    mode: run.mode,
+    round: Number(run.round),
+    roundStart: run.round_start == null ? null : Number(run.round_start),
+    pausedAt: run.paused_at == null ? null : Number(run.paused_at),
+    serverNow: Date.now(),
+    completed: !!run.completed,
+    results,
+    score: results.reduce((total, result) => total + Number(result?.score || 0), 0),
+    hintUsed: !!run.hint_used
   };
 }
 
@@ -453,10 +230,11 @@ async function readRun(id: string): Promise<Run | null> {
   return (rows?.[0] || null) as Run | null;
 }
 
-async function createRun(mode: string, book: Book, prompts: PickedPrompt[] = [], id = crypto.randomUUID()): Promise<Run> {
+async function createRun(mode: string, day: Today, prompts: Prompt[], id = crypto.randomUUID()): Promise<Run> {
   const row = {
     id,
-    date: book.date,
+    date: day.date,
+    day_number: day.dayNumber,
     mode,
     round: 0,
     round_start: Date.now() + PREVIEW_MS,
@@ -475,7 +253,7 @@ async function createRun(mode: string, book: Book, prompts: PickedPrompt[] = [],
   const rows = await response.json();
   // A lost response can be retried with the same ID without creating another dive.
   const run = rows?.[0] || await readRun(id);
-  if (!run || run.mode !== mode || run.date !== book.date) throw new HttpError('Dive could not be recovered.', 409);
+  if (!run || run.mode !== mode || run.date !== day.date) throw new HttpError('Dive could not be recovered.', 409);
   return run as Run;
 }
 
@@ -493,22 +271,25 @@ async function updateRun(id: string, patch: Record<string, unknown>): Promise<Ru
   return rows[0] as Run;
 }
 
-function stateFor(run: Run, book: Book) {
-  const results = Array.isArray(run.results) ? run.results : [];
-  return {
-    ...publicBook({ book, stale: false }),
-    runId: run.id,
-    mode: run.mode,
-    round: Number(run.round),
-    roundStart: run.round_start == null ? null : Number(run.round_start),
-    pausedAt: run.paused_at == null ? null : Number(run.paused_at),
-    serverNow: Date.now(),
-    completed: !!run.completed,
-    results,
-    score: results.reduce((total, result) => total + Number(result.score || 0), 0),
-    hintUsed: !!run.hint_used
-  };
+// The answer the browser matched is the browser's word; the server only keeps
+// it inside the tiers it knows and prices it from its own table.
+function cleanResult(value: unknown): Scored | null {
+  if (!value || typeof value !== 'object') return null;
+  const tier = String((value as any).tier || '');
+  const answer = typeof (value as any).answer === 'string' ? (value as any).answer.trim().slice(0, 120) : '';
+  if (!answer || !Object.hasOwn(TIERS, tier)) return null;
+  const quip = typeof (value as any).quip === 'string' ? (value as any).quip.slice(0, 240) : null;
+  return { answer, tier, quip };
 }
+
+const shuffle = <T>(items: T[]) => {
+  const copy = items.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
 
 const runPath = (url: URL) => (url.pathname.replace(/^.*\/krillion/, '').replace(/^\/api/, '') || '/').replace(/\/+$/, '') || '/';
 
@@ -521,41 +302,47 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === 'GET') {
       if (path === '/' || path === '/today') {
-        const date = etDate(receivedAt);
-        const loaded = await loadBook(date);
-        if (loaded.stale || loaded.book.date !== date || !(await bankReady(date))) {
-          throw new HttpError('Today’s dive is temporarily unavailable.', 503);
-        }
-        return reply(publicBook(loaded));
+        const day = await loadToday();
+        return reply({ ...day, sample: false, stale: false, source: 'krillion.io' });
       }
-      if (path === '/health') return reply({ ok: true, rounds: 7 });
+      // The day's answer sheet, streamed straight through. A browser cannot ask
+      // the reference site itself: there are no CORS headers on it.
+      if (path === '/reveal') {
+        const date = String(url.searchParams.get('date') || '');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError('Pick a real dive date.', 400);
+        const upstream = await fetch(REFERENCE + 'reveal?date=' + encodeURIComponent(date), {
+          headers: { 'User-Agent': USER_AGENT }
+        });
+        if (!upstream.body) throw new HttpError('The answer sheet is temporarily unavailable.', 503);
+        if (!upstream.ok) {
+          return new Response(await upstream.text(), {
+            status: upstream.status,
+            headers: { ...CORS, 'Content-Type': 'application/json' }
+          });
+        }
+        return new Response(upstream.body, {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+            // The sheet cannot change during the day, so a replay is free.
+            'Cache-Control': 'private, max-age=300'
+          }
+        });
+      }
+      if (path === '/health') return reply({ ok: true, rounds: ROUNDS });
       if (path === '/party/rooms') return reply({ rooms: [], seats: [] });
       if (path === '/state') {
         const run = await readRun(url.searchParams.get('run') || '');
         if (!run) throw new HttpError('Dive not found on this browser.', 404);
-        return reply(stateFor(run, await bookForRun(run)));
+        return reply(stateFor(run));
       }
-      if (path === '/review') {
+      if (path === '/population') {
         const run = await readRun(url.searchParams.get('run') || '');
-        if (!run?.completed) throw new HttpError('Finish your dive before opening the answer sheet.', 403);
-        const book = await bookForRun(run);
-        const comparison = run.mode === 'daily'
+        if (!run?.completed) throw new HttpError('Finish your dive before opening the sounding.', 403);
+        return reply(run.mode === 'daily'
           ? dailyComparison(run, await dailyScores(run.date))
-          : { population: 0, betterThan: null, dist: Array(71).fill(0) };
-        // A round can hold 195k answers; the sheet shows the deepest page of
-        // them and says how many landed in total.
-        const sheets = await Promise.all(book.prompts.map(prompt =>
-          callBank<{ total: number; answers: { answer: string; tier: string; quip: string | null; score: number }[] }>(
-            'krillion_review', { p_date: book.date, p_prompt: prompt.id, p_limit: 200 }).catch(() => ({ total: 0, answers: [] }))));
-        return reply({
-          prompts: book.prompts.map((prompt, index) => ({
-            id: prompt.id,
-            text: prompt.text,
-            total: sheets[index]?.total ?? 0,
-            answers: sheets[index]?.answers ?? []
-          })),
-          ...comparison
-        });
+          : { population: 0, betterThan: null, dist: Array(71).fill(0) });
       }
       if (path === '/leaderboard') {
         const run = await readRun(url.searchParams.get('run') || '');
@@ -572,68 +359,46 @@ Deno.serve(async (req: Request) => {
 
     if (path === '/start') {
       if (body.archive || body.pack || body.unlimited) throw new HttpError('Only the daily dive is available in Bored.', 400);
-      if (body.practice === true) {
-        // Unlimited: seven prompts picked at random from past dives. The run is
-        // stored like a daily dive, but against the days those prompts came from.
-        const response = await sb('rpc/krillion_random_prompts', {
-          method: 'POST',
-          body: JSON.stringify({ p_count: 7 })
-        });
-        if (!response.ok) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
-        const prompts = await response.json();
-        if (!Array.isArray(prompts) || prompts.length !== 7) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
-        const run = await createRun('practice', { date: etDate(), dayNumber: 0, source: 'Archive dive', title: ARCHIVE_TITLE, prompts: [] }, prompts);
-        return reply(stateFor(run, await bookForRun(run)));
-      }
-      const date = etDate(receivedAt);
+      const day = await loadToday();
+      const mode = body.practice === true ? 'practice' : 'daily';
+      // Unlimited replays the day's own prompts, shuffled: past days' answer
+      // sheets are not public, so there is no archive to draw from.
+      const prompts = mode === 'practice' ? shuffle(day.prompts) : day.prompts;
       const requestedId = body.runId;
       if (requestedId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(requestedId))) throw new HttpError('Invalid dive ID.', 400);
       if (requestedId) {
         const existing = await readRun(String(requestedId));
         if (existing) {
-          if (existing.mode !== 'daily' || existing.date !== date) throw new HttpError('This dive belongs to another day.', 409);
-          return reply(stateFor(existing, await bookForRun(existing)));
+          if (existing.mode !== mode || existing.date !== day.date) throw new HttpError('This dive belongs to another day.', 409);
+          return reply(stateFor(existing));
         }
       }
-      const loaded = await loadBook(date);
-      if (loaded.stale || loaded.book.date !== date || !(await bankReady(date))) {
-        throw new HttpError('Today’s dive is temporarily unavailable.', 503);
-      }
-      const run = await createRun('daily', loaded.book, [], requestedId ? String(requestedId) : undefined);
-      return reply(stateFor(run, loaded.book));
+      const run = await createRun(mode, day, prompts, requestedId ? String(requestedId) : undefined);
+      return reply(stateFor(run));
     }
 
     if (path === '/answer') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
-      const book = await bookForRun(run);
+      const prompts = Array.isArray(run.prompts) ? run.prompts : [];
       const round = Number(body.round);
-      if (!Number.isInteger(round) || round < 0 || round >= book.prompts.length) throw new HttpError('Invalid round.', 400);
+      if (!Number.isInteger(round) || round < 0 || round >= prompts.length) throw new HttpError('Invalid round.', 400);
       if (run.completed || run.round_start == null || round !== Number(run.round)) {
-        return reply({ state: stateFor(run, book), alreadyScored: true });
+        return reply({ state: stateFor(run), alreadyScored: true });
       }
       const windowStart = Number(run.round_start);
-      // Time spent inside this function (including database reads) must not
-      // count against the player. Keep a small, server-measured network grace.
-      const late = receivedAt > windowStart + ROUND_MS;
-      const timely = receivedAt <= windowStart + ROUND_MS + 1_500;
+      // Time spent matching in the browser must not count against the player.
+      const timely = receivedAt <= windowStart + ROUND_MS + ANSWER_GRACE_MS;
       const raw = String(body.answer ?? '').trim().slice(0, 256);
-      const prompt = book.prompts[round];
-      const match = raw && timely ? await matchStored(book.date, prompt.id, raw) : null;
-      if (!match && raw && !late && !body.timeout) {
-        return reply({ rejected: true, message: `“${raw}”: no echo. try again` });
-      }
-      if (match?.correction && body.confirm !== true && !late && !body.timeout && body.previewCorrection !== false) {
-        return reply({ correction: match.answer, original: raw });
-      }
+      const scored = timely ? cleanResult(body.result) : null;
       const result: AnswerResult = {
         round,
         rawAnswer: raw || null,
-        answer: match?.answer || null,
-        tier: match?.tier || null,
-        score: match ? TIERS[match.tier].score : 0,
-        quip: match?.quip || null,
-        promptText: prompt.text
+        answer: scored?.answer ?? null,
+        tier: scored?.tier ?? null,
+        score: scored ? TIERS[scored.tier].score : 0,
+        quip: scored?.quip ?? null,
+        promptText: String(prompts[round]?.text || '')
       };
       const results = [...run.results.filter(entry => entry.round !== round), result].sort((a, b) => a.round - b.round);
       // An earlier request might have committed after the browser timed out.
@@ -641,34 +406,32 @@ Deno.serve(async (req: Request) => {
       const response = await sb('krillion_runs?id=eq.' + encodeURIComponent(run.id) + '&round=eq.' + round + '&completed=eq.false', {
         method: 'PATCH',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ round: round + 1, round_start: null, completed: round + 1 >= book.prompts.length, results })
+        body: JSON.stringify({ round: round + 1, round_start: null, completed: round + 1 >= prompts.length, results })
       });
       if (!response.ok) throw new HttpError('The answer could not be saved. Retry this round.', 503);
       const rows = await response.json();
       if (!rows?.[0]) {
         const current = await readRun(run.id);
         if (!current) throw new HttpError('Dive not found.', 404);
-        return reply({ state: stateFor(current, book), alreadyScored: true });
+        return reply({ state: stateFor(current), alreadyScored: true });
       }
       const updated = rows[0] as Run;
       if (updated.completed) dailyCache = null;
-      return reply({ result, state: stateFor(updated, book) });
+      return reply({ result, state: stateFor(updated) });
     }
 
     if (path === '/next') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
-      const book = await bookForRun(run);
       const updated = !run.completed && run.round_start == null
         ? await updateRun(run.id, { round_start: Date.now() + PREVIEW_MS })
         : run;
-      return reply(stateFor(updated, book));
+      return reply(stateFor(updated));
     }
 
     if (path === '/pause') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
-      const book = await bookForRun(run);
       let updated = run;
       if (body.paused === true && !run.completed && run.round_start != null && !run.paused_at && Date.now() <= Number(run.round_start) + ROUND_MS) {
         updated = await updateRun(run.id, { paused_at: Date.now() });
@@ -676,7 +439,7 @@ Deno.serve(async (req: Request) => {
         const delta = Date.now() - Number(run.paused_at);
         updated = await updateRun(run.id, { round_start: Number(run.round_start) + delta, paused_at: null });
       }
-      return reply(stateFor(updated, book));
+      return reply(stateFor(updated));
     }
 
     if (path === '/hint') {
@@ -684,17 +447,8 @@ Deno.serve(async (req: Request) => {
       if (!run) throw new HttpError('Dive not found.', 404);
       if (run.completed) throw new HttpError('This dive is over.', 409);
       if (run.hint_used) throw new HttpError('That hint is already spent for this dive.', 409);
-      const book = await bookForRun(run);
-      const prompt = book.prompts[Number(run.round)];
-      if (!prompt) throw new HttpError('This dive is over.', 409);
-      const sheet = await callBank<{ count: number; deepest: string | null }>('krillion_hint',
-        { p_date: book.date, p_prompt: prompt.id });
-      if (!sheet?.count || !sheet.deepest) throw new HttpError('This dive is over.', 409);
-      await updateRun(run.id, { hint_used: true });
-      return reply({
-        used: true,
-        hint: `${sheet.count} answers land here. The deepest one starts with “${String(sheet.deepest)[0].toUpperCase()}”.`
-      });
+      const updated = await updateRun(run.id, { hint_used: true });
+      return reply({ used: true, state: stateFor(updated) });
     }
 
     if (path === '/feedback') return reply({ ok: true });

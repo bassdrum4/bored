@@ -4,6 +4,7 @@ import { Sound } from './sound.mjs';
 import { DROP_MS, easeInOut, easeOut, iconFor, tierImage, diveChart, distributionChart, leaderboardList } from './presentation.mjs';
 import { connectLive } from './live.mjs';
 import { createClassSet } from './class-set.mjs';
+import { createRevealRun } from './reveal-run.mjs';
 
 const $=id=>document.getElementById(id);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,12 +35,12 @@ const API_BASE='https://djdpttltfmwkofdrvkem.supabase.co/functions/v1/krillion';
 const API_KEY='sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
 const setName=(queryParams.get('set')||'').toLowerCase();
 const classSet=/^[a-z0-9][a-z0-9-]{0,40}$/.test(setName)?createClassSet(setName):null;
-async function api(path,data){if(classSet)return classSet(path,data);
+async function remote(path,data){
   const safe=data===undefined||(path==='start'&&!!data.runId);
-  const timeout=path==='start'||path==='today'?35000:15000;
+  const timeout=path.startsWith('reveal')?120000:path==='start'||path==='today'?35000:15000;
   for(let attempt=0;;attempt++){
     try{
-      const response=await fetch(API_BASE+'/'+path,{cache:'no-store',headers:{apikey:API_KEY,...(data===undefined?{}:{'Content-Type':'application/json'})},...(data===undefined?{}:{method:'POST',body:JSON.stringify(data)}),signal:AbortSignal.timeout(timeout)});
+      const response=await fetch(API_BASE+'/'+path,{cache:path.startsWith('reveal')?'default':'no-store',headers:{apikey:API_KEY,...(data===undefined?{}:{'Content-Type':'application/json'})},...(data===undefined?{}:{method:'POST',body:JSON.stringify(data)}),signal:AbortSignal.timeout(timeout)});
       if(response.ok)return await response.json();
       const body=await response.json().catch(()=>({}));
       const error=new Error(body.error||'The signal is lost. Please retry.');error.status=response.status;throw error;
@@ -49,6 +50,10 @@ async function api(path,data){if(classSet)return classSet(path,data);
     }
   }
 }
+// The daily dive's own answers are fetched and matched here; classroom sets and
+// everything else keep their own paths.
+const revealRun=createRevealRun({call:remote});
+const api=(path,data)=>classSet?classSet(path,data):revealRun(path,data);
 function setPhase(value){if(value!=='done')stopLive();const card=$('prompt-card'),exiting=value==='plunge'&&!card.hidden;clearTimeout(promptExitTimer);card.classList.toggle('leaving',exiting);if(exiting)promptExitTimer=setTimeout(()=>{if(phase==='plunge')card.hidden=true;},testMode?40:650);phase=value;if(value!=='answering')document.body.classList.remove('timer-hot');document.body.dataset.phase=value;scene.setPhase(value);$('hero').hidden=false;$('intro').hidden=value!=='intro';card.hidden=!exiting&&!['preview','answering'].includes(value);$('answer-dock').hidden=value!=='answering';$('preview-label').hidden=value!=='preview';$('landing').hidden=value!=='landed';$('next-wrap').hidden=value!=='landed';$('results').hidden=value!=='done';$('falling-answer').hidden=value!=='plunge';$('tier-ladder').hidden=value!=='plunge';}
 function applySettings(){scene.lowPower=settings.lowPower;document.body.classList.toggle('low-power',settings.lowPower);document.body.classList.toggle('colorblind',settings.colorblind);document.querySelectorAll('[data-setting]').forEach(input=>input.checked=!!settings[input.dataset.setting]);sound.mute(!!settings.muted);$('mute-btn').setAttribute('aria-pressed',String(!!settings.muted));$('mute-btn').setAttribute('aria-label',settings.muted?'Turn sound on':'Turn sound off');$('mute-btn').innerHTML=`<svg viewBox="0 0 20 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M2 6h3l4-4v12l-4-4H2z"/>${settings.muted?'<path d="m12 5 5 6m0-6-5 6" stroke="currentColor" stroke-width="2"/>':'<path d="M11 6h2v4h-2zm4-3h2v10h-2z"/>'}</svg>`;$('mascot').dataset.buddy=settings.buddy;const buddy=buddyOptions.find(b=>b.id===settings.buddy)||buddyOptions[0];$('mascot').querySelector('img').src=buddy.src;$('mascot').querySelector('img').alt=buddy.name;syncBuddyGold();}
 const buddyOptions=[{id:'krill',name:'The Krill',streak:0,src:'assets/krill.svg'},{id:'schooler',name:'Schooler',streak:5,src:'assets/schooler.svg'},{id:'rare',name:'Rare Squid',streak:14,src:'assets/rare.svg'},{id:'deepcut',name:'Deep Cut Angler',streak:30,src:'assets/deepcut.svg'},{id:'evil',name:'Evil Krill',streak:45,src:'assets/evil.svg'}];
