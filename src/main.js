@@ -817,6 +817,8 @@ function activePlayerId() {
 // player-owned keys rather than just changing the library JSON namespace.
 function activateProfile() {
   clearTimeout(cloudTimer);
+  cloudTimer = 0;
+  cloudPendingOwner = null;
   const id = activePlayerId();
   activatePlayerStorage(id ? 'user:' + id : 'guest');
   dailyResults.clear();
@@ -952,23 +954,41 @@ function syncBuddy() {
 }
 
 let cloudTimer = 0;
+let cloudPendingOwner = null;
+let cloudPushFlight = null;
 
-/** Debounced: one run can move a best and the recent shelf in the same gesture. */
+// A bounded batch, not a sliding debounce: continuous play never postpones a save
+// forever. Local state is written immediately by its existing callers.
 function requestCloudPush() {
   if (!getSession() || !backendReady()) return;
+  cloudPendingOwner = getSession().user.id;
+  if (cloudTimer || cloudPushFlight) return;
+  cloudTimer = setTimeout(flushCloudPush, 5000);
+}
+async function flushCloudPush() {
   clearTimeout(cloudTimer);
-  const id = getSession().user.id;
-  cloudTimer = setTimeout(async () => {
-    if (getSession()?.user?.id !== id) return;
+  cloudTimer = 0;
+  const id = cloudPendingOwner;
+  if (cloudPushFlight || !id || getSession()?.user?.id !== id) return;
+  cloudPendingOwner = null;
+  const job = (async () => {
     try {
       const merged = await pushPlayerState(localPlayerState());
       if (!merged || getSession()?.user?.id !== id) return;
       if (mergePlayerState(merged)) {
         saveLibrary(); renderRecent(); renderLibrary(); renderDaily();
       }
-    } catch { /* Offline: the next save or login retries. */ }
-  }, 900);
+    } catch { /* Offline: the next save or login retries from durable local state. */ }
+  })();
+  cloudPushFlight = job;
+  try { await job; }
+  finally {
+    if (cloudPushFlight === job) cloudPushFlight = null;
+    if (cloudPendingOwner && getSession()?.user?.id === cloudPendingOwner) requestCloudPush();
+  }
 }
+document.addEventListener('visibilitychange', () => { if (document.hidden) void flushCloudPush(); });
+window.addEventListener('pagehide', () => { void flushCloudPush(); });
 
 // Called as soon as a session exists. A table that has not been created yet, an
 // unreachable network, or a token that will not refresh all resolve to "keep
@@ -1307,6 +1327,9 @@ addEventListener('message', event => {
             reply = { ...reply, rows: reply.rows.map(row => ({ ...row, tier: medalFor(row.handle) })) };
           }
           if (gameFrame.contentWindow === frame) frame.postMessage({ type: 'bored:roulette-result', id, ...reply }, '*');
+        }).catch(error => {
+          console.warn('Shotgun Roulette request failed', error?.message);
+          if (gameFrame.contentWindow === frame && activeSlug === 'shotgun-roulette') frame.postMessage({ type: 'bored:roulette-result', id, ok: false, reason: 'server' }, '*');
         });
       }
       break;

@@ -193,13 +193,20 @@ function renderRooms(payload) {
   $('load-more').hidden = payload.rooms.length < 50;
 }
 
+let roomsRequest = 0;
+let roomsLoading = false;
 async function loadRooms(offset = 0) {
+  if (state.code || $('lobby').hidden || document.hidden || roomsLoading) return;
+  const requestId = ++roomsRequest;
+  roomsLoading = true;
   try {
-    renderRooms(await api(`party/rooms?offset=${offset}`));
+    const result = await api(`party/rooms?offset=${offset}`);
+    if (requestId !== roomsRequest || state.code || $('lobby').hidden) return;
+    renderRooms(result);
     state.roomsOffset = offset;
   } catch {
-    $('room-list').innerHTML = '<li class="pf-empty">The room list is unavailable right now.</li>';
-  }
+    if (!state.code && !$('lobby').hidden) $('room-list').innerHTML = '<li class="pf-empty">The room list is unavailable right now.</li>';
+  } finally { roomsLoading = false; }
 }
 
 $('lobby-name').value = prefs.name;
@@ -495,15 +502,22 @@ function stopRoom() {
   state.poll = state.ticker = null;
   state.live?.close();
   state.live = null;
+  state.liveConnected = false;
+  clearTimeout(state.liveSync);
 }
 
 function openChannel() {
   state.live?.close();
   state.live = connectParty({
     code: state.code, name: prefs.name,
-    onStatus: value => { if (value === 'disconnected') paintPresenceNote('reconnecting…'); },
+    onStatus: value => {
+      state.liveConnected = value === 'connected';
+      if (value === 'disconnected') paintPresenceNote('reconnecting…');
+      if (state.liveConnected) void sync();
+    },
     onMessage: message => {
-      if (message.type !== 'broadcast') return;
+      if (message.type !== 'broadcast' || document.hidden || !state.code) return;
+      if (message.revision && message.revision <= state.paintedRevision) return;
       // The nudge is only a trigger: a room read is personalised ("(you)", whose
       // turn it is), so a peer's copy is never painted here. It just spares the
       // room a wait for the next poll, which is most of the felt delay.
@@ -515,22 +529,24 @@ function openChannel() {
 function paintPresenceNote(note) { status(note, ''); }
 
 async function sync(force = false) {
-  if (!state.code) return;
+  if (!state.code || document.hidden) return;
   if (state.syncing) { state.again = true; return; }
   state.syncing = true;
+  const code = state.code;
   try {
-    const view = await api('party/room?code=' + state.code);
+    const view = await api('party/room?code=' + code);
+    if (state.code !== code) return;
     // A poll that lands on the same revision only needs the clock corrected.
     if (!force && view.revision === state.paintedRevision) {
       state.offset = (view.serverNow || Date.now()) - Date.now();
       paintClock();
     } else paint(view);
   } catch (error) {
+    if (state.code !== code) return;
     if (error.status === 403 || error.status === 404) {
       stopRoom();
       showLobby();
       status('You are not in that room any more.', 'bad');
-      loadRooms();
     }
   } finally {
     state.syncing = false;
@@ -543,12 +559,16 @@ async function sync(force = false) {
 // the same revision cost one small request and no repaint.
 function scheduleSync() {
   clearInterval(state.poll);
-  let tick = 0;
+  let lastPoll = 0;
   state.poll = setInterval(() => {
-    tick += 1;
-    if (document.hidden) return;
-    const playing = !!state.view && state.view.status !== 'lobby';
-    if (!playing && tick % 3) return;
+    if (document.hidden || !state.code || state.view?.status === 'finished') return;
+    const playing = state.view?.status === 'playing';
+    const remaining = Number(state.view?.deadline || 0) - (Date.now() + state.offset);
+    // Broadcasts still sync immediately. Poll fast when realtime is unavailable
+    // or a server-authoritative turn deadline is about to expire.
+    const interval = playing ? (!state.liveConnected || remaining <= 1500 ? 500 : 2500) : (state.liveConnected ? 5000 : 1500);
+    if (Date.now() - lastPoll < interval) return;
+    lastPoll = Date.now();
     sync();
   }, 500);
   clearInterval(state.ticker);
@@ -597,6 +617,7 @@ async function host() {
 }
 
 function openRoom(view, code) {
+  roomsRequest++;
   state.code = code;
   state.seatHtml = '';
   state.paintedRevision = -1;
@@ -707,6 +728,11 @@ $('answer-form').addEventListener('submit', async event => {
 
 loadIdentity();
 loadRooms(0);
-setInterval(() => { if (!$('lobby').hidden) loadRooms(0); }, 6000);
+setInterval(() => { if (!state.code && !$('lobby').hidden && !document.hidden) loadRooms(state.roomsOffset || 0); }, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (state.code) void sync(true);
+  else void loadRooms(state.roomsOffset || 0);
+});
 const initial = new URLSearchParams(location.search).get('code');
 if (initial) enter(initial);

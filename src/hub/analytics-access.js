@@ -10,14 +10,30 @@ export const CIV_LITE_GAME = 'ashcrown';
 // role check and reuse it briefly, but never cache across an account/token
 // change or cache failed checks. Database RLS remains the actual gate.
 const ACCESS_TTL_MS = 120_000;
+const ORDINARY_TTL_MS = 30 * 60_000;
+const ACCESS_CACHE_KEY = "bored.analytics.ordinary.v1";
+function readOrdinary(userId, session) {
+  try {
+    const item = JSON.parse(sessionStorage.getItem(ACCESS_CACHE_KEY) || "null");
+    if (session.expires_at && item?.userId === userId && item.sessionExpiry === session.expires_at && Date.now() < item.expiresAt)
+      return { userId, kind: null, games: [] };
+  } catch {}
+  return null;
+}
+function rememberOrdinary(userId, session, expiresAt) {
+  try { if (session.expires_at) sessionStorage.setItem(ACCESS_CACHE_KEY, JSON.stringify({ userId, sessionExpiry: session.expires_at, expiresAt })); } catch {}
+}
+function clearOrdinary() { try { sessionStorage.removeItem(ACCESS_CACHE_KEY); } catch {} }
 let cachedAccess = null;
 let accessInFlight = null;
 const noAccess = () => ({ userId: null, kind: null, games: [] });
 
 if (typeof window !== 'undefined') {
   window.addEventListener('bored:identity', () => {
-    cachedAccess = null;
-    accessInFlight = null;
+    const session = getSession();
+    if (!session?.user?.id) clearOrdinary();
+    if (cachedAccess?.userId !== session?.user?.id || cachedAccess?.token !== session?.access_token) cachedAccess = null;
+    if (accessInFlight?.userId !== session?.user?.id || accessInFlight?.token !== session?.access_token) accessInFlight = null;
   });
 }
 
@@ -36,21 +52,33 @@ export async function getAnalyticsAccess() {
   if (accessInFlight?.userId === userId && accessInFlight.token === token)
     return accessInFlight.promise;
 
+  // Only negative (ordinary-player) results persist across reloads; privileged
+  // roles are revalidated frequently and the database remains the actual gate.
+  const stored = readOrdinary(userId, session);
+  if (stored && !cachedAccess) return stored;
   const promise = (async () => {
-    const [admins, gameReaders] = await Promise.all([
-      request('/rest/v1/analytics_admins?select=user_id&user_id=eq.' + encodeURIComponent(userId),
-        { token }),
-      request('/rest/v1/game_analytics_readers?select=game&user_id=eq.' + encodeURIComponent(userId),
-        { token })
-    ]);
+    let access;
+    try {
+      const result = await request("/rest/v1/rpc/my_analytics_access", { method: "POST", body: {}, token });
+      if (typeof result?.admin === "boolean" && Array.isArray(result.games)) access = result;
+    } catch (error) { if (error?.status !== 404) throw error; }
+    if (!access) {
+      const [admins, gameReaders] = await Promise.all([
+        request('/rest/v1/analytics_admins?select=user_id&user_id=eq.' + encodeURIComponent(userId),
+          { token }),
+        request('/rest/v1/game_analytics_readers?select=game&user_id=eq.' + encodeURIComponent(userId),
+          { token })
+      ]);
+      access = { admin: Array.isArray(admins) && admins.some(row => row.user_id === userId),
+        games: Array.isArray(gameReaders) ? gameReaders.map(row => row.game) : [] };
+    }
     // Never hand an old account's entitlement to the next signed-in player.
     if (getSession()?.user?.id !== userId || getSession()?.access_token !== token) return noAccess();
-    const isAdmin = Array.isArray(admins) && admins.some(row => row.user_id === userId);
-    const games = Array.isArray(gameReaders)
-      ? [...new Set(gameReaders.map(row => row.game).filter(game => typeof game === 'string' && game))].sort()
-      : [];
-    const value = { userId, kind: isAdmin ? 'admin' : games.length ? 'game-reader' : null, games };
-    cachedAccess = { userId, token, expiresAt: Date.now() + ACCESS_TTL_MS, value };
+    const games = [...new Set(access.games.filter(game => typeof game === 'string' && game))].sort();
+    const value = { userId, kind: access.admin ? 'admin' : games.length ? 'game-reader' : null, games };
+    const expiresAt = Date.now() + (value.kind ? ACCESS_TTL_MS : ORDINARY_TTL_MS);
+    if (value.kind) clearOrdinary(); else rememberOrdinary(userId, session, expiresAt);
+    cachedAccess = { userId, token, expiresAt, value };
     return value;
   })();
   accessInFlight = { userId, token, promise };

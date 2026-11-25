@@ -361,6 +361,14 @@ test('browser regressions', async t => {
       assert.equal(await rouletteFrame.evaluate(() => getComputedStyle(document.body).visibility), 'visible');
       assert.equal(await rouletteFrame.evaluate(() => document.querySelector('#startup-error').hidden), true);
       assert.equal(await rouletteFrame.evaluate(() => document.querySelector('#mp-open').hidden), false);
+      await rouletteFrame.click('button[data-mode="normal"]');
+      await rouletteFrame.waitForFunction(() => /not enough tokens|sign in/i.test(document.querySelector('#lobby-note').textContent));
+      assert.ok(await rouletteFrame.evaluate(() => {
+        const note = document.querySelector('#lobby-note').getBoundingClientRect();
+        return note.top >= 0 && note.bottom <= innerHeight;
+      }), 'mode refusal is visible within the game frame');
+      await rouletteFrame.click('#test-start');
+      await rouletteFrame.waitForFunction(() => document.querySelector('#lobby').hidden && !document.querySelector('#hud').hidden && /Round 1/.test(document.querySelector('#round-label').textContent));
       await page.waitForFunction(() => document.querySelector('#frame')?.title === 'Shotgun Roulette');
       // Public, but still an opaque origin: it cannot read the session or the wallet.
       assert.equal(await page.$eval('#frame', el => el.getAttribute('sandbox')), 'allow-scripts');
@@ -386,6 +394,24 @@ test('browser regressions', async t => {
       assert.equal(await directPage.evaluate(() => getComputedStyle(document.body).visibility), 'visible');
       assert.equal(await directPage.evaluate(() => document.querySelectorAll('button[data-mode]').length), 2);
       assert.equal(await directPage.evaluate(() => !!document.querySelector('#test-start')), true);
+      // Exercise both paid modes against a fake wallet responder; never touch a real account.
+      await directPage.evaluateOnNewDocument(() => {
+        addEventListener('message', event => {
+          const data = event.data;
+          if (data?.type === 'bored:roulette') {
+            const response = {type:'bored:roulette-result',id:data.id,ok:true,chips:1000,wonToday:0,capLeft:3000,betId:'fixture'};
+            if (data.op === 'rewards') Object.assign(response,{signedIn:true,daily:{amount:300,claimed:true},bailout:{open:false}});
+            window.postMessage(response,'*');
+          }
+        });
+      });
+      for (const mode of ['normal','hard']) {
+        await directPage.reload();
+        await directPage.waitForFunction(() => typeof window.__boredSnapshot === 'function' && document.querySelector('#coins').textContent === '1,000');
+        await directPage.click('button[data-mode="' + mode + '"]');
+        await directPage.waitForFunction(() => document.querySelector('#lobby').hidden && !document.querySelector('#hud').hidden && /Round 1/.test(document.querySelector('#round-label').textContent));
+        assert.equal(await directPage.evaluate(() => window.__boredSnapshot().real), true);
+      }
     } finally {
       await directPage.close();
     }

@@ -204,14 +204,14 @@
   .tip[hidden] { display: none }
 
   /* The lobby, over the room with the lights down and no dealer. */
-  .lobby { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 380px; gap: 48px; padding: 70px 76px 40px;
+  .lobby { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 380px; gap: 48px; padding: 56px 76px 24px;
            background: linear-gradient(90deg, #060409f5 0, #060409d9 60%, #060409f0 100%) }
   .lobby[hidden] { display: none }
-  .title { font: 700 76px/0.95 var(--display); letter-spacing: -.03em }
-  .reflection { display: block; font: 700 76px/0.95 var(--display); letter-spacing: -.03em; transform: scaleY(-1); color: #3a2758;
-                margin-top: .22em; user-select: none }
+  .title { font: 700 64px/0.95 var(--display); letter-spacing: -.03em }
+  .reflection { display: block; font: 700 48px/0.95 var(--display); letter-spacing: -.03em; transform: scaleY(-1); color: #3a2758;
+                margin-top: .08em; user-select: none }
   .status { max-width: 46ch; margin-top: 16px; color: var(--dim) }
-  .lobby h2 { font: 400 24px/1.25 var(--display); margin: 26px 0 12px }
+  .lobby h2 { font: 400 24px/1.25 var(--display); margin: 18px 0 8px }
   .bet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 16px; color: var(--dim); font-size: 15px }
   .bet-row label { color: var(--ink) }
   .bet-row input { width: 7ch; margin-left: 8px; padding: 6px 8px; border: 1px solid #3a2758; border-radius: 3px; background: #1d1230;
@@ -231,7 +231,7 @@
   .test-pick { display: flex; gap: 14px; margin-top: 10px; font-size: 14px; color: var(--dim) }
   .test-pick label { display: flex; align-items: center; gap: 5px; cursor: pointer }
   .test-pick input { accent-color: var(--gold) }
-  .lobby-note { min-height: 1.6em; margin-top: 14px; font-size: 15px; color: var(--gold) }
+  .lobby-note { min-height: 2.9em; margin: 0 0 8px; font-size: 15px; color: var(--gold) }
   .board-panel { border-left: 1px solid #3a2758; padding-left: 32px }
   .tabs { display: flex; gap: 6px; margin-bottom: 12px }
   .tab { min-height: 34px; padding: 5px 14px; border: 1px solid #3a2758; border-radius: 3px; background: none; color: var(--dim); font-size: 15px; cursor: pointer }
@@ -565,6 +565,7 @@
           <label for="bet">Your bet<input id="bet" type="number" min="10" max="500" step="10" value="50" inputmode="numeric"></label>
           <span id="cap-line">Bets run from 10 to 500 tokens. You can win up to 3,000 tokens a day, net of losses.</span>
         </div>
+        <p class="lobby-note" id="lobby-note" role="status" aria-live="polite">Test Game is free and needs no tokens.</p>
         <div class="islands" role="group" aria-labelledby="opponents-title">
           <button class="island normal" type="button" data-mode="normal">
             <span class="name">Altered Giratina</span><span class="level">Normal</span><span class="pays">A win pays 1.8 times your bet</span>
@@ -599,7 +600,6 @@
           <div class="mp-rooms" id="mp-rooms"></div>
           <button class="mp-btn quiet" id="mp-close" type="button">Close</button>
         </div>
-        <p class="lobby-note" id="lobby-note" role="status"></p>
       </section>
     </main>
     <section class="board-panel" aria-labelledby="lb-title">
@@ -1671,22 +1671,22 @@ $("#shoot-foe").onclick = () => { if (g && g.holding && !g.busy && !g.over) fire
 /* ── The lobby ────────────────────────────────────────────────────────── */
 const note = text => { $("#lobby-note").textContent = text; };
 const REFUSED = {
-  coins: "You don't have enough tokens for that bet.",
-  chips: "You don't have enough tokens for that bet. Claim 300 a day up top.",
+  coins: "Not enough tokens. Lower your bet, claim tokens above, or choose Test Game (free).",
+  chips: "Not enough tokens. Claim daily tokens above, lower your bet, or choose Test Game (free).",
   cap: "You're 3,000 tokens up today, the daily limit. Come back tomorrow, or play a test game.",
   range: "Bets run from 10 to 500 tokens.",
-  signin: "Sign in to bet tokens."
+  signin: "Sign in to bet tokens, or choose Test Game (free)."
 };
 async function startReal(mode, bet) {
   if (!(Number.isInteger(bet) && bet >= RULES.minBet && bet <= RULES.maxBet)) return note(REFUSED.range);
   if (coins !== null && bet > coins) return note(REFUSED.coins);
   note("Placing your bet...");
   for (const b of document.querySelectorAll(".islands button")) b.disabled = true;
-  const reply = await ask("bet", { mode, bet });
+  const reply = await ask("bet", { mode, bet }, 6000);
   for (const b of document.querySelectorAll(".islands button")) b.disabled = false;
-  if (!reply) return note("Token bets aren't open yet: the arcade hasn't switched them on for this preview. Try a test game in the meantime.");
+  if (!reply) return note("The arcade did not confirm your bet. Check your balance before retrying, or choose Test Game (free).");
   showCap(reply);
-  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet didn't go through. Your tokens weren't touched.");
+  if (!reply.ok) return note(REFUSED[reply.reason] || "The bet was not confirmed. Check your token balance or try a free Test Game.");
   setBalance(reply);
   note("");
   begin(mode, false, bet, reply.betId);

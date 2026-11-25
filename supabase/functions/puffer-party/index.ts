@@ -698,12 +698,32 @@ async function leaveParty(body: Record<string, any>, token: string) {
   return snapshot(saved, state, token, await loadBook());
 }
 
+const roomListCache = new Map<number, { expires: number; value: unknown }>();
+const roomListFlight = new Map<number, Promise<unknown>>();
+let lastRoomCleanup = 0;
 async function listRooms(url: URL) {
+  const offset = Math.max(0, Math.min(10000, Math.trunc(Number(url.searchParams.get('offset')) || 0)));
+  const cached = roomListCache.get(offset);
+  if (cached && Date.now() < cached.expires) return cached.value;
+  const pending = roomListFlight.get(offset);
+  if (pending) return pending;
+  const job = fetchPublicRooms(offset).then(value => {
+    if (roomListCache.size >= 32) roomListCache.clear();
+    roomListCache.set(offset, { expires: Date.now() + 8000, value });
+    return value;
+  });
+  roomListFlight.set(offset, job);
+  try { return await job; }
+  finally { if (roomListFlight.get(offset) === job) roomListFlight.delete(offset); }
+}
+async function fetchPublicRooms(offset: number) {
   const stale = new Date(Date.now() - ROOM_TTL).toISOString();
-  await sb('party_rooms?updated_at=lt.' + encodeURIComponent(stale), { method: 'DELETE' });
-  const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+  if (Date.now() - lastRoomCleanup >= 300000) {
+    lastRoomCleanup = Date.now();
+    try { await sb('party_rooms?updated_at=lt.' + encodeURIComponent(stale), { method: 'DELETE' }); } catch { /* retry later */ }
+  }
   const limit = 50;
-  const query = 'party_rooms?listed=eq.true&status=in.(lobby,playing)&select=code,state,status,seats,revision,updated_at&order=updated_at.desc&limit=' + limit + '&offset=' + offset;
+  const query = 'party_rooms?listed=eq.true&status=in.(lobby,playing)&updated_at=gte.' + encodeURIComponent(stale) + '&select=code,state,status,seats,revision,updated_at&order=updated_at.desc&limit=' + limit + '&offset=' + offset;
   const response = await sb(query);
   if (!response.ok) throw new HttpError('The room list is unavailable right now.', 503);
   const rows = await response.json();
