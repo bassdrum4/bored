@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 978,
+  "count": 980,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"66bdd6bd","date":"2026-11-25","author":"Daniel Lowe","subject":"Repair browser CI fixtures for current hub and analytics RPC","pr":357},
+  {"sha":"5d1c9546","date":"2026-11-25","author":"Daniel Lowe","subject":"Add global chat with OpenAI moderation","pr":358},
   {"sha":"39f64194","date":"2026-11-25","author":"Daniel Lowe","subject":"Replace presence WebSockets with SSE and long polling","pr":356},
   {"sha":"00d527ea","date":"2026-11-25","author":"Daniel Lowe","subject":"Keep analytics-only migration out of isolated multiplayer test schema"},
   {"sha":"9cd8b08e","date":"2026-11-25","author":"bassdrum4","subject":"Fix Roulette mode feedback and reduce redundant backend requests"},
