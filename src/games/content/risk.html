@@ -4259,6 +4259,13 @@
         });
         if (!s.attackedBy) s.attackedBy = {};
       }
+      // Keep ownership public, but conceal enemy strength until opening deployment ends.
+      function riskOpeningArmiesHidden(owner) {
+        return Boolean(ONLINE && state.phase === "SETUP" && owner >= 0 && owner !== myPlayerIndex);
+      }
+      function riskArmyLabel(owner, armies) {
+        return riskOpeningArmiesHidden(owner) ? "?" : armies;
+      }
       function getStatsHTML(pid) {
         if (pid == null || !state.players[pid]) return "No data";
         ensureStats(pid);
@@ -4268,7 +4275,9 @@
           (t) => t && t.owner === pid,
         );
         const territoriesOwned = terrs.length;
-        const totalArmies = terrs.reduce((a, b) => a + (b.armies || 0), 0);
+        // /info is shared in chat, so conceal both players’ opening totals there.
+        const privateSetup = Boolean(ONLINE && state.phase === "SETUP");
+        const totalArmies = privateSetup ? "?" : terrs.reduce((a, b) => a + (b.armies || 0), 0);
         // continents controlled
         const continents = CONTINENTS.map((c) => ({
           name: c.name,
@@ -4302,7 +4311,7 @@
           `<div>Territories owned: ${territoriesOwned}</div>`,
           `<div>Continents controlled: ${continentsControlled}</div>`,
           `<div>Total armies: ${totalArmies}</div>`,
-          `<div>Armies placed this turn: ${s.armiesPlacedThisTurn}</div>`,
+          `<div>Armies placed this turn: ${privateSetup ? "?" : s.armiesPlacedThisTurn}</div>`,
           `<div>Armies lost: ${s.armiesLost}</div>`,
           `<div>Armies killed: ${s.armiesKilled}</div>`,
           `<div>Cards held: ${(p.cards || []).length}</div>`,
@@ -5761,7 +5770,7 @@
             ctx.font = "bold 14px Orbitron";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(t.armies, x, y);
+            ctx.fillText(riskArmyLabel(t.owner, t.armies), x, y);
           });
           requestAnimationFrame(drawLoop);
         } catch (e) {
@@ -5864,7 +5873,7 @@
                     </div>
                     <div class="flex justify-between text-lg">
                         <span style="color:#aaa">ARMIES:</span>
-                        <span style="color:#fff; font-weight:bold">${t.armies}</span>
+                        <span style="color:#fff; font-weight:bold">${riskArmyLabel(t.owner, t.armies)}</span>
                     </div>
                 `;
         } else {
@@ -5872,6 +5881,7 @@
         }
       });
       function updateHUD() {
+        if (ONLINE && tooltip) tooltip.style.display = "none";
         const safeLastDice =
           state.lastDice && typeof state.lastDice === "object"
             ? state.lastDice
@@ -6012,7 +6022,7 @@
         if (state.phase==="SETUP") {
           const deployingNow=state.players[state.turnIndex];
           if (state.turnIndex===-1) help.textContent="Click your territories to place 1 army, or Shift-click for up to 5. Press FINISH when all are placed.";
-          else if (isMe) help.textContent="Your deployment turn: place every opening army (click for 1, Shift-click for up to 5), then press END DEPLOYMENT.";
+          else if (isMe) help.textContent="Your deployment turn: place every opening army (click for 1, Shift-click for up to 5), then press END DEPLOYMENT. Enemy troop counts stay hidden until both players finish.";
           else help.textContent=`${deployingNow?deployingNow.name:"The other commander"} is placing their opening armies. Your turn follows.`;
         }
         else if (cpuTurn) help.textContent="Computer commanders are taking their turns. Your turn is next.";
@@ -6036,7 +6046,7 @@
                 <div class="stats-row" style="${!p.alive ? "opacity:0.3" : ""}">
                     <span style="color:${P_COLORS[i]}" class="w-16 truncate">${p.name}</span>
                     <span class="w-8 text-center text-white">${terrs}</span>
-                    <span class="w-8 text-center text-yellow-500">${armies}</span>
+                    <span class="w-8 text-center text-yellow-500">${riskArmyLabel(i, armies)}</span>
                     <span class="w-8 text-center text-green-400">${cards}</span>
                     <span class="w-8 text-center text-cyan-400">+${income}</span>
                 </div>`;
