@@ -387,7 +387,7 @@ test('Story chapters: rows after the Champion that wait for what they need, scen
     const post = sceneNow && sceneNow.id; endScene();
     const after = rows().filter(x => x.text.startsWith('Test'));
     // Bond comes from a win in the active party only.
-    S.box[26] = { xp: 1e6 }; startLoc({ kind: 'route', r: 0, k: 0 }); defeat();
+    S.box[26] = { xp: 1e6 }; S.balls = { poke: 0, great: 0, ultra: 0, master: 0 }; startLoc({ kind: 'route', r: 0, k: 0 }); defeat();   // no balls: no random catch
     return { before, after, order: oneAt === champAt + 1, pre, post, ch: S.story.ch, clue: S.story.clues, snap: storyProgress(S), bond: [S.box[25].bond, S.box[26].bond], peak: S.box[25].peak };
   });
   assert.deepEqual(got.before.map(x => [x.text, x.open]), [['Test oneafter Blue', false], ['Test twoafter Test one', false]]);
