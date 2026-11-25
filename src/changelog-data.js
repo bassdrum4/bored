@@ -2,13 +2,20 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 957,
-  "newest": "2026-11-24",
+  "count": 965,
+  "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"41b9356e","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story framework: v3 revisions (hidden bond flag, level sync)"},
+  {"sha":"0209f735","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story framework: v2 revisions (catch regions, bonded, trust, Next up and the Year map)"},
+  {"sha":"b070c0b6","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story Year 1: Vettel's revisions"},
+  {"sha":"129af392","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story: reserve the later years' save fields now, and keep a Story lifetime dex in the story block"},
+  {"sha":"4ebbb699","date":"2026-11-25","author":"Claude","subject":"Poké Idle: Story Mode Year 1 end, Replay Mode, achievements, wiki and letter (part 3 of 3)"},
+  {"sha":"7c908826","date":"2026-11-25","author":"Claude","subject":"Poké Idle: Story Mode Year 1, The Long Freeze (part 2 of 3)"},
+  {"sha":"c59f8782","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story test: no balls in the bond check, so a random catch can't change the dex count"},
   {"sha":"7a0144bc","date":"2026-11-24","author":"Daniel Lowe","subject":"Allow Pages deploy after successful build when scheduled-only job is skipped"},
   {"sha":"e6a25d01","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Pages artifact propagation race with separate build and bounded deployment retries"},
   {"sha":"0aab6001","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix game launches after removing the recent shelf eyebrow"},
@@ -20,6 +27,7 @@ export const CHANGELOG = [
   {"sha":"84347091","date":"2026-11-24","author":"Daniel Lowe","subject":"Squaretato leaderboard and 21 illustrated characters","pr":346},
   {"sha":"4118ec44","date":"2026-11-24","author":"Daniel Lowe","subject":"Add signed-in online presence with account-wide opt-out","pr":345},
   {"sha":"64d4a23b","date":"2026-11-24","author":"Daniel Lowe","subject":"Squaretato: overhaul wave combat, shops and run progression","pr":341},
+  {"sha":"089906f4","date":"2026-11-24","author":"Claude","subject":"Poké Idle: Story Mode framework (Year 1, part 1 of 3)"},
   {"sha":"f7f31718","date":"2026-11-24","author":"Daniel Lowe","subject":"Use actual Puppeteer collection evaluation for hub and preview checks","pr":340},
   {"sha":"88a3ef50","date":"2026-11-24","author":"Daniel Lowe","subject":"Repair browser regressions and invalidate leaderboard card cache on score updates","pr":339},
   {"sha":"03c6771e","date":"2026-11-24","author":"Daniel Lowe","subject":"Add Squaretato survival arena","pr":337},
