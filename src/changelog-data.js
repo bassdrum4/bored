@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 947,
+  "count": 948,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4118ec44","date":"2026-11-24","author":"Daniel Lowe","subject":"Add signed-in online presence with account-wide opt-out","pr":345},
   {"sha":"64d4a23b","date":"2026-11-24","author":"Daniel Lowe","subject":"Squaretato: overhaul wave combat, shops and run progression","pr":341},
   {"sha":"f7f31718","date":"2026-11-24","author":"Daniel Lowe","subject":"Use actual Puppeteer collection evaluation for hub and preview checks","pr":340},
   {"sha":"88a3ef50","date":"2026-11-24","author":"Daniel Lowe","subject":"Repair browser regressions and invalidate leaderboard card cache on score updates","pr":339},
