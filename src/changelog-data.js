@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 955,
+  "count": 956,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"e6a25d01","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix Pages artifact propagation race with separate build and bounded deployment retries"},
   {"sha":"0aab6001","date":"2026-11-24","author":"Daniel Lowe","subject":"Fix game launches after removing the recent shelf eyebrow"},
   {"sha":"5a0b2010","date":"2026-11-24","author":"Daniel Lowe","subject":"Connect Bored to verified owner-controlled Render presence service"},
   {"sha":"cf38833a","date":"2026-11-24","author":"Daniel Lowe","subject":"Move Bored presence to an optimized free Render service"},
