@@ -128,6 +128,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore('squaretato', 'Squaretato', 'survival', { metric: 'score', min: 1, max: 50059999, when: snapshot => snapshot.scoreReady === true, format: value => Math.floor(value / 100000) + ' waves · D' + Math.floor(value % 100000 / 10000) + ' · ' + (value % 10000).toLocaleString('en-US') + ' kills' }),
   highScore("ballistic-chickens", "Ballistic Chickens", "m", { metric: "meters", when: snapshot => snapshot.finished === true }),
   // Biggest single-game profit (chips won minus the bet) from a real game that
   // was won, either mode. The game is sandboxed, so src/hub/roulette.js posts it

@@ -240,6 +240,12 @@
     "better": "high",
     "max_value": 10000000
   },
+  "squaretato": {
+    "label": "Waves cleared, then Danger level, then kills (survival score)",
+    "better": "high",
+    "min_value": 1,
+    "max_value": 50059999
+  },
   "sudoku": {
     "label": "Seconds to solve a puzzle",
     "better": "low",
