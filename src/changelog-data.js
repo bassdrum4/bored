@@ -2,16 +2,18 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 968,
+  "count": 970,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"067a622f","date":"2026-11-25","author":"bassdrum4","subject":"Keep Krillion's run state so a finished dive gets its sounding"},
   {"sha":"6bb9cba1","date":"2026-11-25","author":"Codebuff","subject":"Poll presence every 45 seconds and raise the per-address cap"},
   {"sha":"83101baa","date":"2026-11-25","author":"Codebuff","subject":"Keep online presence working when a network blocks WebSocket upgrades"},
   {"sha":"b96cba93","date":"2026-11-25","author":"bassdrum4","subject":"Score Krillion's dive in the browser instead of a Postgres answer bank"},
+  {"sha":"5261606d","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story Year 1: scene text from the plot (rev 3), and tuning notes"},
   {"sha":"41b9356e","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story framework: v3 revisions (hidden bond flag, level sync)"},
   {"sha":"0209f735","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story framework: v2 revisions (catch regions, bonded, trust, Next up and the Year map)"},
   {"sha":"b070c0b6","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story Year 1: Vettel's revisions"},
