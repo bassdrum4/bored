@@ -2355,9 +2355,11 @@ const MAIL = [
   { id: "story-r1", chapter: true, date: "After Johto", from: "Sssssssnakes", title: "Warm-up",
     body: `<p>Don't get used to winning. That was a warm-up.</p><p>Also Penguin never tells you anything, right? Yeah. He did that to me too.</p><p>— Sssssnakes</p>` },
   { id: "story-kanto", chapter: true, date: "After Kanto", from: "Prof Penguin", title: "The cage",
-    body: `<p>That lab was built to hold a legend. Who builds a cage before there's anything to put in it?</p><p>You'll find uses for this. Better you have it early.</p><p><i>A Key Stone is in the envelope: Mega Evolution is open.</i></p><p>The next pin went blue last night. Johto. The Bell Tower stopped ringing.</p><p>Prof Penguin</p>` },
-  { id: "story-johto", chapter: true, date: "After Johto", from: "Prof Penguin", title: "Two somethings",
-    body: `<p>Something's moving under the sea off Hoenn. Two somethings. Go quickly.</p><p>Prof Penguin</p>` },
+    body: `<p>That lab was built to hold a legend. Who builds a cage before there's anything to put in it?</p><p>You'll find uses for the stone. Better you have it early.</p><p><i>A Key Stone is in the envelope: Mega Evolution is open.</i></p><p>The next pin went blue last night. Johto. The Bell Tower stopped ringing.</p><p>Prof Penguin</p>` },
+  { id: "story-johto-249", chapter: true, date: "After Johto", from: "Prof Penguin", title: "The sea one",
+    body: `<p>The sea one. Of course you'd pick the cold.</p><p>Something's moving under the sea off Hoenn. Two somethings. Go quickly.</p><p>Prof Penguin</p>` },
+  { id: "story-johto-250", chapter: true, date: "After Johto", from: "Prof Penguin", title: "Fire",
+    body: `<p>Fire. Good. We'll need it before this is over.</p><p>Something's moving under the sea off Hoenn. Two somethings. Go quickly.</p><p>Prof Penguin</p>` },
   { id: "story-hoenn", chapter: true, date: "After Hoenn", from: "Prof Penguin", title: "Wrong clocks",
     body: `<p>My clocks are wrong. All of them, all at once. Sinnoh, Mt. Coronet. Dress warm.</p><p>Prof Penguin</p>` },
   { id: "story-unova", chapter: true, date: "After Unova", from: "Prof Penguin", title: "That roar",
@@ -2365,13 +2367,13 @@ const MAIL = [
   { id: "story-kalos-next", chapter: true, date: "After Kalos", from: "Prof Penguin", title: "Paper",
     body: `<p>If there's a list, someone wrote it down. Alola's next on it. Keep your eyes open for paper.</p><p>Prof Penguin</p>` },
   { id: "story-alola", chapter: true, date: "After Alola", from: "Prof Penguin", title: "Galar",
-    body: `<p>Sssssssnakes is in Galar. I'd rather you got there before they did something they regret.</p><p>Prof Penguin</p>` },
+    body: `<p>Sssssssnakes is in Galar. I'd rather you got there before he does something he regrets.</p><p>Prof Penguin</p>` },
   { id: "story-galar", chapter: true, date: "After Galar", from: "Prof Penguin", title: "It ends there",
     body: `<p>Every reading points to Paldea now. Whatever they're building, it ends there.</p><p>Prof Penguin</p>` },
   { id: "story-memo", chapter: true, date: "Year 1", from: "(no sender)", title: "INTERNAL",
-    body: `<p><b>INTERNAL. Do not forward.</b></p><p>The Engine is on schedule. It wakes and binds each legend in turn, per the list. Units are assigned per site.</p><p>Unit 1: Aether, contained. Unit 2: assigned to the Director.</p>` },
+    body: `<p><b>INTERNAL.</b></p><p>...the Engine performs as designed: it wakes and binds the subject. Binding holds for approx. 9–14 days before thermal drain becomes visible to the public. Recommend release of Thaw Packs on Day 3 of visible drain...</p>` },
   { id: "story-kalos", chapter: true, date: "Year 1", from: "Prof Penguin", title: "A pattern",
-    body: `<p>I've been plotting the freeze on the map. It isn't random. It moves from legend to legend in a set order, like someone is following a list.</p><p>Keep writing things down.</p><p>Prof Penguin</p>` },
+    body: `<p>I've charted the dates the freeze reached each legend site. It isn't random. It moves from one legend to the next in a set order, like someone is following a list.</p><p>Prof Penguin</p>` },
   { id: "story-sinnoh", chapter: true, date: "After Sinnoh", from: "Prof Penguin", title: "She said that?",
     body: `<p><i>His reply took two days.</i></p><p>She said that?</p><p>I knew their leader once. A long time ago. Let's leave it there.</p><p>Unova next. Two dragons, one tower. And something colder underneath.</p><p>Prof Penguin</p>` },
   { id: "update-hall-of-fame", hof: true, date: "Hall of Fame", from: "Prof Penguin", title: "The Hall of Fame",
@@ -2649,7 +2651,7 @@ function wikiSections() {
     { id: "story", group: "Story Mode", title: "Story Mode: Year 1", html: `<p><b>New game</b> asks Classic or Story. Story has its own save on this device (not in your Bored account yet), and the title screen switches between the two. Starting one over never touches the other.</p>
       <p><b>Rules.</b> XP ×${STORY_XP} and shinies ×${STORY_SHINY} (1 in ${4096 / STORY_SHINY}; the Shiny Charm's ×3 on top). No prestige. Shiny lines are shared with Classic: the first catch of a line you've had shiny in either mode comes out shiny. A Pokémon below the highest level it ever reached gets ×${REMEMBER} XP until it's back there (❄ in Party &amp; Box); in Story that replaces the catch-up bonus.</p>
       <p><b>League rules</b>, for Story's gyms and Champions: no Tier 0, 1 or 2, at most one Tier 3 and at most two Tier 4s. Mascot legends and Mega pseudo forms are both Tier 3. A party that breaks them gets a notice that loads a saved team that fits.</p>
-      <p><b>Chapters</b> come after each Champion: in Johto, Unova and Galar ${RIVAL_NAME} first, then a Team Thaw admin (a little harder than the Champion, at the Champion's level cap), then the legend: Mewtwo in Kanto, and a pick of two everywhere else. You catch it the usual way; if it gets away, try again from the list. Prizes: ${CHAPTERS.filter(c => c.prize && c.prize.stone).map(c => REGIONS[c.r].name).join(", ")} give Mega pseudo stones, the others a Master Ball, and Prof Penguin gives you a Key Stone after Kanto. Alola has an optional rescue.</p>
+      <p><b>Chapters</b> come after each Champion: in Johto, Unova and Galar ${RIVAL_NAME} first, then a Team Thaw admin (a little harder than the Champion, at the Champion's level cap), then the legend: Mewtwo in Kanto, and a pick of two everywhere else. You catch it the usual way; if it gets away, try again from the list. Prizes: ${CHAPTERS.filter(c => c.prize && c.prize.stone).map(c => REGIONS[c.r].name).join(", ")} give Mega pseudo stones, the others a Master Ball, and Prof Penguin gives you a Key Stone after Kanto. Alola has an optional chapter, The Mask: free a Type: Null, then win 10 battles with it in your party (its detail shows Trust: X/10) and it evolves into Silvally.</p>
       <p><b>The finale</b>, in Paldea: all three admins in a row at Lv 100, ${FINAL_TIME}s each with a ${FINAL_BREAK}s break to change your party between them. Run out of time anywhere and it starts over. It opens after every other region's legend and ${FINALE_DEX} Pokémon in your Story dex. Then Paldea's pick, and Red on Mt. Silver for the Shiny Charm.</p>
       <p><b>The Story tab</b> keeps every scene you've seen, to read again, and the clues you've found. <b>Replay Year 1</b> (title screen, after Red) plays the year again from Kanto with a copy of your Box, at Year 1's level caps, for the story and the other picks: nothing in it is caught or counts, and it's thrown away when you end it. Year 2 is coming.</p>
       <p><b>Levels.</b> In Story a Pokémon above the level cap fights at the cap, shown as "Lv 90 (fights at 24)", and gains no XP until the cap passes it. The cap is in the party header.</p>` },
@@ -3223,152 +3225,184 @@ function nullTrust() {
   if (had) { had.xp = Math.max(had.xp, b.xp); carryTrack(b, had); } else { S.box[SILVALLY] = { xp: b.xp, shiny: lineShiny(NULL) }; carryTrack(b, S.box[SILVALLY]); }
   const i = S.party.indexOf(NULL); if (S.party.includes(SILVALLY)) S.party.splice(i, 1); else S.party[i] = SILVALLY;
   st.silvally = 2; shineLines();
-  setTimeout(() => toast("Type: Null trusts you now. Its mask is gone: it evolved into Silvally!"), 800);
+  setTimeout(() => playScene("alola-silvally"), 800);
 }
 
 // Scenes, in Prof Penguin's text box: lines of [who, text]. Each has a year and a region (-1 for the prologue) for the
 // Story tab, where every scene you've seen (or skipped) can be read again.
 const SCENES = {
-  "open-1": { year: 1, r: -1, title: "Snow in Kanto", lines: [
-    ["", "Snow is falling on Kanto, three weeks early."],
-    ["", "Prof Penguin's lab is freezing. He stands over a map covered in pins, top hat and all."],
-    ["Prof Penguin", "Every legend in the world is asleep, and every one of them is waking up early. And every time one wakes, the world gets colder. I need eyes in the field."],
-    ["Prof Penguin", "Pick a partner. Any of these three will do."]] },
+  // Year 1, The Long Freeze, from the plot (revision 3). Who speaks: "" is the narrator.
+  "open-1": { year: 1, r: -1, title: "One Pokémon and a notebook", lines: [
+    ["", "The snow comes to Kanto three weeks early."],
+    ["", "At first nobody minds. Then the snow keeps falling, the rivers start to freeze, and on the third night the wild Pokémon along Route 1 stop coming out of the grass."],
+    ["", "Prof Penguin's lab is colder inside than out. He's a Prinplup in a top hat, standing over a table of maps with pins in them. Some of the pins are blue, and more of them turn blue every night."],
+    ["Prof Penguin", "Ah. You came. Good. Sit, sit. Mind the frost on the chair."],
+    ["", "Every legendary Pokémon in the world is asleep, the way they're supposed to be. Every one of them is also waking up early, years before its time. And each time one wakes, it pulls a little warmth out of the world."],
+    ["Prof Penguin", "I've been watching this for a long while, and I'm too old to chase it. I need eyes in the field. Young ones. Stubborn ones."],
+    ["", "He holds out three Poké Balls."]] },
   "open-2": { year: 1, r: -1, title: "The notebook", lines: [
-    ["", "Prof Penguin hands you a notebook. The cover is already a little frosty."],
-    ["Prof Penguin", "Write down everything, especially the things that seem small."],
-    ["Prof Penguin", "...And send me the pages. I'll write back."]] },
-  // Year 1, The Long Freeze. Who speaks: "" is the narrator.
+    ["", "He slides a small leather notebook across the table."],
+    ["Prof Penguin", "Write down everything, especially the things that seem small. The small things are usually the important ones. Nobody believes that until it's too late."],
+    ["Prof Penguin", "And send me the pages. I'll write back."],
+    ["", "He adjusts his hat. For a moment he looks like he wants to say something else. He doesn't."]] },
   "kanto-gyms": { year: 1, r: 0, title: "Hand warmers", lines: [
-    ["", "Outside the gym, a grunt in a white jacket is handing out hand warmers."],
-    ["Team Thaw grunt", "Free hand warmer! Stay warm out there. Team Thaw's got you."],
-    ["", "The badge on the jacket is a snowflake, melting."],
-    ["", "It seems small. You write it down."]] },
-  "kanto-alarm": { year: 1, r: 0, title: "The alarm", lines: [
-    ["", "An alarm goes off across Kanto."],
-    ["Prof Penguin", "That's Team Thaw's lab out at Cerulean. Someone's breached it. Go and look. Carefully."]] },
-  "kanto-rime": { year: 1, r: 0, title: "Containment", lines: [
-    ["", "The lab doors hang open. Frost covers every screen."],
-    ["Rime", "Containment variance. Within tolerance."],
-    ["Rime", "You aren't on the list. Leave, or be removed."]] },
-  "kanto-rime-after": { year: 1, r: 0, title: "Rime leaves", lines: [
-    ["Rime", "Noted."],
-    ["", "Rime walks out without hurrying. Behind her, in the deepest tank, something opens its eyes."]] },
+    ["", "Outside every Pokémon Center there's a grunt in a white coat, with a pin shaped like a snowflake melting into a drop of water."],
+    ["Team Thaw grunt", "Free hand warmer! Stay safe out there."],
+    ["", "They're friendly, and they say it like they mean it. You write down the pin."]] },
+  "kanto-alarm": { year: 1, r: 0, title: "The sirens", lines: [
+    ["", "The crowd is still cheering when the sirens start."],
+    ["", "Every screen in the stadium cuts to the same shot: a building outside Cerulean City with its doors blown open from the inside, and frost spreading out from it across the grass."]] },
+  "kanto-rime": { year: 1, r: 0, title: "The lab at Cerulean", lines: [
+    ["", "You get there before the police do. Inside are lines of empty containment tubes, all labeled with the same melting snowflake."],
+    ["", "A woman in a long white coat stands calmly among them, writing on a clipboard."],
+    ["Rime", "Containment variance. Within tolerance."]] },
+  "kanto-rime-after": { year: 1, r: 0, title: "Noted", lines: [
+    ["Rime", "Field researcher. Penguin's, I assume. Noted."],
+    ["", "She walks out past you. Deeper inside, something huge and pale is pressed against the last unbroken tube, and the glass is cracking."]] },
+  "kanto-mewtwo": { year: 1, r: 0, title: "The last tube", lines: [
+    ["", "Mewtwo breaks free in a burst of cold light. It doesn't run. It turns to face you."]] },
   "kanto-cage": { year: 1, r: 0, title: "The cage", lines: [
-    ["", "A letter from Prof Penguin arrives. There's a Key Stone in the envelope."],
+    ["", "You write it all down and send the page. Penguin's reply comes the next morning, with a small stone: a Key Stone."],
     ["Prof Penguin", "That lab was built to hold a legend. Who builds a cage before there's anything to put in it?"],
-    ["Prof Penguin", "You'll find uses for this. Better you have it early."],
+    ["Prof Penguin", "You'll find uses for the stone. Better you have it early."],
     ["Prof Penguin", "The next pin went blue last night. Johto. The Bell Tower stopped ringing."]] },
   "johto-r1": { year: 1, r: 1, title: "Sssssssnakes", lines: [
-    ["", "Someone steps into your path, a Snivy draped over their shoulder."],
+    ["", "Johto's skies are grey all the time now. The Bell Tower's bells have frozen solid."],
+    ["", "Someone is waiting for you on the steps of the League building, and he's clearly bored. He's wearing a snake-shaped helmet with a wide, fanged grin, and dark brown hair sticks out the back."],
+    ["", "A Snivy is draped over his shoulder. When he opens his jacket, there's a whole string of Poké Balls clipped inside."],
     ["Sssssssnakes", "Oh, you're Penguin's new one? Cute. Try to keep up."]] },
   "johto-r1-after": { year: 1, r: 1, title: "Better coffee", lines: [
-    ["Sssssssnakes", "Whatever. Team Thaw says the freeze is natural, and they're the ones fixing it. You should come work with us. Better coffee."]] },
-  "johto-hail": { year: 1, r: 1, title: "Chained", lines: [
-    ["", "At the Bell Tower, Lugia and Ho-Oh are chained to the ground."],
-    ["Hail", "For their own protection. Move along."]] },
-  "johto-hail-after": { year: 1, r: 1, title: "One of them", lines: [
-    ["Hail", "Fine. Take one. The other one's already spoken for."]] },
-  "johto-249": { year: 1, r: 1, title: "Lugia", lines: [["Prof Penguin", "The sea one. Of course you'd pick the cold."]] },
-  "johto-250": { year: 1, r: 1, title: "Ho-Oh", lines: [["Prof Penguin", "Fire. Good. We'll need it before this is over."]] },
+    ["Sssssssnakes", "Whatever. Lucky. Look, the freeze is natural. Cycles. Team Thaw says they've seen this before, and they're the ones actually fixing it. You should come work with us. Better coffee."],
+    ["", "That's the first time anyone has said the name out loud."]] },
+  "johto-hail": { year: 1, r: 1, title: "Grounded", lines: [
+    ["", "At the Tin Tower ruins, two legends are chained to the ground with thick, frost-covered cables. One is silver and one is gold."],
+    ["", "A huge grunt in a steel-plated coat stands guard."],
+    ["Hail", "For their own protection. Back off, kid."]] },
+  "johto-hail-after": { year: 1, r: 1, title: "Swinging", lines: [
+    ["", "His team hits hard enough to shake the cables. When he goes down, he goes down swinging."]] },
+  "johto-249": { year: 1, r: 1, title: "Lugia", lines: [
+    ["", "You cut Lugia free. The other is gone by morning, its chains left lying empty."],
+    ["Prof Penguin", "The sea one. Of course you'd pick the cold."]] },
+  "johto-250": { year: 1, r: 1, title: "Ho-Oh", lines: [
+    ["", "You cut Ho-Oh free. The other is gone by morning, its chains left lying empty."],
+    ["Prof Penguin", "Fire. Good. We'll need it before this is over."]] },
+  "johto-next": { year: 1, r: 1, title: "Two somethings", lines: [["Prof Penguin", "Something's moving under the sea off Hoenn. Two somethings. Go quickly."]] },
   "hoenn-gyms": { year: 1, r: 2, title: "Flyers", lines: [
-    ["", "Grunts are handing out flyers outside the gym."],
-    ["", "THE FREEZE IS COMING. THAW IS HERE."]] },
-  "hoenn-slush": { year: 1, r: 2, title: "See what happens", lines: [
-    ["", "Groudon on one side of the cave, Kyogre on the other, both awake and both furious."],
-    ["Slush", "I just want to see what happens. Science!"]] },
+    ["", "In Hoenn the beaches are rimmed with ice. Team Thaw has gone from hand warmers to flyers, pinned to every noticeboard in Slateport:"],
+    ["", "THE FREEZE IS COMING. THAW IS HERE. Ask about Thaw Packs™ at your nearest station."],
+    ["", "Thaw Packs warm a house for a week. They're expensive, and in the towns the freeze has already reached, they're sold out."]] },
+  "hoenn-slush": { year: 1, r: 2, title: "The clash", lines: [
+    ["", "Off the coast, Groudon and Kyogre have both woken, and they're heading toward each other."],
+    ["", "Someone is sitting on a rock above the shore, swinging their legs and eating a Thaw Pack-branded ice pop."],
+    ["Slush", "Oh good, an audience. I wanted to see what'd happen if you pointed them at each other. For science. You're not going to make this boring, are you?"]] },
   "hoenn-slush-after": { year: 1, r: 2, title: "The nice one", lines: [
-    ["Slush", "Don't look at me like that. I'm the nice one."]] },
-  "hoenn-383": { year: 1, r: 2, title: "Groudon", lines: [["Prof Penguin", "The land, then. Keep it warm."]] },
-  "hoenn-382": { year: 1, r: 2, title: "Kyogre", lines: [["Prof Penguin", "The sea. Mind the cold."]] },
+    ["Slush", "Don't look at me like that. I'm the nice one."],
+    ["", "Slush tosses the ice pop stick over their shoulder and leaves. You'll remember that later."]] },
+  "hoenn-next": { year: 1, r: 2, title: "Wrong clocks", lines: [["Prof Penguin", "My clocks are wrong. All of them, all at once. Sinnoh, Mt. Coronet. Dress warm."]] },
+  "sinnoh-rime": { year: 1, r: 3, title: "Stopped clocks", lines: [
+    ["", "Mt. Coronet is so cold that even the Ice types look uncomfortable."],
+    ["", "At Spear Pillar, time is stuttering. Snowflakes hang in the air, then fall, then hang again. Rime stands in the middle of it, adjusting a device on her wrist."],
+    ["Rime", "You again. Good. I need a control subject."]] },
+  "sinnoh-rime-after": { year: 1, r: 3, title: "The pillar", lines: [["", "You win, and the pillar shudders."]] },
+  "sinnoh-483": { year: 1, r: 3, title: "Dialga", lines: [
+    ["Rime", "You chose time. He always did too."],
+    ["", "She says he, and it sounds like someone she knows well. She leaves before you can ask."]] },
+  "sinnoh-484": { year: 1, r: 3, title: "Palkia", lines: [
+    ["Rime", "Space. He never did. Interesting."],
+    ["", "She says he, and it sounds like someone she knows well. She leaves before you can ask."]] },
   "sinnoh-letter": { year: 1, r: 3, title: "She said that?", lines: [
-    ["", "You send Prof Penguin the page about Rime. His reply took two days."],
-    ["Prof Penguin", "She said that?"],
-    ["Prof Penguin", "I knew their leader once. A long time ago. Let's leave it there."],
+    ["", "That night you write her words in your notebook, tear out the page and send it to Penguin."],
+    ["", "His reply takes two days. It usually comes by the next morning. It's short, and the handwriting is shaky:"],
+    ["Prof Penguin", "She said that? ...I knew their leader once. A long time ago. Let's leave it there."],
     ["Prof Penguin", "Unova next. Two dragons, one tower. And something colder underneath."]] },
-  "sinnoh-rime": { year: 1, r: 3, title: "Spear Pillar", lines: [
-    ["Rime", "Spear Pillar. You again."],
-    ["Rime", "Choose carefully. Someone will be reading the result."]] },
-  "sinnoh-rime-after": { year: 1, r: 3, title: "Proceed", lines: [
-    ["Rime", "Proceed. I'll be watching which one you take."]] },
-  "sinnoh-483": { year: 1, r: 3, title: "Dialga", lines: [["Rime", "You chose time. He always did too."]] },
-  "sinnoh-484": { year: 1, r: 3, title: "Palkia", lines: [["Rime", "Space. He never did. Interesting."]] },
   "unova-r2": { year: 1, r: 4, title: "On loan", lines: [
-    ["Sssssssnakes", "Team Thaw lent me this. Don't be jealous."]] },
+    ["", "Sssssssnakes catches you outside the Unova League. His Snivy is a Servine now, and there's a Milotic curled around his legs that you've never seen before."],
+    ["Sssssssnakes", "Team Thaw lent me this. And this."],
+    ["", "He holds up a Poké Ball. Inside it is the Hoenn legend you didn't pick."],
+    ["Sssssssnakes", "Don't be jealous."]] },
   "unova-r2-after": { year: 1, r: 4, title: "Good scouting", lines: [
-    ["Sssssssnakes", "Weird thing. Team Thaw always gets to a legend site before it freezes. Like they know."],
-    ["Sssssssnakes", "...Probably just good scouting."]] },
-  "unova-hail": { year: 1, r: 4, title: "Dragonspiral", lines: [
-    ["Hail", "Dragonspiral Tower is closed. Thaw business."]] },
-  "unova-hail-after": { year: 1, r: 4, title: "Go on", lines: [["Hail", "Hmph. Go on, then."]] },
-  "unova-643": { year: 1, r: 4, title: "Reshiram", lines: [["Prof Penguin", "White fire. It'll keep you warm."]] },
-  "unova-644": { year: 1, r: 4, title: "Zekrom", lines: [["Prof Penguin", "Black lightning. Loud, but useful."]] },
+    ["", "He loses, and he doesn't make a joke about it. He looks at the legend's ball for a long moment."],
+    ["Sssssssnakes", "Weird thing. Team Thaw always gets to a legend site before it freezes. Like they know. ...Probably just good scouting."]] },
+  "unova-hail": { year: 1, r: 4, title: "Truth and ideals", lines: [
+    ["", "At the Dragonspiral Tower, Hail is trying to cage two dragons, one white and one black."]] },
+  "unova-hail-after": { year: 1, r: 4, title: "Stopped", lines: [["", "You stop him."]] },
   "unova-kyurem": { year: 1, r: 4, title: "A roar", lines: [
-    ["", "Far off, something roars. The air goes still and very cold."],
-    ["", "You write it down and send Prof Penguin the page. His reply comes the next morning."],
+    ["", "As you leave, something roars from far off to the north, from Giant Chasm. It's deep and cold, and it rattles your bones."],
+    ["", "You write down the roar. Penguin's reply:"],
     ["Prof Penguin", "That one's ice is... different. Keep away from it this year."],
     ["Prof Penguin", "I've been charting the dates the freeze reached each site. Come and see what I found once you reach Kalos."]] },
-  "johto-next": { year: 1, r: 1, title: "Two somethings", lines: [["Prof Penguin", "Something's moving under the sea off Hoenn. Two somethings. Go quickly."]] },
-  "hoenn-next": { year: 1, r: 2, title: "Wrong clocks", lines: [["Prof Penguin", "My clocks are wrong. All of them, all at once. Sinnoh, Mt. Coronet. Dress warm."]] },
-  "kalos-next": { year: 1, r: 5, title: "Paper", lines: [
-    ["", "You send Prof Penguin the page with Slush's question on it."],
-    ["Prof Penguin", "If there's a list, someone wrote it down. Alola's next on it. Keep your eyes open for paper."]] },
-  "alola-next": { year: 1, r: 6, title: "Galar", lines: [["Prof Penguin", "Sssssssnakes is in Galar. I'd rather you got there before they did something they regret."]] },
-  "galar-next": { year: 1, r: 7, title: "It ends there", lines: [["Prof Penguin", "Every reading points to Paldea now. Whatever they're building, it ends there."]] },
-  "kalos-letter": { year: 1, r: 5, title: "A pattern", lines: [
-    ["", "A letter from Prof Penguin."],
-    ["Prof Penguin", "The freeze moves from legend to legend in a set order. Like someone is following a list."]] },
-  "kalos-slush": { year: 1, r: 5, title: "The list", lines: [
+  "kalos-letter": { year: 1, r: 5, title: "The chart", lines: [
+    ["", "Penguin's letter comes with a chart: a map of every legend site, with the date the freeze reached each one."],
+    ["", "It isn't random. It moves from one legend to the next in a set order, like someone is following a list."]] },
+  "kalos-slush": { year: 1, r: 5, title: "Out of balance", lines: [
+    ["", "At the Team Flare ruins, Xerneas and Yveltal are both awake, and the land around them flickers between blooming and dying."],
+    ["", "Slush is lying on a bench nearby, scrolling on a phone."]] },
+  "kalos-slush-after": { year: 1, r: 5, title: "The list", lines: [
+    ["", "When you win, Slush sits up."],
     ["Slush", "Ever wonder who wrote the list?"],
+    ["", "You stare at them."],
     ["Slush", "...No? Okay. Never mind."]] },
-  "kalos-slush-after": { year: 1, r: 5, title: "You didn't hear it", lines: [["Slush", "You didn't hear any of that from me."]] },
-  "kalos-716": { year: 1, r: 5, title: "Xerneas", lines: [["Prof Penguin", "Life, then. Good."]] },
-  "kalos-717": { year: 1, r: 5, title: "Yveltal", lines: [["Prof Penguin", "Hm. Keep a close eye on that one."]] },
-  "alola-memo": { year: 1, r: 6, title: "The memo", lines: [
-    ["", "A letter arrives with no sender. Inside is one page, stamped INTERNAL."],
-    ["", "The Engine wakes and binds each legend in turn, per the list."],
-    ["", "You put it in the notebook."]] },
-  "alola-rime": { year: 1, r: 6, title: "Aether", lines: [
-    ["Rime", "Aether Paradise is a Thaw facility now. Turn around."]] },
-  "alola-rime-after": { year: 1, r: 6, title: "Nothing changes", lines: [["Rime", "This changes nothing."]] },
-  "alola-791": { year: 1, r: 6, title: "Solgaleo", lines: [["Prof Penguin", "The sun. We could use more of it."]] },
-  "alola-792": { year: 1, r: 6, title: "Lunala", lines: [["Prof Penguin", "The moon. Quiet, and it sees in the dark."]] },
-  "alola-null": { year: 1, r: 6, title: "Unit 1", lines: [
-    ["", "Deep in the lab, a Type: Null thrashes against its mask."],
-    ["", "A tag on the cage: UNIT 1. Under it, half scratched out: UNIT 2, ASSIGNED TO THE DIRECTOR."]] },
-  "alola-null-after": { year: 1, r: 6, title: "Silvally", lines: [
-    ["", "The mask cracks and falls away. Type: Null is Silvally now, and it isn't going back in a cage."]] },
+  "kalos-next": { year: 1, r: 5, title: "Paper", lines: [
+    ["", "You send Penguin the page with Slush's line on it. He replies:"],
+    ["Prof Penguin", "If there's a list, someone wrote it down. Alola's next on it. Keep your eyes open for paper."]] },
+  "alola-memo": { year: 1, r: 6, title: "Memo #1", lines: [
+    ["", "Snow is falling on the beaches of Alola, which nobody alive has ever seen."],
+    ["", "Something lands in your Mail with no sender: one page of a Team Thaw internal memo, photocopied badly."],
+    ["", "...the Engine performs as designed: it wakes and binds the subject. Binding holds for approx. 9-14 days before thermal drain becomes visible to the public. Recommend release of Thaw Packs on Day 3 of visible drain..."],
+    ["", "Team Thaw isn't stopping the freeze. They're causing it, so they can sell the cure."]] },
+  "alola-rime": { year: 1, r: 6, title: "Sun and moon", lines: [
+    ["", "At the Altar of the Sunne, Rime is calibrating something pointed at the sky."]] },
+  "alola-null": { year: 1, r: 6, title: "The Mask", lines: [
+    ["", "The memo has a second page. It mentions a \"subject unit\" kept at Aether Paradise."],
+    ["", "Team Thaw has taken over Aether's lower labs. A lab chief blocks the door with a Steel and Psychic team: containment staff, working for Rime."],
+    ["", "Behind the door is a Type: Null, alone in a cold room, locked in its heavy mask. It's terrified."]] },
+  "alola-null-after": { year: 1, r: 6, title: "Unit 1", lines: [
+    ["", "Type: Null stops fighting. It walks over to you, still in its mask."],
+    ["", "On the lab terminal there's one more line:"],
+    ["", "Unit 1 (field) — compromised. Unit 2 — assigned to the Director."],
+    ["", "There's a second one."],
+    ["", "The mask won't come off yet. Win 10 battles with Type: Null in your party and it will trust you. Its detail in Party & Box shows how far along you are: Trust: 0/10."]] },
+  "alola-silvally": { year: 1, r: 6, title: "Silvally", lines: [
+    ["", "The mask cracks and falls away, and Type: Null evolves into Silvally."],
+    ["", "It looks at you without the mask for the first time."]] },
+  "alola-next": { year: 1, r: 6, title: "Galar", lines: [["Prof Penguin", "Sssssssnakes is in Galar. I'd rather you got there before he does something he regrets."]] },
   "galar-r3": { year: 1, r: 7, title: "Too quiet", lines: [
+    ["", "Sssssssnakes is waiting at Wyndon Stadium. His Servine is a Serperior now. Beside him is a Zygarde, its 50% Forme coiled and watchful, and the Unova legend you didn't pick."],
     ["Sssssssnakes", "Team Thaw gave me a Zygarde. Said the land would be safer with me."],
+    ["", "He frowns."],
     ["Sssssssnakes", "...It's been quiet since. Zygarde's never quiet."]] },
   "galar-r3-after": { year: 1, r: 7, title: "Myself", lines: [
     ["Sssssssnakes", "If they're lying to me, I'll find out myself. Not because you said anything."]] },
-  "galar-hail": { year: 1, r: 7, title: "The Weald", lines: [["Hail", "The Slumbering Weald is closed. Thaw business."]] },
-  "galar-hail-after": { year: 1, r: 7, title: "Take your pick", lines: [["Hail", "Take your pick. Sssssssnakes gets the other one."]] },
-  "galar-888": { year: 1, r: 7, title: "Zacian", lines: [["Prof Penguin", "The sword. Cut a way through."]] },
-  "galar-889": { year: 1, r: 7, title: "Zamazenta", lines: [["Prof Penguin", "The shield. Someone has to stand still."]] },
-  "paldea-white": { year: 1, r: 8, title: "White sky", lines: [["", "The sky over Paldea goes white."]] },
-  "paldea-admins": { year: 1, r: 8, title: "All three", lines: [
-    ["Rime", "All three of us. Don't take it personally."],
-    ["Slush", "I'd take it a little personally."],
-    ["Hail", "Enough. Begin."]] },
-  "paldea-admins-after": { year: 1, r: 8, title: "Go", lines: [["Hail", "...Go. Take your legend. It won't matter."]] },
-  "paldea-1007": { year: 1, r: 8, title: "Koraidon", lines: [["Prof Penguin", "The old land. It knows the way."]] },
-  "paldea-1008": { year: 1, r: 8, title: "Miraidon", lines: [["Prof Penguin", "What comes next. Let's hope it's warmer."]] },
+  "galar-hail": { year: 1, r: 7, title: "Sword and shield", lines: [
+    ["", "At the Slumbering Weald the fog has turned to ice. Hail is trying to drag a sword and a shield out of the ground with machinery."]] },
+  "galar-next": { year: 1, r: 7, title: "It ends there", lines: [["Prof Penguin", "Every reading points to Paldea now. Whatever they're building, it ends there."]] },
+  "paldea-white": { year: 1, r: 8, title: "White sky", lines: [["", "You beat the Champion of Paldea, and the sky goes white."]] },
+  "paldea-admins": { year: 1, r: 8, title: "Every site at once", lines: [
+    ["", "At Area Zero, all three admins are waiting together for the first time. Rime has her clipboard, Hail has his fists and Slush has a grin."],
+    ["", "Behind them, Koraidon and Miraidon are straining against Team Thaw cables."],
+    ["Rime", "Phase one."],
+    ["Hail", "Phase two."],
+    ["Slush", "Phase three. Sorry, there's a lot of us."]] },
+  "paldea-watches": { year: 1, r: 8, title: "Their watches", lines: [["", "You win, and the admins don't run. They look at their watches."]] },
   "paldea-freeze": { year: 1, r: 8, title: "The same night", lines: [
-    ["", "That night every legend site in the world freezes, all at once."],
-    ["", "Every screen in every city shows the same message:"],
+    ["", "That night, every legend site in the world freezes at once. The Tin Tower, Spear Pillar, Dragonspiral and every other site you visited all go white in the same hour."],
+    ["", "By morning, every screen in every region is showing the same broadcast:"],
     ["", "WE WARNED YOU. THAW PACKS AVAILABLE NOW."],
-    ["", "Prof Penguin's letter is just two words:"],
-    ["Prof Penguin", "It's started. Go."]] },
+    ["", "Penguin's letter is just two words:"],
+    ["Prof Penguin", "It's started. Go."],
+    ["", "Under it in your Mail is one more letter, very short."]] },
   "silver": { year: 1, r: 1, title: "Mt. Silver", lines: [
-    ["", "Mt. Silver. Red is waiting in the snow."],
-    ["", "He doesn't say anything."]] },
+    ["", "There's one person who hasn't been on any screen."],
+    ["", "At the top of Mt. Silver, where the snow never stops, a trainer in a red cap stands with his back to you. Red felt the cold before anyone else, months before Kanto's early snow, up here where nobody would have noticed."],
+    ["", "He doesn't speak. He turns, and he battles you."]] },
   "silver-after": { year: 1, r: 1, title: "Red", lines: [
-    ["", "Red hands you a Shiny Charm, nods once, and turns back to the snow."]] }
+    ["", "When it's over, he presses something into your hand: the Shiny Charm. Then he turns back to the snow, as if you were never there."],
+    ["", "You write down the fight, and the way Red's Pokémon stood with him in the snow without a single command. Penguin replies:"],
+    ["Prof Penguin", "Red doesn't talk much. His Pokémon don't need him to."],
+    ["Prof Penguin", "The ones you fight beside remember you best. Don't forget that."]] }
 };
 const CLUES = {
-  badge: { title: "The melting snowflake", text: "Team Thaw's grunts wear a badge: a snowflake, melting. They hand out hand warmers outside the gyms." },
+  badge: { title: "The melting-snowflake badge", text: "Grunts in white coats outside every Pokémon Center wear it: a snowflake melting into a drop of water. They hand out free hand warmers." },
   memo: { title: "Memo #1: The Engine", text: "No sender. \"The Engine wakes and binds each legend in turn, per the list.\" A second unit is \"assigned to the Director\"." }
 };
 // ── Year 1 chapters. Per region: gyms, the Champion, then (Johto, Unova, Galar) Sssssssnakes, the Team Thaw admin, and
@@ -3376,7 +3410,7 @@ const CLUES = {
 // tried again at once if it gets away. Paldea's admins come all three in a row (the finale), then its pick. Each
 // legend chapter has a prize: a Mega pseudo stone where one exists, a Master Ball where none does. Red waits on Mt.
 // Silver (Johto) once the year is over.
-const CHIEF_USE = 0.95, ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
+const CHIEF_USE = 0.95, ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_SLUSH_USE = 1.17, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
 const ADMIN_PIC = { Rime: "thaw-rime.png", Hail: "thaw-hail.png", Slush: "thaw-slush.png", Sssssssnakes: "sssssssnakes.png", "Team Thaw grunt": "thaw-grunt.png", "Prof Penguin": "prof-penguin.png" };
 const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
 // Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
@@ -3390,12 +3424,14 @@ const ADMIN_TEAMS = {
   kalos: ["Slush", [658, 687, 689, 675, 693, 713]],
   alola: ["Rime", ["v10104", "v10102", 740, 779, 765, "v10106"]],
   galar: ["Hail", [879, 823, 863, "v10177", 881, 884]],
-  // Generation 9 has two Ice lines: Baxcalibur's goes to Rime and Slush, Cetitan's to Hail.
+  // The finale is all Generation 9, which has only two Ice lines: Baxcalibur leads Rime's team, a precision team of
+  // Psychic and Steel around it (not an Ice team), and Cetitan is Hail's. Slush's is all Water and Dark.
   "paldea-rime": ["Rime", [998, 956, 1000, 981, 954, 936]],
   "paldea-hail": ["Hail", [975, 983, 959, 968, 966, 1018]],
-  "paldea-slush": ["Slush", [977, 976, 943, 962, 908, 997]],
+  "paldea-slush": ["Slush", [977, 976, 943, 962, 908, 964]],
   // The Mask: Aether Paradise's lab chief (Alola's generation), then Type: Null.
-  "aether-chief": ["the lab chief", [748, 760, 768, 750, 745, 770]],
+  // The lab chief's containment staff: Steel and Psychic (design doc C4).
+  "aether-chief": ["the lab chief", [777, "v10100", 437, 375, 707, 765]],
   "aether-null": ["Type: Null", [772]]
 };
 const adminTeam = k => ADMIN_TEAMS[k][1].map(foeFrom);
@@ -3410,30 +3446,31 @@ const admin = (id, r, team, pre, post, after = ["champ"], at = "") => ({ id, r, 
 const pick = (id, r, mons, hints, prize, after, at = "", more = {}) => ({ id, r, type: "pick", mons, hints, prize, name: `${mons.map(n => mon(n).name).join(" or ")}`, after, at, liberates: true, ...more });
 const CHAPTERS = [
   admin("kanto-admin", 0, "kanto", "kanto-rime", "kanto-rime-after", ["champ"], "the Cerulean lab"),
-  { id: "kanto-legend", r: 0, type: "legend", mons: [150], name: "Mewtwo", at: "the Cerulean lab", after: ["kanto-admin"], post: "kanto-cage", prize: { stone: 10281, key: 1 }, letter: "story-kanto", liberates: true },
+  { id: "kanto-legend", r: 0, type: "legend", mons: [150], name: "Mewtwo", at: "the Cerulean lab", after: ["kanto-admin"], pre: "kanto-mewtwo", post: "kanto-cage", prize: { stone: 10281, key: 1 }, letter: "story-kanto", liberates: true },
   { id: "johto-rival", r: 1, type: "rival", rival: "early", letter: "story-r1", name: RIVAL_NAME, at: "the League steps", pre: "johto-r1", post: "johto-r1-after" },
-  admin("johto-admin", 1, "johto", "johto-hail", "johto-hail-after", ["johto-rival"], "the Bell Tower"),
-  pick("johto-pick", 1, [249, 250], ["It sleeps under the sea and calms the storms.", "It brings the sun back wherever it lands."], { stone: 10049 }, ["johto-admin"], "the Bell Tower", { after2: "johto-next", letter: "story-johto" }),
-  admin("hoenn-admin", 2, "hoenn", "hoenn-slush", "hoenn-slush-after", ["champ"], "the Cave of Origin"),
-  pick("hoenn-pick", 2, [383, 382], ["It raises the land and dries up the rain.", "It fills the sea and brings the rain."], { stone: [10089, 10076] }, ["hoenn-admin"], "the Cave of Origin", { after2: "hoenn-next", letter: "story-hoenn" }),
+  admin("johto-admin", 1, "johto", "johto-hail", "johto-hail-after", ["johto-rival"], "the Tin Tower ruins"),
+  // Johto's letter carries Penguin's line for your pick.
+  pick("johto-pick", 1, [249, 250], ["It sleeps under the sea and calms the storms.", "It brings the sun back wherever it lands."], { stone: 10049 }, ["johto-admin"], "the Tin Tower ruins", { after2: "johto-next", letter: () => "story-johto-" + S.story.picks[1] }),
+  admin("hoenn-admin", 2, "hoenn", "hoenn-slush", undefined, ["champ"], "the shore"),
+  pick("hoenn-pick", 2, [383, 382], ["It raises the land and dries up the rain.", "It fills the sea and brings the rain."], { stone: [10089, 10076] }, ["hoenn-admin"], "the shore", { post: "hoenn-slush-after", after2: "hoenn-next", letter: "story-hoenn" }),
   admin("sinnoh-admin", 3, "sinnoh", "sinnoh-rime", "sinnoh-rime-after", ["champ"], "Spear Pillar"),
   pick("sinnoh-pick", 3, [483, 484], ["It keeps time moving.", "It holds space together."], { stone: 10058 }, ["sinnoh-admin"], "Spear Pillar", { after2: "sinnoh-letter", letter: "story-sinnoh" }),
-  { id: "unova-rival", r: 4, type: "rival", rival: "mid", extra: "hoenn-pick", letter: "story-r2", name: RIVAL_NAME, at: "the League steps", pre: "unova-r2", post: "unova-r2-after", after: ["champ", "hoenn-pick"] },
+  { id: "unova-rival", r: 4, type: "rival", rival: "mid", extra: "hoenn-pick", letter: "story-r2", name: RIVAL_NAME, at: "the Unova League", pre: "unova-r2", post: "unova-r2-after", after: ["champ", "hoenn-pick"] },
   admin("unova-admin", 4, "unova", "unova-hail", "unova-hail-after", ["unova-rival"], "Dragonspiral Tower"),
   pick("unova-pick", 4, [643, 644], ["White fire, for truth.", "Black lightning, for ideals."], { master: 1 }, ["unova-admin"], "Dragonspiral Tower", { after2: "unova-kyurem", letter: "story-unova" }),
-  admin("kalos-admin", 5, "kalos", "kalos-slush", "kalos-slush-after", ["champ"], "the Pokémon Village"),
-  pick("kalos-pick", 5, [716, 717], ["It gives life.", "It takes it."], { stone: 10309 }, ["kalos-admin"], "the Pokémon Village", { after2: "kalos-next", letter: "story-kalos-next" }),
-  admin("alola-admin", 6, "alola", "alola-rime", "alola-rime-after", ["champ"], "Aether Paradise"),
-  pick("alola-pick", 6, [791, 792], ["It eats the sun.", "It drinks the moon."], { master: 1 }, ["alola-admin"], "the Altar of the Sunne and Moone", { after2: "alola-next", letter: "story-alola" }),
+  admin("kalos-admin", 5, "kalos", "kalos-slush", undefined, ["champ"], "the Team Flare ruins"),
+  pick("kalos-pick", 5, [716, 717], ["It gives life.", "It takes it."], { stone: 10309 }, ["kalos-admin"], "the Team Flare ruins", { post: "kalos-slush-after", after2: "kalos-next", letter: "story-kalos-next" }),
+  admin("alola-admin", 6, "alola", "alola-rime", undefined, ["champ"], "the Altar of the Sunne"),
+  pick("alola-pick", 6, [791, 792], ["It eats the sun.", "It drinks the moon."], { master: 1 }, ["alola-admin"], "the Altar of the Sunne", { after2: "alola-next", letter: "story-alola" }),
   // The Mask (optional): Aether's lab chief, then the masked Type: Null itself. Type: Null joins, and earns its trust
   // (Trust: X/10 in its detail) until it evolves into Silvally.
   { id: "alola-silvally", r: 6, type: "rescue", name: "The Mask", at: "Aether Paradise", optional: true, after: ["alola-admin"], pre: "alola-null", post: "alola-null-after", doneNote: "Type: Null freed" },
-  { id: "galar-rival", r: 7, type: "rival", rival: "late", extra: "unova-pick", letter: "story-r3", name: RIVAL_NAME, at: "the League steps", pre: "galar-r3", post: "galar-r3-after", after: ["champ", "unova-pick"] },
-  admin("galar-admin", 7, "galar", "galar-hail", "galar-hail-after", ["galar-rival"], "the Slumbering Weald"),
+  { id: "galar-rival", r: 7, type: "rival", rival: "late", extra: "unova-pick", letter: "story-r3", name: RIVAL_NAME, at: "Wyndon Stadium", pre: "galar-r3", post: "galar-r3-after", after: ["champ", "unova-pick"] },
+  admin("galar-admin", 7, "galar", "galar-hail", undefined, ["galar-rival"], "the Slumbering Weald"),
   pick("galar-pick", 7, [888, 889], ["The sword.", "The shield."], { master: 1 }, ["galar-admin"], "the Slumbering Weald", { after2: "galar-next", letter: "story-galar" }),
-  { id: "paldea-finale", r: 8, type: "finale", finale: true, name: "Paldea finale", at: "Area Zero", after: ["champ", ...LEGENDS], pre: "paldea-admins", post: "paldea-admins-after",
+  { id: "paldea-finale", r: 8, type: "finale", finale: true, name: "Paldea finale", at: "Area Zero", after: ["champ", ...LEGENDS], pre: "paldea-admins",
     open: () => storyDex() >= FINALE_DEX, note: () => storyDex() >= FINALE_DEX ? "all three admins, back to back" : `Dex ${storyDex()} / ${FINALE_DEX}` },
-  pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"], "Area Zero", { after2: "paldea-freeze", letter: ["story-started", "story-snakes-end"] }),
+  pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"], "Area Zero", { post: "paldea-watches", after2: "paldea-freeze", letter: ["story-started", "story-snakes-end"] }),
   { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", at: "the summit", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", letter: "story-silver", doneNote: "Shiny Charm" }
 ];
 const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
@@ -3480,7 +3517,9 @@ function storyFight(c) {
 function storyTune(B) {
   const c = CHAPTER[B.ch];
   if (B.catchIt) return legendTuning(B);
-  if (c.type === "finale") return leagueTuning(B, FINALE_USE);
+  // Slush's all Water and Dark finale team is the hardest to cover with one team, so its phase is set lower: one
+  // League-legal team, with no swaps, still clears all three phases back to back.
+  if (c.type === "finale") return leagueTuning(B, B.phases[B.phase - 1] === "paldea-slush" ? FINALE_SLUSH_USE : FINALE_USE);
   if (c.type === "rescue") return B.phase === 1 ? gymTuning(B, 3, 6, [B.r, 3], CHIEF_USE) : legendTuning(B);
   return gymTuning(B, 3, 6, [B.r, 3], c.type === "rival" ? RIVAL_USE : ADMIN_USE);
 }
@@ -3553,7 +3592,7 @@ function chapterPrize(c) {
   if (c.type === "pick" || c.type === "legend") S.story.picks[c.r] = S.story.picks[c.r] || c.mons[0];
   if (c.type === "rescue") { S.story.silvally = Math.max(1, S.story.silvally || 0); if (!S.box[NULL]) { S.box[NULL] = { xp: Math.pow(levelCap(), 3), shiny: lineShiny(NULL), from: catchRegion({ kind: "quest", q: "aether" }) }; if (joinsParty()) joinParty(NULL); } got.push("Type: Null (win with it in your party to earn its trust)"); }
   if (c.type === "red") S.story.epilogue = 1;
-  for (const id of [].concat(c.letter || [])) S.mail.got[id] = 1;
+  for (const id of [].concat(typeof c.letter === "function" ? c.letter() : c.letter || [])) S.mail.got[id] = 1;
   if (got.length) setTimeout(() => toast(`${c.name}: ${got.join(", ")}.`), 3400);
 }
 // The pick: two silhouettes, a line from Prof Penguin under each, and "This one's mine." The pick is saved, and

@@ -435,7 +435,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
       sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
       silver: MAIL.find(m => m.id === 'story-silver').body,
       signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
-      gens: Object.values(ADMIN_TEAMS).map(([, t]) => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief').map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
   assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
   assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
@@ -447,15 +447,15 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
   assert.deepEqual(got.stones, [10049, 10058, 10076, 10089, 10281, 10309, 10325]);
   assert.deepEqual([got.key, got.charm, got.silvally], [1, 1, 1], 'The Mask frees Type: Null (silvally 1, trust to come)');
   assert.equal(got.master, 50 - 9 + 4, 'nine thrown on the legends; Year 1 gives four (Unova, Alola, Galar, Rival 3), none from Champions');
-  assert.equal(got.fights['alola-silvally'].join(','), 'Toxapex,Bewear,Golisopod,Mudsdale,Lycanroc,Palossand,Type: Null', 'The Mask: the lab chief, then Type: Null');
-  for (const id of ['story-johto', 'story-hoenn', 'story-sinnoh', 'story-unova', 'story-kalos-next', 'story-alola', 'story-galar']) assert.ok(got.mail.includes(id), 'transition letter ' + id);
+  assert.equal(got.fights['alola-silvally'].join(','), 'Togedemaru,Alolan Raichu,Bronzong,Metang,Klefki,Oranguru,Type: Null', 'The Mask: the lab chief\u2019s Steel and Psychic team, then Type: Null');
+  for (const id of ['story-johto-250', 'story-hoenn', 'story-sinnoh', 'story-unova', 'story-kalos-next', 'story-alola', 'story-galar']) assert.ok(got.mail.includes(id), 'transition letter ' + id);
   assert.deepEqual(got.mail.filter(x => x.startsWith('rival-')), [], 'Story sends its own rival letters, not Classic\u2019s');
   for (const id of ['story-kanto', 'story-r1', 'story-r2', 'story-r3', 'story-started', 'story-snakes-end', 'story-silver']) assert.ok(got.mail.includes(id), id);
   assert.equal(got.silver, "<p>Red doesn't talk much. His Pokémon don't need him to.</p><p>The ones you fight beside remember you best. Don't forget that.</p><p>Prof Penguin</p>", 'bond hint 1, word for word');
   assert.ok(got.sinnoh.includes('His reply took two days.') && got.sinnoh.includes('Unova next.'), 'Sinnoh\u2019s reply, two days late');
   assert.deepEqual(got.signatures, ['— Sssssnakes', '— Ssssssnakes', '— Sssssssnakes', '— Sssnakes'], 'a different number of s\u2019s every time');
   assert.ok(got.mail.indexOf('story-started') < got.mail.indexOf('story-snakes-end'), 'the last letter sits under Penguin\u2019s');
-  assert.deepEqual(got.gens, [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 7, 7], 'each admin team from its region\u2019s generation, the finale\u2019s all Generation 9');
+  assert.deepEqual(got.gens, [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 7], 'each admin team from its region\u2019s generation, the finale\u2019s all Generation 9');
   assert.deepEqual(got.progress, { year: 1, chapter: 23, regionsLiberated: 9, lifeDex: got.progress.lifeDex });
   assert.deepEqual(got.seen, [true, true, true, true]);
   assert.deepEqual(errors, []);
