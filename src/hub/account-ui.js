@@ -21,6 +21,8 @@ function renderAccount() {
   const state = $('#account-state');
   const action = $('#account-action');
   const rename = $('#account-rename');
+  const signout = $('#account-signout');
+  const accountPanel = $('#account-panel');
   const label = $('#profile-label');
   label.textContent = guest ? 'Sign in / Account' : (getHandle() || suggestedHandle());
   state.replaceChildren();
@@ -29,23 +31,31 @@ function renderAccount() {
     label.textContent = 'Account';
     action.hidden = true;
     rename.hidden = true;
+    signout.hidden = true;
+    accountPanel.hidden = true;
     return;
   }
-  action.hidden = false;
   if (!guest) {
     const nameNode = element('b', '', getHandle() || suggestedHandle());
     addMedal(nameNode, getHandle());
     state.append('Signed in as ', nameNode,
       ui.lbNotice ? ' · ' + ui.lbNotice : '. Best scores sync to the shared board.');
-    action.textContent = 'Sign out';
+    // The menu keeps the name and the way back to the board; signing out and
+    // renaming live on the settings page now.
+    action.hidden = true;
     action.classList.remove('primary');
     rename.hidden = false;
+    signout.hidden = false;
+    accountPanel.hidden = false;
   } else {
     state.textContent = 'Playing as a guest. Your scores stay in this browser until you make an account.';
     action.textContent = 'Sign in';
     // Signing in is the one thing a guest has to find, so it carries the weight.
+    action.hidden = false;
     action.classList.add('primary');
     rename.hidden = true;
+    signout.hidden = true;
+    accountPanel.hidden = true;
   }
 }
 
@@ -245,6 +255,7 @@ function initAccount() {
   const profile = $('#profile-menu');
   $('#account-action').onclick = () => { profile.open = false; if (hasIdentity()) signOutUser(); else openAuthDialog('signin'); };
   $('#account-rename').onclick = () => { profile.open = false; openAuthDialog('name'); };
+  $('#account-signout').onclick = () => { profile.open = false; signOutUser(); };
   profile.addEventListener('click', event => { if (event.target.closest('a')) profile.open = false; });
   document.addEventListener('pointerdown', event => { if (profile.open && !profile.contains(event.target)) profile.open = false; });
   profile.addEventListener('keydown', event => { if (event.key === 'Escape' && profile.open) { profile.open = false; profile.querySelector('summary').focus(); } });

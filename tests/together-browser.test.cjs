@@ -360,7 +360,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   // Switching identities while an original game is open closes it synchronously.
   await db.query('delete from bored_together.limits');
   await launch(a,active.id);await frame(a,'.connect');
-  await a.evaluate(()=>document.querySelector('#account-action').click());
+  await a.evaluate(()=>document.querySelector('#account-signout').click());
   await a.waitForFunction(()=>document.querySelector('#player').hidden);
   await a.waitForFunction(()=>document.querySelector('#together-content').textContent.includes('Join Bored Together'));
   assert.ok(!(await a.$eval('#together-content',e=>e.textContent)).includes('BananaWizard'));

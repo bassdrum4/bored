@@ -232,7 +232,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.click('#home-nav');
     assert.equal(await page.$eval('#daily', el => el.hidden), false);
     assert.equal(await page.$eval('#library', el => el.hidden), false);
-    await page.click('#library-nav');
+    await page.click('#recent .section-links a[href="#library"]');
     assert.equal(new URL(page.url()).hash, '#library');
     assert.equal(await page.$eval('#library', el => el.hidden), false);
     await page.click('#home-nav');
@@ -453,8 +453,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
   // note has to travel with the player's session rather than the public key.
   assert.equal(notes[0].authorization, 'Bearer mock-access', 'a signed-in note uses the player session');
   assert.equal(notes[0].user_id, 'test-user', 'the note carries the account the token belongs to');
-  if (!(await page.$eval('#profile-menu', el => el.open))) await page.click('#profile-menu > summary');
-  await page.click('#account-action');
+  await page.click('#settings-nav');
+  await page.click('#account-signout');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('guest'));
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.session')), null);
   assert.equal(activity.length, 0, 'local CI must never record account gameplay telemetry');

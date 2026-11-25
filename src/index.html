@@ -61,9 +61,9 @@ try {
     <div class="masthead-top"><h1>Bored<span class="wordmark-dot">.</span></h1>
     <nav class="site-nav" aria-label="Main navigation">
       <a id="home-nav" class="nav-link" href="#home">Home</a>
-      <a id="library-nav" class="nav-link" href="#library">All Games</a>
       <a id="leaderboard-nav" class="nav-link" href="#leaderboard">Leaderboard</a>
       <a id="together-nav" class="nav-link" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a>
+      <a id="settings-nav" class="nav-link" href="#settings">Settings<span class="invite-dot" aria-hidden="true" hidden></span></a>
       <details id="mobile-more-nav" class="mobile-more-nav">
         <summary>More<span class="invite-dot" aria-hidden="true" hidden></span></summary>
         <div class="mobile-more-menu">
@@ -84,14 +84,13 @@ try {
           <p class="online-note" id="presence-privacy-note">Your online status is visible to other participating players. You can turn it off in <a id="presence-settings-link" href="#settings">Settings</a>.</p>
         </div>
       </details>
+      <button id="feedback-open" class="header-feedback" type="button">Feedback</button>
       <button id="announcement-toggle" class="header-icon" type="button" aria-label="Announcements" title="Announcements" aria-haspopup="dialog" aria-controls="announcement-dialog"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 6-3 7-3 9h18c0-2-3-3-3-9M10 21h4"/></svg><span id="announcement-count" class="badge" hidden></span></button>
       <details id="profile-menu">
         <summary><img id="account-buddy" alt="" width="26" height="26" hidden><span id="profile-label">Account</span><span class="invite-dot" aria-hidden="true" hidden></span></summary>
         <div id="account" class="profile-panel">
           <span id="account-state">Playing as a guest. </span>
           <button id="account-action" type="button">Sign in</button>
-          <button id="account-rename" type="button" hidden>Change name</button>
-          <a id="settings-nav" class="nav-link" href="#settings">Settings<span class="invite-dot" aria-hidden="true" hidden></span></a>
           <a id="changelog-nav" class="nav-link" href="./changelog.html">Changelog</a>
         </div>
       </details>
@@ -183,6 +182,16 @@ try {
     </div>
     <div class="settings-layout">
       <div class="settings-panels">
+        <section class="settings-panel" id="account-panel" aria-labelledby="account-panel-heading" hidden>
+          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◔</span><div>
+            <h3 id="account-panel-heading">Account</h3>
+            <p>Your scores follow the account, not this browser.</p>
+          </div></div>
+          <div class="settings-row"><div><p class="invite-label">Display name</p><p>The name other players see on the leaderboard.</p></div>
+            <button id="account-rename" class="action" type="button" hidden>Change name</button></div>
+          <div class="settings-row"><div><p class="invite-label">Sign out</p><p>Signing out keeps your scores on your account for next time.</p></div>
+            <button id="account-signout" class="action" type="button">Sign out</button></div>
+        </section>
         <section class="settings-panel" aria-labelledby="appearance-heading">
           <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◐</span><div>
             <h3 id="appearance-heading">Appearance</h3>
@@ -239,7 +248,7 @@ try {
       </aside>
     </div>
   </section>
-  <footer class="foot"><span>have fun. stay a while.</span><span><a id="admin-analytics-link" href="./analytics.html" hidden>Analytics · </a><a id="admin-preview-link" href="#shotgun-roulette" hidden>Shotgun Roulette (admin preview) · </a><button id="feedback-open" class="text-button" type="button">Send feedback</button> · <span id="foot-count"></span></span></footer>
+  <footer class="foot"><span>have fun. stay a while.</span><span><a id="admin-analytics-link" href="./analytics.html" hidden>Analytics · </a><a id="admin-preview-link" href="#shotgun-roulette" hidden>Shotgun Roulette (admin preview) · </a><span id="foot-count"></span></span></footer>
 </main>
 
 <!-- A game waiting on you, in the corner. Quiet, dismissible, never over a game. -->

@@ -52,7 +52,7 @@ async function submitFeedback(event) {
       const button = $('#feedback-open');
       button.textContent = 'Got it. Thanks.';
       button.disabled = true;
-      setTimeout(() => { button.textContent = 'Send feedback'; button.disabled = false; }, 4000);
+      setTimeout(() => { button.textContent = 'Feedback'; button.disabled = false; }, 4000);
     }
   } catch (err) {
     status.textContent = feedbackErrorMessage(err);

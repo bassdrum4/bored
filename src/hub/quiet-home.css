@@ -15,6 +15,9 @@
 .header-tools .online-presence summary { padding: 8px 4px; }
 .header-icon { position: relative; display: grid; place-items: center; width: 36px; height: 36px; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
 .header-icon .badge { position: absolute; top: 0; right: 0; }
+.header-feedback { border: 0; background: transparent; color: var(--ink); font: inherit; padding: 8px 4px; cursor: pointer; }
+.header-feedback:hover, .header-feedback:focus-visible { text-decoration: underline; }
+.header-feedback:disabled { color: var(--dim); cursor: default; text-decoration: none; }
 #profile-menu { position: relative; min-width: 0; }
 #profile-menu summary { display: flex; align-items: center; gap: 5px; cursor: pointer; list-style: none; min-height: 36px; }
 #profile-menu summary::-webkit-details-marker { display: none; }
@@ -51,7 +54,6 @@
 #library #game-finder[hidden] { display: none; }
 #game-finder-open { color: var(--dim); }
 #library .tools { margin-top: 8px; }
-.foot #feedback-open { padding: 0; }
 @media (max-width: 1100px) and (min-width: 701px) {
   .masthead-top .site-nav { order: 2; flex-basis: 100%; margin-left: 0; }
 }

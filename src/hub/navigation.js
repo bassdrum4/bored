@@ -45,7 +45,9 @@ export function createHubNavigation({ togetherUI, onLeaderboard, onSettings = ()
   }
 
   for (const id of ['home', 'library', 'leaderboard', 'settings']) {
-    $(id + '-nav').addEventListener('click', event => {
+    const nav = $(id + '-nav');
+    if (!nav) continue;
+    nav.addEventListener('click', event => {
       event.preventDefault();
       navigate(id);
     });
