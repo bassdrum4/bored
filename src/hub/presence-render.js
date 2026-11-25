@@ -122,7 +122,7 @@ export function mountRenderPresence(){
       if(!alive())return;
       if(!res.ok)throw Error('Presence unavailable');
       if(pollMode){
-        accept(await res.json(),id,v);valid=true;
+        const m=await res.json();if(!alive())return;accept(m,id,v);valid=true;pollFail=0;
       }else{
         // Authenticated fetch streaming keeps JWTs out of URLs and works without EventSource headers.
         if(!res.headers.get('content-type')?.includes('text/event-stream')||!res.body)throw Error('Streaming unavailable');
@@ -147,7 +147,7 @@ export function mountRenderPresence(){
         if(!renew&&alive())throw Error('Stream closed');
       }
     }catch{
-      if(alive()){failed=true;pollFail++;if(!pollMode)pollMode=true;render();}
+      if(alive()){failed=true;pollFail++;if(!pollMode)pollMode=true;if(pollFail>=3){ready=false;counts=null;names=[];namesReady=false;cursor='';}render();}
     }finally{
       clearTimeout(timeout);
       if(controller===ctl){
@@ -199,7 +199,7 @@ export function mountRenderPresence(){
     }
     epoch++;const v=epoch;
     saving=true;reading=false;paused=false;
-    // Stop publishing immediately and hide all verified sockets for this account.
+    // Stop publishing immediately and invalidate verified sessions after saving.
     const hideCredentials=lastCredentials,hideSid=sid;
     stop();showPreference(desired);note.textContent='Saving…';
     try{
@@ -210,7 +210,8 @@ export function mountRenderPresence(){
       if(desired)void connect(id,v);
       else{
         // Persist privacy first, then invalidate all active server sessions for this account.
-        const auth=hideCredentials||await credentials(id,v);
+        const auth=await credentials(id,v).catch(()=>hideCredentials);
+        if(!auth)return;
         if(current(id,v))void fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid:hideSid||crypto.randomUUID(),mode:'hide'}),keepalive:true,cache:'no-store'}).catch(()=>{});
       }
     }catch{
@@ -229,7 +230,7 @@ export function mountRenderPresence(){
   details.addEventListener('keydown',e=>{if(e.key==='Escape'){details.open=false;summary.focus();}});
   window.addEventListener('bored:identity',()=>{
     if(viewer()!==owner){identityChanged();return;}
-    // A successful rename/account UI update can refresh the verified name.
+    // Reconnect after a same-account identity change.
     if(ready&&owner!==GUEST&&visible===true)reconnect();
     else if(visible===null)void refreshPreference();
   });
