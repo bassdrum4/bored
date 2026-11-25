@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="./styles.css?bored-build=20261124-bo-loading-v2">
 <link rel="stylesheet" href="./hub/paper-layout.css">
 <link rel="stylesheet" href="./hub/game-finder.css">
+<link rel="stylesheet" href="./hub/presence.css">
 <script>
 // Set a saved dark theme before first paint, so it never flashes paper.
 try {
@@ -84,6 +85,15 @@ try {
         <button id="account-action" type="button">Sign in</button>
         <button id="account-rename" type="button" hidden>Change name</button>
       </div>
+      <details id="online-presence" class="online-presence" hidden>
+        <summary id="online-summary" aria-controls="online-panel">Online</summary>
+        <div id="online-panel" class="online-panel">
+          <strong>Online now</strong>
+          <p id="online-status" role="status">Connecting…</p>
+          <ul id="online-names" aria-label="Online players"></ul>
+          <p class="online-note">Your online status is visible to other participating players. You can turn it off in <a id="presence-settings-link" href="#settings">Settings</a>.</p>
+        </div>
+      </details>
       <button id="announcement-toggle" class="side-action" type="button" aria-label="Announcements" aria-haspopup="dialog" aria-controls="announcement-dialog">Announcements <span id="announcement-count" class="badge" hidden></span></button>
        <button id="feedback-open" class="side-action" type="button">Send feedback</button>
     </div>
@@ -190,6 +200,8 @@ try {
           </div></div>
           <div class="settings-row"><div><label for="setting-reduced-motion">Reduce animations</label></div>
             <input id="setting-reduced-motion" class="settings-checkbox" type="checkbox"></div>
+          <div class="settings-row"><div><label for="presence-enabled">Show when I'm online</label><p>Other signed-in players with online status enabled can see your display name. Applies to your account on all devices.</p><p id="presence-setting-status" role="status">Sign in to manage your online status.</p></div>
+            <input id="presence-enabled" class="settings-checkbox" type="checkbox" disabled></div>
           <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Which games get played, and for how long.</p></div>
             <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
         </section>
@@ -380,6 +392,7 @@ try {
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; pointer-lock; clipboard-write; encrypted-media; picture-in-picture"></iframe>
 </div>
 <script type="module" src="./hub/watchdog.js"></script>
+<script type="module" src="./hub/presence.js"></script>
 <script type="module" src="./main.js?bored-build=20261124-bo-loading-v2"></script>
 </body>
 </html>
