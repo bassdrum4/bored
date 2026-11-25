@@ -41,7 +41,7 @@ begin
     select decode(split_part(t,':',2),'hex') as data, split_part(t,':',3) as mac
     from raw where t ~ '^p2:([0-9a-f]{32}){2,14}:[0-9a-f]{64}$'
   ), authentic as materialized (
-    select data from encrypted where mac=encode(extensions.hmac(data,signing_key,'sha256'),'hex')
+    select data from encrypted where encrypted.mac=encode(extensions.hmac(data,signing_key,'sha256'),'hex')
   ), plain as materialized (
     select convert_from(extensions.decrypt_iv(substring(data from 17),
       extensions.hmac(convert_to('presence-encryption-v2','UTF8'),signing_key,'sha256'),
