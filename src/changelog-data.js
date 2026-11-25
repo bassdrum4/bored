@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 982,
+  "count": 983,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"80e1bd84","date":"2026-11-25","author":"Daniel Lowe","subject":"Fix multiplayer retry cooldown, stale lobby reads and cloud-save CI","pr":361},
   {"sha":"19c316ea","date":"2026-11-25","author":"Daniel Lowe","subject":"Simplify global chat controls","pr":360},
   {"sha":"1e3686ef","date":"2026-11-25","author":"Daniel Lowe","subject":"Use modern Supabase secret key for chat","pr":359},
   {"sha":"66bdd6bd","date":"2026-11-25","author":"Daniel Lowe","subject":"Repair browser CI fixtures for current hub and analytics RPC","pr":357},
