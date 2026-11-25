@@ -156,7 +156,7 @@ test('prestige resets the journey, keeps what it promises, and pays its bonuses'
   const after = await tab.evaluate(() => ({ pick: !document.querySelector('#pick').hidden, p: S.prestige, box: Object.keys(S.box), sp: S.box[395], cap: levelCap(), money: S.money, charm: !!S.charm,
     stones: Object.keys(S.stones).length, won: Object.keys(S.won).length, badges: Object.keys(S.badges).length, tower: S.tower.best, wins: S.stats.wins, ach: !!S.ach.dex10, beat: S.beat,
     teams: S.teams.length, lines: !!JSON.parse(localStorage.getItem('bored.poke-idle.shinylines.v1'))[4], life: lifeDex(), score: window.__boredSnapshot().score, read: !!S.mail.read['update-2026-11-24a'], again: canPrestige(), lab: finalOpen() }));
-  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special' }, cap: after.cap, money: 0, charm: false,
+  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special', peak: after.cap, from: 0 }, cap: after.cap, money: 0, charm: false,
     stones: 0, won: 0, badges: 0, tower: 12, wins: 500, ach: true, beat: '2026-11-20', teams: 1, lines: true, life: 4, score: 6, read: true, again: false, lab: false });
   // A new starter, then the SP edition joins it; P1 shows on the HUD and the party header.
   await tab.click('[data-start="1"]');
@@ -306,5 +306,379 @@ test('the Hall of Fame, switched on: after the Lab, a little harder than Prof Pe
     { won: true, sp: 'hof-hydrapple', look: 'special', tier: 2, stats: [106, 90, 140, 150, 110, 54, 650], types: 'Grass/Dragon', wiki: true, mail: true });
   // Prof Penguin's phase 2, for comparison: his reference team needs FINAL_USE.
   assert.ok(await tab.evaluate(() => FINAL_USE < HOF_USE));
+  assert.deepEqual(errors, []);
+});
+
+// ── Story Mode (framework). A Classic save as main wrote it before Story existed.
+const OLD_SAVE = { v: 1, money: 500, box: { 4: { xp: 1000, shiny: false }, 16: { xp: 300, shiny: true } }, party: [4, 16], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: { '0-0': 1 }, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: 'route', r: 0, k: 1 }, set: { fresh: 'auto', dupe: 'none', shiny: 'best', auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, last: Date.now() };
+
+test('an old Classic save stays Classic: same odds, same XP, same snapshot, no Story tab', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(old => {
+    localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot();
+    const xp0 = S.box[16].xp; gainXp(100);
+    S.box[4].xp = 1e6; enter('party'); const classicTile = document.querySelector('#party [data-n="4"]').textContent, classicCap = document.querySelector('#partycap').hidden;
+    enter('battle');
+    return { classicTile, classicCap, story: isStory(), mode: S.mode, odds: shinyOdds() * 4096, xp: S.box[16].xp - xp0, tab: document.querySelector('#tabs [data-tab=story]').hidden, snap: __boredSnapshot(), prestigeRule: canPrestige.toString().includes('isStory') };
+  }, OLD_SAVE);
+  assert.equal(got.story, false);
+  assert.equal(got.mode, undefined, 'an old save is not given a mode');
+  assert.ok(!got.classicTile.includes('fights at') && got.classicCap, 'Classic shows one level and no cap line, as before');
+  assert.equal(got.odds, 1);
+  assert.equal(got.xp, 200, 'the catch-up bonus still applies in Classic (Lv 6 behind Lv 10)');
+  assert.equal(got.tab, true);
+  assert.deepEqual([got.snap.score, got.snap.lifeDex, got.snap.caught, got.snap.finished, got.snap.story], [3, 2, 2, true, null]);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Mode: its own save, the opening scenes, ×2 XP and shinies, no prestige, and a Classic board that never moves', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(old => { localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot(); go('new'); }, OLD_SAVE);
+  assert.equal(await tab.evaluate(() => document.querySelectorAll('#t-card [data-act=mode]').length), 2, 'New game asks Classic or Story');
+  await tab.click('#t-card [data-act=mode][data-k="bored.poke-idle.story"]');
+  const pick = await tab.evaluate(() => ({ screen, slot, scene: !$('#scene').hidden && sceneNow.id, classic: !!readSlot(KEY) }));
+  assert.deepEqual(pick, { screen: 'pick', slot: 'bored.poke-idle.story', scene: 'open-1', classic: true });
+  await tab.click('#scene [data-scene=skip]');
+  await tab.click('[data-start="7"]');
+  const story = await tab.evaluate(() => ({ mode: S.mode, scene: sceneNow && sceneNow.id, odds: shinyOdds() * 4096, charm: (S.charm = 1, shinyOdds() * 4096), prestige: (S.beat = '2026-11-24', S.pbeat = 1, canPrestige()), tab: !$('#tabs [data-tab=story]').hidden, from: S.box[7].from }));
+  assert.deepEqual(story, { mode: 'story', scene: 'open-2', odds: 2, charm: 6, prestige: false, tab: true, from: 0 });
+  const fields = await tab.evaluate(() => { save(); const st = readSlot(STORY_KEY).story; return { keys: Object.keys(st).sort(), life: Object.keys(st.lifeDex) }; });
+  assert.deepEqual(fields.keys, ['ch', 'cleared', 'clues', 'epilogue', 'eternatusStolen', 'frozen', 'giratinaDebt', 'liberated', 'lifeDex', 'nullTrust', 'picks', 'roulette', 'seen', 'silvally', 'y3Recovered', 'year'], 'every story field is in the save from day one');
+  assert.deepEqual(fields.life, ['7'], 'the Story lifetime dex');
+  await tab.evaluate(() => { S.charm = 0; delete S.beat; delete S.pbeat; });
+  await tab.click('#scene [data-scene=skip]');
+  const book = await tab.evaluate(() => ({ seen: S.story.seen, tab, text: $('#t-story').textContent, rereads: [...document.querySelectorAll('#t-story [data-reread]')].map(b => b.dataset.reread) }));
+  assert.deepEqual(book.seen, { 'open-1': 1, 'open-2': 1 }, 'a skipped scene counts as seen');
+  assert.equal(book.tab, 'story');
+  assert.ok(book.text.includes('Write down everything, especially the things that seem small.'));
+  assert.deepEqual(book.rereads, ['open-1', 'open-2']);
+  await tab.click('#t-story [data-reread="open-2"]');
+  assert.equal(await tab.evaluate(() => sceneNow.id), 'open-2', 'a scene can be read again');
+  await tab.click('#scene [data-scene=skip]');
+  // XP: ×2, no catch-up; below its peak a Pokémon gets ×2 more, but only back up to its peak.
+  const xp = await tab.evaluate(() => {
+    S.box = { 7: { xp: 27, shiny: false, peak: 7 }, 1: { xp: 27, shiny: false } }; S.party = [7, 1];
+    const tile = remembers(7) && (openTab('party'), !!document.querySelector('#party [data-n="7"] .peak'));
+    gainXp(100); return { remembered: S.box[7].xp, plain: S.box[1].xp, tile, after: remembers(7) };
+  });
+  assert.deepEqual(xp, { remembered: 343 + 42, plain: 27 + 200, tile: true, after: false });
+  // The Classic board doesn't move while Story is open; Story's progress rides along.
+  const snap = await tab.evaluate(() => { save(); return __boredSnapshot(); });
+  assert.deepEqual([snap.score, snap.lifeDex, snap.caught, snap.finished], [3, 2, 2, true]);
+  assert.deepEqual(snap.story, { year: 1, chapter: 0, regionsLiberated: 0, lifeDex: 2 });
+  // Switching back: the Classic save is just as it was, and the Story save waits.
+  await tab.evaluate(() => { showTitle(); go('switch'); });
+  const back = await tab.evaluate(() => ({ slot, mode: S.mode || null, money: S.money, box: Object.keys(S.box), story: readSlot(STORY_KEY).mode, menu: [...document.querySelectorAll('#menu [data-go]')].map(b => b.textContent) }));
+  assert.deepEqual(back, { slot: 'bored.poke-idle.save', mode: null, money: 500, box: ['4', '16'], story: 'story', menu: back.menu });
+  assert.ok(back.menu.includes('Switch to Story'));
+  assert.deepEqual(errors, []);
+});
+
+test('Story chapters: rows after the Champion that wait for what they need, scenes before and after, clues, and tracking', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25];
+    SCENES['t-pre'] = { year: 1, r: 0, title: 'Before', lines: [['Prof Penguin', 'One.']] };
+    SCENES['t-post'] = { year: 1, r: 0, title: 'After', lines: [['', 'Two.']] };
+    CLUES.t = { title: 'A clue', text: 'Something small.' };
+    for (const c of [{ id: 't-1', r: 0, type: 'scene', name: 'Test one', pre: 't-pre', post: 't-post', clue: 't', liberates: true }, { id: 't-2', r: 0, type: 'scene', name: 'Test two', after: ['t-1'] }]) { CHAPTERS.push(c); CHAPTER[c.id] = c; }
+    viewR = 0; enter('battle');
+    const rows = () => [...document.querySelectorAll('#locs .loc')].map(b => ({ text: b.textContent, open: !b.disabled }));
+    const before = rows().filter(x => x.text.startsWith('Test'));
+    const champAt = rows().findIndex(x => /^Champion Blue/.test(x.text)), oneAt = rows().findIndex(x => x.text.startsWith('Test one'));
+    S.champs[0] = 1; renderLocs();
+    startLoc({ kind: 'chapter', r: 0, x: 't-1' });
+    const pre = sceneNow && sceneNow.id; endScene();
+    const post = sceneNow && sceneNow.id; endScene();
+    const after = rows().filter(x => x.text.startsWith('Test'));
+    // Bond comes from a win in the active party only.
+    S.box[26] = { xp: 1e6 }; S.balls = { poke: 0, great: 0, ultra: 0, master: 0 }; startLoc({ kind: 'route', r: 0, k: 0 }); defeat();   // no balls: no random catch
+    return { before, after, order: rows()[champAt + 1].text.startsWith('Team Thaw: Rime') && oneAt > champAt, pre, post, ch: S.story.ch, clue: S.story.clues, snap: storyProgress(S), bond: [S.box[25].bond, S.box[26].bond], peak: S.box[25].peak };
+  });
+  assert.deepEqual(got.before.map(x => [x.text, x.open]), [['Test oneafter Blue', false], ['Test twoafter Test one', false]]);
+  assert.equal(got.order, true, 'chapters come right after the Champion, in order');
+  assert.deepEqual([got.pre, got.post], ['t-pre', 't-post']);
+  assert.deepEqual(got.ch, { 't-1': 1 });
+  assert.deepEqual(got.clue, { t: 1 });
+  assert.deepEqual(got.after.map(x => [x.text, x.open]), [['Test onedone', true], ['Test twostory', true]]);
+  assert.deepEqual(got.snap, { year: 1, chapter: 1, regionsLiberated: 1, lifeDex: 2 });
+  assert.deepEqual(got.bond, [1, null], 'only the party member that fought bonds');
+  assert.equal(got.peak, 100);
+  assert.deepEqual(errors, []);
+});
+
+// ── Story Mode Year 1: the content.
+const storyAllChamps = () => {
+  slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25]; S.balls.master = 50; S.set.fresh = 'master'; S.set.dupe = 'master';   // a Master Ball always holds
+  for (let r = 0; r < 9; r++) { for (let k = 0; k < 4; k++) { S.badges[r + '-' + k] = 1; S.kills[r + '-' + k] = 10; } S.champs[r] = 1; }
+};
+
+test('Story Year 1 plays through: admins, rivals with the mascot you left, picks, prizes, the finale and Red', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(`(${storyAllChamps})()`).then(() => tab.evaluate(() => {
+    const done = [], fights = {};
+    const skip = () => { let n = 0; while (sceneNow && n++ < 20) endScene(); };
+    const win = () => { B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); if (!B.manual) next(); };
+    for (let i = 0; i < 160; i++) S.lifeDex[2000 + i] = 1;
+    viewR = 0; enter('battle'); skip();
+    const gated = chapterOpen(CHAPTER['paldea-finale']);
+    for (const c of CHAPTERS) {
+      skip(); if (!chapterOpen(c)) continue;
+      startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+      if (pickNow) { pickClick({ dataset: { pick: String(c.mons[1]) } }); pickClick({ dataset: { pick: 'mine' } }); skip(); }
+      fights[c.id] = B.queue.map(f => f.name);
+      win(); while (B && B.brk != null) { storyGo(); fights[c.id] = fights[c.id].concat(B.queue.map(f => f.name)); win(); }
+      skip(); if (chDone(c.id)) done.push(c.id);
+    }
+    return { gated, done, fights, picks: S.story.picks, stones: Object.keys(S.stones).map(Number).sort(), key: S.key, charm: S.charm, silvally: !!S.box[772] && S.story.silvally, master: S.balls.master,
+      mail: inbox().map(m => m.id).filter(x => /^(story|rival)-/.test(x)),
+      sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
+      silver: MAIL.find(m => m.id === 'story-silver').body,
+      signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
+      gens: Object.values(ADMIN_TEAMS).map(([, t]) => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+  }));
+  assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
+  assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
+  assert.deepEqual(got.fights['johto-rival'], ['Snivy', 'Ekans', 'Silicobra']);
+  assert.deepEqual(got.fights['unova-rival'], ['Servine', 'Arbok', 'Sandaconda', 'Milotic', 'Groudon'], 'Rival 2 has the Hoenn mascot you left');
+  assert.deepEqual(got.fights['galar-rival'], ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme', 'Reshiram'], 'Rival 3 has the Unova mascot you left');
+  assert.equal(got.fights['paldea-finale'].length, 18, 'the finale is all three admins, six each');
+  assert.deepEqual(got.picks, { 0: 150, 1: 250, 2: 382, 3: 484, 4: 644, 5: 717, 6: 792, 7: 889, 8: 1008 });
+  assert.deepEqual(got.stones, [10049, 10058, 10076, 10089, 10281, 10309, 10325]);
+  assert.deepEqual([got.key, got.charm, got.silvally], [1, 1, 1], 'The Mask frees Type: Null (silvally 1, trust to come)');
+  assert.equal(got.master, 50 - 9 + 4, 'nine thrown on the legends; Year 1 gives four (Unova, Alola, Galar, Rival 3), none from Champions');
+  assert.equal(got.fights['alola-silvally'].join(','), 'Toxapex,Bewear,Golisopod,Mudsdale,Lycanroc,Palossand,Type: Null', 'The Mask: the lab chief, then Type: Null');
+  for (const id of ['story-johto', 'story-hoenn', 'story-sinnoh', 'story-unova', 'story-kalos-next', 'story-alola', 'story-galar']) assert.ok(got.mail.includes(id), 'transition letter ' + id);
+  assert.deepEqual(got.mail.filter(x => x.startsWith('rival-')), [], 'Story sends its own rival letters, not Classic\u2019s');
+  for (const id of ['story-kanto', 'story-r1', 'story-r2', 'story-r3', 'story-started', 'story-snakes-end', 'story-silver']) assert.ok(got.mail.includes(id), id);
+  assert.equal(got.silver, "<p>Red doesn't talk much. His Pokémon don't need him to.</p><p>The ones you fight beside remember you best. Don't forget that.</p><p>Prof Penguin</p>", 'bond hint 1, word for word');
+  assert.ok(got.sinnoh.includes('His reply took two days.') && got.sinnoh.includes('Unova next.'), 'Sinnoh\u2019s reply, two days late');
+  assert.deepEqual(got.signatures, ['— Sssssnakes', '— Ssssssnakes', '— Sssssssnakes', '— Sssnakes'], 'a different number of s\u2019s every time');
+  assert.ok(got.mail.indexOf('story-started') < got.mail.indexOf('story-snakes-end'), 'the last letter sits under Penguin\u2019s');
+  assert.deepEqual(got.gens, [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 7, 7], 'each admin team from its region\u2019s generation, the finale\u2019s all Generation 9');
+  assert.deepEqual(got.progress, { year: 1, chapter: 23, regionsLiberated: 9, lifeDex: got.progress.lifeDex });
+  assert.deepEqual(got.seen, [true, true, true, true]);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1: the finale waits for 150 in the Story dex, runs three phases, and starts over from Rime on a loss', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(`(${storyAllChamps})()`);
+  const got = await tab.evaluate(() => {
+    for (const id of LEGENDS) S.story.ch[id] = 1;
+    const before = chapterOpen(CHAPTER['paldea-finale']), note = chapterRows(8).find(x => x.x === 'paldea-finale').note;
+    for (let i = 0; i < 150; i++) S.lifeDex[3000 + i] = 1;
+    viewR = 8; enter('battle');
+    startLoc({ kind: 'story', r: 8, x: 'paldea-finale' });
+    const p1 = { phase: B.phase, use: B.tune, L: B.L };
+    B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next();
+    const brk = B.brk != null && !bossLocked();
+    storyGo(); const p2 = B.phase;
+    B.time = 0.001; lastTick = performance.now() - 500; tick();
+    return { before, note, p1, brk, p2, after: B && B.kind, done: chDone('paldea-finale') };
+  });
+  assert.equal(got.before, false);
+  assert.match(got.note, /^Dex \d+ \/ 150$/);
+  assert.equal(got.p1.phase, 1);
+  assert.equal(got.p1.L, 100);
+  assert.equal(got.brk, true, 'the party is free during the break');
+  assert.equal(got.p2, 2);
+  assert.equal(got.after, 'route', 'out of time anywhere: back to the route, and it starts over from Rime');
+  assert.equal(got.done, false);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the scenes, clues and letters on the way', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(async () => {
+    const classicDen = (slot = KEY, S = fresh(), dungeonBosses(0).map(m => m.num));
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25]; viewR = 0; enter('battle'); hideTip();
+    const sleep = ms => new Promise(f => setTimeout(f, ms)), seen = [];
+    const beat = async loc => { S.kills[loc.r + '-' + (loc.k || 0)] = 10; startLoc(loc); B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next(); await sleep(800); seen.push(sceneNow && sceneNow.id); while (sceneNow) endScene(); };
+    await beat({ kind: 'gym', r: 0, k: 0 }); await beat({ kind: 'gym', r: 0, k: 1 });
+    for (let k = 1; k < 4; k++) S.badges['0-' + k] = 1;
+    await beat({ kind: 'champ', r: 0 });
+    for (const r of [1, 2, 4, 5]) S.champs[r] = 1;
+    for (const r of [3, 6]) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; await beat({ kind: 'champ', r }); }
+    for (let r = 0; r < 9; r++) S.champs[r] = 1;
+    const kinds = r => (viewR = r, renderLocs(), [...document.querySelectorAll('#locs [data-loc]')].map(b => JSON.parse(b.dataset.loc).kind));
+    const k0 = kinds(0), k1 = kinds(1), k7 = kinds(7);
+    // League rules: two Tier 3s, then a saved team that fits.
+    S.box[150] = { xp: 1e6 }; S.box[249] = { xp: 1e6 }; S.party = [150, 249]; S.teams = [{ name: 'Fits', party: [150, 25] }]; B = null;
+    startLoc({ kind: 'gym', r: 0, k: 0 });
+    const notice = !$('#league').hidden && $('#league').textContent;
+    $('#league [data-league="0"]').click();
+    const plates = (S.champs = Object.fromEntries(REGIONS.map((_, r) => [r, 1])), gainPlates(5));
+    return { classicDen, storyDen: dungeonBosses(0).map(m => m.num), galar: dungeonBosses(7).map(m => m.num), kalos: dungeonBosses(5).map(m => m.num), hoenn: dungeonBosses(2).map(m => m.num), unova: dungeonBosses(4).map(m => m.num), plates, seen, clues: S.story.clues, mail: inbox().map(m => m.id).filter(x => x.startsWith('story')),
+      k0, k1, k7, notice, party: S.party, fighting: B && B.kind, arceus: (S.box[493] = { xp: 1e6 }, leagueBreaks([493])), megaT3: tierOf(formById(10281)) };
+  });
+  assert.ok(got.classicDen.includes(150), 'Classic keeps Mewtwo in the Kanto dungeon');
+  assert.deepEqual(got.storyDen, [144, 145, 146, 151]);
+  assert.ok(![888, 889, 890].some(n => got.galar.includes(n)));
+  assert.ok([896, 897].every(n => got.galar.includes(n)), 'Glastrier and Spectrier stay for Year 2');
+  assert.ok(got.kalos.includes(718) && ![716, 717].some(n => got.kalos.includes(n)), 'Zygarde stays for Year 3');
+  assert.ok(![380, 381, 386].some(n => got.hoenn.includes(n)) && ![641, 642, 645, 647].some(n => got.unova.includes(n)), 'no legend a Story chapter gives');
+  assert.equal(got.plates, '', 'no Plates in Story');
+  assert.deepEqual(got.seen, ['kanto-gyms', null, 'kanto-alarm', null, 'alola-memo'], 'Sinnoh\u2019s letter now comes after Rime\u2019s line, not the Champion');
+  assert.deepEqual(got.clues, { badge: 1, memo: 1 });
+  assert.deepEqual(got.mail.sort(), ['story-memo']);
+  for (const k of ['final', 'hof', 'rival', 'quest', 'summit']) assert.ok(![...got.k0, ...got.k1].includes(k), `no ${k} row in Story`);
+  assert.ok(got.k1.includes('chapter') && !got.k7.includes('darkest'));
+  assert.ok(got.notice && got.notice.includes('Mascot legends and Mega pseudo forms are both Tier 3.'), 'the League rules notice');
+  assert.deepEqual(got.party, [150, 25]);
+  assert.equal(got.fighting, 'gym', 'loading a team that fits starts the fight');
+  assert.match(got.arceus, /Tier 1 or stronger/);
+  assert.equal(got.megaT3, 3);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay Mode changes nothing that counts', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(`(${storyAllChamps})()`);
+  const got = await tab.evaluate(() => {
+    localStorage.setItem(KEY, JSON.stringify({ ...fresh(), box: { 1: { xp: 125, shiny: false } }, party: [1] }));
+    for (const c of CHAPTERS) S.story.ch[c.id] = 1;
+    S.story.epilogue = 1; S.story.picks = { 1: 249 }; S.charm = 1; S.box[249] = { xp: 1e6, shiny: false }; S.money = 777; save();
+    const core = () => { const x = JSON.parse(localStorage.getItem(STORY_KEY)); return JSON.stringify([x.box, x.story, x.money, x.balls, x.stones, x.party, x.lifeDex]); };   // not its timestamps
+    const main = core(), shinyBefore = localStorage.getItem(SHINY_KEY);
+    enter('battle'); viewR = 1; renderLocs();
+    const rows = () => [...document.querySelectorAll('#locs .loc')].map(b => ({ text: b.textContent, open: !b.disabled }));
+    const year2 = rows().find(x => x.text.startsWith('Year 2'));
+    const red = rows().find(x => x.text.startsWith('Mt. Silver'));
+    const ach = achs().filter(a => a.group === 'Story').map(a => [a.id, a.have()]);
+    showTitle();
+    const menu = [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go);
+    go('replay');
+    enter('battle'); const banner = !$('#replaybar').hidden && $('#replaybar').textContent; showTitle();
+    const inReplay = { slot, replay: S.replay, banner, badges: Object.keys(S.badges).length, cap: levelCap(), tag: $('#tagline').textContent, picks: { ...S.story.picks }, ch: Object.keys(S.story.ch).length, menu: [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go), snap: __boredSnapshot() };
+    // Play the Johto pick the other way: no catch, no money kept, the main save untouched.
+    enter('battle'); while (sceneNow) endScene();
+    S.box[999] = { xp: 1e6, shiny: true }; S.story.ch['johto-rival'] = 1; S.story.ch['johto-admin'] = 1; save();   // the replay starts every chapter over
+    startLoc({ kind: 'chapter', r: 1, x: 'johto-pick' }); while (sceneNow) endScene();
+    pickClick({ dataset: { pick: '250' } }); pickClick({ dataset: { pick: 'mine' } }); while (sceneNow) endScene();
+    B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next(); while (sceneNow) endScene();
+    const replayPick = { done: chDone('johto-pick'), caught: !!S.box[250] };
+    // No prizes in a replay, but an allowlisted reward (Year 3's one exception) reaches the main Story save, once.
+    const prizeBefore = S.stones[10049];
+    REPLAY_REWARDS.add('test-reward');
+    const hook = [storyReward('prize:johto-pick', T => { T.money += 1; }), storyReward('test-reward', T => { T.money += 5; }), storyReward('test-reward', T => { T.money += 5; })];
+    REPLAY_REWARDS.delete('test-reward');
+    const mainMoney = readSlot(STORY_KEY).money;
+    year2Confirm(); const y2 = { text: $('#scene').textContent, disabled: $('#scene [data-y2="go"]').disabled, no: $('#scene [data-y2="no"]').textContent }; $('#scene [data-y2="no"]').click(); y2.closed = $('#scene').hidden;
+    showTitle(); go('endreplay');
+    return { y2, year2, red, ach, menu, inReplay, replayPick, prizeBefore: prizeBefore || null, hook, mainMoney, after: { slot, gone: localStorage.getItem(REPLAY_KEY), same: core() === main, shiny: localStorage.getItem(SHINY_KEY) === shinyBefore },
+      classicAch: (slot = KEY, S = readSlot(KEY), achs().some(a => a.group === 'Story')), wiki: wikiSections().some(x => x.id === 'story'), classicMail: inbox().some(m => m.id === 'update-story-mode') };
+  });
+  assert.deepEqual(got.year2, { text: 'Year 2: The Huntcoming soon', open: false }, 'Year 2 shows, but YEAR2_READY is false');
+  assert.equal(got.red.open, true, 'Red can still be fought');
+  assert.deepEqual(got.ach.map(([, h]) => h), [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  assert.ok(got.menu.includes('replay'));
+  assert.deepEqual([got.inReplay.slot, got.inReplay.replay, got.inReplay.picks, got.inReplay.ch], ['bored.poke-idle.story.replay', 1, {}, 0]);
+  assert.equal(got.inReplay.banner, 'This is a replay. Nothing here changes your save.');
+  assert.equal(got.inReplay.tag, 'This is a replay. Nothing here changes your save.');
+  assert.deepEqual([got.inReplay.badges, got.inReplay.cap < 20], [0, true], 'the replay uses Year 1\u2019s level caps from the start');
+  assert.ok(got.inReplay.menu.includes('endreplay') && !got.inReplay.menu.includes('new'));
+  assert.equal(got.inReplay.snap.caught, 1, 'the board still reports the Classic save');
+  assert.equal(got.inReplay.snap.story.chapter, 23, 'and the main Story save, not the replay');
+  assert.deepEqual(got.replayPick, { done: true, caught: false });
+  assert.equal(got.prizeBefore, null, 'no chapter prize in a replay');
+  assert.deepEqual(got.hook, [false, true, false], 'only an allowlisted reward, and only once');
+  assert.equal(got.mainMoney, 777 + 5);
+  assert.deepEqual(got.after, { slot: 'bored.poke-idle.story', gone: null, same: false, shiny: true }, 'only the allowlisted reward changed the main save');
+  assert.equal(got.classicAch, false, 'no Story achievements in Classic');
+  assert.ok(got.y2.text.includes('Every Pokémon goes back to Lv 5') && got.y2.text.includes('your whole Box') && got.y2.text.includes('Begin Year 2.'), 'the Year 2 confirm screen');
+  assert.ok(!/bond/i.test(got.y2.text), 'bond flags are kept but never listed');
+  assert.deepEqual([got.y2.disabled, got.y2.no, got.y2.closed], [true, 'Not yet.', true], 'Begin Year 2. stays disabled while YEAR2_READY is false');
+  assert.ok(got.wiki && got.classicMail);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1 finale, as one run: a League-legal team built on the admins gets through all three back to back, and the Hall of Fame stays harder', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(`(${storyAllChamps})()`);
+  const got = await tab.evaluate(() => {
+    S.key = 1; S.band = 1; for (const id of LEGENDS) S.story.ch[id] = 1; for (let i = 0; i < 160; i++) S.lifeDex[4000 + i] = 1;
+    viewR = 8; enter('battle'); startLoc({ kind: 'story', r: 8, x: 'paldea-finale' });
+    const cap = areaCap(), typed = (m, f) => refHit(m, cap, f) * bestEff(m, f), pool = refPool(...refArea(8, 3), cap, 2);
+    // One team for the whole run, picked against all eighteen, with no swaps in the breaks.
+    const all = B.phases.flatMap(adminTeam), team = refPick(pool, all.map(f => ({ f, hp: 1 })), typed, 6, leagueRule);
+    const need = () => B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) * B.tune * clockRate(f) / (team.reduce((d, m) => d + typed(m, f), 0) * bossBoost()), 0);
+    const phases = [];
+    for (let i = 0; i < 3; i++) { if (i) { B.brk = 1; storyGo(); } phases.push({ need: need(), clock: B.bossTime * refDef(team) }); }
+    return { legal: !leagueBreaksList(team), phases, whole: phases.reduce((s, p) => s + p.need, 0) / phases.reduce((s, p) => s + p.clock, 0), hof: HOF_USE, finale: FINALE_USE };
+  });
+  for (const p of got.phases) assert.ok(p.need < p.clock, `each phase is won in time (${(p.need / p.clock).toFixed(3)})`);
+  assert.ok(got.whole <= 0.95 && got.whole >= 0.8, `the whole run needs 80-95% of its clock (${got.whole.toFixed(3)})`);
+  assert.ok(got.finale < got.hof, 'the Hall of Fame stays the hardest fight');
+  assert.deepEqual(errors, []);
+});
+
+test('every catch has a from region (Kanto when nothing else fits), the bond flag stays hidden, level sync shows, and Type: Null evolves on trust', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    const where = [
+      catchRegion({ kind: 'route', r: 3, k: 1 }), catchRegion({ kind: 'dungeon', r: 5 }), catchRegion({ kind: 'summit', r: 1 }), catchRegion({ kind: 'quest', q: 'aether' }),
+      catchRegion({ kind: 'quest', q: 'distortion' }), catchRegion({ kind: 'quest', q: 'kitakami' }), catchRegion({ kind: 'quest', q: 'meteor' }), catchRegion({ kind: 'quest', q: 'southern' }),
+      catchRegion({ kind: 'quest', q: 'chasm' }), catchRegion({ kind: 'quest', q: 'meltan' }), catchRegion({ kind: 'raid', r: 7 }),
+      catchRegion({ kind: 'daily', r: 4 }), catchRegion({ kind: 'tower', r: 8 }), catchRegion({ kind: 'route', r: TRAIN_R, k: 0 }), catchRegion(null), catchRegion({ kind: 'anything' })];
+    // An old entry with no region gets Kanto when the save is written.
+    slot = KEY; S = fresh(); S.box[1] = { xp: 125 }; S.party = [1]; save(); const old = readSlot(KEY).box[1].from;
+    // A route catch in Johto, through addMon.
+    S.loc = { kind: 'route', r: 1, k: 0 }; B = { kind: 'route', r: 1, k: 0 }; addMon(161, 5, false); const johto = S.box[161].from;
+    // Story: bonded words, and Type: Null's trust.
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e6 }; S.box[NULL] = { xp: 1e6 }; S.party = [25]; S.story.silvally = 1;
+    detail = 25; renderDetail(); const unb = document.querySelector('#detail').innerHTML;
+    S.box[25].bond = 1; renderDetail(); const bon = document.querySelector('#detail').innerHTML;
+    // Level sync: Lv 100 stored, the cap far below.
+    enter('party'); const tile = document.querySelector('#party [data-n="25"]').textContent, cap = document.querySelector('#partycap').textContent;
+    S.party = [25, NULL]; for (let i = 0; i < 9; i++) nullTrust();
+    detail = NULL; renderDetail(); const trust = document.querySelector('#detail').textContent;
+    nullTrust();
+    return { where, old, johto, hidden: unb === bon && !/bond/i.test(bon), tile, cap, detailLv: bon.includes(`Lv 100 (fights at ${levelCap()})`), lvCap: levelCap(), trust: trust.includes('Trust: 9/10'), silvally: S.story.silvally, party: S.party, has: !!S.box[SILVALLY] };
+  });
+  assert.deepEqual(got.where, [3, 5, 1, 6, 3, 8, 2, 2, 4, 7, 7, 0, 0, 0, 0, 0]);
+  assert.equal(got.old, 0, 'an entry with no region counts as Kanto');
+  assert.equal(got.johto, 1);
+  assert.equal(got.hidden, true, 'the bond flag is never shown');
+  assert.ok(got.tile.includes(`Lv 100 (fights at ${got.lvCap})`) && got.detailLv, 'level sync: the real level and the one it fights at');
+  assert.equal(got.cap, `Level cap ${got.lvCap}`);
+  assert.equal(got.trust, true, 'Trust: X/10 shows');
+  assert.deepEqual([got.silvally, got.party, got.has], [2, [25, 773], true]);
+  assert.deepEqual(errors, []);
+});
+
+test('the Story tab: Next up and the Year map, with ??? for what you haven\'t reached and the finale shown from the start', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25];
+    CHAPTERS.length = 0;   // just these test chapters
+    const add = c => { CHAPTERS.push(c); CHAPTER[c.id] = c; };
+    add({ id: 'k-1', r: 0, type: 'scene', name: 'Containment', at: 'Cerulean' });
+    add({ id: 'k-2', r: 0, type: 'scene', name: 'The cage', after: ['k-1'] });
+    add({ id: 'k-opt', r: 0, type: 'scene', name: 'The Mask', optional: true, after: ['k-1'] });
+    add({ id: 'p-f', r: 8, type: 'scene', name: 'Paldea finale', finale: true, after: ['champ'], open: () => lifeDex() >= 150, note: () => `Dex ${lifeDex()} / 150` });
+    const step = () => { save(); renderStory(); return { next: storyNext().text, map: yearMap().map(x => x.mark + x.name + (x.optional ? ' (optional)' : '') + (x.note ? ' ' + x.note : '')) }; };
+    const a = step(); S.champs[0] = 1; const b = step(); S.story.ch['k-1'] = 1; const c = step();
+    S.story.ch['k-2'] = 1; for (let r = 1; r < 9; r++) S.champs[r] = 1; const d = step();
+    enter('battle'); openTab('story');
+    return { a, b, c, d, shown: document.querySelector('#t-story .next').textContent };
+  });
+  assert.equal(got.a.next, 'Next: Champion of Kanto, then Containment at Cerulean.');
+  assert.deepEqual(got.a.map, ['▶Containment', '🔒???', '🔒??? (optional)', '🔒Paldea finale Dex 1 / 150']);
+  assert.equal(got.b.next, 'Next: Containment at Cerulean, in Kanto.');
+  assert.deepEqual(got.c.map, ['✓Containment', '▶The cage', '🔒The Mask (optional)', '🔒Paldea finale Dex 1 / 150']);
+  assert.equal(got.d.next, 'Next: Paldea finale. Dex 1 / 150');
+  assert.equal(got.shown, got.d.next);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Champions give no Master Ball (Year 1 has four, from chapters); Classic Champions still do', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    const champ = story => { slot = story ? STORY_KEY : KEY; S = fresh(); if (story) startStory(); S.box[25] = { xp: 1e9 }; S.party = [25]; for (let k = 0; k < 4; k++) S.badges['0-' + k] = 1;
+      enter('battle'); startLoc({ kind: 'champ', r: 0 }); B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next(); return S.balls.master; };
+    return { classic: champ(false), story: champ(true) };
+  });
+  assert.deepEqual(got, { classic: 1, story: 0 });
   assert.deepEqual(errors, []);
 });

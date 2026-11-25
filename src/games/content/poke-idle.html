@@ -212,6 +212,28 @@
   .tip { position: relative; margin-top: 8px; padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink); display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55 }
   .tip .who { position: absolute; top: -9px; left: 12px; padding: 0 6px; background: var(--paper); font-size: 12px; font-weight: 700; line-height: 16px }
   .tip p { max-width: 68ch }
+  /* Story scenes use Prof Penguin's text box, over whichever screen is open. */
+  .scene { margin: 0 0 12px }
+  .replaybar { margin: 0 0 10px; padding: 6px 10px; border: 1px solid var(--ink); border-radius: 4px; font-size: 13px; font-weight: 700; text-align: center }
+  .scene .count { margin-left: auto }
+  .y2 { border-collapse: collapse } .y2 th, .y2 td { border: 1px solid var(--ink); padding: 4px 8px; text-align: left; vertical-align: top }
+  .modes { display: grid; gap: 8px }
+  .modes button { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
+  .modes button span { font-size: 12px; color: var(--dim) }
+  .face { float: left; width: 40px; height: 40px; margin: 0 10px 4px 0; border: 1px solid var(--ink); border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 700; text-align: center; overflow: hidden; background: var(--paper) }
+  .face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated }
+  .picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+  .picks button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
+  .picks button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px }
+  .picks img { width: 72px; height: 72px; filter: brightness(0); image-rendering: pixelated }
+  .picks span { font-size: 12px; color: var(--dim) }
+  .mon .peak { position: absolute; bottom: 2px; right: 3px; font-size: 9px; color: var(--xp); font-weight: 700 }
+  .st-group { margin: 6px 0 12px } .st-group h4 { margin: 8px 0 4px; font-size: 12px; color: var(--dim) }
+  .st-scenes { display: flex; flex-wrap: wrap; gap: 6px }
+  .next { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--ink); border-radius: 4px }
+  .yearmap { list-style: none; display: grid; gap: 4px; font-size: 13px; padding: 0 } .yearmap .mk { display: inline-block; width: 1.4em }
+  .clues { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) }
+  .clue { border: 1px solid var(--ink); border-radius: 4px; padding: 10px 12px; font-size: 13px } .clue b { display: block; margin-bottom: 4px }
   .syncask { margin: 0 0 12px }
   .syncask h2 { margin: 0; font-size: 14px }
   .sync-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px }
@@ -322,6 +344,8 @@
 <body>
 <main>
   <div class="tip syncask" id="syncask" role="alertdialog" aria-labelledby="syncask-h" hidden></div>
+  <p class="replaybar" id="replaybar" hidden></p>
+  <div class="tip scene" id="scene" role="dialog" aria-live="polite" hidden></div>
   <section id="title" hidden>
     <div class="head"><h1 id="sign">Poké Idle</h1><b class="ptag" id="t-prest" hidden></b><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
     <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
@@ -357,8 +381,10 @@
       <button data-tab="wiki" type="button">Wiki</button>
       <button data-tab="mail" type="button">Mail<b id="mailn"></b></button>
       <button data-tab="ach" type="button">Achievements</button>
+      <button data-tab="story" type="button" hidden>Story</button>
     </div>
     <div class="tip" id="tip" role="status" hidden></div>
+    <div class="tip" id="league" role="alertdialog" hidden></div>
     <div class="credits" id="credits" role="dialog" aria-modal="true" aria-labelledby="credits-h" hidden></div>
 
     <section id="t-battle" class="cols">
@@ -385,7 +411,7 @@
     </section>
 
     <section id="t-party" class="box" hidden>
-      <h2>Party <span class="ptag small" id="partyp" hidden></span></h2>
+      <h2>Party <span class="ptag small" id="partyp" hidden></span> <span class="small muted" id="partycap" hidden></span></h2>
       <div class="small muted" id="partyhint"></div>
       <div class="party" id="party"></div>
       <div class="small muted" id="teamline"></div>
@@ -419,6 +445,7 @@
       </div>
     </section>
 
+    <section id="t-story" class="box" hidden></section>
     <section id="t-ach" class="box" hidden>
       <div class="small" id="achsum"></div>
       <div id="achlist"></div>
@@ -582,7 +609,7 @@ const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUN
 // Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
 const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 5.3, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
 // Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it, and each prestige doubles it up to ×8 (see Prestige).
-const shinyOdds = () => (S.charm ? 3 : 1) * prestigeShiny() / 4096;
+const shinyOdds = () => (S.charm ? 3 : 1) * (isStory() ? STORY_SHINY : prestigeShiny()) / 4096;
 const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
@@ -664,7 +691,7 @@ const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && !tripOnly(m)
 // Only Tier 3 and 4 come from dungeons (Arceus, Tier 1, is the Hall of Origin's), and never a quest-only species: those
 // come from their quests (or, for Cosmog, as a gift).
 const QUEST_ONLY = new Set([772, 773, 789, 790, 808, 809, 891, 892, 898, 1017, 1024]);
-const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >= 3 && tierOf(m) <= 4 && !QUEST_ONLY.has(m.num)).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
+const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >= 3 && tierOf(m) <= 4 && !QUEST_ONLY.has(m.num) && !(isStory() && STORY_NO_DEN.has(m.num))).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
 // Boss stats shape the fight. A team's Attack and Speed set how long you last: against the other bosses of its region,
 // a faster, harder-hitting team gives you up to 20% less time and a slow one up to 20% more (a dungeon's random
 // legendary: -10% to +15%). Each boss Pokémon's HP comes from its HP, Defense and Sp. Def together.
@@ -694,16 +721,20 @@ const proteinPrice = n => Math.round(300 * Math.pow(1.5, n));
 const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 
 // ── Save
-// The real save, and a separate slot for the test account (below). Which slot is open is remembered.
-const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
-let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
+// The real save (Classic), Story Mode's own save, and a separate slot for the test account (below). Which slot is
+// open is remembered in SLOT_KEY: "real", "story" or "test". Only the Classic save goes to the Bored account (sync,
+// below, reads KEY itself), and the leaderboard always reports Classic (see __boredSnapshot).
+const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", STORY_KEY = "bored.poke-idle.story", REPLAY_KEY = "bored.poke-idle.story.replay", SLOT_KEY = "bored.poke-idle.slot";
+const SLOT_NAME = { [KEY]: "real", [TEST_KEY]: "test", [STORY_KEY]: "story", [REPLAY_KEY]: "replay" };
+let slot = (() => { try { const v = localStorage.getItem(SLOT_KEY); return v === "test" ? TEST_KEY : v === "story" ? STORY_KEY : v === "replay" ? REPLAY_KEY : KEY; } catch { return KEY; } })();
+const setSlotPref = k => { try { localStorage.setItem(SLOT_KEY, SLOT_NAME[k]); } catch {} };
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
 const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, prestige: 0, lifeDex: {}, lifeShiny: {}, last: Date.now() });
 let S = readSlot(slot);
 // Your save in your Bored account (see "Saves in your account" further down). openAt is the save's time as this page
 // found it, before anything here touched it.
 const SYNC = { acct: null, state: "start", row: null, busy: false, again: false, tries: 0, retryAt: 0, lastPush: 0, hidden: false, ask: null, hideAsk: false, blocked: 0, error: false, openAt: (readSlot(KEY) || {}).last || 0 };
-const save = () => { if (syncHold()) return; shineLines(); S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
+const save = () => { if (syncHold()) return; shineLines(); notePeaks(); S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
 // ── Party power
 const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
@@ -716,6 +747,11 @@ function levelCap() {
 }
 // XP past the cap (from older saves) is kept but doesn't count until the cap catches up.
 const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
+// Level sync (Story): a Pokémon's real level is its stored one, which only XP raises; it fights at the cap when it's
+// above it (level, and battleLevel where a place has a cap of its own), and gains no XP until the cap passes it. Story
+// shows both, "Lv 90 (fights at 24)", since a new year starts the cap over. Classic shows the one level, as before.
+const realLevel = n => lvlOf(S.box[n].xp);
+const lvText = (n, at = level(n)) => isStory() && realLevel(n) > at ? `Lv ${realLevel(n)} (fights at ${at})` : `Lv ${at}`;
 // Every place has its own cap too: the one you had when you first got there. Go back to an
 // earlier region and your party fights held down to it, so a Lv 90 team from Galar is a Lv 30 team on Hoenn Route 1.
 function areaCap(loc = S.loc) {
@@ -723,7 +759,7 @@ function areaCap(loc = S.loc) {
   if (!loc || loc.kind === "summit" || loc.kind === "tower") return 100;
   if (loc.kind === "final" || loc.kind === "daily" || loc.kind === "hof") return levelCap();
   // Sssssssnakes fights under that region's Champion's cap, whenever you come back.
-  if (loc.kind === "rival") return Math.min(100, champLevel(loc.r) + CAP_OVER);
+  if (loc.kind === "rival" || loc.kind === "story") return Math.min(100, champLevel(loc.r) + CAP_OVER);
   // Side quests, the Darkest Day, and the Ultra Wormhole and Area Zero come after a Champion: your level cap.
   if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || loc.kind === "quest" || loc.kind === "darkest") return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
@@ -1065,7 +1101,8 @@ function questNote(Q) {
 }
 // Sinnoh's wild Pokémon now and then turn up one of Arceus's Plates once every Champion is beaten; its bosses bring a couple.
 function gainPlates(k) {
-  if (!allChamps() || (S.plates || 0) >= PLATES_NEED || k <= 0) return "";
+  // Story never drops Plates: its Arceus comes with all of them, in Year 3.
+  if (isStory() || !allChamps() || (S.plates || 0) >= PLATES_NEED || k <= 0) return "";
   const before = S.plates || 0; S.plates = Math.min(PLATES_NEED, before + k);
   let note = ` Found ${S.plates - before > 1 ? S.plates - before + " Plates" : "a Plate"} (${S.plates}/${PLATES_NEED}).`;
   if (S.plates >= PLATES_NEED) { note += " All 17 Plates: the Hall of Origin is in Sinnoh's list."; toast(note.trim()); }
@@ -1094,7 +1131,11 @@ const badge = (r, k) => !!S.badges[r + "-" + k];
 const kills = (r, k) => S.kills[r + "-" + k] || 0;
 function unlocked(loc) {
   const { kind, r, k } = loc;
-  if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
+  if (kind === "chapter") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
+  if (isStory() && STORY_HIDDEN.has(kind)) return false;
+  if (kind === "year2") return YEAR2_READY && isStory() && !!S.story.epilogue && !S.replay;
+  if (kind === "story") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
+  if (kind === "summit") return isStory() ? chDone(SILVER_AFTER) : Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
   if (kind === "hof") return HOF_READY && labBeaten();
   if (kind === "daily") return S.party.length > 0;
@@ -1121,6 +1162,8 @@ function locName(loc) {
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
   if (loc.kind === "dungeon") return loc.x ? TRIP[loc.x].place : `${R.name} dungeon`;
+  if (loc.kind === "year2") return `Year 2: ${YEARS[2]}`;
+  if (loc.kind === "chapter" || loc.kind === "story") return CHAPTER[loc.x] ? CHAPTER[loc.x].name : "Story";
   if (loc.kind === "summit") return "Mt. Silver";
   if (loc.kind === "darkest") return "Energy Plant";
   if (loc.kind === "tower") return "Battle Tower";
@@ -1162,14 +1205,14 @@ function refPool(r, k, cap, tier) {
 }
 // The best six of a pool against foes [{ f, hp }]: one at a time, whichever cuts the fight's total time most, each
 // species once, at most one Mega and one Gigantamax (as in a real party).
-function refPick(P, foes, hit, size = 6) {
+function refPick(P, foes, hit, size = 6, rule) {
   const H = P.map(m => foes.map(({ f }) => hit(m, f))), dps = foes.map(() => 0), out = [], nums = new Set();
   let mega = false, gmax = false;
   while (out.length < size) {
     let best = -1, cost = Infinity;
     for (let i = 0; i < P.length; i++) {
       const m = P[i];
-      if (nums.has(m.num) || (mega && m.kind === "mega") || (gmax && m.kind === "gmax")) continue;
+      if (nums.has(m.num) || (mega && m.kind === "mega") || (gmax && m.kind === "gmax") || (rule && !rule(out, m))) continue;
       const c = foes.reduce((s, { hp }, j) => s + hp / Math.max(1e-9, dps[j] + H[i][j]), 0);
       if (c < cost) { cost = c; best = i; }
     }
@@ -1275,10 +1318,11 @@ function finalBreak() {
 function renderFinalBox() {
   const el = $("#finalbox"), on = !!(B && B.brk != null);
   el.hidden = !on;
-  el.innerHTML = on ? `<span>Phase 2 starts in <b id="finalwait">${Math.ceil(B.brk)}s</b>.</span><button class="lbl" type="button" data-final="go">Start phase 2</button>` : "";
+  el.innerHTML = on ? `<span>Phase ${(B.phase || 1) + 1} starts in <b id="finalwait">${Math.ceil(B.brk)}s</b>.</span><button class="lbl" type="button" data-final="go">Start phase ${(B.phase || 1) + 1}</button>` : "";
 }
 function finalGo() {
   if (!B || B.brk == null) return;
+  if (B.kind === "story") return storyGo();
   if (!S.party.length) { say("Put at least one Pokémon in your party. The showdown starts over from phase 1.", true); backToRoute(); return; }
   B.brk = null; B.phase = 2; B.queue = finalTeam(); B.idx = 0;
   B.time = fightTime(FINAL_TIME, B.queue, RED_OFFENSE, .8, 1.2); B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def);
@@ -1288,7 +1332,7 @@ function finalGo() {
 }
 $("#finalbox").onclick = e => { if (e.target.closest("[data-final]")) finalGo(); };
 // Party changes wait for the end of a boss fight, but the break in Prof Penguin's showdown is free.
-const bossLocked = () => !!(B && B.kind !== "route" && !(B.kind === "final" && B.brk != null));
+const bossLocked = () => !!(B && B.kind !== "route" && !((B.kind === "final" || B.kind === "story") && B.brk != null));
 function finalWin() {
   const first = !S.beat, prize = rewardFor(B.L, B.i, 50); S.money += prize; S.pbeat = 1;
   if (first) {
@@ -1321,7 +1365,7 @@ const PRESTIGE_KEEP = ["ach", "mail", "stats", "beat", "teams", "set", "tut", "d
 const prestigeShiny = (p = S.prestige || 0) => Math.min(PRESTIGE_SHINY_MAX, 2 ** p);
 const prestigeXp = () => S.prestige ? PRESTIGE_XP : 1;
 const nextShiny = () => prestigeShiny((S.prestige || 0) + 1);
-const canPrestige = () => !!(S && !S.pick && (S.pbeat || (S.beat && !S.prestige)));
+const canPrestige = () => !!(S && !isStory() && !S.pick && (S.pbeat || (S.beat && !S.prestige)));
 const PRESTIGE_RESETS = ["your Box and party", "money", "balls, items, Linking Cords and Protein", "badges and Champions", "dungeons and side quests", "rival fights", ...(HOF_READY ? ["the Hall of Fame"] : []), "dungeon tickets",
   "Mega Stones, Max Soup and Gigantamax forms", "the Shiny Charm", "region progress: routes, Zygarde Cells, Wishing Pieces and Plates", "Prof Penguin's Lab: beat him again to prestige again"];
 const PRESTIGE_STAYS = ["achievements", "Mail", "your Battle Tower best", "stats counters (wins, taps, evolutions)", "the day you beat the game", "saved teams, as templates: loading one fills in the members you have",
@@ -1363,11 +1407,11 @@ const RIVALS = [
 const RIVAL_AT = Object.fromEntries(RIVALS.map(x => [x.r, x])), RIVAL = Object.fromEntries(RIVALS.map(x => [x.id, x]));
 const rivalWon = id => !!(S && S.rivals && S.rivals[id]);
 const rivalTime = x => fightTime(CHAMP_TIME, x.team, regionOffense(x.r), .8, 1.2);
-function rivalWin() {
-  const x = RIVAL_AT[B.r], first = !rivalWon(x.id), prize = rewardFor(B.L, B.i, first ? RIVAL_PAY : RIVAL_REMATCH);
+function rivalWin(x = RIVAL_AT[B.r], letter = "rival-" + x.id) {
+  const first = !rivalWon(x.id), prize = rewardFor(B.L, B.i, first ? RIVAL_PAY : RIVAL_REMATCH);
   S.money += prize; S.rivals = { ...(S.rivals || {}), [x.id]: 1 };
   if (first && x.master) S.balls.master++;
-  if (first) S.mail.got["rival-" + x.id] = 1;
+  if (first) S.mail.got[letter] = 1;
   toast(first ? `You beat ${RIVAL_NAME}! +$${fmt(prize)}${x.master ? " and a Master Ball" : ""}. ${RIVAL_NAME} sent you a letter.` : `${RIVAL_NAME} rematch won. +$${fmt(prize)}.`);
 }
 // ── The Hall of Fame (held back by HOF_READY, above). A row after Prof Penguin's Lab in every list, open once you've
@@ -1395,9 +1439,12 @@ function hofWin() {
   toast(first ? `You beat ${RIVAL_NAME} in the Hall of Fame! +$${fmt(prize)}. Mega Hydrapple is yours.` : `Hall of Fame rematch won. +$${fmt(prize)}.`);
 }
 function startLoc(loc) {
+  if (loc.kind === "chapter") return runChapter(CHAPTER[loc.x]);
+  if (loc.kind === "year2") return YEAR2_READY ? year2Confirm() : void toast(`Year 2: ${YEARS[2]} isn't here yet.`);
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
+  if (isStory() && (loc.kind === "gym" || loc.kind === "champ") && leagueBreaks()) { leagueNotice(loc); return; }
   // The ticket is only used once the run is sure to start.
   if (loc.kind === "dungeon" || loc.kind === "raid") {
     const t = S.tickets[loc.r] || 0;
@@ -1421,6 +1468,7 @@ function startLoc(loc) {
   else if (loc.kind === "hof") { const L = Math.max(champLevel(r), levelCap()), q = HOF_TEAM(); B = { kind: "hof", r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: q, L, base: FINAL_TIME, time: fightTime(FINAL_TIME, q, RED_OFFENSE, .8, 1.2), idx: 0 }; }
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
+  else if (loc.kind === "story") B = storyFight(CHAPTER[loc.x]);
   else if (loc.kind === "rival") { const x = RIVAL_AT[r]; B = { kind: "rival", r, i: r * 4 + 3, queue: x.team.slice(), L: areaCap(S.loc), base: CHAMP_TIME, time: rivalTime(x), idx: 0 }; }
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
   else {
@@ -1435,6 +1483,7 @@ function startLoc(loc) {
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "rival") B.tune = gymTuning(B, 3, 6, [B.r, 3], RIVAL_USE);
+  else if (B.kind === "story") B.tune = storyTune(B);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
   else if (B.kind === "raid") B.tune = raidTuning(B);
   else if (B.kind === "quest") B.tune = tierTuning(B, QUEST[B.q].tier, refArea(B.r, 3));
@@ -1442,7 +1491,7 @@ function startLoc(loc) {
   else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
   else if (B.kind === "hof") B.tune = finalTuning(B, HOF_USE);
   else if (B.kind === "daily") B.tune = tierTuning(B, 5, dailyArea(B.r));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "story" ? storySay(B) : B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1455,9 +1504,9 @@ function spawn() {
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" || B.kind === "raid" ? CHAMP_HP : GYM_HP;
     mult = B.kind === "dungeon" && !boss ? (B.fodder || fodderHp(B.i)) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
-    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final" || B.kind === "rival" || B.kind === "hof") pay = CHAMP_HP;
+    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final" || B.kind === "rival" || B.kind === "hof" || B.kind === "story") pay = CHAMP_HP;
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
-    shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
+    shiny = (B.kind === "dungeon" || (B.catchIt && boss)) && Math.random() < shinyOdds();
   }
   B.foe = { m, L, shiny, max: (boss ? bossHpFor : hpFor)(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
   B.foe.hp = B.foe.max; B.pause = 0;
@@ -1476,16 +1525,20 @@ function hit(dmg) {
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
   S.money += f.reward; S.stats.wins++;
+  // Bonded: in the active party for a win, at least once, and for good. It needn't fight or land the last hit; a saved
+  // team doesn't count. It's hidden: nothing shows it, and nothing in Year 1 reads it (Year 3's thaw does).
+  for (const n of S.party) if (S.box[n]) S.box[n].bond = 1;
+  if (isStory()) nullTrust();
   gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5) * (B.kind === "route" && B.r === TRAIN_R ? TRAIN_XP : 1)));
   if (B.kind === "route" && B.r !== TRAIN_R) S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
   if (f.wild && Math.random() < 1 / CELL_ODDS) text += gainCells(1);
   if (f.wild && B.r === PIECES_FROM && Math.random() < 1 / PIECE_ODDS) text += gainPieces(1);
   if (f.wild && B.r === PLATES_FROM && Math.random() < 1 / PLATE_ODDS) text += gainPlates(1);
-  const boss = f.wild && B.kind === "dungeon" && B.idx === B.queue.length - 1;
+  const boss = ((f.wild && B.kind === "dungeon") || B.catchIt) && B.idx === B.queue.length - 1;
   if ((boss || (f.wild && f.shiny)) && S.set.manual && BALLS.some(b => S.balls[b.id] > 0)) { say(text); startManual(f, boss); return; }
-  if (boss) text += bossThrows(f);
-  else if (f.wild) {
+  if (boss) text += S.replay ? (B.bossCaught = true, " It's a replay: no catch, the chapter goes on.") : bossThrows(f);
+  else if (f.wild && !S.replay) {
     const ball = chooseBall(f);
     if (ball) {
       S.balls[ball.id]--;
@@ -1629,12 +1682,15 @@ function next() {
   if (B.idx < B.queue.length) { spawn(); return; }
   if (B.kind === "tower") { towerFloor(); return; }
   if (B.kind === "final" && B.phase === 1) { finalBreak(); return; }
+  if (B.kind === "story" && B.phases && B.phase < B.phases.length) { storyBreak(); return; }
   // Bosses in Galar bring Wishing Pieces, in Sinnoh Plates.
   const R = REGIONS[B.r], galar = (B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "") + (B.r === PLATES_FROM && B.kind !== "quest" ? gainPlates(PLATE_BOSS) : "");
+  if (B.kind === "gym" && isStory() && !badge(B.r, B.k)) storyEvent("gym", B.r);
+  if (B.kind === "champ" && isStory() && !S.champs[B.r]) storyEvent("champ", B.r);
   if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + gainCells(CELL_BOSS) + galar); }
-  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++;
-    const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
-    toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + gainCells(CELL_BOSS) + galar); }
+  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first && !isStory()) S.balls.master++;
+    const unlock = first && B.r === KEY_STONE_FROM && !S.key ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
+    toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)}${isStory() ? "" : " and a Master Ball"}. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS)); }
   if (B.kind === "dungeon" && B.bossCaught !== false) delete (S.den || {})[B.x || "d" + B.r];
   if (B.kind === "dungeon" && B.x) { S.trips[B.x] = (S.trips[B.x] || 0) + 1; const T = TRIP[B.x]; toast(`${T.place} cleared. ${T.what}: ${tripCaught(T)}/${T.all.length} caught.` + stoneDrop(B.r) + gainCells(CELL_BOSS)); }
@@ -1645,25 +1701,26 @@ function next() {
     for (const n of Q.gmax || []) S.gfactor[n] = 1;
     // The prize, and any other Pokémon the quest gives (Kubfu with Urshifu), join you if you don't have them.
     const joins = [Q.prize, ...(Q.gives || [])].filter(n => n && !S.box[n]);
-    for (const n of joins) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(n); }
+    for (const n of joins) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion({ kind: "quest", q: Q.id }) }; if (joinsParty()) joinParty(n); }
     const joined = joins.length ? ` ${joins.map(n => mon(n).name).join(" and ")} join${joins.length > 1 ? "" : "s"} you.` : "";
     toast((first ? `You beat ${Q.boss} at ${theQ(Q)}! +$${fmt(prize)}.${joined} ${Q.won}` : `${Q.boss} rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS));
   }
   if (B.kind === "darkest") {
     const first = !S.eternamax, prize = rewardFor(B.L, B.i, 30); S.money += prize; S.eternamax = 1; S.gfactor[ETERNATUS] = 1;
     let joined = "";
-    if (!S.box[ETERNATUS]) { S.box[ETERNATUS] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(ETERNATUS); joined = " Eternatus joins you."; }
+    if (!S.box[ETERNATUS]) { S.box[ETERNATUS] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion({ kind: "darkest", r: B.r }) }; if (joinsParty()) joinParty(ETERNATUS); joined = " Eternatus joins you."; }
     toast((first ? `You ended the Darkest Day! +$${fmt(prize)}.${joined} Eternatus can Eternamax now: turn it on in its detail in Party & Box.` : `Eternatus rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS));
   }
   if (B.kind === "raid") {
     const n = B.n, prize = rewardFor(B.L, B.i, 30); S.money += prize; S.gfactor[n] = 1; S.raids = (S.raids || 0) + 1;
     let joined = "";
-    if (!S.box[n] && !legendary(mon(n))) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(n); joined = ` ${mon(n).name} joins you.`; }
+    if (!S.box[n] && !legendary(mon(n))) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion({ kind: "raid" }) }; if (joinsParty()) joinParty(n); joined = ` ${mon(n).name} joins you.`; }
     S.raid = 0; raidMon();
     toast(`You won the Max Raid! ${mon(n).name} can Gigantamax now: turn it on in its detail in Party & Box. +$${fmt(prize)}.${joined}` + gainCells(CELL_BOSS) + galar);
   }
   if (B.kind === "final") finalWin();
   if (B.kind === "rival") rivalWin();
+  if (B.kind === "story" || B.storyCh) storyWin();
   if (B.kind === "hof") hofWin();
   if (B.kind === "daily") {
     const first = !dailyWon(), prize = rewardFor(B.L, B.i, 15); S.money += prize;
@@ -1687,7 +1744,7 @@ function backToRoute() {
 }
 function addMon(num, L, shiny, vid) {
   const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num), again = !had && !shiny && !lineWasShiny && lineRecorded(num);
-  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again };
+  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again, from: catchRegion(B || S.loc) };
   else if (shiny) shineOne(had);
   shineLines();
   const newForm = v ? unlockVar(num, vid, !had) : false;
@@ -1696,7 +1753,7 @@ function addMon(num, L, shiny, vid) {
   if (!had) msgs.push(`${(v || mon(num)).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
   else if (newForm) msgs.push(`${v.name}! It joins as a form of your ${mon(num).name}: pick it in its detail in Party & Box.`);
   // The shiny toast comes once per line: a second shiny of a line that already shines says nothing new.
-  if (again) msgs.push(`${(v || mon(num)).name} came out shiny: you had its line shiny before you prestiged.${familyOf(num).length > 1 ? " The whole line shines again." : ""}`);
+  if (again) msgs.push(`${(v || mon(num)).name} came out shiny: you had its line shiny ${isStory() ? "in another save" : "before you prestiged"}.${familyOf(num).length > 1 ? " The whole line shines again." : ""}`);
   if (shiny && !lineWasShiny) msgs.push(`A shiny ${(v || mon(num)).name}!${familyOf(num).length > 1 ? " Its whole evolution line is shiny for you now." : ""} Party & Box can switch the look back.`);
   if (msgs.length) toast(msgs.join(" "));
   // Cosmog is a gift the first time you catch Solgaleo or Lunala; Cosmoem comes from evolving it.
@@ -1731,7 +1788,7 @@ const lineKey = n => familyOf(n)[0];
 function readShinyLines() { try { const v = JSON.parse(localStorage.getItem(SHINY_KEY)); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } }
 const lineRecorded = n => !!readShinyLines()[lineKey(n)];
 function recordShinyLines() {
-  if (!S || !S.box || S.test || slot === TEST_KEY) return;
+  if (!S || !S.box || S.test || S.replay || slot === TEST_KEY) return;
   const store = readShinyLines(); let added = false;
   for (const k of Object.keys(S.box)) if (S.box[k].shiny && !store[lineKey(+k)]) { store[lineKey(+k)] = 1; added = true; }
   if (added) try { localStorage.setItem(SHINY_KEY, JSON.stringify(store)); } catch {}
@@ -1741,6 +1798,7 @@ function recordShinyLines() {
 function recordLife() {
   S.lifeDex = S.lifeDex || {}; S.lifeShiny = S.lifeShiny || {};
   for (const [k, b] of Object.entries(S.box)) { S.lifeDex[k] = 1; if (b.shiny) S.lifeShiny[k] = 1; }
+  if (S.story) Object.assign(S.story.lifeDex = S.story.lifeDex || {}, S.lifeDex);
 }
 const lifeDex = () => Object.keys(S.lifeDex || {}).length, lifeShiny = () => Object.keys(S.lifeShiny || {}).length;
 const boardScore = () => lifeDex() + lifeShiny();
@@ -1749,16 +1807,34 @@ function shineLines() {
   for (const k of Object.keys(S.box)) if (S.box[k].shiny) for (const m of familyOf(+k)) if (S.box[m]) shineOne(S.box[m]);
   recordShinyLines(); recordLife();
 }
-function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSMOG]) return false; S.box[COSMOG] = { xp: Math.pow(levelCap(), 3), shiny: false }; return true; }
+function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSMOG]) return false; S.box[COSMOG] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion(B || S.loc) }; return true; }
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
 function gainXp(xp) {
   xp *= prestigeXp();
+  if (isStory()) return storyXp(xp * STORY_XP);
   const top = Math.pow(levelCap(), 3), lead = Math.min(top, Math.max(0, ...S.party.map(n => S.box[n].xp))), leadL = Math.max(0, ...S.party.map(n => level(n)));
   for (const n of S.party.slice()) {
     const b = S.box[n], before = level(n), mult = Math.min(CATCH_MAX, Math.pow(2, Math.max(0, leadL - before) / CATCH_UP));
     if (b.xp < top) b.xp = Math.min(top, b.xp + Math.max(xp, Math.min(xp * mult, lead + xp - b.xp)));
     if (level(n) > before) autoEvolve(n);
   }
+}
+// Story Mode has no catch-up bonus. Instead, "It remembers you": a Pokémon below the highest level it ever reached
+// (b.peak) gets ×REMEMBER XP until it's back there, then the usual Story rate. Rare in Year 1; it's for the years after.
+function storyXp(xp) {
+  const top = Math.pow(levelCap(), 3);
+  for (const n of S.party.slice()) {
+    const b = S.box[n], before = level(n);
+    if (b.xp < top) b.xp = Math.min(top, rememberXp(b, xp));
+    notePeak(b);
+    if (level(n) > before) autoEvolve(n);
+  }
+}
+function rememberXp(b, xp) {
+  const peakXp = Math.pow(b.peak || 0, 3);
+  if (b.xp >= peakXp) return b.xp + xp;
+  const fast = b.xp + xp * REMEMBER;
+  return fast <= peakXp ? fast : peakXp + (fast - peakXp) / REMEMBER;
 }
 // A new badge can lift a Pokémon that was already sitting at the cap over its evolution level.
 function liftCap() { for (const n of S.party.slice()) autoEvolve(n); }
@@ -1791,8 +1867,8 @@ function evolve(n, e, quiet) {
   // Shinies go by line (shineLines): the evolution is shiny if its line is, and wears the look the one it came from
   // had picked (a shiny set back to Normal stays Normal).
   const had = S.box[t];
-  if (had) had.xp = Math.max(had.xp, S.box[n].xp);
-  else S.box[t] = { xp: S.box[n].xp, shiny: lineShiny(n), ...(S.box[n].shiny && lookKind(n) === "normal" ? { look: "normal" } : {}) };
+  if (had) { had.xp = Math.max(had.xp, S.box[n].xp); carryTrack(S.box[n], had); }
+  else { S.box[t] = { xp: S.box[n].xp, shiny: lineShiny(n), ...(S.box[n].shiny && lookKind(n) === "normal" ? { look: "normal" } : {}) }; carryTrack(S.box[n], S.box[t]); }
   shineLines();
   if (form) unlockVar(t, form.vid, true);
   const slot = S.party.indexOf(n);
@@ -1834,7 +1910,7 @@ function tick() {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
       B.time -= dt * clockRate(B.foe.m);
-      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : B.kind === "rival" ? `${RIVAL_NAME}: "Too ssslow. Come back when you're ready."` : B.kind === "hof" ? `${RIVAL_NAME}: "The Hall of Fame isn't for everyone."` : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
+      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : B.kind === "story" ? storyLose(B) : B.kind === "rival" ? `${RIVAL_NAME}: "Too ssslow. Come back when you're ready."` : B.kind === "hof" ? `${RIVAL_NAME}: "The Hall of Fame isn't for everyone."` : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
     }
   }
   drawBattle();
@@ -1876,7 +1952,7 @@ const TIPS = [
 ];
 let tipNow = null;
 function tutor() {
-  if (!S || !S.tut || S.tut.off || screen !== "game" || tipNow) return;
+  if (!S || !S.tut || S.tut.off || screen !== "game" || tipNow || sceneNow) return;
   const t = TIPS.find(x => !S.tut.seen[x.id] && x.when());
   if (!t) return;
   tipNow = t;
@@ -1889,7 +1965,8 @@ function hideTip() { tipNow = null; $("#tip").hidden = true; }
 let tab = "battle", dexR = 0, viewR = 0, detail = null;
 function renderAll() { renderTop(); renderLocs(); renderMinis(); if (tab === "party") renderParty(); if (tab === "dex") renderDex(); if (tab === "shop") renderShop(); }
 function renderTop() {
-  $("#top h1").textContent = S && S.test ? "Poké Idle (test)" : "Poké Idle";
+  $("#top h1").textContent = S && S.test ? "Poké Idle (test)" : isStory() ? "Poké Idle: Story" : "Poké Idle";
+  $('#tabs [data-tab="story"]').hidden = !isStory();
   $("#mailn").textContent = unreadMail() || "";
   $("#hudp").hidden = !S.prestige; $("#hudp").textContent = S.prestige ? "P" + S.prestige : ""; $("#hudp").title = S.prestige ? "Prestige " + S.prestige : "";
   $("#dexn").textContent = Object.keys(S.box).length;
@@ -1902,10 +1979,11 @@ function renderLocs() {
     + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Sssssssnakes sits at the very top of each of those regions' lists.
-  if (RIVAL_AT[r]) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
+  if (RIVAL_AT[r] && !isStory()) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
+  if (isStory() && S.story.epilogue && !S.replay) items.push({ kind: "year2", r, note: YEAR2_READY ? "begin" : "coming soon" });
   // Prof Penguin's Lab sits at the top of every list.
-  const hofRow = HOF_READY ? { kind: "hof", r: HOF_R, note: !labBeaten() ? "after Prof Penguin" : `${RIVAL_NAME}, first graduate${hofWon() ? " · won" : ""}`, done: hofWon() } : null;
-  items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
+  const hofRow = HOF_READY && !isStory() ? { kind: "hof", r: HOF_R, note: !labBeaten() ? "after Prof Penguin" : `${RIVAL_NAME}, first graduate${hofWon() ? " · won" : ""}`, done: hofWon() } : null;
+  if (!isStory()) items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
   // The Hall of Fame right after the Lab.
   if (hofRow) items.push(hofRow);
   // Today's boss, the same for every player, under the Lab in every list.
@@ -1918,14 +1996,15 @@ function renderLocs() {
       if (k === 1) { const t4 = dungeonT4(r); items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${dungeonPhase(r) === 4 ? `Legends ${t4.filter(ownsFoe).length}/${t4.length}` : "Tier 3"} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] }); }
     }
     items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
-    if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
+    if (isStory()) items.push(...chapterRows(r));
+    if (r === PIECES_FROM && !isStory()) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
     if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
     for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, types: unlocked({ kind: "dungeon", r, x: T.id }) ? denFoe(r, T.id).types : null, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
-    for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
+    if (!isStory()) for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
     if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
-    if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
+    if (r === 1 && !isStory()) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   }
-  const quest = r === CELLS_FROM ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
+  const quest = r === CELLS_FROM && !isStory() ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
   $("#locs").innerHTML = items.map(it => {
     const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0) && (S.loc.q || "") === (it.q || "") && (S.loc.x || "") === (it.x || "");
     return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}), ...(it.x ? { x: it.x } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${it.train ? `${tyChip(it.train)} area` : esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}${it.types ? " " + it.types.map(tyChip).join(" ") : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
@@ -1940,7 +2019,7 @@ function monTile(n, opts = {}) {
   const eLabel = e == null ? "" : dm > .95 && dm < 1.05 ? ({ 0: "0x", .25: "¼x", .5: "½x" })[te] || te + "x" : (e >= 10 ? Math.round(e) : Math.round(e * 10) / 10) + "x";
   const eTitle = e == null ? "" : `${te}x type; ${ph ? "Attack vs Defense" : "Sp. Atk vs Sp. Def"} ×${dm.toFixed(2)}`;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span>${remembers(n) ? `<span class="peak" title="It remembers you: ×${REMEMBER} XP back to Lv ${S.box[n].peak}">❄${S.box[n].peak}</span>` : ""}<span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : lvText(n, opts.battle ? battleLevel(n) : level(n))}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -2000,6 +2079,7 @@ function renderParty() {
   // Below the cap each one counts × (level ÷ cap)², so the line shows both: on paper, and at their levels.
   const avg = f => S.party.length ? S.party.reduce((t, n) => t + f(n), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
   const avgBulk = avg(n => bulkFor(fighter(n))), lvBulk = avg(n => bulkFor(fighter(n)) * underCap(battleLevel(n)) ** 2), under = Math.round(lvBulk) < Math.round(avgBulk);
+  $("#partycap").hidden = !isStory(); $("#partycap").textContent = isStory() ? `Level cap ${levelCap()}` : "";
   renderTeams();
   $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(lvBulk)}</b> on average${under ? ` at their levels (base ${Math.round(avgBulk)}; below the cap each counts × (level ÷ cap)²)` : ""}, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
   const gh = ghosts();
@@ -2063,7 +2143,7 @@ function renderDetail() {
   const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   const now = statsAt(st, level(detail)), bRaw = bulkOf(fighter(detail)), bNow = Math.round(bulkNow(detail)), bFull = Math.round(bulkFor(fighter(detail)));
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> ${lvText(detail)}${remembers(detail) ? ` <span class="small" title="It remembers you: ×${REMEMBER} XP until it's back to Lv ${S.box[detail].peak}">❄ was Lv ${S.box[detail].peak}</span>` : ""}${isStory() && +detail === NULL && S.story.silvally === 1 ? ` <span class="small">Trust: ${S.story.nullTrust || 0}/${TRUST_NEED}</span>` : ""} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small">Lv ${level(detail)}: HP <b>${now.hp}</b> · Atk <b>${now.atk}</b> · Def <b>${now.def}</b> · SpA <b>${now.spa}</b> · SpD <b>${now.spd}</b> · Spe <b>${now.spe}</b> · Total <b>${now.bst}</b></div>` +
     `<div class="small muted">Base stats: HP ${st.hp} · Atk ${st.atk} · Def ${st.def} · SpA ${st.spa} · SpD ${st.spd} · Spe ${st.spe} · Total ${st.bst}</div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
@@ -2192,6 +2272,9 @@ const ACH = [
   { id: "areazero", group: "Side quests", title: "Out of time", desc: "Catch all 20 Paradox Pokémon", need: PARADOX.length + PARADOX_LATE.length, have: () => [...PARADOX, ...PARADOX_LATE].filter(n => S.box[n]).length },
   ...[["early", "Shed skin", "Johto"], ["mid", "Coiled", "Unova"], ["late", "Top of the food chain", "Galar"]]
     .map(([id, title, at]) => ({ id: "rival-" + id, group: "Rival", title, desc: `Beat ${RIVAL_NAME} in ${at}`, need: 1, have: () => rivalWon(id) ? 1 : 0 })),
+  ...REGIONS.map((R, r) => ({ id: "story-" + R.name.toLowerCase(), group: "Story", story: true, title: R.name + " thawed", desc: `Finish ${R.name}'s Year 1 chapters, legend and all`, need: 1,
+    have: () => chDone(r === 8 ? "paldea-pick" : LEGENDS[r]) ? 1 : 0 })),
+  { id: "story-year1", group: "Story", story: true, title: "The Long Freeze", desc: "Clear Year 1: beat Red on Mt. Silver", need: 1, have: () => S.story && S.story.epilogue ? 1 : 0 },
   { id: "graduation", group: "Prof Penguin", title: "Graduation", desc: "Beat Prof Penguin's final showdown", need: 1, have: () => S.beat ? 1 : 0 },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
@@ -2217,9 +2300,11 @@ const ACH = [
   const at = ACH.map((a, i) => a.group === "Side quests" ? i : -1).filter(i => i >= 0), sorted = at.map(i => ACH[i]).sort((a, b) => rank(a) - rank(b));
   at.forEach((i, j) => { ACH[i] = sorted[j]; });
 }
+// The Story group only shows in Story saves.
+const achs = () => ACH.filter(a => !a.story || isStory());
 function checkAch(quiet) {
   if (!S || !S.ach) return [];
-  const now = Date.now(), got = ACH.filter(a => !S.ach[a.id] && a.have() >= a.need);
+  const now = Date.now(), got = achs().filter(a => !S.ach[a.id] && a.have() >= a.need);
   for (const a of got) S.ach[a.id] = now;
   if (!got.length) return got;
   const msg = got.length === 1 ? `Achievement: ${got[0].title}` : `${got.length} achievements: ${got.map(a => a.title).join(", ")}`;
@@ -2229,10 +2314,10 @@ function checkAch(quiet) {
 }
 function renderAch() {
   if (!S) return;
-  const done = ACH.filter(a => S.ach[a.id]).length;
-  $("#achsum").innerHTML = `<b>${done}/${ACH.length}</b> earned. Just for show: they don't change the game.`;
+  const done = achs().filter(a => S.ach[a.id]).length;
+  $("#achsum").innerHTML = `<b>${done}/${achs().length}</b> earned. Just for show: they don't change the game.`;
   let html = "", group = null;
-  for (const a of ACH) {
+  for (const a of achs()) {
     if (a.group !== group) { group = a.group; html += `<div class="ach-group">${esc(group)}</div>`; }
     const at = S.ach[a.id], have = Math.min(a.have(), a.need);
     html += `<div class="ach${at ? " got" : ""}"><span><b>${esc(a.title)}</b> · ${esc(a.desc)}</span>` +
@@ -2249,6 +2334,46 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "update-story-mode", story: true, date: "Nov 25, 2026", from: "Prof Penguin", title: "Story Mode, Year 1",
+    body: `<ul><li><b>New game</b> now asks: Classic or <b>Story</b>. Each has its own save, and you switch between them on the title screen. Your Classic save stays as it is.</li>
+      <li>Year 1 is <b>The Long Freeze</b>. Snow in Kanto three weeks early, legends waking up, and a cheerful outfit called Team Thaw that always seems to get there first.</li>
+      <li>Story has ×2 XP and ×2 shinies, your shiny lines carry over from Classic, and there's no prestige. Its gyms and Champions follow League rules: no Tier 0 to 2, one Tier 3, two Tier 4s.</li>
+      <li>After each Champion come the chapters: Team Thaw's admins, Sssssssnakes, and a legend to catch (pick one of two; the other goes elsewhere). The Story tab keeps every scene and clue.</li>
+      <li>Beat Red after the finale and you can replay Year 1, other picks and all, without touching your save. The Wiki's Story Mode page has the details.</li></ul>` },
+  // Bond hint 1. Keep the wording exactly: it hints at the hidden bond without naming anything.
+  { id: "story-silver", chapter: true, date: "After Mt. Silver", from: "Prof Penguin", title: "Red",
+    body: `<p>Red doesn't talk much. His Pokémon don't need him to.</p><p>The ones you fight beside remember you best. Don't forget that.</p><p>Prof Penguin</p>` },
+  { id: "story-started", chapter: true, date: "Year 1", from: "Prof Penguin", title: "It's started",
+    body: `<p>It's started. Go.</p>` },
+  // Sssssssnakes's letters: each signature has its own number of s's, on purpose. Copy them exactly.
+  { id: "story-snakes-end", chapter: true, date: "Year 1", from: "Sssssssnakes", title: "Did you know?",
+    body: `<p>Did you know? Tell me you didn't know.</p><p>— Sssnakes</p>` },
+  { id: "story-r3", chapter: true, date: "After Galar", from: "Sssssssnakes", title: "Here",
+    body: `<p>Here's a Master Ball. Not because you earned it. Because I have too many.</p><p>(You earned it.)</p><p>(Don't tell anyone I said that.)</p><p>— Sssssssnakes</p>` },
+  { id: "story-r2", chapter: true, date: "After Unova", from: "Sssssssnakes", title: "The scouting thing",
+    body: `<p>Asked my supervisor about the scouting thing. She said "great question" and then didn't answer it.</p><p>That's fine. That's normal. Right?</p><p>— Ssssssnakes</p>` },
+  { id: "story-r1", chapter: true, date: "After Johto", from: "Sssssssnakes", title: "Warm-up",
+    body: `<p>Don't get used to winning. That was a warm-up.</p><p>Also Penguin never tells you anything, right? Yeah. He did that to me too.</p><p>— Sssssnakes</p>` },
+  { id: "story-kanto", chapter: true, date: "After Kanto", from: "Prof Penguin", title: "The cage",
+    body: `<p>That lab was built to hold a legend. Who builds a cage before there's anything to put in it?</p><p>You'll find uses for this. Better you have it early.</p><p><i>A Key Stone is in the envelope: Mega Evolution is open.</i></p><p>The next pin went blue last night. Johto. The Bell Tower stopped ringing.</p><p>Prof Penguin</p>` },
+  { id: "story-johto", chapter: true, date: "After Johto", from: "Prof Penguin", title: "Two somethings",
+    body: `<p>Something's moving under the sea off Hoenn. Two somethings. Go quickly.</p><p>Prof Penguin</p>` },
+  { id: "story-hoenn", chapter: true, date: "After Hoenn", from: "Prof Penguin", title: "Wrong clocks",
+    body: `<p>My clocks are wrong. All of them, all at once. Sinnoh, Mt. Coronet. Dress warm.</p><p>Prof Penguin</p>` },
+  { id: "story-unova", chapter: true, date: "After Unova", from: "Prof Penguin", title: "That roar",
+    body: `<p>That one's ice is... different. Keep away from it this year.</p><p>I've been charting the dates the freeze reached each site. Come and see what I found once you reach Kalos.</p><p>Prof Penguin</p>` },
+  { id: "story-kalos-next", chapter: true, date: "After Kalos", from: "Prof Penguin", title: "Paper",
+    body: `<p>If there's a list, someone wrote it down. Alola's next on it. Keep your eyes open for paper.</p><p>Prof Penguin</p>` },
+  { id: "story-alola", chapter: true, date: "After Alola", from: "Prof Penguin", title: "Galar",
+    body: `<p>Sssssssnakes is in Galar. I'd rather you got there before they did something they regret.</p><p>Prof Penguin</p>` },
+  { id: "story-galar", chapter: true, date: "After Galar", from: "Prof Penguin", title: "It ends there",
+    body: `<p>Every reading points to Paldea now. Whatever they're building, it ends there.</p><p>Prof Penguin</p>` },
+  { id: "story-memo", chapter: true, date: "Year 1", from: "(no sender)", title: "INTERNAL",
+    body: `<p><b>INTERNAL. Do not forward.</b></p><p>The Engine is on schedule. It wakes and binds each legend in turn, per the list. Units are assigned per site.</p><p>Unit 1: Aether, contained. Unit 2: assigned to the Director.</p>` },
+  { id: "story-kalos", chapter: true, date: "Year 1", from: "Prof Penguin", title: "A pattern",
+    body: `<p>I've been plotting the freeze on the map. It isn't random. It moves from legend to legend in a set order, like someone is following a list.</p><p>Keep writing things down.</p><p>Prof Penguin</p>` },
+  { id: "story-sinnoh", chapter: true, date: "After Sinnoh", from: "Prof Penguin", title: "She said that?",
+    body: `<p><i>His reply took two days.</i></p><p>She said that?</p><p>I knew their leader once. A long time ago. Let's leave it there.</p><p>Unova next. Two dragons, one tower. And something colder underneath.</p><p>Prof Penguin</p>` },
   { id: "update-hall-of-fame", hof: true, date: "Hall of Fame", from: "Prof Penguin", title: "The Hall of Fame",
     body: `<ul><li>The <b>Hall of Fame</b> is open, right under my Lab in every list, once you've beaten me.</li>
       <li>Sssssssnakes, the first trainer ever to graduate, is waiting there with Serperior, Arbok, Gigantamax Sandaconda, Milotic, Zygarde in its 50% Forme and a Mega Hydrapple nobody has seen before.</li>
@@ -2418,7 +2543,8 @@ const arcadeDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/De
 // A letter with beat: true arrives when you beat Prof Penguin.
 // One with rival: true arrives when you first beat Sssssssnakes there (S.mail.got).
 // One with hof: true waits for HOF_READY.
-const delivered = m => !(m.hof && !HOF_READY) && ((m.beat ? !!S.beat : !m.day && !m.rival) || !!S.mail.got[m.id]);
+// A Story save skips Classic's update notes (update- letters with no gift); a letter with story: true is for both.
+const delivered = m => !(m.hof && !HOF_READY) && !(isStory() && /^update-/.test(m.id) && !m.story && !m.gift) && ((m.beat ? !!S.beat : !m.day && !m.rival && !m.chapter) || !!S.mail.got[m.id]);
 function deliverMail(today = arcadeDay()) {
   if (!S) return;
   const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
@@ -2520,6 +2646,13 @@ function wikiSections() {
       <p>The ace is a Mega Hydrapple nobody else has: ${HOF_ACE.types.join("/")}, HP ${HOF_ACE.hp}, Attack ${HOF_ACE.atk}, Defense ${HOF_ACE.def}, Sp. Atk ${HOF_ACE.spa}, Sp. Def ${HOF_ACE.spd}, Speed ${HOF_ACE.spe} (${HOF_ACE.bst}). Gigantamax Sandaconda has a Gigantamax's doubled HP.</p>
       <p>It's set the way Prof Penguin's phase 2 is: the best six of every tier (Eternamax, one Mega, one Gigantamax), with every matchup counted as 1×, at the cap with a quarter of your Protein, would need ${pct(HOF_USE)} of the clock idling, where his phase 2 needs ${pct(FINAL_USE)}. It's harder than his phase 2: you know the team ahead, so bring one built on its weaknesses (Ice hits half of it four times over). Even the best of those, with a quarter of your Protein, only just wins idling; more Protein or a few taps give you room.</p>
       <p>Win the first time for the SP Mega Hydrapple: ${SPECIALS[HOF_SP].types.join("/")}, Tier 2, total ${SPECIALS[HOF_SP].bst}, a permanent Mega that doesn't take your Mega slot. A prestige resets the Hall of Fame; the SP comes with you.</p>` }] : []),
+    { id: "story", group: "Story Mode", title: "Story Mode: Year 1", html: `<p><b>New game</b> asks Classic or Story. Story has its own save on this device (not in your Bored account yet), and the title screen switches between the two. Starting one over never touches the other.</p>
+      <p><b>Rules.</b> XP ×${STORY_XP} and shinies ×${STORY_SHINY} (1 in ${4096 / STORY_SHINY}; the Shiny Charm's ×3 on top). No prestige. Shiny lines are shared with Classic: the first catch of a line you've had shiny in either mode comes out shiny. A Pokémon below the highest level it ever reached gets ×${REMEMBER} XP until it's back there (❄ in Party &amp; Box); in Story that replaces the catch-up bonus.</p>
+      <p><b>League rules</b>, for Story's gyms and Champions: no Tier 0, 1 or 2, at most one Tier 3 and at most two Tier 4s. Mascot legends and Mega pseudo forms are both Tier 3. A party that breaks them gets a notice that loads a saved team that fits.</p>
+      <p><b>Chapters</b> come after each Champion: in Johto, Unova and Galar ${RIVAL_NAME} first, then a Team Thaw admin (a little harder than the Champion, at the Champion's level cap), then the legend: Mewtwo in Kanto, and a pick of two everywhere else. You catch it the usual way; if it gets away, try again from the list. Prizes: ${CHAPTERS.filter(c => c.prize && c.prize.stone).map(c => REGIONS[c.r].name).join(", ")} give Mega pseudo stones, the others a Master Ball, and Prof Penguin gives you a Key Stone after Kanto. Alola has an optional rescue.</p>
+      <p><b>The finale</b>, in Paldea: all three admins in a row at Lv 100, ${FINAL_TIME}s each with a ${FINAL_BREAK}s break to change your party between them. Run out of time anywhere and it starts over. It opens after every other region's legend and ${FINALE_DEX} Pokémon in your Story dex. Then Paldea's pick, and Red on Mt. Silver for the Shiny Charm.</p>
+      <p><b>The Story tab</b> keeps every scene you've seen, to read again, and the clues you've found. <b>Replay Year 1</b> (title screen, after Red) plays the year again from Kanto with a copy of your Box, at Year 1's level caps, for the story and the other picks: nothing in it is caught or counts, and it's thrown away when you end it. Year 2 is coming.</p>
+      <p><b>Levels.</b> In Story a Pokémon above the level cap fights at the cap, shown as "Lv 90 (fights at 24)", and gains no XP until the cap passes it. The cap is in the party header.</p>` },
     { id: "rival", group: "Side quests", title: `Rival ${RIVAL_NAME}`, html: `<p>${RIVAL_NAME} was the first trainer ever to beat Poké Idle, and now an optional rival: one fight each in Johto, Unova and Galar, at the top of that region's list once its Champion is beaten.</p>
       <ul>${RIVALS.map(x => `<li><b>${REGIONS[x.r].name}</b> (after ${REGIONS[x.r].champ}): ${x.team.map(m => m.name).join(", ")}, at Lv ${Math.min(100, champLevel(x.r) + CAP_OVER)}.</li>`).join("")}</ul>
       <p>Each one uses that Champion's rules: your party is held to the Champion's level cap, the clock starts at ${CHAMP_TIME}s and moves with the team's Attack and Speed (−20% to +20%) and your party's bulk, and the fight is set against the best six that region offers. It's a little harder: that team, with a quarter of your Protein (see Tiers), needs ${pct(RIVAL_USE)} of the clock idling where a Champion needs ${pct(BOSS_USE)}. A little more Protein, or a few taps, makes up the difference.</p>
@@ -2735,7 +2868,7 @@ $("#wiki-text").addEventListener("scroll", () => {
 });
 
 // ── Events
-function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail", "ach"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex" && REGIONS[S.loc.r]) dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); if (t === "ach") renderAch(); renderAll(); refitSprites(); }
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail", "ach", "story"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex" && REGIONS[S.loc.r]) dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); if (t === "ach") renderAch(); if (t === "story") renderStory(); renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#throwbox").onclick = e => { const b = e.target.closest("[data-throw]"); if (b) manualThrow(b.dataset.throw); };
@@ -2934,7 +3067,12 @@ for (const id of ["fresh", "dupe", "shiny"]) {
 $("#export").onclick = () => { save(); $("#savecode").value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $("#savecode").select(); $("#setmsg").textContent = "Copy this code and keep it somewhere safe."; };
 const BAD_CODE = 'That code didn\'t load. Paste the whole code from "Show my save code".';
 function loadCode(text) {
-  try { const s = JSON.parse(decodeURIComponent(escape(atob(String(text).trim())))); if (!s || s.v !== 1 || !s.box) return false; S = s; save(); return true; }
+  try {
+    const s = JSON.parse(decodeURIComponent(escape(atob(String(text).trim())))); if (!s || s.v !== 1 || !s.box) return false;
+    const k = s.mode === "story" ? STORY_KEY : slot === STORY_KEY ? KEY : slot;
+    if (k !== slot) { if (S) save(); slot = k; setSlotPref(k); }
+    S = s; save(); return true;
+  }
   catch { return false; }
 }
 $("#import").onclick = () => {
@@ -2969,6 +3107,8 @@ function offline() {
 
 // Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
 function migrateSave() {
+  // A Story save from before a field was added gets it (see freshStory); a Classic save never has a story block.
+  if (S.story) S.story = { ...freshStory(), ...S.story };
   if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; }
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.raid = S.raid || 0; S.mega = S.mega || null; S.gmax = S.gmax || 0;
@@ -2994,9 +3134,582 @@ function migrateSave() {
   S.prestige = S.prestige || 0; recordLife();
 }
 
+// ── Story Mode. A Story save is an ordinary save with mode: "story" and a story block (freshStory). It has its own
+// slot (STORY_KEY), never prestiges, gets ×STORY_XP XP and ×STORY_SHINY shinies (the Shiny Charm's ×3 on top), and shares
+// the shiny lines with Classic (SHINY_KEY). Everything Story-only checks isStory(), so a Classic save plays as before.
+// Each region has an ordered list of chapters (CHAPTERS, filled in by the year's content) that show as rows right after
+// its Champion. A chapter has a type (scene, admin, legend, rival, pick, finale), what it waits for (after: "champ" or
+// other chapter ids) and scenes before and after (pre, post). S.story.ch keeps the ones you've finished.
+const STORY_XP = 2, STORY_SHINY = 2, REMEMBER = 2;
+const YEARS = { 1: "The Long Freeze", 2: "The Hunt" };
+// Year 2 is built later. Until YEAR2_READY, its row shows (after Red) but can't be started, and nothing resets.
+const YEAR2_READY = false;
+const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
+  [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
+const isStory = () => !!(S && S.mode === "story");
+const otherSlot = () => slot === KEY ? STORY_KEY : slot === STORY_KEY ? KEY : null;
+// The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). silvally: 0 not
+// freed, 1 freed (Type: Null, its trust in nullTrust, up to TRUST_NEED), 2 evolved. The fields after epilogue are
+// reserved for the years to come and stay unused in Year 1, so later years need no migration.
+const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, nullTrust: 0, lifeDex: {}, epilogue: 0,
+  liberated: {}, frozen: {}, eternatusStolen: 0, y3Recovered: 0, cleared: {}, giratinaDebt: 0, roulette: null });
+let newFor = null, pickFrom = null;
+// New game in a mode: that slot is emptied and the starter screen opens for it. Back to title goes back to the save
+// you came from.
+function newGame(k) {
+  if (S) save();
+  pickFrom = slot; newFor = null;
+  slot = k; setSlotPref(k);
+  try { localStorage.removeItem(k); } catch {}
+  S = null; B = null; showPick();
+}
+// Replay Year 1, after Red: a copy of your Story Box and teams in its own slot (REPLAY_KEY), with the year started over
+// (no badges, Champions or chapters), so you can play the story and the other mascot picks again. It uses Year 1's
+// level caps: by level sync, your party fights at the cap and shows "Lv 90 (fights at 8)". The League rules apply.
+// Nothing in it counts: no catches, no shiny lines, no prizes (see storyReward), nothing for the leaderboard, and the
+// whole slot is thrown away when you end it.
+function startReplay() {
+  const m = S; save();
+  const copy = o => JSON.parse(JSON.stringify(o || {})), R = fresh();
+  Object.assign(R, { mode: "story", replay: 1, story: { ...freshStory(), seen: { ...m.story.seen }, clues: { ...m.story.clues } }, box: copy(m.box), party: m.party.slice(), teams: copy(m.teams || []),
+    stones: { ...m.stones }, gfactor: { ...m.gfactor }, key: m.key, band: m.band, mega: m.mega, gmax: m.gmax, set: { ...m.set }, lifeDex: { ...m.lifeDex }, tut: { seen: {}, off: 1 }, items: { ...m.items }, full: 1 });
+  R.loc = { kind: "route", r: 0, k: 0 };
+  slot = REPLAY_KEY; setSlotPref(REPLAY_KEY); S = R; save(); boot();
+  titleMsg = "Replay started: Year 1 from the beginning, at Year 1's level caps. Nothing in it counts."; renderTitle();
+}
+const REPLAY_LINE = "This is a replay. Nothing here changes your save.";
+// Begin Year 2: what resets and what stays, then "Begin Year 2." or "Not yet." It opens only once YEAR2_READY is true;
+// the reset itself comes with Year 2 (beginYear2). Bond flags are kept too, but they're hidden, so they're not listed.
+const YEAR2_RESETS = ["Every Pokémon goes back to Lv 5 (❄ catch-up XP helps them back)", "badges", "money", "balls and items"];
+const YEAR2_STAYS = ["your whole Box", "your dex", "key items, Mega Stones and form unlocks", "achievements, Mail and saved teams"];
+function year2Confirm() {
+  hideTip();
+  $("#scene").innerHTML = `<span class="who">Year 2: ${esc(YEARS[2])}</span><p>Begin Year 2? This can't be undone.</p>
+    <table class="small y2"><tr><th>Resets</th><th>Stays</th></tr>${YEAR2_RESETS.map((r, i) => `<tr><td>${esc(r)}</td><td>${esc(YEAR2_STAYS[i] || "")}</td></tr>`).join("")}</table>
+    <div class="row"><button class="skip" type="button" data-y2="no">Not yet.</button><button class="lbl danger" type="button" data-y2="go"${YEAR2_READY ? "" : " disabled"}>Begin Year 2.</button></div>`;
+  $("#scene").hidden = false;
+}
+function beginYear2() { if (!YEAR2_READY) return; /* Year 2 builds the reset itself. */ }
+function endReplay() { try { localStorage.removeItem(REPLAY_KEY); } catch {} S = null; B = null; useSlot(STORY_KEY); }
+function startStory() { S.mode = "story"; S.story = freshStory(); for (const id of preSeen.splice(0)) S.story.seen[id] = 1; }
+// Tracking from day one, in both modes, for the years to come: from (the region a Pokémon counts as caught in, by
+// catchRegion), bond (bonded: it was in the active party for a win, at least once) and peak (the highest level it
+// ever reached). In Year 3 a frozen Pokémon thaws with its from region, so every box entry has one: anything without
+// a region of its own (the starter, a special, the daily boss, the Battle Tower) counts as Kanto, and so does an
+// entry from before this existed.
+const notePeak = b => { const L = lvlOf(b.xp); if (!(b.peak >= L)) b.peak = L; if (b.from == null) b.from = 0; };
+function notePeaks() { if (S && S.box) for (const b of Object.values(S.box)) notePeak(b); }
+// Places outside the region lists: a side quest counts as its region (the Mystery Box as Galar), Mt. Silver as Johto,
+// the Max Raid Den as Galar. Year 2's places are here already, so the map stays in one place.
+const CATCH_PLACE = { summit: 1, raid: 7, distortion: 3, kitakami: 8, meteor: 2, southern: 2, abundant: 4, icirrus: 4, chasm: 4, towers: 7, meltan: 7, crown: 7, aether: 6 };
+function catchRegion(src) {
+  if (!src) return 0;
+  const place = src.kind === "quest" ? src.q : src.kind;
+  if (place in CATCH_PLACE) return CATCH_PLACE[place];
+  if (src.kind === "quest" && QUEST[src.q] && REGIONS[QUEST[src.q].r]) return QUEST[src.q].r;
+  if (["route", "gym", "champ", "dungeon", "rival", "story", "chapter", "darkest"].includes(src.kind) && REGIONS[src.r]) return src.r;
+  return 0;
+}
+function carryTrack(a, b) { if (a.bond) b.bond = 1; if (a.from != null && b.from == null) b.from = a.from; if (a.peak > (b.peak || 0)) b.peak = a.peak; }
+const remembers = n => isStory() && !!S.box[n] && S.box[n].peak > lvlOf(S.box[n].xp);
+// Type: Null's trust (Story, once it's freed): one for each win with it in the active party. At TRUST_NEED it
+// evolves into Silvally, and story.silvally becomes 2.
+const NULL = 772, SILVALLY = 773, TRUST_NEED = 10;
+function nullTrust() {
+  const st = S.story; if (st.silvally !== 1 || !S.party.includes(NULL) || !S.box[NULL]) return;
+  st.nullTrust = Math.min(TRUST_NEED, (st.nullTrust || 0) + 1);
+  if (st.nullTrust < TRUST_NEED) return;
+  const b = S.box[NULL], had = S.box[SILVALLY];
+  if (had) { had.xp = Math.max(had.xp, b.xp); carryTrack(b, had); } else { S.box[SILVALLY] = { xp: b.xp, shiny: lineShiny(NULL) }; carryTrack(b, S.box[SILVALLY]); }
+  const i = S.party.indexOf(NULL); if (S.party.includes(SILVALLY)) S.party.splice(i, 1); else S.party[i] = SILVALLY;
+  st.silvally = 2; shineLines();
+  setTimeout(() => toast("Type: Null trusts you now. Its mask is gone: it evolved into Silvally!"), 800);
+}
+
+// Scenes, in Prof Penguin's text box: lines of [who, text]. Each has a year and a region (-1 for the prologue) for the
+// Story tab, where every scene you've seen (or skipped) can be read again.
+const SCENES = {
+  "open-1": { year: 1, r: -1, title: "Snow in Kanto", lines: [
+    ["", "Snow is falling on Kanto, three weeks early."],
+    ["", "Prof Penguin's lab is freezing. He stands over a map covered in pins, top hat and all."],
+    ["Prof Penguin", "Every legend in the world is asleep, and every one of them is waking up early. And every time one wakes, the world gets colder. I need eyes in the field."],
+    ["Prof Penguin", "Pick a partner. Any of these three will do."]] },
+  "open-2": { year: 1, r: -1, title: "The notebook", lines: [
+    ["", "Prof Penguin hands you a notebook. The cover is already a little frosty."],
+    ["Prof Penguin", "Write down everything, especially the things that seem small."],
+    ["Prof Penguin", "...And send me the pages. I'll write back."]] },
+  // Year 1, The Long Freeze. Who speaks: "" is the narrator.
+  "kanto-gyms": { year: 1, r: 0, title: "Hand warmers", lines: [
+    ["", "Outside the gym, a grunt in a white jacket is handing out hand warmers."],
+    ["Team Thaw grunt", "Free hand warmer! Stay warm out there. Team Thaw's got you."],
+    ["", "The badge on the jacket is a snowflake, melting."],
+    ["", "It seems small. You write it down."]] },
+  "kanto-alarm": { year: 1, r: 0, title: "The alarm", lines: [
+    ["", "An alarm goes off across Kanto."],
+    ["Prof Penguin", "That's Team Thaw's lab out at Cerulean. Someone's breached it. Go and look. Carefully."]] },
+  "kanto-rime": { year: 1, r: 0, title: "Containment", lines: [
+    ["", "The lab doors hang open. Frost covers every screen."],
+    ["Rime", "Containment variance. Within tolerance."],
+    ["Rime", "You aren't on the list. Leave, or be removed."]] },
+  "kanto-rime-after": { year: 1, r: 0, title: "Rime leaves", lines: [
+    ["Rime", "Noted."],
+    ["", "Rime walks out without hurrying. Behind her, in the deepest tank, something opens its eyes."]] },
+  "kanto-cage": { year: 1, r: 0, title: "The cage", lines: [
+    ["", "A letter from Prof Penguin arrives. There's a Key Stone in the envelope."],
+    ["Prof Penguin", "That lab was built to hold a legend. Who builds a cage before there's anything to put in it?"],
+    ["Prof Penguin", "You'll find uses for this. Better you have it early."],
+    ["Prof Penguin", "The next pin went blue last night. Johto. The Bell Tower stopped ringing."]] },
+  "johto-r1": { year: 1, r: 1, title: "Sssssssnakes", lines: [
+    ["", "Someone steps into your path, a Snivy draped over their shoulder."],
+    ["Sssssssnakes", "Oh, you're Penguin's new one? Cute. Try to keep up."]] },
+  "johto-r1-after": { year: 1, r: 1, title: "Better coffee", lines: [
+    ["Sssssssnakes", "Whatever. Team Thaw says the freeze is natural, and they're the ones fixing it. You should come work with us. Better coffee."]] },
+  "johto-hail": { year: 1, r: 1, title: "Chained", lines: [
+    ["", "At the Bell Tower, Lugia and Ho-Oh are chained to the ground."],
+    ["Hail", "For their own protection. Move along."]] },
+  "johto-hail-after": { year: 1, r: 1, title: "One of them", lines: [
+    ["Hail", "Fine. Take one. The other one's already spoken for."]] },
+  "johto-249": { year: 1, r: 1, title: "Lugia", lines: [["Prof Penguin", "The sea one. Of course you'd pick the cold."]] },
+  "johto-250": { year: 1, r: 1, title: "Ho-Oh", lines: [["Prof Penguin", "Fire. Good. We'll need it before this is over."]] },
+  "hoenn-gyms": { year: 1, r: 2, title: "Flyers", lines: [
+    ["", "Grunts are handing out flyers outside the gym."],
+    ["", "THE FREEZE IS COMING. THAW IS HERE."]] },
+  "hoenn-slush": { year: 1, r: 2, title: "See what happens", lines: [
+    ["", "Groudon on one side of the cave, Kyogre on the other, both awake and both furious."],
+    ["Slush", "I just want to see what happens. Science!"]] },
+  "hoenn-slush-after": { year: 1, r: 2, title: "The nice one", lines: [
+    ["Slush", "Don't look at me like that. I'm the nice one."]] },
+  "hoenn-383": { year: 1, r: 2, title: "Groudon", lines: [["Prof Penguin", "The land, then. Keep it warm."]] },
+  "hoenn-382": { year: 1, r: 2, title: "Kyogre", lines: [["Prof Penguin", "The sea. Mind the cold."]] },
+  "sinnoh-letter": { year: 1, r: 3, title: "She said that?", lines: [
+    ["", "You send Prof Penguin the page about Rime. His reply took two days."],
+    ["Prof Penguin", "She said that?"],
+    ["Prof Penguin", "I knew their leader once. A long time ago. Let's leave it there."],
+    ["Prof Penguin", "Unova next. Two dragons, one tower. And something colder underneath."]] },
+  "sinnoh-rime": { year: 1, r: 3, title: "Spear Pillar", lines: [
+    ["Rime", "Spear Pillar. You again."],
+    ["Rime", "Choose carefully. Someone will be reading the result."]] },
+  "sinnoh-rime-after": { year: 1, r: 3, title: "Proceed", lines: [
+    ["Rime", "Proceed. I'll be watching which one you take."]] },
+  "sinnoh-483": { year: 1, r: 3, title: "Dialga", lines: [["Rime", "You chose time. He always did too."]] },
+  "sinnoh-484": { year: 1, r: 3, title: "Palkia", lines: [["Rime", "Space. He never did. Interesting."]] },
+  "unova-r2": { year: 1, r: 4, title: "On loan", lines: [
+    ["Sssssssnakes", "Team Thaw lent me this. Don't be jealous."]] },
+  "unova-r2-after": { year: 1, r: 4, title: "Good scouting", lines: [
+    ["Sssssssnakes", "Weird thing. Team Thaw always gets to a legend site before it freezes. Like they know."],
+    ["Sssssssnakes", "...Probably just good scouting."]] },
+  "unova-hail": { year: 1, r: 4, title: "Dragonspiral", lines: [
+    ["Hail", "Dragonspiral Tower is closed. Thaw business."]] },
+  "unova-hail-after": { year: 1, r: 4, title: "Go on", lines: [["Hail", "Hmph. Go on, then."]] },
+  "unova-643": { year: 1, r: 4, title: "Reshiram", lines: [["Prof Penguin", "White fire. It'll keep you warm."]] },
+  "unova-644": { year: 1, r: 4, title: "Zekrom", lines: [["Prof Penguin", "Black lightning. Loud, but useful."]] },
+  "unova-kyurem": { year: 1, r: 4, title: "A roar", lines: [
+    ["", "Far off, something roars. The air goes still and very cold."],
+    ["", "You write it down and send Prof Penguin the page. His reply comes the next morning."],
+    ["Prof Penguin", "That one's ice is... different. Keep away from it this year."],
+    ["Prof Penguin", "I've been charting the dates the freeze reached each site. Come and see what I found once you reach Kalos."]] },
+  "johto-next": { year: 1, r: 1, title: "Two somethings", lines: [["Prof Penguin", "Something's moving under the sea off Hoenn. Two somethings. Go quickly."]] },
+  "hoenn-next": { year: 1, r: 2, title: "Wrong clocks", lines: [["Prof Penguin", "My clocks are wrong. All of them, all at once. Sinnoh, Mt. Coronet. Dress warm."]] },
+  "kalos-next": { year: 1, r: 5, title: "Paper", lines: [
+    ["", "You send Prof Penguin the page with Slush's question on it."],
+    ["Prof Penguin", "If there's a list, someone wrote it down. Alola's next on it. Keep your eyes open for paper."]] },
+  "alola-next": { year: 1, r: 6, title: "Galar", lines: [["Prof Penguin", "Sssssssnakes is in Galar. I'd rather you got there before they did something they regret."]] },
+  "galar-next": { year: 1, r: 7, title: "It ends there", lines: [["Prof Penguin", "Every reading points to Paldea now. Whatever they're building, it ends there."]] },
+  "kalos-letter": { year: 1, r: 5, title: "A pattern", lines: [
+    ["", "A letter from Prof Penguin."],
+    ["Prof Penguin", "The freeze moves from legend to legend in a set order. Like someone is following a list."]] },
+  "kalos-slush": { year: 1, r: 5, title: "The list", lines: [
+    ["Slush", "Ever wonder who wrote the list?"],
+    ["Slush", "...No? Okay. Never mind."]] },
+  "kalos-slush-after": { year: 1, r: 5, title: "You didn't hear it", lines: [["Slush", "You didn't hear any of that from me."]] },
+  "kalos-716": { year: 1, r: 5, title: "Xerneas", lines: [["Prof Penguin", "Life, then. Good."]] },
+  "kalos-717": { year: 1, r: 5, title: "Yveltal", lines: [["Prof Penguin", "Hm. Keep a close eye on that one."]] },
+  "alola-memo": { year: 1, r: 6, title: "The memo", lines: [
+    ["", "A letter arrives with no sender. Inside is one page, stamped INTERNAL."],
+    ["", "The Engine wakes and binds each legend in turn, per the list."],
+    ["", "You put it in the notebook."]] },
+  "alola-rime": { year: 1, r: 6, title: "Aether", lines: [
+    ["Rime", "Aether Paradise is a Thaw facility now. Turn around."]] },
+  "alola-rime-after": { year: 1, r: 6, title: "Nothing changes", lines: [["Rime", "This changes nothing."]] },
+  "alola-791": { year: 1, r: 6, title: "Solgaleo", lines: [["Prof Penguin", "The sun. We could use more of it."]] },
+  "alola-792": { year: 1, r: 6, title: "Lunala", lines: [["Prof Penguin", "The moon. Quiet, and it sees in the dark."]] },
+  "alola-null": { year: 1, r: 6, title: "Unit 1", lines: [
+    ["", "Deep in the lab, a Type: Null thrashes against its mask."],
+    ["", "A tag on the cage: UNIT 1. Under it, half scratched out: UNIT 2, ASSIGNED TO THE DIRECTOR."]] },
+  "alola-null-after": { year: 1, r: 6, title: "Silvally", lines: [
+    ["", "The mask cracks and falls away. Type: Null is Silvally now, and it isn't going back in a cage."]] },
+  "galar-r3": { year: 1, r: 7, title: "Too quiet", lines: [
+    ["Sssssssnakes", "Team Thaw gave me a Zygarde. Said the land would be safer with me."],
+    ["Sssssssnakes", "...It's been quiet since. Zygarde's never quiet."]] },
+  "galar-r3-after": { year: 1, r: 7, title: "Myself", lines: [
+    ["Sssssssnakes", "If they're lying to me, I'll find out myself. Not because you said anything."]] },
+  "galar-hail": { year: 1, r: 7, title: "The Weald", lines: [["Hail", "The Slumbering Weald is closed. Thaw business."]] },
+  "galar-hail-after": { year: 1, r: 7, title: "Take your pick", lines: [["Hail", "Take your pick. Sssssssnakes gets the other one."]] },
+  "galar-888": { year: 1, r: 7, title: "Zacian", lines: [["Prof Penguin", "The sword. Cut a way through."]] },
+  "galar-889": { year: 1, r: 7, title: "Zamazenta", lines: [["Prof Penguin", "The shield. Someone has to stand still."]] },
+  "paldea-white": { year: 1, r: 8, title: "White sky", lines: [["", "The sky over Paldea goes white."]] },
+  "paldea-admins": { year: 1, r: 8, title: "All three", lines: [
+    ["Rime", "All three of us. Don't take it personally."],
+    ["Slush", "I'd take it a little personally."],
+    ["Hail", "Enough. Begin."]] },
+  "paldea-admins-after": { year: 1, r: 8, title: "Go", lines: [["Hail", "...Go. Take your legend. It won't matter."]] },
+  "paldea-1007": { year: 1, r: 8, title: "Koraidon", lines: [["Prof Penguin", "The old land. It knows the way."]] },
+  "paldea-1008": { year: 1, r: 8, title: "Miraidon", lines: [["Prof Penguin", "What comes next. Let's hope it's warmer."]] },
+  "paldea-freeze": { year: 1, r: 8, title: "The same night", lines: [
+    ["", "That night every legend site in the world freezes, all at once."],
+    ["", "Every screen in every city shows the same message:"],
+    ["", "WE WARNED YOU. THAW PACKS AVAILABLE NOW."],
+    ["", "Prof Penguin's letter is just two words:"],
+    ["Prof Penguin", "It's started. Go."]] },
+  "silver": { year: 1, r: 1, title: "Mt. Silver", lines: [
+    ["", "Mt. Silver. Red is waiting in the snow."],
+    ["", "He doesn't say anything."]] },
+  "silver-after": { year: 1, r: 1, title: "Red", lines: [
+    ["", "Red hands you a Shiny Charm, nods once, and turns back to the snow."]] }
+};
+const CLUES = {
+  badge: { title: "The melting snowflake", text: "Team Thaw's grunts wear a badge: a snowflake, melting. They hand out hand warmers outside the gyms." },
+  memo: { title: "Memo #1: The Engine", text: "No sender. \"The Engine wakes and binds each legend in turn, per the list.\" A second unit is \"assigned to the Director\"." }
+};
+// ── Year 1 chapters. Per region: gyms, the Champion, then (Johto, Unova, Galar) Sssssssnakes, the Team Thaw admin, and
+// the legend: Mewtwo in Kanto, a pick of two mascots elsewhere (Sssssssnakes takes the other), caught the usual way and
+// tried again at once if it gets away. Paldea's admins come all three in a row (the finale), then its pick. Each
+// legend chapter has a prize: a Mega pseudo stone where one exists, a Master Ball where none does. Red waits on Mt.
+// Silver (Johto) once the year is over.
+const CHIEF_USE = 0.95, ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
+const ADMIN_PIC = { Rime: "thaw-rime.png", Hail: "thaw-hail.png", Slush: "thaw-slush.png", Sssssssnakes: "sssssssnakes.png", "Team Thaw grunt": "thaw-grunt.png", "Prof Penguin": "prof-penguin.png" };
+const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
+// Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
+// Six each, all from that region's generation (forms included); the finale's are all Generation 9.
+const ADMIN_TEAMS = {
+  kanto: ["Rime", [124, 91, 87, 82, 65, 131]],
+  johto: ["Hail", [208, 212, 227, 221, 205, 215]],
+  hoenn: ["Slush", [319, 342, 359, 275, 365, 362]],
+  sinnoh: ["Rime", [478, 471, 473, 460, 437, 476]],
+  unova: ["Hail", [614, 530, 625, 589, 598, 584]],
+  kalos: ["Slush", [658, 687, 689, 675, 693, 713]],
+  alola: ["Rime", ["v10104", "v10102", 740, 779, 765, "v10106"]],
+  galar: ["Hail", [879, 823, 863, "v10177", 881, 884]],
+  // Generation 9 has two Ice lines: Baxcalibur's goes to Rime and Slush, Cetitan's to Hail.
+  "paldea-rime": ["Rime", [998, 956, 1000, 981, 954, 936]],
+  "paldea-hail": ["Hail", [975, 983, 959, 968, 966, 1018]],
+  "paldea-slush": ["Slush", [977, 976, 943, 962, 908, 997]],
+  // The Mask: Aether Paradise's lab chief (Alola's generation), then Type: Null.
+  "aether-chief": ["the lab chief", [748, 760, 768, 750, 745, 770]],
+  "aether-null": ["Type: Null", [772]]
+};
+const adminTeam = k => ADMIN_TEAMS[k][1].map(foeFrom);
+// Story's dungeons, in every year: no mascot and no Mewtwo (the one you didn't pick belongs to Year 2), and no legend
+// a Story chapter gives you in any year. Glastrier and Spectrier stay (Year 2's finale needs them), and so does Zygarde
+// (Year 3's Terminus), with the other Tier 4s.
+const STORY_NO_DEN = new Set([150, 249, 250, 382, 383, 483, 484, 643, 644, 716, 717, 791, 792, 888, 889, 1007, 1008,
+  384, 487, 646, 890, 1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 1024, 898, 800, 493]);
+const STORY_HIDDEN = new Set(["final", "hof", "rival", "darkest", "quest"]);
+const LEGENDS = ["kanto-legend", "johto-pick", "hoenn-pick", "sinnoh-pick", "unova-pick", "kalos-pick", "alola-pick", "galar-pick"];
+const admin = (id, r, team, pre, post, after = ["champ"], at = "") => ({ id, r, type: "admin", team, name: `Team Thaw: ${ADMIN_TEAMS[team][0]}`, after, pre, post, at });
+const pick = (id, r, mons, hints, prize, after, at = "", more = {}) => ({ id, r, type: "pick", mons, hints, prize, name: `${mons.map(n => mon(n).name).join(" or ")}`, after, at, liberates: true, ...more });
+const CHAPTERS = [
+  admin("kanto-admin", 0, "kanto", "kanto-rime", "kanto-rime-after", ["champ"], "the Cerulean lab"),
+  { id: "kanto-legend", r: 0, type: "legend", mons: [150], name: "Mewtwo", at: "the Cerulean lab", after: ["kanto-admin"], post: "kanto-cage", prize: { stone: 10281, key: 1 }, letter: "story-kanto", liberates: true },
+  { id: "johto-rival", r: 1, type: "rival", rival: "early", letter: "story-r1", name: RIVAL_NAME, at: "the League steps", pre: "johto-r1", post: "johto-r1-after" },
+  admin("johto-admin", 1, "johto", "johto-hail", "johto-hail-after", ["johto-rival"], "the Bell Tower"),
+  pick("johto-pick", 1, [249, 250], ["It sleeps under the sea and calms the storms.", "It brings the sun back wherever it lands."], { stone: 10049 }, ["johto-admin"], "the Bell Tower", { after2: "johto-next", letter: "story-johto" }),
+  admin("hoenn-admin", 2, "hoenn", "hoenn-slush", "hoenn-slush-after", ["champ"], "the Cave of Origin"),
+  pick("hoenn-pick", 2, [383, 382], ["It raises the land and dries up the rain.", "It fills the sea and brings the rain."], { stone: [10089, 10076] }, ["hoenn-admin"], "the Cave of Origin", { after2: "hoenn-next", letter: "story-hoenn" }),
+  admin("sinnoh-admin", 3, "sinnoh", "sinnoh-rime", "sinnoh-rime-after", ["champ"], "Spear Pillar"),
+  pick("sinnoh-pick", 3, [483, 484], ["It keeps time moving.", "It holds space together."], { stone: 10058 }, ["sinnoh-admin"], "Spear Pillar", { after2: "sinnoh-letter", letter: "story-sinnoh" }),
+  { id: "unova-rival", r: 4, type: "rival", rival: "mid", extra: "hoenn-pick", letter: "story-r2", name: RIVAL_NAME, at: "the League steps", pre: "unova-r2", post: "unova-r2-after", after: ["champ", "hoenn-pick"] },
+  admin("unova-admin", 4, "unova", "unova-hail", "unova-hail-after", ["unova-rival"], "Dragonspiral Tower"),
+  pick("unova-pick", 4, [643, 644], ["White fire, for truth.", "Black lightning, for ideals."], { master: 1 }, ["unova-admin"], "Dragonspiral Tower", { after2: "unova-kyurem", letter: "story-unova" }),
+  admin("kalos-admin", 5, "kalos", "kalos-slush", "kalos-slush-after", ["champ"], "the Pokémon Village"),
+  pick("kalos-pick", 5, [716, 717], ["It gives life.", "It takes it."], { stone: 10309 }, ["kalos-admin"], "the Pokémon Village", { after2: "kalos-next", letter: "story-kalos-next" }),
+  admin("alola-admin", 6, "alola", "alola-rime", "alola-rime-after", ["champ"], "Aether Paradise"),
+  pick("alola-pick", 6, [791, 792], ["It eats the sun.", "It drinks the moon."], { master: 1 }, ["alola-admin"], "the Altar of the Sunne and Moone", { after2: "alola-next", letter: "story-alola" }),
+  // The Mask (optional): Aether's lab chief, then the masked Type: Null itself. Type: Null joins, and earns its trust
+  // (Trust: X/10 in its detail) until it evolves into Silvally.
+  { id: "alola-silvally", r: 6, type: "rescue", name: "The Mask", at: "Aether Paradise", optional: true, after: ["alola-admin"], pre: "alola-null", post: "alola-null-after", doneNote: "Type: Null freed" },
+  { id: "galar-rival", r: 7, type: "rival", rival: "late", extra: "unova-pick", letter: "story-r3", name: RIVAL_NAME, at: "the League steps", pre: "galar-r3", post: "galar-r3-after", after: ["champ", "unova-pick"] },
+  admin("galar-admin", 7, "galar", "galar-hail", "galar-hail-after", ["galar-rival"], "the Slumbering Weald"),
+  pick("galar-pick", 7, [888, 889], ["The sword.", "The shield."], { master: 1 }, ["galar-admin"], "the Slumbering Weald", { after2: "galar-next", letter: "story-galar" }),
+  { id: "paldea-finale", r: 8, type: "finale", finale: true, name: "Paldea finale", at: "Area Zero", after: ["champ", ...LEGENDS], pre: "paldea-admins", post: "paldea-admins-after",
+    open: () => storyDex() >= FINALE_DEX, note: () => storyDex() >= FINALE_DEX ? "all three admins, back to back" : `Dex ${storyDex()} / ${FINALE_DEX}` },
+  pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"], "Area Zero", { after2: "paldea-freeze", letter: ["story-started", "story-snakes-end"] }),
+  { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", at: "the summit", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", letter: "story-silver", doneNote: "Shiny Charm" }
+];
+const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
+const storyDex = () => lifeDex();
+// After a first gym badge or Champion win in a region: its scene, and any clue or letter that comes with it.
+const STORY_EVENTS = {
+  "gym:0": { scene: "kanto-gyms", clue: "badge" }, "gym:2": { scene: "hoenn-gyms" },
+  "champ:0": { scene: "kanto-alarm" }, "champ:5": { scene: "kalos-letter", letter: "story-kalos" },
+  "champ:6": { scene: "alola-memo", letter: "story-memo", clue: "memo" }, "champ:8": { scene: "paldea-white" }
+};
+function storyEvent(kind, r) {
+  if (kind === "gym" && Object.keys(S.badges).some(k => k.startsWith(r + "-"))) return;
+  const e = STORY_EVENTS[kind + ":" + r]; if (!e) return;
+  if (e.clue) S.story.clues[e.clue] = 1;
+  if (e.letter) S.mail.got[e.letter] = 1;
+  setTimeout(() => playScene(e.scene), 700);
+}
+// The mascot Sssssssnakes took: the one you didn't pick there.
+const otherPick = id => { const c = CHAPTER[id], p = c && S.story.picks[c.r]; return p ? c.mons.find(n => n !== p) : null; };
+// How each type of chapter plays once its opening scene is done.
+const CHAPTER_RUN = {
+  admin: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  rival: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  rescue: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  finale: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  legend: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  pick: c => S.story.picks[c.r] ? startLoc({ kind: "story", r: c.r, x: c.id }) : pickScreen(c),
+  red: c => { startLoc({ kind: "summit", r: 1 }); if (B && B.kind === "summit") B.storyCh = c.id; }
+};
+// The fight for a chapter (startLoc builds the rest).
+function storyFight(c) {
+  const r = c.r, L = Math.min(100, champLevel(r) + CAP_OVER), base = { kind: "story", ch: c.id, r, i: r * 4 + 3, L, idx: 0 };
+  const boss = (q, t = CHAMP_TIME) => ({ ...base, queue: q, base: t, time: fightTime(t, q, regionOffense(r), .8, 1.2) });
+  if (c.type === "admin") return boss(adminTeam(c.team));
+  if (c.type === "rival") { const x = RIVAL[c.rival], extra = otherPick(c.extra); return { ...boss([...x.team, ...(extra ? [mon(extra)] : [])]), rival: x.id }; }
+  if (c.type === "rescue") { const phases = ["aether-chief", "aether-null"]; return { ...boss(adminTeam(phases[0])), phases, phase: 1 }; }
+  if (c.type === "finale") { const phases = ["paldea-rime", "paldea-hail", "paldea-slush"]; return { ...boss(adminTeam(phases[0]), FINAL_TIME), phases, phase: 1 }; }
+  // A legend: one fight, then the throws a dungeon's legend gets.
+  const lg = mon(c.type === "pick" ? S.story.picks[r] : c.mons[0]);
+  return { ...base, queue: [lg], base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [lg], regionOffense(r), .9, 1.15), catchIt: true };
+}
+// Admins and Sssssssnakes: the Champion's method, a little harder. Legends: as a dungeon's. The finale: Prof Penguin's
+// phase 2 method (every matchup 1×), against the best team the League rules allow.
+function storyTune(B) {
+  const c = CHAPTER[B.ch];
+  if (B.catchIt) return legendTuning(B);
+  if (c.type === "finale") return leagueTuning(B, FINALE_USE);
+  if (c.type === "rescue") return B.phase === 1 ? gymTuning(B, 3, 6, [B.r, 3], CHIEF_USE) : legendTuning(B);
+  return gymTuning(B, 3, 6, [B.r, 3], c.type === "rival" ? RIVAL_USE : ADMIN_USE);
+}
+function leagueTuning(B, use) {
+  const cap = areaCap(), hit = (m, f) => refHit(m, cap, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) * clockRate(f) }));
+  const P = refPick(refPool(...refArea(B.r, 3), cap, 2), foes, hit, 6, leagueRule), boost = bossBoost();
+  const secs = foes.reduce((s, { f, hp }) => s + hp / (P.reduce((d, m) => d + hit(m, f), 0) * boost), 0);
+  return use * B.bossTime * refDef(P) / secs;
+}
+function storySay(B) {
+  const c = CHAPTER[B.ch];
+  if (c.type === "finale") return `Phase ${B.phase} of 3: ${ADMIN_TEAMS[B.phases[B.phase - 1]][0]}. Lose anywhere and it starts over from Rime.`;
+  if (B.catchIt) return `${B.queue[0].name} is awake, and it isn't happy. Beat it, then the throws are yours.`;
+  if (c.type === "rival") return `${RIVAL_NAME} sends out ${B.queue.map(f => f.name).join(", ")}.`;
+  if (c.type === "rescue") return B.phase === 1 ? `Aether's lab chief won't let it go: ${B.queue.map(f => f.name).join(", ")}.` : "Type: Null thrashes against its mask. Calm it down.";
+  return `${ADMIN_TEAMS[c.team][0]} of Team Thaw: ${B.queue.map(f => f.name).join(", ")}.`;
+}
+function storyLose(B) {
+  const c = CHAPTER[B.ch];
+  return c.type === "finale" ? "The admins regroup. It starts over from Rime." : B.catchIt ? `${B.queue[0].name} is still here. Try again when you're ready.` : c.type === "rival" ? `${RIVAL_NAME}: "Too ssslow."` : "Build a team for this fight and try again.";
+}
+// The finale's break between admins: the party is free, like Prof Penguin's.
+function storyBreak() {
+  B.foe = null; B.queue = null; B.brk = FINAL_BREAK;
+  const next = B.phases[B.phase]; $("#shiny").hidden = true; $("#timerwrap").hidden = true;
+  $("#foeimg").src = sprite(ADMIN_TEAMS[next][1].find(x => typeof x === "number"));
+  $("#hpbar").style.width = "0%"; $("#hptext").textContent = ""; $("#where").textContent = `${CHAPTER[B.ch].name} · break`;
+  $("#foeinfo").innerHTML = `<b>${ADMIN_TEAMS[next][0]}</b> <span class="muted small">is next</span>`;
+  say(`${ADMIN_TEAMS[B.phases[B.phase - 1]][0]} is down. Your party is free: load a saved team in Party & Box. ${ADMIN_TEAMS[next][0]} is next.`);
+  renderFinalBox(); renderAll(); save();
+}
+function storyGo() {
+  if (!S.party.length) { say("Put at least one Pokémon in your party. It starts over from Rime.", true); backToRoute(); return; }
+  B.brk = null; B.phase++; B.queue = adminTeam(B.phases[B.phase - 1]); B.idx = 0;
+  B.time = fightTime(B.base, B.queue, regionOffense(B.r), .8, 1.2); B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def);
+  B.tune = storyTune(B); B.total = B.time;
+  say(storySay(B)); renderFinalBox(); spawn(); renderAll(); save();
+}
+// A won Story fight. A legend that got away keeps its chapter open.
+function storyWin() {
+  const c = CHAPTER[B.ch || B.storyCh]; if (!c) return;
+  if (B.catchIt && !B.bossCaught) { toast(`${B.queue[0].name} got away. It's still here: try again from the list.`); return; }
+  const first = !chDone(c.id);
+  if (c.type === "rival") rivalWin(RIVAL[c.rival], c.letter);
+  else if (c.type === "admin" || c.type === "finale") { const prize = rewardFor(B.L, B.i, first ? (c.type === "finale" ? FINALE_PAY : ADMIN_PAY) : 30); S.money += prize; toast(`${c.name} beaten! +$${fmt(prize)}.`); }
+  if (first) chapterPrize(c);
+  finishChapter(c);
+}
+// Replay Mode gives nothing back, through one door: storyReward(id, give) runs give on the save that should get it,
+// once. Outside a replay that's the save you're playing. In a replay it's nothing, unless the id is in REPLAY_REWARDS:
+// then it's the main Story save, once ever (story.replayGot). The list is empty in Year 1. Year 3 adds one: knocking out
+// Prof Penguin's Giratina with your own Origin Giratina in a replay of the Year 3 finale (a secret achievement, a hidden
+// letter and the Griseous Orb SP look).
+const REPLAY_REWARDS = new Set();
+function storyReward(id, give) {
+  if (!S.replay) return give(S), true;
+  if (!REPLAY_REWARDS.has(id)) return false;
+  const main = readSlot(STORY_KEY); if (!main || !main.story || (main.story.replayGot || {})[id]) return false;
+  give(main); main.story.replayGot = { ...(main.story.replayGot || {}), [id]: 1 };
+  try { localStorage.setItem(STORY_KEY, JSON.stringify(main)); } catch {}
+  return true;
+}
+function chapterPrize(c) {
+  const p = c.prize || {}, got = [];
+  storyReward("prize:" + c.id, T => {
+    for (const id of [].concat(p.stone || [])) { T.stones[id] = 1; got.push(formById(id).name.replace(/^Mega /, "") + "ite"); }
+    if (p.master) { T.balls.master++; got.push("a Master Ball"); }
+    if (p.key && !T.key) { T.key = 1; got.push("a Key Stone (Mega Evolution is open)"); }
+  });
+  if (c.type === "pick" || c.type === "legend") S.story.picks[c.r] = S.story.picks[c.r] || c.mons[0];
+  if (c.type === "rescue") { S.story.silvally = Math.max(1, S.story.silvally || 0); if (!S.box[NULL]) { S.box[NULL] = { xp: Math.pow(levelCap(), 3), shiny: lineShiny(NULL), from: catchRegion({ kind: "quest", q: "aether" }) }; if (joinsParty()) joinParty(NULL); } got.push("Type: Null (win with it in your party to earn its trust)"); }
+  if (c.type === "red") S.story.epilogue = 1;
+  for (const id of [].concat(c.letter || [])) S.mail.got[id] = 1;
+  if (got.length) setTimeout(() => toast(`${c.name}: ${got.join(", ")}.`), 3400);
+}
+// The pick: two silhouettes, a line from Prof Penguin under each, and "This one's mine." The pick is saved, and
+// Sssssssnakes gets the other one.
+let pickNow = null;
+function pickScreen(c) {
+  pickNow = { c, n: null }; hideTip();
+  renderPick();
+}
+function renderPick() {
+  const { c, n } = pickNow;
+  $("#scene").innerHTML = `<span class="who">Prof Penguin</span><p>Both of them are awake. Team Thaw will take whichever you leave. Pick one.</p>
+    <div class="picks">${c.mons.map((m, i) => `<button type="button" data-pick="${m}" aria-pressed="${n === m}"><img src="${sprite(m)}" alt="A silhouette"><span>${esc(c.hints[i])}</span></button>`).join("")}</div>
+    <div class="row"><button class="skip" type="button" data-pick="later">Not yet</button><button class="lbl" type="button" data-pick="mine"${n ? "" : " disabled"}>This one's mine.</button></div>`;
+  $("#scene").hidden = false;
+}
+function pickClick(b) {
+  const v = b.dataset.pick, c = pickNow.c;
+  if (v === "later") { pickNow = null; $("#scene").hidden = true; return; }
+  if (v === "mine") { const n = pickNow.n; pickNow = null; $("#scene").hidden = true; S.story.picks[c.r] = n; save(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
+  pickNow.n = +v; renderPick();
+}
+// ── The League rules, for Story's gyms and Champions: no Tier 0 to 2, at most one Tier 3 and two Tier 4s.
+const LEAGUE_MAX = { 3: 1, 4: 2 };
+const leagueRule = (out, m) => { const t = tierOf(m); if (t != null && t < 3) return false; return !LEAGUE_MAX[t] || out.filter(x => tierOf(x) === t).length < LEAGUE_MAX[t]; };
+// The same rules for a list of Pokémon (a reference team), as a message or "".
+const leagueBreaksList = list => { for (const t of [0, 1, 2]) if (list.some(m => tierOf(m) === t)) return `Tier ${t}`; for (const t of [3, 4]) if (list.filter(m => tierOf(m) === t).length > LEAGUE_MAX[t]) return `${t}`; return ""; };
+function leagueBreaks(party = S.party) {
+  const ts = party.map(n => tierOf(fighter(n))), low = party.filter((n, i) => ts[i] != null && ts[i] < 3);
+  if (low.length) return `${low.map(n => lookOf(n).name).join(", ")} ${low.length > 1 ? "are" : "is"} Tier ${Math.min(...low.map(n => tierOf(fighter(n))))} or stronger: not allowed.`;
+  for (const t of [3, 4]) { const k = ts.filter(x => x === t).length; if (k > LEAGUE_MAX[t]) return `${k} Tier ${t}s in the party: at most ${LEAGUE_MAX[t]}.`; }
+  return "";
+}
+let leagueFor = null;
+function leagueNotice(loc) {
+  leagueFor = loc; hideTip();
+  const teams = (S.teams || []).map((t, i) => [t, i]).filter(([t]) => !leagueBreaks(t.party.filter(n => S.box[n])));
+  $("#league").innerHTML = `<span class="who">League rules</span><p>Gyms and Champions in Story Mode allow no Tier 0, 1 or 2 Pokémon, at most one Tier 3 and at most two Tier 4s. ${esc(leagueBreaks())}</p>
+    <p class="small muted">Mascot legends and Mega pseudo forms are both Tier 3.</p>
+    <div class="row">${teams.length ? teams.map(([t, i]) => `<button class="lbl" type="button" data-league="${i}">Load ${esc(t.name)}</button>`).join("") : '<span class="small muted">No saved team fits. Save one in Party &amp; Box.</span>'}<button class="skip" type="button" data-league="close">Close</button></div>`;
+  $("#league").hidden = false;
+}
+$("#league").onclick = e => {
+  const b = e.target.closest("[data-league]"); if (!b) return;
+  $("#league").hidden = true;
+  if (b.dataset.league === "close") return;
+  loadTeam(+b.dataset.league);
+  if (leagueFor && !leagueBreaks()) startLoc(leagueFor);
+};
+const chDone = id => !!(S && S.story && S.story.ch[id]);
+const chaptersDone = () => CHAPTERS.filter(c => chDone(c.id)).length;
+// What a chapter waits for: "champ", another chapter's id, or nothing.
+const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a)) || null;
+const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open());
+function chapterRows(r) {
+  return CHAPTERS.filter(c => c.r === r).map(c => {
+    const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
+    return { kind: "chapter", r, x: c.id, done: chDone(c.id),
+      note: chDone(c.id) ? c.doneNote || (c.type === "pick" && S.story.picks[c.r] ? mon(S.story.picks[c.r]).name : "done") : !wait ? (c.note ? c.note() : c.optional ? "optional" : "story")
+        : wait === "champ" ? `after ${REGIONS[r].champ}` : `after ${CHAPTER[wait].name}${CHAPTER[wait].r !== r ? ` (${REGIONS[CHAPTER[wait].r].name})` : ""}` };
+  });
+}
+function runChapter(c) {
+  if (!c || !(chapterOpen(c) || chDone(c.id))) return;
+  if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
+  if (chDone(c.id) && c.type !== "scene" && c.type !== "red") { playScene(c.pre, () => playScene(c.post)); return; }
+  const go = CHAPTER_RUN[c.type];
+  playScene(c.pre, () => go ? go(c) : finishChapter(c));
+}
+function finishChapter(c) {
+  const first = !chDone(c.id);
+  S.story.ch[c.id] = 1;
+  if (first) { if (c.clue) S.story.clues[c.clue] = 1; if (c.won) c.won(); }
+  save(); renderAll();
+  playScene(c.post, () => playScene(c.after2));
+}
+// Next up, at the top of the Story tab: the next chapter that isn't optional, where it is, and what it waits for.
+function storyNext() {
+  const c = CHAPTERS.find(c => !c.optional && !chDone(c.id)); if (!c) return { c: null, text: "Year 1 is done. Year 2 is coming." };
+  const at = c.at ? ` at ${c.at}` : "", R = REGIONS[c.r].name, wait = waitOf(c);
+  if (wait === "champ") return { c, text: `Next: Champion of ${R}, then ${c.name}${at}.` };
+  if (wait) return { c, text: `Next: ${CHAPTER[wait].name}, then ${c.name}${at}.` };
+  if (c.open && !c.open()) return { c, text: `Next: ${c.name}. ${c.note ? c.note() : ""}`.trim() };
+  return { c, text: `Next: ${c.name}${at}, in ${R}.` };
+}
+// The Year map: every chapter of the year, ✓ done, ▶ next, 🔒 not yet. A chapter you haven't reached in the story shows
+// as ???, except the finale, which shows from the start with its checklist.
+function yearMap() {
+  const now = storyNext().c;
+  return CHAPTERS.map(c => {
+    const done = chDone(c.id), cur = c === now, known = done || cur || chapterOpen(c) || c.finale;
+    return { id: c.id, mark: done ? "✓" : cur ? "▶" : "🔒", name: known ? c.name : "???", optional: !!c.optional, note: c.finale && !done && c.note ? c.note() : "", r: c.r, grey: !done && !cur };
+  });
+}
+// Story's leaderboard progress (for the Story board the hub doesn't have yet): year, chapters done, regions
+// liberated (a chapter with liberates: true closes its region), and the Story lifetime dex, which never goes down.
+function storyProgress(st) {
+  if (!st || st.mode !== "story" || !st.story) return null;
+  const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
+  return { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
+    lifeDex: new Set([...keys(st.lifeDex), ...keys(st.story.lifeDex), ...keys(st.box)]).size };
+}
+
+// The scene box. playScene(id, then): then runs once it's closed, skipped or not. A scene you've already seen plays
+// again from the Story tab the same way and changes nothing. Seen before the save exists (the opening): kept in preSeen.
+let sceneNow = null;
+const preSeen = [];
+function playScene(id, then) {
+  const sc = id && SCENES[id];
+  if (!sc) { if (then) then(); return; }
+  hideTip();
+  if (sceneNow) markSeen(sceneNow.id);
+  sceneNow = { id, i: 0, then };
+  renderScene();
+}
+function renderScene() {
+  const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], last = sceneNow.i === sc.lines.length - 1;
+  $("#scene").innerHTML = (who ? `<span class="who">${esc(who)}</span>${ADMIN_PIC[who] ? `<span class="face"><img src="${SPRITE_DIR + ADMIN_PIC[who]}" alt="" onerror="this.parentNode.textContent='${esc(who.split(" ").pop().toUpperCase())}'"></span>` : ""}` : "") + `<p>${esc(text)}</p><div class="row"><button class="skip" type="button" data-scene="skip">Skip</button><span class="muted small count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next">${last ? "Close" : "Next"}</button></div>`;
+  $("#scene").hidden = false;
+  $("#scene [data-scene=next]").focus({ preventScroll: true });
+}
+function endScene() {
+  const s = sceneNow; if (!s) return;
+  sceneNow = null; $("#scene").hidden = true;
+  markSeen(s.id);
+  if (tab === "story" && screen === "game") renderStory();
+  if (s.then) s.then();
+  tutor();
+}
+function markSeen(id) { if (S && S.story) { if (!S.story.seen[id]) { S.story.seen[id] = 1; save(); } } else if (!preSeen.includes(id)) preSeen.push(id); }
+$("#scene").onclick = e => {
+  const p = e.target.closest("[data-pick]"); if (p && pickNow) return pickClick(p);
+  const y = e.target.closest("[data-y2]"); if (y) { $("#scene").hidden = true; if (y.dataset.y2 === "go") beginYear2(); return; }
+  const b = e.target.closest("[data-scene]"); if (!b || !sceneNow) return;
+  if (b.dataset.scene === "skip" || sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
+  else { sceneNow.i++; renderScene(); }
+};
+
+// The Story tab: the notebook, every scene seen so far by year and region, and the clue cards.
+function renderStory() {
+  if (!isStory()) return;
+  const st = S.story, seen = Object.keys(SCENES).filter(id => st.seen[id]), groups = {};
+  for (const id of seen) { const sc = SCENES[id], g = sc.year + ":" + sc.r; (groups[g] = groups[g] || { year: sc.year, r: sc.r, ids: [] }).ids.push(id); }
+  const order = Object.values(groups).sort((a, b) => a.year - b.year || a.r - b.r);
+  const clues = Object.keys(CLUES).filter(k => st.clues[k]);
+  const map = yearMap(), next = CHAPTERS.length ? storyNext().text : "";
+  $("#t-story").innerHTML = (next ? `<p class="next"><b>${esc(next)}</b></p>` : "") + `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
+    ${map.length ? `<h2>Year ${st.year}: ${esc(YEARS[st.year] || "")}</h2><ul class="yearmap">${map.map(x => `<li class="${x.grey ? "muted" : ""}"><span class="mk">${x.mark}</span> ${esc(x.name)}${x.optional ? " (optional)" : ""}${x.note ? ` <span class="small">· ${esc(x.note)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+    <h2>Story so far</h2>${order.length ? order.map(g => `<div class="st-group"><h4>Year ${g.year}: ${esc(YEARS[g.year] || "")} · ${g.r < 0 ? "Prologue" : esc(REGIONS[g.r].name)}</h4><div class="st-scenes">${g.ids.map(id => `<button class="lbl" type="button" data-reread="${id}">${esc(SCENES[id].title)}</button>`).join("")}</div></div>`).join("") : '<p class="small muted">Nothing yet.</p>'}
+    <h2>Clues</h2>${clues.length ? `<div class="clues">${clues.map(k => `<div class="clue"><b>${esc(CLUES[k].title)}</b>${esc(CLUES[k].text)}</div>`).join("")}</div>` : '<p class="small muted">No clues yet. Keep your eyes open.</p>'}`;
+}
+$("#t-story").onclick = e => { const b = e.target.closest("[data-reread]"); if (b) playScene(b.dataset.reread); };
+
 // ── Screens: title (the landing page), pick (a new save's starter), game.
 let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
-function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; refitSprites(); }
+function show(name) { const rb = $("#replaybar"); rb.hidden = !(S && S.replay); rb.textContent = REPLAY_LINE; screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; refitSprites(); }
 function boot() {
   B = null; awayText = ""; titleMsg = ""; hideTip();
   let earned = [];
@@ -3007,7 +3720,8 @@ function boot() {
 function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
 function showPick() {
   show("pick");
-  $("#pickline").textContent = S && S.pick ? `Prestige ${S.prestige}: a new journey. XP ×${PRESTIGE_XP} for good, shinies ×${prestigeShiny()}${S.charm ? "" : " (×" + 3 * prestigeShiny() + " once you win the Shiny Charm again)"}.` : "Poké Idle. Your party fights on its own; you just help.";
+  if (slot === STORY_KEY && !S) playScene("open-1");
+  $("#pickline").textContent = S && S.pick ? `Prestige ${S.prestige}: a new journey. XP ×${PRESTIGE_XP} for good, shinies ×${prestigeShiny()}${S.charm ? "" : " (×" + 3 * prestigeShiny() + " once you win the Shiny Charm again)"}.` : slot === STORY_KEY ? `Story Mode, Year 1: ${YEARS[1]}.` : "Poké Idle. Your party fights on its own; you just help.";
   $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img class="spr" data-ref="42" src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
 }
 function enter(t) {
@@ -3037,6 +3751,7 @@ const HOW = [
   "Speed sets how often each Pokémon hits, and your party's HP, Defense and Sp. Def stretch the timer in boss fights.",
   "Beat Steven for a Key Stone: each region's dungeon then drops its own generation's Mega Stones. Beat Leon for a Dynamax Band and win Gigantamax in Galar's Max Raid Den.",
   "Drag Pokémon in Party & Box to rearrange your team or swap someone in from the Box.",
+  "New game asks Classic or Story. Story Mode has its own save, chapters after each Champion and its own rules: the Wiki's Story Mode page has them.",
   "Someone waits on Mt. Silver once every Champion is beaten, and the Battle Tower opens after Paldea. The Wiki tab has every rule, plus a Pokédex of every Pokémon."
 ];
 // ── Test account. Hold, hold, tap, tap, tap on the title screen's "Poké Idle" (Morse --...: a hold is 350ms or
@@ -3066,7 +3781,7 @@ function testAccount() {
 }
 function useSlot(k, account) {
   if (S) save();
-  slot = k; try { localStorage.setItem(SLOT_KEY, k === TEST_KEY ? "test" : "real"); } catch {}
+  slot = k; setSlotPref(k);
   S = account || readSlot(k);
   if (S) save();
   $("#testdoor").hidden = true; boot();
@@ -3086,8 +3801,9 @@ $("#testdoor").onsubmit = e => {
   else $("#testmsg").textContent = "That's not it.";
 };
 function renderTitle() {
-  const items = MENU[S ? "save" : "fresh"].concat(slot === TEST_KEY ? [["back", "Back to my save"]] : []);
-  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : "Your party fights on its own; you just help.";
+  const other = otherSlot(), items = MENU[S ? "save" : "fresh"].filter(([id]) => !(slot === REPLAY_KEY && id === "new")).concat(slot === TEST_KEY ? [["back", "Back to my save"]] : slot === REPLAY_KEY ? [["endreplay", "End the replay"]]
+    : [...(other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []), ...(isStory() && S.story.epilogue ? [["replay", readSlot(REPLAY_KEY) ? "Back to the replay" : "Replay Year 1"]] : [])]);
+  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === REPLAY_KEY ? REPLAY_LINE : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
   $("#t-prest").hidden = !(S && S.prestige); $("#t-prest").textContent = S && S.prestige ? "P" + S.prestige : ""; $("#t-prest").title = S && S.prestige ? "Prestige " + S.prestige : "";
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
@@ -3096,7 +3812,10 @@ function renderTitle() {
   const card = $("#t-card");
   if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
   else if (panel === "load") card.innerHTML = `<h2>Load a save code</h2><p class="small muted">On your other device, open Settings and use "Show my save code", then paste the code here.</p><textarea id="t-code" aria-label="Save code" spellcheck="false"></textarea><div class="row"><button class="lbl" type="button" data-act="load">Load save</button></div><div class="small bad" id="t-msg" role="status"></div>`;
-  else if (panel === "new") card.innerHTML = `<h2>Start a new game?</h2><p class="small">This erases your save${syncOn() ? " on this device and in your Bored account" : " on this device"}: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
+  else if (panel === "new") card.innerHTML = `<h2>New game</h2><p class="small">Pick a mode. Each has its own save, and starting one never touches the other. You switch between them here.</p><div class="modes">${MODES.map(([k, name, line]) => `<button type="button" data-act="mode" data-k="${k}"><b>${name}${readSlot(k) ? ' <span class="bad">(erases your ' + name + ' save)</span>' : ""}</b><span>${line}</span></button>`).join("")}</div>`;
+  else if (panel === "erase" && newFor) card.innerHTML = newFor === KEY
+    ? `<h2>Start a new game?</h2><p class="small">This erases your save${syncOn() ? " on this device and in your Bored account" : " on this device"}: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`
+    : `<h2>Start Story Mode over?</h2><p class="small">This erases your Story save on this device: its Box, badges, chapters and notebook. Your Classic save and your shiny lines stay. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase Story save and start over</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
   else if (panel === "prestige" && canPrestige()) card.innerHTML = prestigeCard();
   else card.innerHTML = saveCard();
 }
@@ -3107,20 +3826,23 @@ function leadField() {
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
-    ...(S.prestige || S.beat ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
+    ...(isStory() ? [["Story", `Year ${S.story.year}: ${YEARS[S.story.year]}, ${chaptersDone()} of ${CHAPTERS.length} chapters`], ["Story dex", `${lifeDex()} ever caught`]] : []),
+    ...(!isStory() && (S.prestige || S.beat) ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${achs().filter(a => S.ach[a.id]).length} of ${achs().length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "") +
     `<p class="small muted" id="t-sync" role="status">${esc(syncText())}</p>` +
     (canPrestige() ? `<div class="row"><button class="lbl" type="button" data-act="prestige-ask">Prestige</button><span class="small muted">Start over for good: XP ×${PRESTIGE_XP}, shinies ×${nextShiny()}</span></div>`
-      : S.beat && !S.pick ? `<p class="small muted">Beat Prof Penguin again to prestige once more.</p>` : "");
+      : S.beat && !S.pick && !isStory() ? `<p class="small muted">Beat Prof Penguin again to prestige once more.</p>` : "");
 }
 function go(id) {
   if (id === "continue") return enter("battle");
   if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail" || id === "ach") return enter(id);
   if (id === "back") return useSlot(KEY);
-  if (id === "new" && !S) return showPick();
+  if (id === "switch" && otherSlot()) return useSlot(otherSlot());
+  if (id === "replay" && isStory()) return readSlot(REPLAY_KEY) ? useSlot(REPLAY_KEY) : startReplay();
+  if (id === "endreplay") return endReplay();
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
   panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();
   if (panel === "load") $("#t-code").focus();
@@ -3138,22 +3860,24 @@ document.addEventListener("keydown", e => {
 });
 $("#t-card").onclick = e => {
   const a = e.target.closest("[data-act]"); if (!a) return;
-  if (a.dataset.act === "erase") eraseSave();
+  if (a.dataset.act === "mode") { const k = a.dataset.k; if (readSlot(k)) { newFor = k; panel = "erase"; renderTitle(); } else newGame(k); }
+  else if (a.dataset.act === "erase") newGame(newFor || slot);
   else if (a.dataset.act === "keep") { panel = "save"; renderTitle(); }
   else if (a.dataset.act === "prestige-ask") { panel = "prestige"; renderTitle(); }
   else if (a.dataset.act === "prestige") prestige();
   else if (a.dataset.act === "load") { if (loadCode($("#t-code").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); } else $("#t-msg").textContent = BAD_CODE; }
 };
-$("#pickback").onclick = showTitle;
+$("#pickback").onclick = () => { if (!S && pickFrom && pickFrom !== slot) { slot = pickFrom; setSlotPref(slot); S = readSlot(slot); boot(); return; } showTitle(); };
 // A new game, or the first partner of a new journey after a prestige (S.pick): the SP editions that came along join after it.
 $("#starters").onclick = e => {
   const b = e.target.closest("[data-start]"); if (!b) return;
   const n = +b.dataset.start, again = !!(S && S.pick);
-  if (!again) S = fresh();
-  if (!S.box[n]) S.box[n] = { xp: 125, shiny: false };
+  if (!again) { S = fresh(); if (slot === STORY_KEY) startStory(); }
+  if (!S.box[n]) S.box[n] = { xp: 125, shiny: false, from: 0 };
   S.party = [n];
   if (again) { delete S.pick; for (const k of Object.keys(S.box).map(Number)) if (k !== n && S.box[k].special && joinsParty()) joinParty(k); }
   B = null; enter("battle"); toast(`${mon(n).name} is your partner. Tap the wild Pokémon to help it fight.`);
+  if (isStory() && !again) playScene("open-2", () => openTab("story"));
 };
 // ── Saves in your account. Signed in on Bored, the save also lives in your Bored account, so any device can carry on
 // where another left off. The game has no network and no credentials: it asks the hub's saves bridge
@@ -3200,6 +3924,7 @@ function syncText() {
   if (SYNC.state === "start") return "Checking your Bored account…";
   if (!SYNC.acct) return "Sign in to Bored and your save follows you to any device.";
   if (slot === TEST_KEY) return "The test account stays on this device; your own save is in your Bored account.";
+  if (slot === STORY_KEY || slot === REPLAY_KEY) return "Story Mode stays on this device for now. Your Classic save is the one in your Bored account.";
   if (SYNC.ask) return "Two different saves: pick the one to keep.";
   if (syncTheirs(localSave() && localSave().s)) return "This save belongs to another Bored account on this browser, so it stays on this device.";
   if (SYNC.error) return "Couldn't reach your Bored account. Trying again.";
@@ -3351,13 +4076,25 @@ syncBoot();
 // never lowers it. prestige is how many times this save has prestiged; ranked is the Classic board's order, prestige
 // first, then lifetime dex (lifeDex is at most 1025, so prestige × 2051 + lifeDex keeps prestige first). The hub
 // doesn't read ranked or lifeDex yet.
+// Story Mode never moves the Classic board: while it's open the snapshot reports the Classic save from storage, and
+// Story's own progress rides along in story ({ year, chapter, regionsLiberated, lifeDex }) for the Story board to come.
 window.__boredSnapshot = () => {
+  if (slot === STORY_KEY) return classicSnapshot(readSlot(KEY), S);
+  if (slot === REPLAY_KEY) return classicSnapshot(readSlot(KEY), readSlot(STORY_KEY));
   const day = bossDay().date, boss = { date: day, won: !!(S && S.daily && S.daily.date === day && S.daily.won) };
   if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, lifeDex: 0, badges: 0, tower: 0, prestige: 0, ranked: 0, boss: { date: day, won: false }, finished: false };
   if (S) recordLife();
   const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0, prestige = S ? S.prestige || 0 : 0, life = S ? lifeDex() : 0;
-  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S };
+  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S, story: storyProgress(readSlot(STORY_KEY)) };
 };
+function classicSnapshot(c, st) {
+  const day = bossDay().date, boss = { date: day, won: !!(c && c.daily && c.daily.date === day && c.daily.won) };
+  const keys = o => Object.keys(o || {}), box = c ? c.box : {};
+  const life = c ? new Set([...keys(c.lifeDex), ...keys(box)]).size : 0;
+  const lifeSh = c ? new Set([...keys(c.lifeShiny), ...keys(box).filter(k => box[k].shiny)]).size : 0, prestige = c ? c.prestige || 0 : 0;
+  return { slug: 'poke-idle', caught: keys(box).length, shinies: Object.values(box).filter(b => b.shiny).length, score: life + lifeSh, lifeDex: life, badges: c ? keys(c.badges).length : 0,
+    tower: c && c.tower ? c.tower.best || 0 : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!c, story: storyProgress(st) };
+}
 </script>
 </body>
 </html>
