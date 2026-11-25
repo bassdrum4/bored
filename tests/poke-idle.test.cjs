@@ -317,11 +317,13 @@ test('an old Classic save stays Classic: same odds, same XP, same snapshot, no S
   const got = await tab.evaluate(old => {
     localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot();
     const xp0 = S.box[16].xp; gainXp(100);
+    S.box[4].xp = 1e6; enter('party'); const classicTile = document.querySelector('#party [data-n="4"]').textContent, classicCap = document.querySelector('#partycap').hidden;
     enter('battle');
-    return { story: isStory(), mode: S.mode, odds: shinyOdds() * 4096, xp: S.box[16].xp - xp0, tab: document.querySelector('#tabs [data-tab=story]').hidden, snap: __boredSnapshot(), prestigeRule: canPrestige.toString().includes('isStory') };
+    return { classicTile, classicCap, story: isStory(), mode: S.mode, odds: shinyOdds() * 4096, xp: S.box[16].xp - xp0, tab: document.querySelector('#tabs [data-tab=story]').hidden, snap: __boredSnapshot(), prestigeRule: canPrestige.toString().includes('isStory') };
   }, OLD_SAVE);
   assert.equal(got.story, false);
   assert.equal(got.mode, undefined, 'an old save is not given a mode');
+  assert.ok(!got.classicTile.includes('fights at') && got.classicCap, 'Classic shows one level and no cap line, as before');
   assert.equal(got.odds, 1);
   assert.equal(got.xp, 200, 'the catch-up bonus still applies in Classic (Lv 6 behind Lv 10)');
   assert.equal(got.tab, true);
@@ -431,6 +433,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
     return { gated, done, fights, picks: S.story.picks, stones: Object.keys(S.stones).map(Number).sort(), key: S.key, charm: S.charm, silvally: !!S.box[772] && S.story.silvally, master: S.balls.master,
       mail: inbox().map(m => m.id).filter(x => /^(story|rival)-/.test(x)),
       sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
+      silver: MAIL.find(m => m.id === 'story-silver').body,
       signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
       gens: Object.values(ADMIN_TEAMS).map(([, t]) => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
@@ -447,7 +450,8 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
   assert.equal(got.fights['alola-silvally'].join(','), 'Toxapex,Bewear,Golisopod,Mudsdale,Lycanroc,Palossand,Type: Null', 'The Mask: the lab chief, then Type: Null');
   for (const id of ['story-johto', 'story-hoenn', 'story-sinnoh', 'story-unova', 'story-kalos-next', 'story-alola', 'story-galar']) assert.ok(got.mail.includes(id), 'transition letter ' + id);
   assert.deepEqual(got.mail.filter(x => x.startsWith('rival-')), [], 'Story sends its own rival letters, not Classic\u2019s');
-  for (const id of ['story-kanto', 'story-r1', 'story-r2', 'story-r3', 'story-started', 'story-snakes-end']) assert.ok(got.mail.includes(id), id);
+  for (const id of ['story-kanto', 'story-r1', 'story-r2', 'story-r3', 'story-started', 'story-snakes-end', 'story-silver']) assert.ok(got.mail.includes(id), id);
+  assert.equal(got.silver, "<p>Red doesn't talk much. His Pokémon don't need him to.</p><p>The ones you fight beside remember you best. Don't forget that.</p><p>Prof Penguin</p>", 'bond hint 1, word for word');
   assert.ok(got.sinnoh.includes('His reply took two days.') && got.sinnoh.includes('Unova next.'), 'Sinnoh\u2019s reply, two days late');
   assert.deepEqual(got.signatures, ['— Sssssnakes', '— Ssssssnakes', '— Sssssssnakes', '— Sssnakes'], 'a different number of s\u2019s every time');
   assert.ok(got.mail.indexOf('story-started') < got.mail.indexOf('story-snakes-end'), 'the last letter sits under Penguin\u2019s');
@@ -548,7 +552,7 @@ test('Story Year 1 finale, as one run: a League-legal team built on the admins g
   assert.deepEqual(errors, []);
 });
 
-test('every catch has a from region (Kanto when nothing else fits), Story shows bonded or not, and Type: Null evolves on trust', async t => {
+test('every catch has a from region (Kanto when nothing else fits), the bond flag stays hidden, level sync shows, and Type: Null evolves on trust', async t => {
   const { tab, errors } = await openIdle(t, '2026-11-24');
   const got = await tab.evaluate(() => {
     const where = [
@@ -562,17 +566,22 @@ test('every catch has a from region (Kanto when nothing else fits), Story shows 
     S.loc = { kind: 'route', r: 1, k: 0 }; B = { kind: 'route', r: 1, k: 0 }; addMon(161, 5, false); const johto = S.box[161].from;
     // Story: bonded words, and Type: Null's trust.
     slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e6 }; S.box[NULL] = { xp: 1e6 }; S.party = [25]; S.story.silvally = 1;
-    detail = 25; renderDetail(); const unb = $('#detail') ? document.querySelector('#detail').textContent : '';
-    S.box[25].bond = 1; renderDetail(); const bon = document.querySelector('#detail').textContent;
+    detail = 25; renderDetail(); const unb = document.querySelector('#detail').innerHTML;
+    S.box[25].bond = 1; renderDetail(); const bon = document.querySelector('#detail').innerHTML;
+    // Level sync: Lv 100 stored, the cap far below.
+    enter('party'); const tile = document.querySelector('#party [data-n="25"]').textContent, cap = document.querySelector('#partycap').textContent;
     S.party = [25, NULL]; for (let i = 0; i < 9; i++) nullTrust();
     detail = NULL; renderDetail(); const trust = document.querySelector('#detail').textContent;
     nullTrust();
-    return { where, old, johto, unb: unb.includes('Not bonded yet'), bon: bon.includes('Bonded ♥'), trust: trust.includes('Trust: 9/10'), silvally: S.story.silvally, party: S.party, has: !!S.box[SILVALLY] };
+    return { where, old, johto, hidden: unb === bon && !/bond/i.test(bon), tile, cap, detailLv: bon.includes(`Lv 100 (fights at ${levelCap()})`), lvCap: levelCap(), trust: trust.includes('Trust: 9/10'), silvally: S.story.silvally, party: S.party, has: !!S.box[SILVALLY] };
   });
   assert.deepEqual(got.where, [3, 5, 1, 6, 3, 8, 2, 2, 4, 7, 7, 0, 0, 0, 0, 0]);
   assert.equal(got.old, 0, 'an entry with no region counts as Kanto');
   assert.equal(got.johto, 1);
-  assert.deepEqual([got.unb, got.bon, got.trust], [true, true, true]);
+  assert.equal(got.hidden, true, 'the bond flag is never shown');
+  assert.ok(got.tile.includes(`Lv 100 (fights at ${got.lvCap})`) && got.detailLv, 'level sync: the real level and the one it fights at');
+  assert.equal(got.cap, `Level cap ${got.lvCap}`);
+  assert.equal(got.trust, true, 'Trust: X/10 shows');
   assert.deepEqual([got.silvally, got.party, got.has], [2, [25, 773], true]);
   assert.deepEqual(errors, []);
 });
