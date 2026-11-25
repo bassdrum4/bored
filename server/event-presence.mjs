@@ -17,8 +17,9 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
       const exp=Number(JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString()).exp)*1000;
       if(!Number.isFinite(exp)||exp<=Date.now())throw Error('Expired token');
       if(auth.size>=2048)auth.delete(auth.keys().next().value);
-      const verified={...value,expires:exp};
-      auth.set(key,{value:verified,until:Math.min(exp,Date.now()+authMs)});
+      const until=Math.min(exp,Date.now()+authMs);
+      const verified={...value,expires:exp,until};
+      auth.set(key,{value:verified,until});
       return verified;
     })();
     pending.set(key,task);
@@ -76,7 +77,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
       if(m.mode==='hide'){hideAccount(p.id);reply(res,200,{t:'off'},origin);return;}
       if(!p.visible){hideAccount(p.id);reply(res,200,{t:'off'},origin);return;}
       if(!p.handle){reply(res,401,{t:'err'},origin);return;}
-      identity={guest:false,id:p.id,name:p.handle,expires:p.expires};
+      identity={guest:false,id:p.id,name:p.handle,expires:p.expires,until:p.until};
     }else{reply(res,400,{t:'err'},origin);return;}
     if(res.destroyed)return;
     let s=sessions.get(m.sid);
@@ -101,7 +102,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     if(c.mode==='sse'){
       res.writeHead(200,{'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache, no-transform','x-accel-buffering':'no','access-control-allow-origin':origin,'vary':'Origin'});
       res.flushHeaders();res.write('data: '+JSON.stringify(frame)+'\n\n');
-      c.timer=setTimeout(()=>detach(s,{t:'renew'}),Math.max(1,Math.min(streamMs,(identity.expires||Infinity)-Date.now()-5000)));c.timer.unref?.();
+      c.timer=setTimeout(()=>detach(s,{t:'renew'}),Math.max(1,Math.min(streamMs,(identity.expires||Infinity)-Date.now()-5000,(identity.until||Infinity)-Date.now())));c.timer.unref?.();
     }else{
       c.timer=setTimeout(()=>detach(s),waitMs);c.timer.unref?.();
     }
