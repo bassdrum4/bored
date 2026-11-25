@@ -155,3 +155,30 @@ test('private presence tracks after join, refreshes ticket and re-tracks after r
   await until(()=>server.state.tracks.length===3);
   assert.equal(server.state.tracks[2].payload.ticket,'ticket-two');
 });
+
+test('guest presence uses the socket API key without requiring a user JWT', async t => {
+  const { subscribeChanges } = await load();
+  const server = await createMockRealtime();
+  const socket = subscribeChanges({
+    url:server.url,topic:'bored-online-v2',private:true,allowGuest:true,getToken:async()=> '',
+    onPresence:()=>{},retry:[20],joinWaitMs:500
+  });
+  t.after(async()=>{socket.close();await server.close();});
+  socket.trackPresence('guest:11111111-1111-4111-8111-111111111111');
+  await until(()=>server.state.tracks.length===1);
+  assert.equal(server.state.joins[0].payload.config.private,true);
+  assert.equal('access_token' in server.state.joins[0].payload,false);
+  assert.equal(server.state.tracks[0].payload.ticket,'guest:11111111-1111-4111-8111-111111111111');
+});
+
+test('online roster combines distinct guest and registered counts', async () => {
+  const { boringLabel, onlineLabel, validPresenceTickets, isLivePresenceUrl } = await import(pathToFileURL(path.join(__dirname,'../src/hub/presence.js')).href);
+  const guest = 'guest:11111111-1111-4111-8111-111111111111';
+  const named = 'p2:' + 'a'.repeat(320) + ':' + 'b'.repeat(64);
+  assert.deepEqual(validPresenceTickets([guest,guest,named,'invalid']),[guest,named]);
+  assert.equal(boringLabel(1),'1 boring person');
+  assert.equal(boringLabel(12),'12 boring people');
+  assert.equal(onlineLabel(['Alice','Bob'],12), '14 online');
+  assert.equal(onlineLabel([],12,2), '14 online');
+  assert.equal(isLivePresenceUrl('https://bassdrum4.github.io/bored/?bored_qa=1'),true);
+});
