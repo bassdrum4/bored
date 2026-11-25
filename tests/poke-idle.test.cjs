@@ -429,7 +429,9 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
       skip(); if (chDone(c.id)) done.push(c.id);
     }
     return { gated, done, fights, picks: S.story.picks, stones: Object.keys(S.stones).map(Number).sort(), key: S.key, charm: S.charm, silvally: !!S.box[773] && S.story.silvally,
-      mail: inbox().map(m => m.id).filter(x => /^(story|rival)-/.test(x)), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+      mail: inbox().map(m => m.id).filter(x => /^(story|rival)-/.test(x)),
+      signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
+      gens: Object.values(ADMIN_TEAMS).map(([, t]) => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
   assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
   assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
@@ -440,7 +442,11 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
   assert.deepEqual(got.picks, { 0: 150, 1: 250, 2: 382, 3: 484, 4: 644, 5: 717, 6: 792, 7: 889, 8: 1008 });
   assert.deepEqual(got.stones, [10049, 10058, 10076, 10089, 10281, 10309, 10325]);
   assert.deepEqual([got.key, got.charm, got.silvally], [1, 1, 1]);
-  assert.ok(got.mail.includes('story-started') && got.mail.includes('rival-late'));
+  assert.deepEqual(got.mail.filter(x => x.startsWith('rival-')), [], 'Story sends its own rival letters, not Classic\u2019s');
+  for (const id of ['story-kanto', 'story-r1', 'story-r2', 'story-r3', 'story-started', 'story-snakes-end']) assert.ok(got.mail.includes(id), id);
+  assert.deepEqual(got.signatures, ['— Sssssnakes', '— Ssssssnakes', '— Sssssssnakes', '— Sssnakes'], 'a different number of s\u2019s every time');
+  assert.ok(got.mail.indexOf('story-started') < got.mail.indexOf('story-snakes-end'), 'the last letter sits under Penguin\u2019s');
+  assert.deepEqual(got.gens, [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9], 'each admin team from its region\u2019s generation, the finale\u2019s all Generation 9');
   assert.deepEqual(got.progress, { year: 1, chapter: 23, regionsLiberated: 9, lifeDex: got.progress.lifeDex });
   assert.deepEqual(got.seen, [true, true, true, true]);
   assert.deepEqual(errors, []);
@@ -493,12 +499,17 @@ test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the
     startLoc({ kind: 'gym', r: 0, k: 0 });
     const notice = !$('#league').hidden && $('#league').textContent;
     $('#league [data-league="0"]').click();
-    return { classicDen, storyDen: dungeonBosses(0).map(m => m.num), galar: dungeonBosses(7).map(m => m.num), seen, clues: S.story.clues, mail: inbox().map(m => m.id).filter(x => x.startsWith('story')),
+    const plates = (S.champs = Object.fromEntries(REGIONS.map((_, r) => [r, 1])), gainPlates(5));
+    return { classicDen, storyDen: dungeonBosses(0).map(m => m.num), galar: dungeonBosses(7).map(m => m.num), kalos: dungeonBosses(5).map(m => m.num), hoenn: dungeonBosses(2).map(m => m.num), unova: dungeonBosses(4).map(m => m.num), plates, seen, clues: S.story.clues, mail: inbox().map(m => m.id).filter(x => x.startsWith('story')),
       k0, k1, k7, notice, party: S.party, fighting: B && B.kind, arceus: (S.box[493] = { xp: 1e6 }, leagueBreaks([493])), megaT3: tierOf(formById(10281)) };
   });
   assert.ok(got.classicDen.includes(150), 'Classic keeps Mewtwo in the Kanto dungeon');
   assert.deepEqual(got.storyDen, [144, 145, 146, 151]);
   assert.ok(![888, 889, 890].some(n => got.galar.includes(n)));
+  assert.ok([896, 897].every(n => got.galar.includes(n)), 'Glastrier and Spectrier stay for Year 2');
+  assert.ok(got.kalos.includes(718) && ![716, 717].some(n => got.kalos.includes(n)), 'Zygarde stays for Year 3');
+  assert.ok(![380, 381, 386].some(n => got.hoenn.includes(n)) && ![641, 642, 645, 647].some(n => got.unova.includes(n)), 'no legend a Story chapter gives');
+  assert.equal(got.plates, '', 'no Plates in Story');
   assert.deepEqual(got.seen, ['kanto-gyms', null, 'kanto-alarm', 'sinnoh-letter', 'alola-memo']);
   assert.deepEqual(got.clues, { badge: 1, memo: 1 });
   assert.deepEqual(got.mail.sort(), ['story-memo', 'story-sinnoh']);
@@ -509,5 +520,25 @@ test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the
   assert.equal(got.fighting, 'gym', 'loading a team that fits starts the fight');
   assert.match(got.arceus, /Tier 1 or stronger/);
   assert.equal(got.megaT3, 3);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1 finale, as one run: a League-legal team built on the admins gets through all three back to back, and the Hall of Fame stays harder', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(`(${storyAllChamps})()`);
+  const got = await tab.evaluate(() => {
+    S.key = 1; S.band = 1; for (const id of LEGENDS) S.story.ch[id] = 1; for (let i = 0; i < 160; i++) S.lifeDex[4000 + i] = 1;
+    viewR = 8; enter('battle'); startLoc({ kind: 'story', r: 8, x: 'paldea-finale' });
+    const cap = areaCap(), typed = (m, f) => refHit(m, cap, f) * bestEff(m, f), pool = refPool(...refArea(8, 3), cap, 2);
+    // One team for the whole run, picked against all eighteen, with no swaps in the breaks.
+    const all = B.phases.flatMap(adminTeam), team = refPick(pool, all.map(f => ({ f, hp: 1 })), typed, 6, leagueRule);
+    const need = () => B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) * B.tune * clockRate(f) / (team.reduce((d, m) => d + typed(m, f), 0) * bossBoost()), 0);
+    const phases = [];
+    for (let i = 0; i < 3; i++) { if (i) { B.brk = 1; storyGo(); } phases.push({ need: need(), clock: B.bossTime * refDef(team) }); }
+    return { legal: !leagueBreaksList(team), phases, whole: phases.reduce((s, p) => s + p.need, 0) / phases.reduce((s, p) => s + p.clock, 0), hof: HOF_USE, finale: FINALE_USE };
+  });
+  for (const p of got.phases) assert.ok(p.need < p.clock, `each phase is won in time (${(p.need / p.clock).toFixed(3)})`);
+  assert.ok(got.whole <= 0.95 && got.whole >= 0.8, `the whole run needs 80-95% of its clock (${got.whole.toFixed(3)})`);
+  assert.ok(got.finale < got.hof, 'the Hall of Fame stays the hardest fight');
   assert.deepEqual(errors, []);
 });
