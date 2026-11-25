@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createRoster, UUID } from './core.mjs';
 import { createEventPresence } from './event-presence.mjs';
-import { createChat } from './chat.mjs';
+import { createChat, createChatStore } from './chat.mjs';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://djdpttltfmwkofdrvkem.supabase.co';
 const API_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
@@ -153,16 +153,12 @@ async function presence(req,res) {
 const events = createEventPresence({roster,verify,changed,reply,readBody,origins:ORIGINS,clientSource,maxClients:MAX_CLIENTS,maxIp:MAX_IP,
   hideAccount(id){authEpoch++;authCache.clear();evict(id);}
 });
-const CHAT_DB_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function chatRpc(action,args){
-  const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/bored_chat_control',{method:'POST',headers:{apikey:CHAT_DB_KEY,authorization:'Bearer '+CHAT_DB_KEY,'content-type':'application/json'},body:JSON.stringify({action,args}),signal:AbortSignal.timeout(8000)});
-  if(!r.ok)throw Error('Chat storage unavailable');return r.json();
-}
+const chatRpc=createChatStore(SUPABASE_URL,process.env.SUPABASE_SECRET_KEY);
 async function chatAdmin(token){
   const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/my_analytics_access',{method:'POST',headers:{apikey:API_KEY,authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(8000)});
   return r.ok&&(await r.json())?.admin===true;
 }
-const chat=createChat({verify,isAdmin:chatAdmin,store:chatRpc,configured:Boolean(process.env.OPENAI_API_KEY&&CHAT_DB_KEY),reply,readBody,origins:ORIGINS,source:clientSource});
+const chat=createChat({verify,isAdmin:chatAdmin,store:chatRpc,configured:Boolean(process.env.OPENAI_API_KEY&&chatRpc),reply,readBody,origins:ORIGINS,source:clientSource});
 const server = http.createServer((req,res)=>{
   if (req.method==='GET' && req.url==='/health') {
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
