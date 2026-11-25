@@ -27,7 +27,7 @@ export function mountPresence() {
 
   let owner = null, epoch = 0, channel = null, tickets = null, visible = null;
   let resolveTimer = 0, refreshTimer = 0, verifyTimer = 0, resolveSerial = 0;
-  let preferencePending = false, suspended = false, preferenceReading = false;
+  let preferencePending = false, suspended = false, preferenceReading = false, paused = false;
   const eligible = backendReady() && isProductionTelemetryUrl(location.href, qaSession()) &&
     typeof WebSocket !== 'undefined';
 
@@ -68,6 +68,9 @@ export function mountPresence() {
     visible = next;
     setting.checked = next === true;
     setting.disabled = preferencePending || !owner || next === null || !eligible;
+    document.getElementById('presence-privacy-note').firstChild.textContent = next === false
+      ? 'Your online status is hidden. You can turn it back on in '
+      : 'Your online status is visible to other participating players. You can turn it off in ';
     if (next !== true) {
       stopChannel();
       paint(null, next === false ? 'You are hidden. Turn online status back on in Settings to see the list.' : 'Checking online status…');
@@ -112,6 +115,7 @@ export function mountPresence() {
       onState(open) {
         if (!current(id, version) || channel !== socket || visible !== true) return;
         if (!open) paint(null, 'Reconnecting…');
+        else if (tickets !== null) scheduleResolve();
       }
     });
     channel = socket;
@@ -119,7 +123,7 @@ export function mountPresence() {
     verifyTimer = setInterval(() => scheduleResolve(0), VERIFY_MS);
   }
   async function refresh() {
-    if (!owner || !eligible || suspended || preferencePending || preferenceReading) return;
+    if (!owner || !eligible || suspended || preferencePending || preferenceReading || paused) return;
     const id = owner, version = epoch;
     preferenceReading = true;
     try {
@@ -146,7 +150,7 @@ export function mountPresence() {
     const id = hasIdentity() ? getSession()?.user?.id || null : null;
     if (id === owner && !suspended) return;
     epoch++; stopChannel(); clearInterval(refreshTimer);
-    owner = id; visible = null; preferencePending = false; preferenceReading = false;
+    owner = id; visible = null; preferencePending = false; preferenceReading = false; paused = false;
     details.hidden = !id || !eligible; details.open = false;
     setting.checked = false; setting.disabled = true;
     settingNote.textContent = !id ? 'Sign in to manage your online status.' :
@@ -161,7 +165,7 @@ export function mountPresence() {
     if (!owner || visible === null || preferencePending || !eligible) return;
     const desired = setting.checked, id = owner, before = visible;
     epoch++; const version = epoch;
-    preferenceReading = false; preferencePending = true;
+    preferenceReading = false; preferencePending = true; paused = false;
     stopChannel();
     setVisible(desired);
     settingNote.textContent = 'Saving…';
@@ -177,6 +181,7 @@ export function mountPresence() {
       if (!current(id, version)) return;
       preferencePending = false;
       // A failed opt-out never silently starts publishing again in this tab.
+      paused = true;
       setVisible(null); setting.disabled = false; setting.checked = before;
       settingNote.textContent = 'Could not save. Your presence is paused here; try again.';
       paint(null, 'Online status paused.');
