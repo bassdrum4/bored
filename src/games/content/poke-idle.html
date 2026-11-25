@@ -221,6 +221,8 @@
   .mon .peak { position: absolute; bottom: 2px; right: 3px; font-size: 9px; color: var(--xp); font-weight: 700 }
   .st-group { margin: 6px 0 12px } .st-group h4 { margin: 8px 0 4px; font-size: 12px; color: var(--dim) }
   .st-scenes { display: flex; flex-wrap: wrap; gap: 6px }
+  .next { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--ink); border-radius: 4px }
+  .yearmap { list-style: none; display: grid; gap: 4px; font-size: 13px; padding: 0 } .yearmap .mk { display: inline-block; width: 1.4em }
   .clues { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) }
   .clue { border: 1px solid var(--ink); border-radius: 4px; padding: 10px 12px; font-size: 13px } .clue b { display: block; margin-bottom: 4px }
   .syncask { margin: 0 0 12px }
@@ -1497,8 +1499,9 @@ function hit(dmg) {
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
   S.money += f.reward; S.stats.wins++;
-  // Bond: a win in the active party (only here, live; a saved team or the Box doesn't count).
+  // Bonded: in the active party for a win, at least once. It needn't fight or land the last hit; a saved team doesn't count.
   for (const n of S.party) if (S.box[n]) S.box[n].bond = 1;
+  if (isStory()) nullTrust();
   gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5) * (B.kind === "route" && B.r === TRAIN_R ? TRAIN_XP : 1)));
   if (B.kind === "route" && B.r !== TRAIN_R) S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
@@ -1668,20 +1671,20 @@ function next() {
     for (const n of Q.gmax || []) S.gfactor[n] = 1;
     // The prize, and any other Pokémon the quest gives (Kubfu with Urshifu), join you if you don't have them.
     const joins = [Q.prize, ...(Q.gives || [])].filter(n => n && !S.box[n]);
-    for (const n of joins) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(n); }
+    for (const n of joins) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion({ kind: "quest", q: Q.id }) }; if (joinsParty()) joinParty(n); }
     const joined = joins.length ? ` ${joins.map(n => mon(n).name).join(" and ")} join${joins.length > 1 ? "" : "s"} you.` : "";
     toast((first ? `You beat ${Q.boss} at ${theQ(Q)}! +$${fmt(prize)}.${joined} ${Q.won}` : `${Q.boss} rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS));
   }
   if (B.kind === "darkest") {
     const first = !S.eternamax, prize = rewardFor(B.L, B.i, 30); S.money += prize; S.eternamax = 1; S.gfactor[ETERNATUS] = 1;
     let joined = "";
-    if (!S.box[ETERNATUS]) { S.box[ETERNATUS] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(ETERNATUS); joined = " Eternatus joins you."; }
+    if (!S.box[ETERNATUS]) { S.box[ETERNATUS] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion({ kind: "darkest", r: B.r }) }; if (joinsParty()) joinParty(ETERNATUS); joined = " Eternatus joins you."; }
     toast((first ? `You ended the Darkest Day! +$${fmt(prize)}.${joined} Eternatus can Eternamax now: turn it on in its detail in Party & Box.` : `Eternatus rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS));
   }
   if (B.kind === "raid") {
     const n = B.n, prize = rewardFor(B.L, B.i, 30); S.money += prize; S.gfactor[n] = 1; S.raids = (S.raids || 0) + 1;
     let joined = "";
-    if (!S.box[n] && !legendary(mon(n))) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(n); joined = ` ${mon(n).name} joins you.`; }
+    if (!S.box[n] && !legendary(mon(n))) { S.box[n] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion({ kind: "raid" }) }; if (joinsParty()) joinParty(n); joined = ` ${mon(n).name} joins you.`; }
     S.raid = 0; raidMon();
     toast(`You won the Max Raid! ${mon(n).name} can Gigantamax now: turn it on in its detail in Party & Box. +$${fmt(prize)}.${joined}` + gainCells(CELL_BOSS) + galar);
   }
@@ -1710,7 +1713,7 @@ function backToRoute() {
 }
 function addMon(num, L, shiny, vid) {
   const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num), again = !had && !shiny && !lineWasShiny && lineRecorded(num);
-  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again, from: B && REGIONS[B.r] ? B.r : S.loc.r };
+  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again, from: catchRegion(B || S.loc) };
   else if (shiny) shineOne(had);
   shineLines();
   const newForm = v ? unlockVar(num, vid, !had) : false;
@@ -1773,7 +1776,7 @@ function shineLines() {
   for (const k of Object.keys(S.box)) if (S.box[k].shiny) for (const m of familyOf(+k)) if (S.box[m]) shineOne(S.box[m]);
   recordShinyLines(); recordLife();
 }
-function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSMOG]) return false; S.box[COSMOG] = { xp: Math.pow(levelCap(), 3), shiny: false }; return true; }
+function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSMOG]) return false; S.box[COSMOG] = { xp: Math.pow(levelCap(), 3), shiny: false, from: catchRegion(B || S.loc) }; return true; }
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
 function gainXp(xp) {
   xp *= prestigeXp();
@@ -2107,7 +2110,7 @@ function renderDetail() {
   const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   const now = statsAt(st, level(detail)), bRaw = bulkOf(fighter(detail)), bNow = Math.round(bulkNow(detail)), bFull = Math.round(bulkFor(fighter(detail)));
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)}${remembers(detail) ? ` <span class="small" title="It remembers you: ×${REMEMBER} XP until it's back to Lv ${S.box[detail].peak}">❄ was Lv ${S.box[detail].peak}</span>` : ""} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)}${remembers(detail) ? ` <span class="small" title="It remembers you: ×${REMEMBER} XP until it's back to Lv ${S.box[detail].peak}">❄ was Lv ${S.box[detail].peak}</span>` : ""}${isStory() ? ` <span class="small ${S.box[detail].bond ? "good" : "muted"}">${S.box[detail].bond ? "Bonded ♥" : "Not bonded yet"}</span>` : ""}${isStory() && +detail === NULL && S.story.silvally === 1 ? ` <span class="small">Trust: ${S.story.nullTrust || 0}/${TRUST_NEED}</span>` : ""} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small">Lv ${level(detail)}: HP <b>${now.hp}</b> · Atk <b>${now.atk}</b> · Def <b>${now.def}</b> · SpA <b>${now.spa}</b> · SpD <b>${now.spd}</b> · Spe <b>${now.spe}</b> · Total <b>${now.bst}</b></div>` +
     `<div class="small muted">Base stats: HP ${st.hp} · Atk ${st.atk} · Def ${st.def} · SpA ${st.spa} · SpD ${st.spd} · Spe ${st.spe} · Total ${st.bst}</div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
@@ -3058,10 +3061,11 @@ const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, 
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
 const otherSlot = () => slot === KEY ? STORY_KEY : slot === STORY_KEY ? KEY : null;
-// The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). The fields after
-// epilogue are reserved for the years to come and stay unused in Year 1, so later years need no migration.
-const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, lifeDex: {}, epilogue: 0,
-  liberated: {}, frozen: {}, eternatusStolen: 0, y3Count: 0, cleared: {}, giratinaDebt: 0, roulette: null });
+// The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). silvally: 0 not
+// freed, 1 freed (Type: Null, its trust in nullTrust, up to TRUST_NEED), 2 evolved. The fields after epilogue are
+// reserved for the years to come and stay unused in Year 1, so later years need no migration.
+const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, nullTrust: 0, lifeDex: {}, epilogue: 0,
+  liberated: {}, frozen: {}, eternatusStolen: 0, y3Recovered: 0, cleared: {}, giratinaDebt: 0, roulette: null });
 let newFor = null, pickFrom = null;
 // New game in a mode: that slot is emptied and the starter screen opens for it. Back to title goes back to the save
 // you came from.
@@ -3073,12 +3077,39 @@ function newGame(k) {
   S = null; B = null; showPick();
 }
 function startStory() { S.mode = "story"; S.story = freshStory(); for (const id of preSeen.splice(0)) S.story.seen[id] = 1; }
-// Tracking from day one, in both modes, for the years to come: from (the region a Pokémon was caught in), bond (it won
-// a battle in the active party) and peak (the highest level it ever reached).
-const notePeak = b => { const L = lvlOf(b.xp); if (!(b.peak >= L)) b.peak = L; };
+// Tracking from day one, in both modes, for the years to come: from (the region a Pokémon counts as caught in, by
+// catchRegion), bond (bonded: it was in the active party for a win, at least once) and peak (the highest level it
+// ever reached). In Year 3 a frozen Pokémon thaws with its from region, so every box entry has one: anything without
+// a region of its own (the starter, a special, the daily boss, the Battle Tower) counts as Kanto, and so does an
+// entry from before this existed.
+const notePeak = b => { const L = lvlOf(b.xp); if (!(b.peak >= L)) b.peak = L; if (b.from == null) b.from = 0; };
 function notePeaks() { if (S && S.box) for (const b of Object.values(S.box)) notePeak(b); }
+// Places outside the region lists: a side quest counts as its region (the Mystery Box as Galar), Mt. Silver as Johto,
+// the Max Raid Den as Galar. Year 2's places are here already, so the map stays in one place.
+const CATCH_PLACE = { summit: 1, raid: 7, distortion: 3, kitakami: 8, meteor: 2, southern: 2, abundant: 4, icirrus: 4, chasm: 4, towers: 7, meltan: 7, crown: 7, aether: 6 };
+function catchRegion(src) {
+  if (!src) return 0;
+  const place = src.kind === "quest" ? src.q : src.kind;
+  if (place in CATCH_PLACE) return CATCH_PLACE[place];
+  if (src.kind === "quest" && QUEST[src.q] && REGIONS[QUEST[src.q].r]) return QUEST[src.q].r;
+  if (["route", "gym", "champ", "dungeon", "rival", "story", "chapter", "darkest"].includes(src.kind) && REGIONS[src.r]) return src.r;
+  return 0;
+}
 function carryTrack(a, b) { if (a.bond) b.bond = 1; if (a.from != null && b.from == null) b.from = a.from; if (a.peak > (b.peak || 0)) b.peak = a.peak; }
 const remembers = n => isStory() && !!S.box[n] && S.box[n].peak > lvlOf(S.box[n].xp);
+// Type: Null's trust (Story, once it's freed): one for each win with it in the active party. At TRUST_NEED it
+// evolves into Silvally, and story.silvally becomes 2.
+const NULL = 772, SILVALLY = 773, TRUST_NEED = 10;
+function nullTrust() {
+  const st = S.story; if (st.silvally !== 1 || !S.party.includes(NULL) || !S.box[NULL]) return;
+  st.nullTrust = Math.min(TRUST_NEED, (st.nullTrust || 0) + 1);
+  if (st.nullTrust < TRUST_NEED) return;
+  const b = S.box[NULL], had = S.box[SILVALLY];
+  if (had) { had.xp = Math.max(had.xp, b.xp); carryTrack(b, had); } else { S.box[SILVALLY] = { xp: b.xp, shiny: lineShiny(NULL) }; carryTrack(b, S.box[SILVALLY]); }
+  const i = S.party.indexOf(NULL); if (S.party.includes(SILVALLY)) S.party.splice(i, 1); else S.party[i] = SILVALLY;
+  st.silvally = 2; shineLines();
+  setTimeout(() => toast("Type: Null trusts you now. Its mask is gone: it evolved into Silvally!"), 800);
+}
 
 // Scenes, in Prof Penguin's text box: lines of [who, text]. Each has a year and a region (-1 for the prologue) for the
 // Story tab, where every scene you've seen (or skipped) can be read again.
@@ -3099,6 +3130,8 @@ const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
 const CHAPTER_RUN = {};
 const chDone = id => !!(S && S.story && S.story.ch[id]);
 const chaptersDone = () => CHAPTERS.filter(c => chDone(c.id)).length;
+// What a chapter waits for: "champ", another chapter's id, or nothing.
+const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a)) || null;
 const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open());
 function chapterRows(r) {
   return CHAPTERS.filter(c => c.r === r).map(c => {
@@ -3119,6 +3152,24 @@ function finishChapter(c) {
   if (first) { if (c.clue) S.story.clues[c.clue] = 1; if (c.won) c.won(); }
   save(); renderAll();
   playScene(c.post);
+}
+// Next up, at the top of the Story tab: the next chapter that isn't optional, where it is, and what it waits for.
+function storyNext() {
+  const c = CHAPTERS.find(c => !c.optional && !chDone(c.id)); if (!c) return { c: null, text: "Year 1 is done. Year 2 is coming." };
+  const at = c.at ? ` at ${c.at}` : "", R = REGIONS[c.r].name, wait = waitOf(c);
+  if (wait === "champ") return { c, text: `Next: Champion of ${R}, then ${c.name}${at}.` };
+  if (wait) return { c, text: `Next: ${CHAPTER[wait].name}, then ${c.name}${at}.` };
+  if (c.open && !c.open()) return { c, text: `Next: ${c.name}. ${c.note ? c.note() : ""}`.trim() };
+  return { c, text: `Next: ${c.name}${at}, in ${R}.` };
+}
+// The Year map: every chapter of the year, ✓ done, ▶ next, 🔒 not yet. A chapter you haven't reached in the story shows
+// as ???, except the finale, which shows from the start with its checklist.
+function yearMap() {
+  const now = storyNext().c;
+  return CHAPTERS.map(c => {
+    const done = chDone(c.id), cur = c === now, known = done || cur || chapterOpen(c) || c.finale;
+    return { id: c.id, mark: done ? "✓" : cur ? "▶" : "🔒", name: known ? c.name : "???", optional: !!c.optional, note: c.finale && !done && c.note ? c.note() : "", r: c.r, grey: !done && !cur };
+  });
 }
 // Story's leaderboard progress (for the Story board the hub doesn't have yet): year, chapters done, regions
 // liberated (a chapter with liberates: true closes its region), and the Story lifetime dex, which never goes down.
@@ -3169,7 +3220,9 @@ function renderStory() {
   for (const id of seen) { const sc = SCENES[id], g = sc.year + ":" + sc.r; (groups[g] = groups[g] || { year: sc.year, r: sc.r, ids: [] }).ids.push(id); }
   const order = Object.values(groups).sort((a, b) => a.year - b.year || a.r - b.r);
   const clues = Object.keys(CLUES).filter(k => st.clues[k]);
-  $("#t-story").innerHTML = `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
+  const map = yearMap(), next = CHAPTERS.length ? storyNext().text : "";
+  $("#t-story").innerHTML = (next ? `<p class="next"><b>${esc(next)}</b></p>` : "") + `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
+    ${map.length ? `<h2>Year ${st.year}: ${esc(YEARS[st.year] || "")}</h2><ul class="yearmap">${map.map(x => `<li class="${x.grey ? "muted" : ""}"><span class="mk">${x.mark}</span> ${esc(x.name)}${x.optional ? " (optional)" : ""}${x.note ? ` <span class="small">· ${esc(x.note)}</span>` : ""}</li>`).join("")}</ul>` : ""}
     <h2>Story so far</h2>${order.length ? order.map(g => `<div class="st-group"><h4>Year ${g.year}: ${esc(YEARS[g.year] || "")} · ${g.r < 0 ? "Prologue" : esc(REGIONS[g.r].name)}</h4><div class="st-scenes">${g.ids.map(id => `<button class="lbl" type="button" data-reread="${id}">${esc(SCENES[id].title)}</button>`).join("")}</div></div>`).join("") : '<p class="small muted">Nothing yet.</p>'}
     <h2>Clues</h2>${clues.length ? `<div class="clues">${clues.map(k => `<div class="clue"><b>${esc(CLUES[k].title)}</b>${esc(CLUES[k].text)}</div>`).join("")}</div>` : '<p class="small muted">No clues yet. Keep your eyes open.</p>'}`;
 }

@@ -156,7 +156,7 @@ test('prestige resets the journey, keeps what it promises, and pays its bonuses'
   const after = await tab.evaluate(() => ({ pick: !document.querySelector('#pick').hidden, p: S.prestige, box: Object.keys(S.box), sp: S.box[395], cap: levelCap(), money: S.money, charm: !!S.charm,
     stones: Object.keys(S.stones).length, won: Object.keys(S.won).length, badges: Object.keys(S.badges).length, tower: S.tower.best, wins: S.stats.wins, ach: !!S.ach.dex10, beat: S.beat,
     teams: S.teams.length, lines: !!JSON.parse(localStorage.getItem('bored.poke-idle.shinylines.v1'))[4], life: lifeDex(), score: window.__boredSnapshot().score, read: !!S.mail.read['update-2026-11-24a'], again: canPrestige(), lab: finalOpen() }));
-  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special', peak: after.cap }, cap: after.cap, money: 0, charm: false,
+  assert.deepEqual(after, { pick: true, p: 1, box: ['395'], sp: { xp: after.cap ** 3, shiny: false, special: 'prof-empoleon', look: 'special', peak: after.cap, from: 0 }, cap: after.cap, money: 0, charm: false,
     stones: 0, won: 0, badges: 0, tower: 12, wins: 500, ach: true, beat: '2026-11-20', teams: 1, lines: true, life: 4, score: 6, read: true, again: false, lab: false });
   // A new starter, then the SP edition joins it; P1 shows on the HUD and the party header.
   await tab.click('[data-start="1"]');
@@ -341,7 +341,7 @@ test('Story Mode: its own save, the opening scenes, ×2 XP and shinies, no prest
   const story = await tab.evaluate(() => ({ mode: S.mode, scene: sceneNow && sceneNow.id, odds: shinyOdds() * 4096, charm: (S.charm = 1, shinyOdds() * 4096), prestige: (S.beat = '2026-11-24', S.pbeat = 1, canPrestige()), tab: !$('#tabs [data-tab=story]').hidden, from: S.box[7].from }));
   assert.deepEqual(story, { mode: 'story', scene: 'open-2', odds: 2, charm: 6, prestige: false, tab: true, from: 0 });
   const fields = await tab.evaluate(() => { save(); const st = readSlot(STORY_KEY).story; return { keys: Object.keys(st).sort(), life: Object.keys(st.lifeDex) }; });
-  assert.deepEqual(fields.keys, ['ch', 'cleared', 'clues', 'epilogue', 'eternatusStolen', 'frozen', 'giratinaDebt', 'liberated', 'lifeDex', 'picks', 'roulette', 'seen', 'silvally', 'y3Count', 'year'], 'every story field is in the save from day one');
+  assert.deepEqual(fields.keys, ['ch', 'cleared', 'clues', 'epilogue', 'eternatusStolen', 'frozen', 'giratinaDebt', 'liberated', 'lifeDex', 'nullTrust', 'picks', 'roulette', 'seen', 'silvally', 'y3Recovered', 'year'], 'every story field is in the save from day one');
   assert.deepEqual(fields.life, ['7'], 'the Story lifetime dex');
   await tab.evaluate(() => { S.charm = 0; delete S.beat; delete S.pbeat; });
   await tab.click('#scene [data-scene=next]'); await tab.click('#scene [data-scene=next]');
@@ -402,5 +402,58 @@ test('Story chapters: rows after the Champion that wait for what they need, scen
   assert.deepEqual(got.snap, { year: 1, chapter: 1, regionsLiberated: 1, lifeDex: 2 });
   assert.deepEqual(got.bond, [1, null], 'only the party member that fought bonds');
   assert.equal(got.peak, 100);
+  assert.deepEqual(errors, []);
+});
+
+test('every catch has a from region (Kanto when nothing else fits), Story shows bonded or not, and Type: Null evolves on trust', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    const where = [
+      catchRegion({ kind: 'route', r: 3, k: 1 }), catchRegion({ kind: 'dungeon', r: 5 }), catchRegion({ kind: 'summit', r: 1 }), catchRegion({ kind: 'quest', q: 'aether' }),
+      catchRegion({ kind: 'quest', q: 'distortion' }), catchRegion({ kind: 'quest', q: 'kitakami' }), catchRegion({ kind: 'quest', q: 'meteor' }), catchRegion({ kind: 'quest', q: 'southern' }),
+      catchRegion({ kind: 'quest', q: 'chasm' }), catchRegion({ kind: 'quest', q: 'meltan' }), catchRegion({ kind: 'raid', r: 7 }),
+      catchRegion({ kind: 'daily', r: 4 }), catchRegion({ kind: 'tower', r: 8 }), catchRegion({ kind: 'route', r: TRAIN_R, k: 0 }), catchRegion(null), catchRegion({ kind: 'anything' })];
+    // An old entry with no region gets Kanto when the save is written.
+    slot = KEY; S = fresh(); S.box[1] = { xp: 125 }; S.party = [1]; save(); const old = readSlot(KEY).box[1].from;
+    // A route catch in Johto, through addMon.
+    S.loc = { kind: 'route', r: 1, k: 0 }; B = { kind: 'route', r: 1, k: 0 }; addMon(161, 5, false); const johto = S.box[161].from;
+    // Story: bonded words, and Type: Null's trust.
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e6 }; S.box[NULL] = { xp: 1e6 }; S.party = [25]; S.story.silvally = 1;
+    detail = 25; renderDetail(); const unb = $('#detail') ? document.querySelector('#detail').textContent : '';
+    S.box[25].bond = 1; renderDetail(); const bon = document.querySelector('#detail').textContent;
+    S.party = [25, NULL]; for (let i = 0; i < 9; i++) nullTrust();
+    detail = NULL; renderDetail(); const trust = document.querySelector('#detail').textContent;
+    nullTrust();
+    return { where, old, johto, unb: unb.includes('Not bonded yet'), bon: bon.includes('Bonded ♥'), trust: trust.includes('Trust: 9/10'), silvally: S.story.silvally, party: S.party, has: !!S.box[SILVALLY] };
+  });
+  assert.deepEqual(got.where, [3, 5, 1, 6, 3, 8, 2, 2, 4, 7, 7, 0, 0, 0, 0, 0]);
+  assert.equal(got.old, 0, 'an entry with no region counts as Kanto');
+  assert.equal(got.johto, 1);
+  assert.deepEqual([got.unb, got.bon, got.trust], [true, true, true]);
+  assert.deepEqual([got.silvally, got.party, got.has], [2, [25, 773], true]);
+  assert.deepEqual(errors, []);
+});
+
+test('the Story tab: Next up and the Year map, with ??? for what you haven\'t reached and the finale shown from the start', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25];
+    const add = c => { CHAPTERS.push(c); CHAPTER[c.id] = c; };
+    add({ id: 'k-1', r: 0, type: 'scene', name: 'Containment', at: 'Cerulean' });
+    add({ id: 'k-2', r: 0, type: 'scene', name: 'The cage', after: ['k-1'] });
+    add({ id: 'k-opt', r: 0, type: 'scene', name: 'The Mask', optional: true, after: ['k-1'] });
+    add({ id: 'p-f', r: 8, type: 'scene', name: 'Paldea finale', finale: true, after: ['champ'], open: () => lifeDex() >= 150, note: () => `Dex ${lifeDex()} / 150` });
+    const step = () => { save(); renderStory(); return { next: storyNext().text, map: yearMap().map(x => x.mark + x.name + (x.optional ? ' (optional)' : '') + (x.note ? ' ' + x.note : '')) }; };
+    const a = step(); S.champs[0] = 1; const b = step(); S.story.ch['k-1'] = 1; const c = step();
+    S.story.ch['k-2'] = 1; for (let r = 1; r < 9; r++) S.champs[r] = 1; const d = step();
+    enter('battle'); openTab('story');
+    return { a, b, c, d, shown: document.querySelector('#t-story .next').textContent };
+  });
+  assert.equal(got.a.next, 'Next: Champion of Kanto, then Containment at Cerulean.');
+  assert.deepEqual(got.a.map, ['▶Containment', '🔒???', '🔒??? (optional)', '🔒Paldea finale Dex 1 / 150']);
+  assert.equal(got.b.next, 'Next: Containment at Cerulean, in Kanto.');
+  assert.deepEqual(got.c.map, ['✓Containment', '▶The cage', '🔒The Mask (optional)', '🔒Paldea finale Dex 1 / 150']);
+  assert.equal(got.d.next, 'Next: Paldea finale. Dex 1 / 150');
+  assert.equal(got.shown, got.d.next);
   assert.deepEqual(errors, []);
 });
