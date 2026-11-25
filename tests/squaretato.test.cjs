@@ -12,7 +12,7 @@ test('real browser starts a run, advances the wave and pauses',async t=>{
  const site=await serve(path.join(__dirname,'../src'));const browser=await puppeteer.launch({executablePath,headless:true});t.after(async()=>{await browser.close();await site.close()});
  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewport({width:1000,height:700});await page.goto(site.origin+'/games/content/squaretato.html');await page.waitForFunction(()=>typeof window.__boredSnapshot==='function');
  async function click(text){await page.evaluate(text=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent===text);if(!b)throw Error('missing '+text);b.click()},text)}
- await click('New run');await click('Select');await click('Start wave 1');await page.waitForFunction(()=>window.__boredSnapshot().playing);assert.equal(await page.evaluate(()=>window.__boredSnapshot().wave),1);
+ await click('New run');assert.equal(await page.$eval('.character-card .portrait svg',els=>els.length),21);await click('Select');await click('Start wave 1');await page.waitForFunction(()=>window.__boredSnapshot().playing);assert.equal(await page.evaluate(()=>window.__boredSnapshot().wave),1);
  await page.keyboard.down('d');await new Promise(r=>setTimeout(r,350));await page.keyboard.up('d');await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__boredSnapshot().playing),false);await click('Resume');assert.equal(await page.evaluate(()=>window.__boredSnapshot().playing),true);assert.deepEqual(errors,[]);
 });
 
