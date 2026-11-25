@@ -1764,6 +1764,7 @@ function recordShinyLines() {
 function recordLife() {
   S.lifeDex = S.lifeDex || {}; S.lifeShiny = S.lifeShiny || {};
   for (const [k, b] of Object.entries(S.box)) { S.lifeDex[k] = 1; if (b.shiny) S.lifeShiny[k] = 1; }
+  if (S.story) Object.assign(S.story.lifeDex = S.story.lifeDex || {}, S.lifeDex);
 }
 const lifeDex = () => Object.keys(S.lifeDex || {}).length, lifeShiny = () => Object.keys(S.lifeShiny || {}).length;
 const boardScore = () => lifeDex() + lifeShiny();
@@ -3018,6 +3019,8 @@ function offline() {
 
 // Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
 function migrateSave() {
+  // A Story save from before a field was added gets it (see freshStory); a Classic save never has a story block.
+  if (S.story) S.story = { ...freshStory(), ...S.story };
   if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; }
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.raid = S.raid || 0; S.mega = S.mega || null; S.gmax = S.gmax || 0;
@@ -3055,7 +3058,10 @@ const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, 
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
 const otherSlot = () => slot === KEY ? STORY_KEY : slot === STORY_KEY ? KEY : null;
-const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, epilogue: 0 });
+// The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). The fields after
+// epilogue are reserved for the years to come and stay unused in Year 1, so later years need no migration.
+const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, lifeDex: {}, epilogue: 0,
+  liberated: {}, frozen: {}, eternatusStolen: 0, y3Count: 0, cleared: {}, giratinaDebt: 0, roulette: null });
 let newFor = null, pickFrom = null;
 // New game in a mode: that slot is emptied and the starter screen opens for it. Back to title goes back to the save
 // you came from.
@@ -3120,7 +3126,7 @@ function storyProgress(st) {
   if (!st || st.mode !== "story" || !st.story) return null;
   const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
   return { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
-    lifeDex: new Set([...keys(st.lifeDex), ...keys(st.box)]).size };
+    lifeDex: new Set([...keys(st.lifeDex), ...keys(st.story.lifeDex), ...keys(st.box)]).size };
 }
 
 // The scene box. playScene(id, then): then runs once it's closed, skipped or not. A scene you've already seen plays
