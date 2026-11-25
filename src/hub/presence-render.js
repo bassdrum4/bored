@@ -3,8 +3,7 @@ import { backendReady, freshSession, getSession, hasIdentity, request } from './
 
 const GUEST='guest', PREF='bored.presence.guest.visible', KEY='bored.presence.guest.key';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const HEARTBEAT=60000, AUTH_RENEW=18*60000;
-const POLL=45000, POLL_TIMEOUT=15000;
+const CONNECT_TIMEOUT=30000, STREAM_IDLE=45000, POLL_TIMEOUT=40000;
 let ephemeralKey='', ephemeralPref=null;
 
 export function renderSocketUrl(origin) {
@@ -19,6 +18,7 @@ export function renderSocketUrl(origin) {
 export function renderPollUrl(origin) {
   return renderSocketUrl(origin) ? origin.replace(/\/+$/,'')+'/presence' : '';
 }
+export function renderEventUrl(origin){return renderSocketUrl(origin)?origin.replace(/\/+$/,'')+'/presence/events':'';}
 function liveSite(){
   try{return location.protocol==='https:' && location.hostname==='bassdrum4.github.io' && /^\/bored(?:\/|$)/.test(location.pathname);}catch{return false;}
 }
@@ -40,16 +40,12 @@ export function mountRenderPresence(){
     status=$('online-status'), setting=$('presence-enabled'), note=$('presence-setting-status'),
     privacy=$('presence-privacy-note'), link=$('presence-settings-link');
   if(!details||!summary||!list||!status||!setting||!note||!privacy||!link)return;
-  const eligible=backendReady()&&liveSite()&&typeof WebSocket!=='undefined';
-  const endpoint=renderSocketUrl(PRESENCE_ORIGIN), pollUrl=renderPollUrl(PRESENCE_ORIGIN);
-  let owner=null,epoch=0,visible=null,ws=null,ready=false,paused=false,suspended=false,saving=false;
-  let retry=0,beat=0,renew=0,deadline=0,attempt=0,poll=0,pollFail=0,pollMode=false;
+  const eligible=backendReady()&&liveSite()&&typeof fetch==='function';
+  const endpoint=renderEventUrl(PRESENCE_ORIGIN);
+  let owner=null,epoch=0,visible=null,ready=false,paused=false,suspended=false,saving=false;
+  let retry=0,pollFail=0,pollMode=false,controller=null,sid='',cursor='',lastCredentials=null;
   let counts=null,names=[],namesReady=false,reading=false;
   const current=(id,v)=>!suspended&&owner===id&&epoch===v&&viewer()===id;
-  const send=(message)=>{
-    if(!ws||ws.readyState!==WebSocket.OPEN)return false;
-    try{ws.send(typeof message==='string'?message:JSON.stringify(message));return true;}catch{return false;}
-  };
   async function account(id,action='get',args={}){
     const s=await freshSession();
     if(s?.user?.id!==id||viewer()!==id)throw Error('Account changed');
@@ -73,11 +69,19 @@ export function mountRenderPresence(){
     else if(counts.a>0)row(counts.a+(counts.a===1?' signed-in player':' signed-in players'));
     if(counts.g>0)row(boringLabel(counts.g),'online-guests');
   }
+  function notify(mode){
+    if(!endpoint||!sid||!lastCredentials)return;
+    const body=JSON.stringify({...lastCredentials,sid,mode});
+    void fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body,keepalive:true,cache:'no-store'}).catch(()=>{});
+  }
+  function cancel(){
+    clearTimeout(retry);retry=0;
+    const old=controller;controller=null;old?.abort();
+  }
   function stop(){
-    clearTimeout(retry);clearInterval(beat);clearInterval(renew);clearTimeout(deadline);clearTimeout(poll);
-    retry=beat=renew=deadline=poll=0;pollFail=0;pollMode=false;
-    const old=ws;ws=null;ready=false;counts=null;names=[];namesReady=false;
-    if(old)try{old.close();}catch{}
+    cancel();notify('leave');
+    sid='';cursor='';lastCredentials=null;pollFail=0;pollMode=false;
+    ready=false;counts=null;names=[];namesReady=false;
   }
   function showPreference(value){
     visible=value;setting.checked=value===true;setting.disabled=!eligible||saving||value===null;
@@ -87,102 +91,77 @@ export function mountRenderPresence(){
     if(value!==true)stop();
     render();
   }
-  function schedule(id,v){
-    if(!current(id,v)||visible!==true||paused||!endpoint||retry)return;
-    const delays=[1500,3000,6000,12000,24000,45000,60000];
-    const delay=delays[Math.min(attempt++,delays.length-1)];
-    retry=setTimeout(()=>{retry=0;connect(id,v);},delay+Math.random()*delay*.4);
+  async function credentials(id,v){
+    if(id===GUEST)return {t:'guest',id:guestId()};
+    const s=await freshSession();
+    if(!current(id,v)||s?.user?.id!==id||!s.access_token)throw Error('Session unavailable');
+    return {t:'auth',jwt:s.access_token};
   }
-  async function authenticate(socket,id,v){
-    if(!current(id,v)||ws!==socket||visible!==true)return;
-    if(id===GUEST){send({t:'guest',id:guestId()});return;}
+  function accept(m,id,v){
+    if(!current(id,v))return;
+    if(m?.t==='off'){stop();showPreference(false);note.textContent='Online status is off.';return;}
+    if(m?.t==='renew'||m?.t==='idle')return;
+    if(m?.t!=='ok'||!Number.isInteger(m.a)||!Number.isInteger(m.g)||m.a<0||m.g<0||m.a+m.g>1000||typeof m.cursor!=='string')throw Error('Invalid presence frame');
+    cursor=m.cursor;counts={a:m.a,g:m.g};ready=true;pollFail=0;
+    if(id!==GUEST&&details.open&&Array.isArray(m.n)){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}
+    render();
+  }
+  async function connect(id,v){
+    if(!current(id,v)||!eligible||!endpoint||visible!==true||paused||controller)return;
+    if(!sid)sid=crypto.randomUUID();
+    const ctl=new AbortController();controller=ctl;
+    const alive=()=>controller===ctl&&current(id,v)&&visible===true&&!paused;
+    let timeout=0,valid=false,renew=false,failed=false;
+    const arm=ms=>{clearTimeout(timeout);timeout=setTimeout(()=>ctl.abort(),ms);};
     try{
-      const s=await freshSession();
-      if(!current(id,v)||ws!==socket||visible!==true)return;
-      if(s?.user?.id!==id||!s.access_token)throw Error('Session unavailable');
-      send({t:'auth',jwt:s.access_token});
-    }catch{if(ws===socket)socket.close();}
-  }
-  function connect(id,v){
-    if(!current(id,v)||!eligible||!endpoint||visible!==true||paused||ws||pollMode)return;
-    let socket;try{socket=new WebSocket(endpoint);}catch{startPolling(id,v);return;}
-    ws=socket;ready=false;render();
-    // Render may need to cold start. Don't hammer it with short connect timeouts.
-    deadline=setTimeout(()=>{if(ws===socket)socket.close();},90000);
-    socket.onopen=()=>{
-      if(ws!==socket||!current(id,v))return;
-      clearTimeout(deadline);deadline=setTimeout(()=>{if(ws===socket&&!ready)socket.close();},15000);
-      void authenticate(socket,id,v);
-      beat=setInterval(()=>send('p'),HEARTBEAT);
-      if(id!==GUEST)renew=setInterval(()=>void authenticate(socket,id,v),AUTH_RENEW);
-    };
-    socket.onmessage=e=>{
-      if(ws!==socket||!current(id,v))return;
-      let m;try{m=JSON.parse(e.data);}catch{return;}
-      if(m?.t==='off'){
-        stop();showPreference(false);note.textContent='Online status is off.';return;
+      const auth=await credentials(id,v);
+      if(!alive())return;
+      lastCredentials=auth;
+      arm(pollMode?POLL_TIMEOUT:CONNECT_TIMEOUT);
+      const res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid,mode:pollMode?'poll':'sse',watch:id!==GUEST&&details.open,cursor}),cache:'no-store',signal:ctl.signal});
+      if(!alive())return;
+      if(!res.ok)throw Error('Presence unavailable');
+      if(pollMode){
+        accept(await res.json(),id,v);valid=true;
+      }else{
+        // Authenticated fetch streaming keeps JWTs out of URLs and works without EventSource headers.
+        if(!res.headers.get('content-type')?.includes('text/event-stream')||!res.body)throw Error('Streaming unavailable');
+        const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
+        while(alive()){
+          const {value,done}=await reader.read();
+          if(done)break;
+          if(!alive())break;
+          buffer+=decoder.decode(value,{stream:true});
+          if(buffer.length>262144)throw Error('Oversized stream frame');
+          let i;
+          while((i=buffer.indexOf('\n\n'))>=0){
+            const frame=buffer.slice(0,i);buffer=buffer.slice(i+2);
+            if(frame.startsWith(':')){if(valid)arm(STREAM_IDLE);continue;}
+            if(!frame.startsWith('data: '))continue;
+            const m=JSON.parse(frame.slice(6));
+            if(m?.t==='renew'){renew=true;break;}
+            accept(m,id,v);valid=true;arm(STREAM_IDLE);
+          }
+          if(renew)break;
+        }
+        if(!renew&&alive())throw Error('Stream closed');
       }
-      if(m?.t==='ok'){
-        clearTimeout(deadline);ready=true;attempt=0;
-        if(details.open&&id!==GUEST)send({t:'watch',on:true});
-      }else if(m?.t==='c'&&Number.isInteger(m.a)&&Number.isInteger(m.g)&&m.a>=0&&m.g>=0&&m.a+m.g<=1000){
-        counts={a:m.a,g:m.g};
-      }else if(m?.t==='n'&&id!==GUEST&&details.open&&Array.isArray(m.n)&&m.n.length<=1000){
-        names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;
+    }catch{
+      if(alive()){failed=true;pollFail++;if(!pollMode)pollMode=true;render();}
+    }finally{
+      clearTimeout(timeout);
+      if(controller===ctl){
+        controller=null;ctl.abort();
+        if(current(id,v)&&visible===true&&!paused){
+          const wait=failed?(pollFail===1?250:Math.min(1000*2**Math.min(pollFail,6),60000)):0;
+          retry=setTimeout(()=>{retry=0;void connect(id,v);},wait+Math.random()*Math.min(wait*.3,1000));
+        }
       }
-      render();
-    };
-    socket.onclose=()=>{
-      if(ws!==socket)return;
-      const wasReady=ready;
-      stop();render();
-      // A socket that never opened was probably refused by the network, not the
-      // server: poll over HTTPS instead of retrying a handshake that cannot win.
-      if(wasReady)schedule(id,v);else startPolling(id,v);
-    };
-    socket.onerror=()=>{}; // onclose performs the only retry
+    }
   }
-  // A school or office proxy can refuse the WebSocket upgrade while plain HTTPS
-  // still works. The same roster answers POST /presence, so a tab whose handshake
-  // never succeeded polls every 45 seconds instead of retrying forever.
-  async function pollOnce(id,v){
-    if(!current(id,v)||ws||!pollUrl||visible!==true||paused)return false;
-    let body;
-    try{
-      if(id===GUEST)body={t:'guest',id:guestId()};
-      else{
-        const s=await freshSession();
-        if(!current(id,v))return true;
-        if(s?.user?.id!==id||!s.access_token)return false;
-        body={t:'auth',jwt:s.access_token};
-      }
-      const res=await fetch(pollUrl,{method:'POST',headers:{'content-type':'application/json'},
-        body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(POLL_TIMEOUT)});
-      if(!res.ok)return false;
-      const m=await res.json();
-      if(!current(id,v))return true;
-      if(m?.t==='off'){stop();showPreference(false);note.textContent='Online status is off.';return true;}
-      if(m?.t!=='ok'||!Number.isInteger(m.a)||!Number.isInteger(m.g)||m.a<0||m.g<0||m.a+m.g>1000)return false;
-      counts={a:m.a,g:m.g};ready=true;
-      if(id!==GUEST&&details.open&&Array.isArray(m.n)){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}
-      render();return true;
-    }catch{return false;}
-  }
-  function startPolling(id,v){
-    if(!current(id,v)||!pollUrl||visible!==true||paused||ws)return;
-    pollMode=true;
-    if(poll)return;
-    const run=async()=>{
-      poll=0;
-      if(!current(id,v)||ws||visible!==true||paused)return;
-      const ok=await pollOnce(id,v);
-      if(!current(id,v)||ws||visible!==true||paused)return;
-      pollFail=ok?0:pollFail+1;
-      if(!ok)render();
-      const wait=ok?POLL:Math.min(POLL*2**Math.min(pollFail,3),120000);
-      poll=setTimeout(()=>void run(),wait);
-    };
-    void run();
+  function reconnect(){
+    if(visible!==true||paused||!owner)return;
+    cancel();cursor='';void connect(owner,epoch);
   }
   async function refreshPreference(){
     if(!owner||!eligible||suspended||saving||reading||paused)return;
@@ -190,14 +169,14 @@ export function mountRenderPresence(){
     if(id===GUEST){
       const value=guestVisible();showPreference(value);
       note.textContent=value?'Guests are counted anonymously on this browser.':'Online status is off on this browser.';
-      if(value)connect(id,v);return;
+      if(value)void connect(id,v);return;
     }
     reading=true;
     try{
       const p=await account(id);
       if(!current(id,v)||saving)return;
       showPreference(p.visible);note.textContent=p.visible?'':'Online status is off.';
-      if(p.visible)connect(id,v);
+      if(p.visible)void connect(id,v);
     }catch{
       if(current(id,v)&&!saving){showPreference(null);note.textContent='Could not load online status.';}
     }finally{if(current(id,v))reading=false;}
@@ -205,7 +184,7 @@ export function mountRenderPresence(){
   function identityChanged(){
     const id=viewer();
     if(id===owner&&!suspended)return;
-    epoch++;stop();owner=id;visible=null;paused=saving=reading=false;attempt=0;
+    epoch++;stop();owner=id;visible=null;paused=saving=reading=false;
     details.hidden=!eligible;details.open=false;
     setting.checked=false;setting.disabled=true;
     note.textContent=eligible?'Loading online status…':'Online status is available on the live site.';
@@ -221,14 +200,19 @@ export function mountRenderPresence(){
     epoch++;const v=epoch;
     saving=true;reading=false;paused=false;
     // Stop publishing immediately and hide all verified sockets for this account.
-    if(!desired)send({t:'hide'});
+    const hideCredentials=lastCredentials,hideSid=sid;
     stop();showPreference(desired);note.textContent='Saving…';
     try{
       const p=await account(id,'set',{visible:desired});
       if(!current(id,v))return;
       if(p.visible!==desired)throw Error('Not saved');
       saving=false;showPreference(desired);note.textContent=desired?'Online status is on.':'Online status is off.';
-      if(desired)connect(id,v);
+      if(desired)void connect(id,v);
+      else{
+        // Persist privacy first, then invalidate all active server sessions for this account.
+        const auth=hideCredentials||await credentials(id,v);
+        if(current(id,v))void fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid:hideSid||crypto.randomUUID(),mode:'hide'}),keepalive:true,cache:'no-store'}).catch(()=>{});
+      }
     }catch{
       if(!current(id,v))return;
       saving=false;paused=true;visible=before;setting.checked=before;setting.disabled=false;
@@ -237,8 +221,7 @@ export function mountRenderPresence(){
   });
   details.addEventListener('toggle',()=>{
     names=[];namesReady=false;
-    if(ready&&owner!==GUEST)send({t:'watch',on:details.open});
-    if(owner!==GUEST&&pollMode)void pollOnce(owner,epoch);
+    if(owner!==GUEST)reconnect();
     render();
   });
   link.addEventListener('click',()=>{details.open=false;});
@@ -247,7 +230,7 @@ export function mountRenderPresence(){
   window.addEventListener('bored:identity',()=>{
     if(viewer()!==owner){identityChanged();return;}
     // A successful rename/account UI update can refresh the verified name.
-    if(ready&&owner!==GUEST&&visible===true&&ws)void authenticate(ws,owner,epoch);
+    if(ready&&owner!==GUEST&&visible===true)reconnect();
     else if(visible===null)void refreshPreference();
   });
   window.addEventListener('storage',e=>{
@@ -255,7 +238,7 @@ export function mountRenderPresence(){
   });
   window.addEventListener('online',()=>{
     if(visible===null)void refreshPreference();
-    else if(!ws&&!pollMode&&visible===true){clearTimeout(retry);retry=0;connect(owner,epoch);}
+    else if(visible===true)reconnect();
   });
   window.addEventListener('pagehide',()=>{suspended=true;epoch++;stop();owner=null;});
   window.addEventListener('pageshow',e=>{if(e.persisted){suspended=false;identityChanged();}});
