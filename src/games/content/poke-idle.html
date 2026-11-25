@@ -1091,7 +1091,8 @@ function questNote(Q) {
 }
 // Sinnoh's wild Pokémon now and then turn up one of Arceus's Plates once every Champion is beaten; its bosses bring a couple.
 function gainPlates(k) {
-  if (!allChamps() || (S.plates || 0) >= PLATES_NEED || k <= 0) return "";
+  // Story never drops Plates: its Arceus comes with all of them, in Year 3.
+  if (isStory() || !allChamps() || (S.plates || 0) >= PLATES_NEED || k <= 0) return "";
   const before = S.plates || 0; S.plates = Math.min(PLATES_NEED, before + k);
   let note = ` Found ${S.plates - before > 1 ? S.plates - before + " Plates" : "a Plate"} (${S.plates}/${PLATES_NEED}).`;
   if (S.plates >= PLATES_NEED) { note += " All 17 Plates: the Hall of Origin is in Sinnoh's list."; toast(note.trim()); }
@@ -1396,11 +1397,11 @@ const RIVALS = [
 const RIVAL_AT = Object.fromEntries(RIVALS.map(x => [x.r, x])), RIVAL = Object.fromEntries(RIVALS.map(x => [x.id, x]));
 const rivalWon = id => !!(S && S.rivals && S.rivals[id]);
 const rivalTime = x => fightTime(CHAMP_TIME, x.team, regionOffense(x.r), .8, 1.2);
-function rivalWin(x = RIVAL_AT[B.r]) {
+function rivalWin(x = RIVAL_AT[B.r], letter = "rival-" + x.id) {
   const first = !rivalWon(x.id), prize = rewardFor(B.L, B.i, first ? RIVAL_PAY : RIVAL_REMATCH);
   S.money += prize; S.rivals = { ...(S.rivals || {}), [x.id]: 1 };
   if (first && x.master) S.balls.master++;
-  if (first) S.mail.got["rival-" + x.id] = 1;
+  if (first) S.mail.got[letter] = 1;
   toast(first ? `You beat ${RIVAL_NAME}! +$${fmt(prize)}${x.master ? " and a Master Ball" : ""}. ${RIVAL_NAME} sent you a letter.` : `${RIVAL_NAME} rematch won. +$${fmt(prize)}.`);
 }
 // ── The Hall of Fame (held back by HOF_READY, above). A row after Prof Penguin's Lab in every list, open once you've
@@ -1785,6 +1786,7 @@ function recordShinyLines() {
 function recordLife() {
   S.lifeDex = S.lifeDex || {}; S.lifeShiny = S.lifeShiny || {};
   for (const [k, b] of Object.entries(S.box)) { S.lifeDex[k] = 1; if (b.shiny) S.lifeShiny[k] = 1; }
+  if (S.story) Object.assign(S.story.lifeDex = S.story.lifeDex || {}, S.lifeDex);
 }
 const lifeDex = () => Object.keys(S.lifeDex || {}).length, lifeShiny = () => Object.keys(S.lifeShiny || {}).length;
 const boardScore = () => lifeDex() + lifeShiny();
@@ -2327,6 +2329,17 @@ const MAIL = [
       <li>Beat Red after the finale and you can replay Year 1, other picks and all, without touching your save. The Wiki's Story Mode page has the details.</li></ul>` },
   { id: "story-started", chapter: true, date: "Year 1", from: "Prof Penguin", title: "It's started",
     body: `<p>It's started. Go.</p>` },
+  // Sssssssnakes's letters: each signature has its own number of s's, on purpose. Copy them exactly.
+  { id: "story-snakes-end", chapter: true, date: "Year 1", from: "Sssssssnakes", title: "Did you know?",
+    body: `<p>Did you know? Tell me you didn't know.</p><p>— Sssnakes</p>` },
+  { id: "story-r3", chapter: true, date: "After Galar", from: "Sssssssnakes", title: "Here",
+    body: `<p>Here's a Master Ball. Not because you earned it. Because I have too many.</p><p>(You earned it.)</p><p>(Don't tell anyone I said that.)</p><p>— Sssssssnakes</p>` },
+  { id: "story-r2", chapter: true, date: "After Unova", from: "Sssssssnakes", title: "The scouting thing",
+    body: `<p>Asked my supervisor about the scouting thing. She said "great question" and then didn't answer it.</p><p>That's fine. That's normal. Right?</p><p>— Ssssssnakes</p>` },
+  { id: "story-r1", chapter: true, date: "After Johto", from: "Sssssssnakes", title: "Warm-up",
+    body: `<p>Don't get used to winning. That was a warm-up.</p><p>Also Penguin never tells you anything, right? Yeah. He did that to me too.</p><p>— Sssssnakes</p>` },
+  { id: "story-kanto", chapter: true, date: "After Kanto", from: "Prof Penguin", title: "The cage",
+    body: `<p>That lab was built to hold a legend. Who builds a cage before there's anything to put in it?</p><p>You'll find uses for this. Better you have it early.</p><p><i>A Key Stone is in the envelope: Mega Evolution is open.</i></p><p>Prof Penguin</p>` },
   { id: "story-memo", chapter: true, date: "Year 1", from: "(no sender)", title: "INTERNAL",
     body: `<p><b>INTERNAL. Do not forward.</b></p><p>The Engine is on schedule. It wakes and binds each legend in turn, per the list. Units are assigned per site.</p><p>Unit 1: Aether, contained. Unit 2: assigned to the Director.</p>` },
   { id: "story-kalos", chapter: true, date: "Year 1", from: "Prof Penguin", title: "A pattern",
@@ -3065,6 +3078,8 @@ function offline() {
 
 // Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
 function migrateSave() {
+  // A Story save from before a field was added gets it (see freshStory); a Classic save never has a story block.
+  if (S.story) S.story = { ...freshStory(), ...S.story };
   if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; }
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.raid = S.raid || 0; S.mega = S.mega || null; S.gmax = S.gmax || 0;
@@ -3104,7 +3119,10 @@ const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, 
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
 const otherSlot = () => slot === KEY ? STORY_KEY : slot === STORY_KEY ? KEY : null;
-const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, epilogue: 0 });
+// The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). The fields after
+// epilogue are reserved for the years to come and stay unused in Year 1, so later years need no migration.
+const freshStory = () => ({ year: 1, ch: {}, picks: {}, seen: {}, clues: {}, silvally: 0, lifeDex: {}, epilogue: 0,
+  liberated: {}, frozen: {}, eternatusStolen: 0, y3Count: 0, cleared: {}, giratinaDebt: 0, roulette: null });
 let newFor = null, pickFrom = null;
 // New game in a mode: that slot is emptied and the starter screen opens for it. Back to title goes back to the save
 // you came from.
@@ -3166,9 +3184,11 @@ const SCENES = {
     ["Rime", "Noted."],
     ["", "Rime walks out without hurrying. Behind her, in the deepest tank, something opens its eyes."]] },
   "kanto-cage": { year: 1, r: 0, title: "The cage", lines: [
+    ["", "A letter from Prof Penguin arrives. There's a Key Stone in the envelope."],
     ["Prof Penguin", "That lab was built to hold a legend. Who builds a cage before there's anything to put in it?"],
-    ["Prof Penguin", "Take this Key Stone. You'll want Mega Evolution before this is over."]] },
+    ["Prof Penguin", "You'll find uses for this. Better you have it early."]] },
   "johto-r1": { year: 1, r: 1, title: "Sssssssnakes", lines: [
+    ["", "Someone steps into your path, a Snivy draped over their shoulder."],
     ["Sssssssnakes", "Oh, you're Penguin's new one? Cute. Try to keep up."]] },
   "johto-r1-after": { year: 1, r: 1, title: "Better coffee", lines: [
     ["Sssssssnakes", "Whatever. Team Thaw says the freeze is natural, and they're the ones fixing it. You should come work with us. Better coffee."]] },
@@ -3277,37 +3297,42 @@ const ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_PAY = 150, FIN
 const ADMIN_PIC = { Rime: "thaw-rime.png", Hail: "thaw-hail.png", Slush: "thaw-slush.png", Sssssssnakes: "sssssssnakes.png", "Team Thaw grunt": "thaw-grunt.png", "Prof Penguin": "prof-penguin.png" };
 const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
 // Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
+// Six each, all from that region's generation (forms included); the finale's are all Generation 9.
 const ADMIN_TEAMS = {
   kanto: ["Rime", [124, 91, 87, 82, 65, 131]],
-  johto: ["Hail", [208, 212, 227, 221, 205, 91]],
+  johto: ["Hail", [208, 212, 227, 221, 205, 215]],
   hoenn: ["Slush", [319, 342, 359, 275, 365, 362]],
   sinnoh: ["Rime", [478, 471, 473, 460, 437, 476]],
   unova: ["Hail", [614, 530, 625, 589, 598, 584]],
   kalos: ["Slush", [658, 687, 689, 675, 693, 713]],
-  alola: ["Rime", ["v10104", "v10102", 740, 779, 765, 376]],
+  alola: ["Rime", ["v10104", "v10102", 740, 779, 765, "v10106"]],
   galar: ["Hail", [879, 823, 863, "v10177", 881, 884]],
-  "paldea-rime": ["Rime", [998, 956, 1000, 981, 478, 471]],
-  "paldea-hail": ["Hail", [975, 983, 959, 968, 966, 473]],
-  "paldea-slush": ["Slush", [977, 976, 943, 962, 461, 91]]
+  // Generation 9 has two Ice lines: Baxcalibur's goes to Rime and Slush, Cetitan's to Hail.
+  "paldea-rime": ["Rime", [998, 956, 1000, 981, 954, 936]],
+  "paldea-hail": ["Hail", [975, 983, 959, 968, 966, 1018]],
+  "paldea-slush": ["Slush", [977, 976, 943, 962, 908, 997]]
 };
 const adminTeam = k => ADMIN_TEAMS[k][1].map(foeFrom);
-// Every mascot and Mewtwo stay out of Story's dungeons, and so do the legends saved for the years to come.
-const STORY_NO_DEN = new Set([150, 249, 250, 382, 383, 384, 483, 484, 487, 643, 644, 646, 716, 717, 791, 792, 888, 889, 890, 1007, 1008]);
+// Story's dungeons, in every year: no mascot and no Mewtwo (the one you didn't pick belongs to Year 2), and no legend
+// a Story chapter gives you in any year. Glastrier and Spectrier stay (Year 2's finale needs them), and so does Zygarde
+// (Year 3's Terminus), with the other Tier 4s.
+const STORY_NO_DEN = new Set([150, 249, 250, 382, 383, 483, 484, 643, 644, 716, 717, 791, 792, 888, 889, 1007, 1008,
+  384, 487, 646, 890, 1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 1024, 898, 800, 493]);
 const STORY_HIDDEN = new Set(["final", "hof", "rival", "darkest", "quest"]);
 const LEGENDS = ["kanto-legend", "johto-pick", "hoenn-pick", "sinnoh-pick", "unova-pick", "kalos-pick", "alola-pick", "galar-pick"];
 const admin = (id, r, team, pre, post, after = ["champ"]) => ({ id, r, type: "admin", team, name: `Team Thaw: ${ADMIN_TEAMS[team][0]}`, after, pre, post });
 const pick = (id, r, mons, hints, prize, after) => ({ id, r, type: "pick", mons, hints, prize, name: `${mons.map(n => mon(n).name).join(" or ")}`, after, liberates: true });
 const CHAPTERS = [
   admin("kanto-admin", 0, "kanto", "kanto-rime", "kanto-rime-after"),
-  { id: "kanto-legend", r: 0, type: "legend", mons: [150], name: "Mewtwo", after: ["kanto-admin"], post: "kanto-cage", prize: { stone: 10281, key: 1 }, liberates: true },
-  { id: "johto-rival", r: 1, type: "rival", rival: "early", name: `Rival ${RIVAL_NAME}`, pre: "johto-r1", post: "johto-r1-after" },
+  { id: "kanto-legend", r: 0, type: "legend", mons: [150], name: "Mewtwo", after: ["kanto-admin"], post: "kanto-cage", prize: { stone: 10281, key: 1 }, letter: "story-kanto", liberates: true },
+  { id: "johto-rival", r: 1, type: "rival", rival: "early", letter: "story-r1", name: `Rival ${RIVAL_NAME}`, pre: "johto-r1", post: "johto-r1-after" },
   admin("johto-admin", 1, "johto", "johto-hail", "johto-hail-after", ["johto-rival"]),
   pick("johto-pick", 1, [249, 250], ["It sleeps under the sea and calms the storms.", "It brings the sun back wherever it lands."], { stone: 10049 }, ["johto-admin"]),
   admin("hoenn-admin", 2, "hoenn", "hoenn-slush", "hoenn-slush-after"),
   pick("hoenn-pick", 2, [383, 382], ["It raises the land and dries up the rain.", "It fills the sea and brings the rain."], { stone: [10089, 10076] }, ["hoenn-admin"]),
   admin("sinnoh-admin", 3, "sinnoh", "sinnoh-rime", "sinnoh-rime-after"),
   pick("sinnoh-pick", 3, [483, 484], ["It keeps time moving.", "It holds space together."], { stone: 10058 }, ["sinnoh-admin"]),
-  { id: "unova-rival", r: 4, type: "rival", rival: "mid", extra: "hoenn-pick", name: `Rival ${RIVAL_NAME}`, pre: "unova-r2", post: "unova-r2-after", after: ["champ", "hoenn-pick"] },
+  { id: "unova-rival", r: 4, type: "rival", rival: "mid", extra: "hoenn-pick", letter: "story-r2", name: `Rival ${RIVAL_NAME}`, pre: "unova-r2", post: "unova-r2-after", after: ["champ", "hoenn-pick"] },
   admin("unova-admin", 4, "unova", "unova-hail", "unova-hail-after", ["unova-rival"]),
   { ...pick("unova-pick", 4, [643, 644], ["White fire, for truth.", "Black lightning, for ideals."], { master: 1 }, ["unova-admin"]), after2: "unova-kyurem" },
   admin("kalos-admin", 5, "kalos", "kalos-slush", "kalos-slush-after"),
@@ -3315,12 +3340,12 @@ const CHAPTERS = [
   admin("alola-admin", 6, "alola", "alola-rime", "alola-rime-after"),
   pick("alola-pick", 6, [791, 792], ["It eats the sun.", "It drinks the moon."], { master: 1 }, ["alola-admin"]),
   { id: "alola-silvally", r: 6, type: "rescue", name: "Free Type: Null", optional: true, after: ["alola-admin"], pre: "alola-null", post: "alola-null-after", doneNote: "Silvally" },
-  { id: "galar-rival", r: 7, type: "rival", rival: "late", extra: "unova-pick", name: `Rival ${RIVAL_NAME}`, pre: "galar-r3", post: "galar-r3-after", after: ["champ", "unova-pick"] },
+  { id: "galar-rival", r: 7, type: "rival", rival: "late", extra: "unova-pick", letter: "story-r3", name: `Rival ${RIVAL_NAME}`, pre: "galar-r3", post: "galar-r3-after", after: ["champ", "unova-pick"] },
   admin("galar-admin", 7, "galar", "galar-hail", "galar-hail-after", ["galar-rival"]),
   pick("galar-pick", 7, [888, 889], ["The sword.", "The shield."], { master: 1 }, ["galar-admin"]),
   { id: "paldea-finale", r: 8, type: "finale", name: "Team Thaw: all three", after: ["champ", ...LEGENDS], pre: "paldea-admins", post: "paldea-admins-after",
     open: () => storyDex() >= FINALE_DEX, note: () => storyDex() >= FINALE_DEX ? "3 admins, back to back" : `Story dex ${storyDex()}/${FINALE_DEX}` },
-  { ...pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"]), after2: "paldea-freeze", letter: "story-started", year: 1 },
+  { ...pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"]), after2: "paldea-freeze", letter: ["story-started", "story-snakes-end"], year: 1 },
   { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", doneNote: "Shiny Charm" }
 ];
 const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
@@ -3410,20 +3435,36 @@ function storyWin() {
   const c = CHAPTER[B.ch || B.storyCh]; if (!c) return;
   if (B.catchIt && !B.bossCaught) { toast(`${B.queue[0].name} got away. It's still here: try again from the list.`); return; }
   const first = !chDone(c.id);
-  if (c.type === "rival") rivalWin(RIVAL[c.rival]);
+  if (c.type === "rival") rivalWin(RIVAL[c.rival], c.letter);
   else if (c.type === "admin" || c.type === "finale") { const prize = rewardFor(B.L, B.i, first ? (c.type === "finale" ? FINALE_PAY : ADMIN_PAY) : 30); S.money += prize; toast(`${c.name} beaten! +$${fmt(prize)}.`); }
   if (first) chapterPrize(c);
   finishChapter(c);
 }
+// Replay Mode gives nothing back, through one door: storyReward(id, give) runs give on the save that should get it,
+// once. Outside a replay that's the save you're playing. In a replay it's nothing, unless the id is in REPLAY_REWARDS:
+// then it's the main Story save, once ever (story.replayGot). The list is empty in Year 1. Year 3 adds one: knocking out
+// Prof Penguin's Giratina with your own Origin Giratina in a replay of the Year 3 finale (a secret achievement, a hidden
+// letter and the Griseous Orb SP look).
+const REPLAY_REWARDS = new Set();
+function storyReward(id, give) {
+  if (!S.replay) return give(S), true;
+  if (!REPLAY_REWARDS.has(id)) return false;
+  const main = readSlot(STORY_KEY); if (!main || !main.story || (main.story.replayGot || {})[id]) return false;
+  give(main); main.story.replayGot = { ...(main.story.replayGot || {}), [id]: 1 };
+  try { localStorage.setItem(STORY_KEY, JSON.stringify(main)); } catch {}
+  return true;
+}
 function chapterPrize(c) {
   const p = c.prize || {}, got = [];
-  for (const id of [].concat(p.stone || [])) { S.stones[id] = 1; got.push(formById(id).name.replace(/^Mega /, "") + "ite"); }
-  if (p.master) { S.balls.master++; got.push("a Master Ball"); }
-  if (p.key && !S.key) { S.key = 1; got.push("a Key Stone (Mega Evolution is open)"); }
+  storyReward("prize:" + c.id, T => {
+    for (const id of [].concat(p.stone || [])) { T.stones[id] = 1; got.push(formById(id).name.replace(/^Mega /, "") + "ite"); }
+    if (p.master) { T.balls.master++; got.push("a Master Ball"); }
+    if (p.key && !T.key) { T.key = 1; got.push("a Key Stone (Mega Evolution is open)"); }
+  });
   if (c.type === "pick" || c.type === "legend") S.story.picks[c.r] = S.story.picks[c.r] || c.mons[0];
   if (c.type === "rescue") { S.story.silvally = 1; if (!S.box[773]) { S.box[773] = { xp: Math.pow(Math.min(100, champLevel(c.r) + CAP_OVER), 3), shiny: lineShiny(772), from: c.r }; if (joinsParty()) joinParty(773); } got.push("Silvally"); }
   if (c.type === "red") S.story.epilogue = 1;
-  if (c.letter) S.mail.got[c.letter] = 1;
+  for (const id of [].concat(c.letter || [])) S.mail.got[id] = 1;
   if (got.length) setTimeout(() => toast(`${c.name}: ${got.join(", ")}.`), 3400);
 }
 // The pick: two silhouettes, a line from Prof Penguin under each, and "This one's mine." The pick is saved, and
@@ -3449,6 +3490,8 @@ function pickClick(b) {
 // ── The League rules, for Story's gyms and Champions: no Tier 0 to 2, at most one Tier 3 and two Tier 4s.
 const LEAGUE_MAX = { 3: 1, 4: 2 };
 const leagueRule = (out, m) => { const t = tierOf(m); if (t != null && t < 3) return false; return !LEAGUE_MAX[t] || out.filter(x => tierOf(x) === t).length < LEAGUE_MAX[t]; };
+// The same rules for a list of Pokémon (a reference team), as a message or "".
+const leagueBreaksList = list => { for (const t of [0, 1, 2]) if (list.some(m => tierOf(m) === t)) return `Tier ${t}`; for (const t of [3, 4]) if (list.filter(m => tierOf(m) === t).length > LEAGUE_MAX[t]) return `${t}`; return ""; };
 function leagueBreaks(party = S.party) {
   const ts = party.map(n => tierOf(fighter(n))), low = party.filter((n, i) => ts[i] != null && ts[i] < 3);
   if (low.length) return `${low.map(n => lookOf(n).name).join(", ")} ${low.length > 1 ? "are" : "is"} Tier ${Math.min(...low.map(n => tierOf(fighter(n))))} or stronger: not allowed.`;
@@ -3502,7 +3545,7 @@ function storyProgress(st) {
   if (!st || st.mode !== "story" || !st.story) return null;
   const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
   return { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
-    lifeDex: new Set([...keys(st.lifeDex), ...keys(st.box)]).size };
+    lifeDex: new Set([...keys(st.lifeDex), ...keys(st.story.lifeDex), ...keys(st.box)]).size };
 }
 
 // The scene box. playScene(id, then): then runs once it's closed, skipped or not. A scene you've already seen plays
