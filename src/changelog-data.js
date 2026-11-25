@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 952,
+  "count": 953,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"cf38833a","date":"2026-11-24","author":"Daniel Lowe","subject":"Move Bored presence to an optimized free Render service"},
   {"sha":"97f2053d","date":"2026-11-24","author":"Daniel Lowe","subject":"Simplify homepage chrome and put games first","pr":348},
   {"sha":"3dbb4d7d","date":"2026-11-24","author":"Daniel Lowe","subject":"Include anonymous boring people in Bored presence","pr":347},
   {"sha":"33050700","date":"2026-11-24","author":"Daniel Lowe","subject":"Include QA-mode signed-in players in online presence"},
