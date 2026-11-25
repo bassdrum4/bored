@@ -4,6 +4,7 @@ import { backendReady, freshSession, getSession, hasIdentity, request } from './
 const GUEST='guest', PREF='bored.presence.guest.visible', KEY='bored.presence.guest.key';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const HEARTBEAT=60000, AUTH_RENEW=18*60000;
+const POLL=20000, POLL_TIMEOUT=15000;
 let ephemeralKey='', ephemeralPref=null;
 
 export function renderSocketUrl(origin) {
@@ -13,6 +14,10 @@ export function renderSocketUrl(origin) {
        u.port || u.pathname!=='/' || u.search || u.hash) return '';
     return 'wss://'+u.hostname+'/ws';
   }catch{return '';}
+}
+// The same service answers a blocked socket over plain HTTPS.
+export function renderPollUrl(origin) {
+  return renderSocketUrl(origin) ? origin.replace(/\/+$/,'')+'/presence' : '';
 }
 function liveSite(){
   try{return location.protocol==='https:' && location.hostname==='bassdrum4.github.io' && /^\/bored(?:\/|$)/.test(location.pathname);}catch{return false;}
@@ -36,9 +41,9 @@ export function mountRenderPresence(){
     privacy=$('presence-privacy-note'), link=$('presence-settings-link');
   if(!details||!summary||!list||!status||!setting||!note||!privacy||!link)return;
   const eligible=backendReady()&&liveSite()&&typeof WebSocket!=='undefined';
-  const endpoint=renderSocketUrl(PRESENCE_ORIGIN);
+  const endpoint=renderSocketUrl(PRESENCE_ORIGIN), pollUrl=renderPollUrl(PRESENCE_ORIGIN);
   let owner=null,epoch=0,visible=null,ws=null,ready=false,paused=false,suspended=false,saving=false;
-  let retry=0,beat=0,renew=0,deadline=0,attempt=0;
+  let retry=0,beat=0,renew=0,deadline=0,attempt=0,poll=0,pollFail=0,pollMode=false;
   let counts=null,names=[],namesReady=false,reading=false;
   const current=(id,v)=>!suspended&&owner===id&&epoch===v&&viewer()===id;
   const send=(message)=>{
@@ -57,7 +62,8 @@ export function mountRenderPresence(){
     if(!counts||!ready){
       summary.textContent=visible===false?'Appear offline':'Online';
       status.textContent=visible===false?'You are hidden. Turn online status back on in Settings to see the list.':
-        paused?'Online status paused.':!endpoint?'Presence server not connected yet.':'Connecting…';
+        paused?'Online status paused.':!endpoint?'Presence server not connected yet.':
+        pollFail>=3?'Online status is unavailable.':'Connecting…';
       return;
     }
     summary.textContent=(counts.a+counts.g)+' online';
@@ -68,8 +74,8 @@ export function mountRenderPresence(){
     if(counts.g>0)row(boringLabel(counts.g),'online-guests');
   }
   function stop(){
-    clearTimeout(retry);clearInterval(beat);clearInterval(renew);clearTimeout(deadline);
-    retry=beat=renew=deadline=0;
+    clearTimeout(retry);clearInterval(beat);clearInterval(renew);clearTimeout(deadline);clearTimeout(poll);
+    retry=beat=renew=deadline=poll=0;pollFail=0;pollMode=false;
     const old=ws;ws=null;ready=false;counts=null;names=[];namesReady=false;
     if(old)try{old.close();}catch{}
   }
@@ -98,8 +104,8 @@ export function mountRenderPresence(){
     }catch{if(ws===socket)socket.close();}
   }
   function connect(id,v){
-    if(!current(id,v)||!eligible||!endpoint||visible!==true||paused||ws)return;
-    let socket;try{socket=new WebSocket(endpoint);}catch{schedule(id,v);return;}
+    if(!current(id,v)||!eligible||!endpoint||visible!==true||paused||ws||pollMode)return;
+    let socket;try{socket=new WebSocket(endpoint);}catch{startPolling(id,v);return;}
     ws=socket;ready=false;render();
     // Render may need to cold start. Don't hammer it with short connect timeouts.
     deadline=setTimeout(()=>{if(ws===socket)socket.close();},90000);
@@ -128,9 +134,55 @@ export function mountRenderPresence(){
     };
     socket.onclose=()=>{
       if(ws!==socket)return;
-      stop();render();schedule(id,v);
+      const wasReady=ready;
+      stop();render();
+      // A socket that never opened was probably refused by the network, not the
+      // server: poll over HTTPS instead of retrying a handshake that cannot win.
+      if(wasReady)schedule(id,v);else startPolling(id,v);
     };
     socket.onerror=()=>{}; // onclose performs the only retry
+  }
+  // A school or office proxy can refuse the WebSocket upgrade while plain HTTPS
+  // still works. The same roster answers POST /presence, so a tab whose handshake
+  // never succeeded polls every 20 seconds instead of retrying forever.
+  async function pollOnce(id,v){
+    if(!current(id,v)||ws||!pollUrl||visible!==true||paused)return false;
+    let body;
+    try{
+      if(id===GUEST)body={t:'guest',id:guestId()};
+      else{
+        const s=await freshSession();
+        if(!current(id,v))return true;
+        if(s?.user?.id!==id||!s.access_token)return false;
+        body={t:'auth',jwt:s.access_token};
+      }
+      const res=await fetch(pollUrl,{method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(POLL_TIMEOUT)});
+      if(!res.ok)return false;
+      const m=await res.json();
+      if(!current(id,v))return true;
+      if(m?.t==='off'){stop();showPreference(false);note.textContent='Online status is off.';return true;}
+      if(m?.t!=='ok'||!Number.isInteger(m.a)||!Number.isInteger(m.g)||m.a<0||m.g<0||m.a+m.g>1000)return false;
+      counts={a:m.a,g:m.g};ready=true;
+      if(id!==GUEST&&details.open&&Array.isArray(m.n)){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}
+      render();return true;
+    }catch{return false;}
+  }
+  function startPolling(id,v){
+    if(!current(id,v)||!pollUrl||visible!==true||paused||ws)return;
+    pollMode=true;
+    if(poll)return;
+    const run=async()=>{
+      poll=0;
+      if(!current(id,v)||ws||visible!==true||paused)return;
+      const ok=await pollOnce(id,v);
+      if(!current(id,v)||ws||visible!==true||paused)return;
+      pollFail=ok?0:pollFail+1;
+      if(!ok)render();
+      const wait=ok?POLL:Math.min(POLL*2**Math.min(pollFail,3),120000);
+      poll=setTimeout(()=>void run(),wait);
+    };
+    void run();
   }
   async function refreshPreference(){
     if(!owner||!eligible||suspended||saving||reading||paused)return;
@@ -186,6 +238,7 @@ export function mountRenderPresence(){
   details.addEventListener('toggle',()=>{
     names=[];namesReady=false;
     if(ready&&owner!==GUEST)send({t:'watch',on:details.open});
+    if(owner!==GUEST&&pollMode)void pollOnce(owner,epoch);
     render();
   });
   link.addEventListener('click',()=>{details.open=false;});
@@ -202,7 +255,7 @@ export function mountRenderPresence(){
   });
   window.addEventListener('online',()=>{
     if(visible===null)void refreshPreference();
-    else if(!ws&&visible===true){clearTimeout(retry);retry=0;connect(owner,epoch);}
+    else if(!ws&&!pollMode&&visible===true){clearTimeout(retry);retry=0;connect(owner,epoch);}
   });
   window.addEventListener('pagehide',()=>{suspended=true;epoch++;stop();owner=null;});
   window.addEventListener('pageshow',e=>{if(e.persisted){suspended=false;identityChanged();}});

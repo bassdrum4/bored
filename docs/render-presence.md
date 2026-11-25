@@ -42,6 +42,18 @@ authentication concurrency, and drops slow consumers. These are protective
 caps, not measured Render performance guarantees. Guest counts are approximate
 and can be inflated by deliberately fabricated browser IDs.
 
+## Blocked WebSockets
+
+Some school and office proxies refuse the `Upgrade` request while allowing ordinary
+HTTPS. A tab whose handshake never succeeds then posts to `POST /presence` on the
+same service every 20 seconds: the same guest ID or verified account token, the
+same roster and the same counts. A poll entry expires 75 seconds after its last
+request. Only a socket that never opened switches a tab to polling for the rest of
+that page load; a socket that worked and then dropped still reconnects as a socket.
+The endpoint applies the socket's origin allowlist through CORS. Polling keeps a
+free instance awake while the tab is open, which is the aim rather than a side
+effect.
+
 Free instances sleep after inactivity; no artificial uptime pings. The hub
 backs off with jitter and never blocks game loading. Ordinary game pushes do
 not restart the service. Restarting loses the ephemeral roster; browsers reconnect.

@@ -8,7 +8,10 @@ const API_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_Ayx7pzjm
 const ORIGINS = new Set((process.env.ALLOWED_ORIGINS || 'https://bassdrum4.github.io').split(','));
 const MAX_CLIENTS = 1000, MAX_IP = 250, MAX_BUFFER = 65536;
 const AUTH_MS = 20*60*1000, AUTH_CACHE_MS = 60*1000;
-const roster = createRoster(), peers = new Map(), ipCounts = new Map();
+// A network that refuses the WebSocket upgrade falls back to HTTPS polling. A
+// poll entry is live for 75 seconds so a throttled background timer does not flap.
+const POLL_TTL = 75000;
+const roster = createRoster(), peers = new Map(), ipCounts = new Map(), pollers = new Map();
 const authCache = new Map(), pending = new Map();
 let authBudget = 24, budgetAt = Date.now(), flushTimer = null, authEpoch = 0;
 let lastCount = '', lastNames = '', shuttingDown = false;
@@ -20,6 +23,34 @@ function send(ws, value) {
 }
 function countFrame() { return JSON.stringify({t:'c',...roster.counts()}); }
 function namesFrame() { return JSON.stringify({t:'n',n:roster.names()}); }
+function clientSource(req) {
+  const ip = req.socket.remoteAddress || 'unknown';
+  // Render's proxy is shared; use its client IP header if present. Never log it.
+  return String(req.headers['x-forwarded-for']||ip).split(',').at(-1).trim();
+}
+function reply(res,code,value,origin) {
+  res.writeHead(code,{
+    'content-type':'application/json','cache-control':'no-store',
+    'access-control-allow-origin':ORIGINS.has(origin)?origin:'null','vary':'Origin'
+  });
+  res.end(JSON.stringify(value));
+}
+function readBody(req) {
+  return new Promise((resolve,reject)=>{
+    let body = '', tooLarge = false;
+    req.setEncoding('utf8');
+    // Drain an oversized body instead of destroying the socket, so the client
+    // gets a readable 413 rather than a network error.
+    req.on('data',chunk=>{ if(tooLarge)return; body += chunk; if(body.length > 4096){ tooLarge = true; body = ''; } });
+    req.on('end',()=>tooLarge?reject(Error('Too large')):resolve(body));
+    req.on('error',reject);
+  });
+}
+function pollCount(source) {
+  let n = 0;
+  for(const entry of pollers.values()) if(entry.ip === source) n++;
+  return n;
+}
 function changed() {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
@@ -36,6 +67,8 @@ function changed() {
   },5000);
 }
 function evict(id) {
+  const poller = 'a:'+id;
+  if (pollers.delete(poller)) roster.remove(poller);
   for (const ws of roster.accountClients(id)) {
     roster.remove(ws); send(ws,{t:'off'}); ws.close(4003,'Presence disabled');
   }
@@ -66,17 +99,61 @@ async function verify(token) {
   pending.set(key,task);
   try { return await task; } finally { pending.delete(key); }
 }
+// The HTTPS twin of a socket join, for networks that block WebSocket upgrades.
+// Same origin allowlist, same verified identity, same roster and counts.
+async function presence(req,res) {
+  const origin = req.headers.origin;
+  if (req.method==='OPTIONS') {
+    res.writeHead(204,{
+      'access-control-allow-origin':ORIGINS.has(origin)?origin:'null',
+      'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'content-type',
+      'access-control-max-age':'86400','vary':'Origin'
+    });
+    res.end(); return;
+  }
+  if (!ORIGINS.has(origin)) { reply(res,403,{error:'Forbidden'},origin); return; }
+  let raw;
+  try { raw = await readBody(req); } catch { reply(res,413,{error:'Too large'},origin); return; }
+  let m;
+  try { m = JSON.parse(raw); } catch { reply(res,400,{error:'Bad request'},origin); return; }
+  let identity = null;
+  if (m?.t==='guest' && UUID.test(m.id||'')) identity = {guest:true,id:m.id};
+  else if (m?.t==='auth' && typeof m.jwt==='string' && m.jwt.length<=7000 && m.jwt.split('.').length===3) {
+    let profile;
+    try { profile = await verify(m.jwt); } catch { reply(res,401,{t:'err'},origin); return; }
+    if (!profile.visible) {
+      const key = 'a:'+profile.id;
+      if (pollers.delete(key) && roster.remove(key)) changed();
+      reply(res,200,{t:'off'},origin); return;
+    }
+    if (!profile.handle) { reply(res,401,{t:'err'},origin); return; }
+    identity = {guest:false,id:profile.id,name:profile.handle};
+  }
+  if (!identity) { reply(res,400,{error:'Bad request'},origin); return; }
+  const key = (identity.guest?'g:':'a:')+identity.id, source = clientSource(req), known = pollers.get(key);
+  if (!known) {
+    const live = roster.counts();
+    if (live.g+live.a >= MAX_CLIENTS) { reply(res,503,{t:'err'},origin); return; }
+    if (pollCount(source) >= MAX_IP) { reply(res,429,{t:'err'},origin); return; }
+  }
+  pollers.set(key,{ip:known?.ip||source,at:Date.now()});
+  roster.add(key,identity); changed();
+  const counts = roster.counts();
+  reply(res,200,identity.guest?{t:'ok',...counts}:{t:'ok',...counts,n:roster.names()},origin);
+}
 const server = http.createServer((req,res)=>{
   if (req.method==='GET' && req.url==='/health') {
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
     res.end(JSON.stringify({ok:true,service:'bored-presence',version:1}));
+  } else if (req.method==='POST' && req.url==='/presence') {
+    void presence(req,res);
+  } else if (req.method==='OPTIONS' && req.url==='/presence') {
+    void presence(req,res);
   } else {res.writeHead(404);res.end();}
 });
 const wss = new WebSocketServer({noServer:true,maxPayload:8192,perMessageDeflate:false});
 server.on('upgrade',(req,socket,head)=>{
-  const ip = req.socket.remoteAddress || 'unknown';
-  // Render's proxy is shared; use its client IP header if present. Never log it.
-  const source = String(req.headers['x-forwarded-for']||ip).split(',').at(-1).trim();
+  const source = clientSource(req);
   if(shuttingDown || req.url!=='/ws' || !ORIGINS.has(req.headers.origin) ||
     peers.size>=MAX_CLIENTS || (ipCounts.get(source)||0)>=MAX_IP) {
     socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');return;
@@ -144,8 +221,16 @@ const sweep=setInterval(()=>{
   for(const [key,value] of authCache)if(value.until<=now)authCache.delete(key);
 },30000);
 sweep.unref();
+const pollSweep = setInterval(()=>{
+  const now = Date.now();
+  for(const [key,entry] of pollers) if(now-entry.at > POLL_TTL) {
+    pollers.delete(key);
+    if(roster.remove(key)) changed();
+  }
+},10000);
+pollSweep.unref();
 function shutdown(){
-  shuttingDown=true;clearInterval(sweep);clearTimeout(flushTimer);
+  shuttingDown=true;clearInterval(sweep);clearInterval(pollSweep);clearTimeout(flushTimer);
   for(const ws of peers.keys())ws.close(1012,'Restarting');
   server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),5000).unref();
 }
