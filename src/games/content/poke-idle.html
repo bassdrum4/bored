@@ -400,7 +400,7 @@
     </section>
 
     <section id="t-party" class="box" hidden>
-      <h2>Party <span class="ptag small" id="partyp" hidden></span></h2>
+      <h2>Party <span class="ptag small" id="partyp" hidden></span> <span class="small muted" id="partycap" hidden></span></h2>
       <div class="small muted" id="partyhint"></div>
       <div class="party" id="party"></div>
       <div class="small muted" id="teamline"></div>
@@ -736,6 +736,11 @@ function levelCap() {
 }
 // XP past the cap (from older saves) is kept but doesn't count until the cap catches up.
 const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
+// Level sync (Story): a Pokémon's real level is its stored one, which only XP raises; it fights at the cap when it's
+// above it (level, and battleLevel where a place has a cap of its own), and gains no XP until the cap passes it. Story
+// shows both, "Lv 90 (fights at 24)", since a new year starts the cap over. Classic shows the one level, as before.
+const realLevel = n => lvlOf(S.box[n].xp);
+const lvText = (n, at = level(n)) => isStory() && realLevel(n) > at ? `Lv ${realLevel(n)} (fights at ${at})` : `Lv ${at}`;
 // Every place has its own cap too: the one you had when you first got there. Go back to an
 // earlier region and your party fights held down to it, so a Lv 90 team from Galar is a Lv 30 team on Hoenn Route 1.
 function areaCap(loc = S.loc) {
@@ -1499,7 +1504,8 @@ function hit(dmg) {
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
   S.money += f.reward; S.stats.wins++;
-  // Bonded: in the active party for a win, at least once. It needn't fight or land the last hit; a saved team doesn't count.
+  // Bonded: in the active party for a win, at least once, and for good. It needn't fight or land the last hit; a saved
+  // team doesn't count. It's hidden: nothing shows it, and nothing in Year 1 reads it (Year 3's thaw does).
   for (const n of S.party) if (S.box[n]) S.box[n].bond = 1;
   if (isStory()) nullTrust();
   gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5) * (B.kind === "route" && B.r === TRAIN_R ? TRAIN_XP : 1)));
@@ -1987,7 +1993,7 @@ function monTile(n, opts = {}) {
   const eLabel = e == null ? "" : dm > .95 && dm < 1.05 ? ({ 0: "0x", .25: "¼x", .5: "½x" })[te] || te + "x" : (e >= 10 ? Math.round(e) : Math.round(e * 10) / 10) + "x";
   const eTitle = e == null ? "" : `${te}x type; ${ph ? "Attack vs Defense" : "Sp. Atk vs Sp. Def"} ×${dm.toFixed(2)}`;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span>${remembers(n) ? `<span class="peak" title="It remembers you: ×${REMEMBER} XP back to Lv ${S.box[n].peak}">❄${S.box[n].peak}</span>` : ""}<span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span>${remembers(n) ? `<span class="peak" title="It remembers you: ×${REMEMBER} XP back to Lv ${S.box[n].peak}">❄${S.box[n].peak}</span>` : ""}<span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : lvText(n, opts.battle ? battleLevel(n) : level(n))}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -2047,6 +2053,7 @@ function renderParty() {
   // Below the cap each one counts × (level ÷ cap)², so the line shows both: on paper, and at their levels.
   const avg = f => S.party.length ? S.party.reduce((t, n) => t + f(n), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
   const avgBulk = avg(n => bulkFor(fighter(n))), lvBulk = avg(n => bulkFor(fighter(n)) * underCap(battleLevel(n)) ** 2), under = Math.round(lvBulk) < Math.round(avgBulk);
+  $("#partycap").hidden = !isStory(); $("#partycap").textContent = isStory() ? `Level cap ${levelCap()}` : "";
   renderTeams();
   $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(lvBulk)}</b> on average${under ? ` at their levels (base ${Math.round(avgBulk)}; below the cap each counts × (level ÷ cap)²)` : ""}, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
   const gh = ghosts();
@@ -2110,7 +2117,7 @@ function renderDetail() {
   const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   const now = statsAt(st, level(detail)), bRaw = bulkOf(fighter(detail)), bNow = Math.round(bulkNow(detail)), bFull = Math.round(bulkFor(fighter(detail)));
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)}${remembers(detail) ? ` <span class="small" title="It remembers you: ×${REMEMBER} XP until it's back to Lv ${S.box[detail].peak}">❄ was Lv ${S.box[detail].peak}</span>` : ""}${isStory() ? ` <span class="small ${S.box[detail].bond ? "good" : "muted"}">${S.box[detail].bond ? "Bonded ♥" : "Not bonded yet"}</span>` : ""}${isStory() && +detail === NULL && S.story.silvally === 1 ? ` <span class="small">Trust: ${S.story.nullTrust || 0}/${TRUST_NEED}</span>` : ""} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> ${lvText(detail)}${remembers(detail) ? ` <span class="small" title="It remembers you: ×${REMEMBER} XP until it's back to Lv ${S.box[detail].peak}">❄ was Lv ${S.box[detail].peak}</span>` : ""}${isStory() && +detail === NULL && S.story.silvally === 1 ? ` <span class="small">Trust: ${S.story.nullTrust || 0}/${TRUST_NEED}</span>` : ""} ${st.types.map(tyChip).join(" ")} <span class="muted small">${tierLabel(st) ? tierLabel(st) + " · " : ""}${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${bNow}${bNow < bFull || bRaw > BULK_CAP ? ` (base ${Math.round(bRaw)}${bRaw > BULK_CAP ? `, counts as ${BULK_CAP}` : ""})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small">Lv ${level(detail)}: HP <b>${now.hp}</b> · Atk <b>${now.atk}</b> · Def <b>${now.def}</b> · SpA <b>${now.spa}</b> · SpD <b>${now.spd}</b> · Spe <b>${now.spe}</b> · Total <b>${now.bst}</b></div>` +
     `<div class="small muted">Base stats: HP ${st.hp} · Atk ${st.atk} · Def ${st.def} · SpA ${st.spa} · SpD ${st.spd} · Spe ${st.spe} · Total ${st.bst}</div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
