@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 965,
+  "count": 966,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b96cba93","date":"2026-11-25","author":"bassdrum4","subject":"Score Krillion's dive in the browser instead of a Postgres answer bank"},
   {"sha":"41b9356e","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story framework: v3 revisions (hidden bond flag, level sync)"},
   {"sha":"0209f735","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story framework: v2 revisions (catch regions, bonded, trust, Next up and the Year map)"},
   {"sha":"b070c0b6","date":"2026-11-25","author":"Claude","subject":"Poké Idle Story Year 1: Vettel's revisions"},
