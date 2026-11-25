@@ -17,8 +17,9 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
       const exp=Number(JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString()).exp)*1000;
       if(!Number.isFinite(exp)||exp<=Date.now())throw Error('Expired token');
       if(auth.size>=2048)auth.delete(auth.keys().next().value);
-      auth.set(key,{value,until:Math.min(exp,Date.now()+authMs)});
-      return value;
+      const verified={...value,expires:exp};
+      auth.set(key,{value:verified,until:Math.min(exp,Date.now()+authMs)});
+      return verified;
     })();
     pending.set(key,task);
     try{return await task;}finally{pending.delete(key);}
@@ -72,9 +73,9 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     else if(m.t==='auth'&&typeof m.jwt==='string'&&m.jwt.length<=7000&&m.jwt.split('.').length===3){
       let p;try{p=await profile(m.jwt);}catch{reply(res,401,{t:'err'},origin);return;}
       if(m.mode==='hide'){hideAccount(p.id);reply(res,200,{t:'off'},origin);return;}
-      if(!p.visible){evict(p.id);reply(res,200,{t:'off'},origin);return;}
+      if(!p.visible){hideAccount(p.id);reply(res,200,{t:'off'},origin);return;}
       if(!p.handle){reply(res,401,{t:'err'},origin);return;}
-      identity={guest:false,id:p.id,name:p.handle};
+      identity={guest:false,id:p.id,name:p.handle,expires:p.expires};
     }else{reply(res,400,{t:'err'},origin);return;}
     if(res.destroyed)return;
     let s=sessions.get(m.sid);
@@ -85,7 +86,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     }
     if(!s){
       const ip=clientSource(req);
-      if(sessions.size>=maxClients||[...sessions.values()].filter(x=>x.ip===ip).length>=maxIp){reply(res,429,{t:'err'},origin);return;}
+      if(sessions.size>=maxClients||roster.counts().g+roster.counts().a>=maxClients||[...sessions.values()].filter(x=>x.ip===ip).length>=maxIp){reply(res,429,{t:'err'},origin);return;}
       s={id:m.sid,identity,ip,watch:false,at:Date.now(),connection:null};sessions.set(s.id,s);
     }
     detach(s);s.identity=identity;s.watch=m.watch===true&&!identity.guest;s.at=Date.now();
@@ -99,7 +100,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     if(c.mode==='sse'){
       res.writeHead(200,{'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache, no-transform','x-accel-buffering':'no','access-control-allow-origin':origin,'vary':'Origin'});
       res.flushHeaders();res.write('data: '+JSON.stringify(frame)+'\n\n');
-      c.timer=setTimeout(()=>detach(s,{t:'renew'}),streamMs);c.timer.unref?.();
+      c.timer=setTimeout(()=>detach(s,{t:'renew'}),Math.max(1,Math.min(streamMs,(identity.expires||Infinity)-Date.now()-5000)));c.timer.unref?.();
     }else{
       c.timer=setTimeout(()=>detach(s),waitMs);c.timer.unref?.();
     }
