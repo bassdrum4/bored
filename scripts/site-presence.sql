@@ -84,10 +84,17 @@ $$;
 revoke all on function public.bored_presence_rpc(text,jsonb) from public,anon,authenticated;
 grant execute on function public.bored_presence_rpc(text,jsonb) to authenticated;
 
+create or replace function bored_presence.can_join()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select auth.uid() is not null
+    and coalesce(auth.jwt()->>'is_anonymous','false') <> 'true'
+    and coalesce((select visible from bored_presence.settings where user_id=auth.uid()),true);
+$$;
+revoke all on function bored_presence.can_join() from public,anon,authenticated;
+grant execute on function bored_presence.can_join() to authenticated;
+
 -- A private channel, scoped to this feature. No broad changes to existing live rooms.
 create policy "bored presence read" on realtime.messages for select to authenticated
-using (realtime.topic()='bored-online-v1' and extension='presence' and
-  coalesce(auth.jwt()->>'is_anonymous','false') <> 'true');
+using (realtime.topic()='bored-online-v1' and extension='presence' and (select bored_presence.can_join()));
 create policy "bored presence track" on realtime.messages for insert to authenticated
-with check (realtime.topic()='bored-online-v1' and extension='presence' and
-  coalesce(auth.jwt()->>'is_anonymous','false') <> 'true');
+with check (realtime.topic()='bored-online-v1' and extension='presence' and (select bored_presence.can_join()));
