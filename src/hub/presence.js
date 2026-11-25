@@ -1,11 +1,19 @@
 import { backendReady, freshSession, getSession, hasIdentity, realtimeURL, request } from './backend.js';
-import { isProductionTelemetryUrl, qaSession } from './analytics.js';
 import { subscribeChanges } from './realtime.js';
 
 const TOPIC = 'bored-online-v1';
 const TICKET_REFRESH_MS = 4 * 60 * 1000;
 const VERIFY_MS = 60 * 1000;
 const TICKET = /^[0-9a-f-]{36}\.[0-9a-f-]{36}\.[0-9]{1,12}\.[0-9a-f]{64}$/;
+
+// QA is an analytics preference, not a social visibility preference.
+export function isLivePresenceUrl(href) {
+  try {
+    const url = new URL(href);
+    return url.protocol === 'https:' && url.hostname === 'bassdrum4.github.io' &&
+      /^\/bored(?:\/|$)/.test(url.pathname);
+  } catch { return false; }
+}
 
 export function validPresenceTickets(tickets) {
   return [...new Set((tickets || []).filter(t => typeof t === 'string' && TICKET.test(t)))].sort().slice(0, 300);
@@ -28,7 +36,7 @@ export function mountPresence() {
   let owner = null, epoch = 0, channel = null, tickets = null, visible = null;
   let resolveTimer = 0, refreshTimer = 0, verifyTimer = 0, resolveSerial = 0;
   let preferencePending = false, suspended = false, preferenceReading = false, paused = false;
-  const eligible = backendReady() && isProductionTelemetryUrl(location.href, qaSession()) &&
+  const eligible = backendReady() && isLivePresenceUrl(location.href) &&
     typeof WebSocket !== 'undefined';
 
   function current(id, version) {
