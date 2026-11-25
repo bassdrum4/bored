@@ -100,8 +100,8 @@ test('analytics role requests are shared, cached briefly, and isolated by accoun
   const calls = [];
   const request = async (url) => {
     calls.push(url);
-    if (url.includes('/analytics_admins')) return [{ user_id: 'account-a' }];
-    return [{ game: 'ashcrown' }];
+    assert.equal(url, '/rest/v1/rpc/my_analytics_access');
+    return { admin: session.user.id === 'account-a', games: ['ashcrown'] };
   };
   const { getAnalyticsAccess } = new Function('request', 'getSession', 'freshSession',
     source + '\nreturn { getAnalyticsAccess };')
@@ -110,19 +110,19 @@ test('analytics role requests are shared, cached briefly, and isolated by accoun
   const both = await Promise.all([getAnalyticsAccess(), getAnalyticsAccess()]);
   assert.equal(both[0].kind, 'admin');
   assert.deepEqual(both[1], both[0]);
-  assert.equal(calls.length, 2, 'concurrent role consumers share one query pair');
+  assert.equal(calls.length, 1, 'concurrent role consumers share one RPC');
   await getAnalyticsAccess();
-  assert.equal(calls.length, 2, 'recent access uses in-memory cache');
+  assert.equal(calls.length, 1, 'recent access uses in-memory cache');
 
   session = { access_token: 'token-b', user: { id: 'account-b' } };
   const next = await getAnalyticsAccess();
   assert.equal(next.userId, 'account-b');
   assert.equal(next.kind, 'game-reader');
-  assert.equal(calls.length, 4, 'new accounts always query their own roles');
+  assert.equal(calls.length, 2, 'new accounts always query their own roles');
 
   session = { access_token: 'token-b2', user: { id: 'account-b' } };
   await getAnalyticsAccess();
-  assert.equal(calls.length, 6, 'new session tokens cannot inherit stale permissions');
+  assert.equal(calls.length, 3, 'new session tokens cannot inherit stale permissions');
 });
 
 test('analytics footer routes only authorized accounts to their dashboard', async t => {
@@ -328,6 +328,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
     const body = req.url().includes('/rpc/analytics_game_popularity_v1') ? popularityFixture :
       req.url().includes('/rpc/analytics_rollup_v1') ? aggregateFixture :
       req.url().includes('/rpc/analytics_retention_cohorts_v1') ? cohortFixture :
+      req.url().includes('/rpc/my_analytics_access') ? {admin,games:[]} :
       req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? req.url().includes('game=eq.f-14') ? [] : fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
     return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
   });
@@ -344,6 +345,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   // game errors in production, even with the user's preference initially on.
   assert.equal(writes.length, 0);
   if (await page.$eval('#claim-dialog', n => n.open)) await page.click('#claim-cancel');
+  await page.click('#profile-menu summary');
   await page.click('#settings-nav');
   assert.equal(await page.$eval('#analytics-enabled', n => n.checked), false);
   assert.equal(await page.$eval('#analytics-enabled', n => n.disabled), true);

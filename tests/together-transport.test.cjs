@@ -22,3 +22,13 @@ test('pool shots use the authenticated Edge endpoint rather than accepting clien
  const rpc=load({hasIdentity:()=>true,getSession:()=>({user:{id:'player'}}),freshSession:async()=>({user:{id:'player'},access_token:'token'}),request:async(path,options)=>{seen={path,options};return {ok:true};}});
  await rpc('pool_move',payload);assert.equal(seen.path,'/functions/v1/together-pool');assert.deepEqual(seen.options.body,payload);assert.equal(seen.options.token,'token');
 });
+
+test('Together caches only short-lived reads and invalidates after a mutation',async()=>{
+ let count=0;
+ const rpc=load({hasIdentity:()=>true,getSession:()=>({user:{id:'one'}}),freshSession:async()=>({user:{id:'one'},access_token:'token'}),request:async()=>({count:++count})});
+ assert.equal((await rpc('dashboard')).count,1);
+ assert.equal((await rpc('dashboard')).count,1);
+ assert.equal((await rpc('dashboard',{}, {force:true})).count,2);
+ await rpc('move',{match_id:'m'});
+ assert.equal((await rpc('dashboard')).count,4);
+});

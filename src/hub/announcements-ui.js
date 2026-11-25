@@ -48,6 +48,32 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
     writeStored(guestVoteKey, saved);
   }
   let entries = [], accountReads = new Set(), generation = 0, refreshedAt = 0;
+  let personalLoadedFor = null, publicFlight = null;
+  const publicKey = "bored.announcements.public.v1";
+  const PUBLIC_TTL = 300000;
+  function visibleNow(item) {
+    return item?.active && Date.parse(item.published_at) <= Date.now() && (!item.expires_at || Date.parse(item.expires_at) > Date.now());
+  }
+  function announcementPath(filter) {
+    const now = encodeURIComponent(new Date().toISOString());
+    return "/rest/v1/announcements?select=id,title,body,kind,options,audience,recipient_id,priority,link_url,active,created_at,published_at,expires_at"
+      + "&active=eq.true&published_at=lte." + now + "&or=(expires_at.is.null,expires_at.gt." + now + ")"
+      + filter + "&order=created_at.desc&limit=100";
+  }
+  async function publicMessages() {
+    const cached = readStored(publicKey, null);
+    if (cached && Array.isArray(cached.items) && Date.now() - cached.at >= 0 && Date.now() - cached.at < PUBLIC_TTL)
+      return cached.items.filter(item => item.audience === "everyone" && visibleNow(item));
+    if (publicFlight) return publicFlight;
+    const job = (async () => {
+      const rows = await request(announcementPath("&audience=eq.everyone"), { token: ANON_TOKEN });
+      const items = (Array.isArray(rows) ? rows : []).filter(item => item.audience === "everyone" && visibleNow(item));
+      writeStored(publicKey, { at: Date.now(), items });
+      return items;
+    })();
+    publicFlight = job;
+    try { return await job; } finally { if (publicFlight === job) publicFlight = null; }
+  }
   const seenBannerImpressions = new Set();
   // announcement id -> { choice } or { answer }. One row per account, so this
   // is also how the card knows whether the poll was already answered.
@@ -313,7 +339,7 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
   // Coming back to the tab is not a reason to re-read the list: coalesce focus
   // refreshes so tabbing in and out cannot spend a request each time.
   async function refresh({ force = false } = {}) {
-    if (!force && Date.now() - refreshedAt < 60000) return;
+    if (!force && Date.now() - refreshedAt < (current() ? 120000 : PUBLIC_TTL)) return;
     refreshedAt = Date.now();
     const seq = ++generation, who = current();
     try {
@@ -321,24 +347,24 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
       // Only what the banner can show: live, already published, not expired. The
       // card applies the same three rules, so drafts and old announcements no
       // longer travel with every load.
-      const now = encodeURIComponent(new Date().toISOString());
-      const [messages, receipts, answers] = await Promise.all([
-        request('/rest/v1/announcements?select=id,title,body,kind,options,audience,recipient_id,priority,link_url,active,created_at,published_at,expires_at'
-          + '&active=eq.true&published_at=lte.' + now + '&or=(expires_at.is.null,expires_at.gt.' + now + ')'
-          + '&order=created_at.desc&limit=100',
-          { token: who ? undefined : ANON_TOKEN }),
-        who ? request('/rest/v1/announcement_reads?select=announcement_id&user_id=eq.' + encodeURIComponent(who) + '&limit=1000') : Promise.resolve([]),
-        who ? request('/rest/v1/announcement_responses?select=announcement_id,choice,answer&user_id=eq.' + encodeURIComponent(who) + '&limit=200') : Promise.resolve([])
+      const loadPersonal = Boolean(who && personalLoadedFor !== who);
+      const [messages, privateMessages, receipts, answers] = await Promise.all([
+        publicMessages(),
+        who ? request(announcementPath('&audience=neq.everyone')).then(rows =>
+          (Array.isArray(rows) ? rows : []).filter(item => visibleNow(item) && (item.audience === 'registered' || item.recipient_id === who))) : Promise.resolve([]),
+        loadPersonal ? request('/rest/v1/announcement_reads?select=announcement_id&user_id=eq.' + encodeURIComponent(who) + '&limit=1000') : Promise.resolve([]),
+        loadPersonal ? request('/rest/v1/announcement_responses?select=announcement_id,choice,answer&user_id=eq.' + encodeURIComponent(who) + '&limit=200') : Promise.resolve([])
       ]);
       if (seq !== generation || current() !== who) return;
-      entries = messages || [];
-      accountReads = new Set(receipts.map(r => r.announcement_id));
-      myResponses.clear();
-      if (who) {
+      entries = [...new Map([...messages, ...privateMessages].map(item => [item.id, item])).values()]
+        .sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)));
+      if (loadPersonal) {
+        for (const row of receipts || []) if (row?.announcement_id) accountReads.add(row.announcement_id);
         for (const row of answers || []) {
-          if (row?.announcement_id) myResponses.set(row.announcement_id, { choice: row.choice, answer: row.answer });
+          if (row?.announcement_id && !myResponses.has(row.announcement_id)) myResponses.set(row.announcement_id, { choice: row.choice, answer: row.answer });
         }
-      } else {
+        personalLoadedFor = who;
+      } else if (!who) {
         for (const [id, choice] of Object.entries(guestVotes())) myResponses.set(id, { choice });
       }
       $('announcement-status').textContent = '';
@@ -346,14 +372,12 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
       // Answered polls show their tally, loaded lazily so the first paint is
       // never held up by a request per poll.
       for (const item of entries) {
-        if (item.kind === 'poll' && myResponses.get(item.id)?.choice) void loadTally(item.id);
+        if (item.kind === 'poll' && myResponses.get(item.id)?.choice && !pollTallies.has(item.id)) void loadTally(item.id);
       }
     } catch {
       if (seq !== generation || current() !== who) return;
-      entries = [];
-      accountReads.clear();
-      myResponses.clear();
-      pollTallies.clear();
+      entries = entries.filter(visibleNow);
+      refreshedAt = 0;
       $('announcement-status').textContent = 'Announcements are unavailable right now.';
       render();
     }
@@ -368,6 +392,7 @@ export function createAnnouncementsUI({ track = () => {} } = {}) {
       const next = current();
       if (identity === next) return;
       identity = next;
+      personalLoadedFor = null;
       entries = [];
       accountReads.clear();
       myResponses.clear();

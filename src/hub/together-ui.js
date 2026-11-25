@@ -188,16 +188,16 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     if (flight) return flight;
     // An unopened Together tab still gets badge updates, but doesn't poll
     // every 15 seconds for someone playing other games.
-    if (!force && Date.now() - lastRefresh < (visible ? 14000 : 55000)) return;
+    if (!force && Date.now() - lastRefresh < (visible ? 14000 : 90000)) return;
     const stamp = generation;
     const task = (async () => {
       try {
-        const next = await togetherRPC('dashboard');
+        const next = await togetherRPC('dashboard', {}, { force });
         if (stamp !== generation) return;
         // Live rooms are a separate endpoint. If it is not there yet (its SQL has not been applied), the rest of
         // Bored Together carries on without it.
         let lives = null;
-        if (next?.enrolled) { try { lives = await liveRPC('list'); } catch { lives = null; } }
+        if (next?.enrolled) { try { lives = await liveRPC('list', {}, { force }); } catch { lives = null; } }
         if (stamp !== generation) return;
         const nextKey = Array.isArray(lives) ? liveSignature(lives) : liveKey;
         const changed = JSON.stringify(data) !== JSON.stringify(next) || nextKey !== liveKey;
@@ -844,7 +844,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     setTimeout(checkInvites, 400);
   }
   window.addEventListener('bored:identity', () => {
-    resetIdentity(); refresh(true);
+    const previous = owner;
+    resetIdentity();
+    if (previous !== owner) refresh(true);
     scheduleInviteCheck();
   });
   window.addEventListener('bored:together-open', event => {
@@ -856,7 +858,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   window.addEventListener('online', () => refresh(true));
   window.addEventListener('hashchange', () => { if (location.hash === '#together') open(); else close(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-  // Preserve quick updates while Together is open; outside it, a minute-level
+  // Preserve quick updates while Together is open; outside it, a 90-second
   // badge refresh costs far fewer Auth and database requests on the Free tier.
   setInterval(() => { if (!document.hidden && hasIdentity()) refresh(); }, 15000);
   resetIdentity(); refresh(); if (location.hash === '#together') open();

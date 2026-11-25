@@ -3,14 +3,27 @@ import { request, freshSession, getSession, hasIdentity } from './backend.js';
 // v3 shows members to each other in a list, with their email. Existing members
 // are asked to review it once before their games load again.
 export const CONSENT_VERSION = '2026-10-26-v3';
-// Share only *simultaneous* identical read requests. There is no TTL or stale
-// state: a later poll always goes to the server, and mutation calls never coalesce.
+// Share in-flight and very recent dashboard/list/people reads by account and token.
+// Explicit refreshes and successful mutations invalidate stale completed results;
+// active match reads and writes never use this cache.
 const inflightReads = new Map();
-function readOnce(owner, endpoint, action, args, send) {
-  const key = JSON.stringify([owner, endpoint, action, args]);
+const completedReads = new Map();
+let readEpoch = 0;
+function invalidateReads() { readEpoch++; completedReads.clear(); inflightReads.clear(); }
+function readOnce(owner, token, endpoint, action, args, send, force = false) {
+  const key = JSON.stringify([owner, token, endpoint, action, args]);
+  const cached = completedReads.get(key);
+  if (!force && cached && Date.now() < cached.expiresAt) return Promise.resolve(cached.value);
   const existing = inflightReads.get(key);
   if (existing) return existing;
-  const job = Promise.resolve().then(send);
+  const epoch = readEpoch;
+  const job = Promise.resolve().then(send).then(value => {
+    if (epoch === readEpoch && value?.ok !== false) {
+      if (completedReads.size >= 32) completedReads.clear();
+      completedReads.set(key, { value, expiresAt: Date.now() + (action === "people" ? 15000 : 5000) });
+    }
+    return value;
+  });
   inflightReads.set(key, job);
   void job.finally(() => { if (inflightReads.get(key) === job) inflightReads.delete(key); }).catch(() => {});
   return job;
@@ -28,10 +41,11 @@ export async function inviteRPC(action, args = {}) {
     method: 'POST', body: { action, args }, token: session.access_token
   });
   if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
+  if (!['list','people'].includes(action)) invalidateReads();
   return result;
 }
 
-export async function togetherRPC(action, args = {}) {
+export async function togetherRPC(action, args = {}, { force = false } = {}) {
   if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');
   const owner = getSession()?.user?.id;
   const session = await freshSession();
@@ -39,8 +53,9 @@ export async function togetherRPC(action, args = {}) {
   const send = () => request(action === 'pool_move' ? '/functions/v1/together-pool' : '/rest/v1/rpc/bt_rpc', {
     method: 'POST', body: action === 'pool_move' ? args : { action, args }, token: session.access_token
   });
-  const result = await (['dashboard', 'people'].includes(action)
-    ? readOnce(owner, 'bt_rpc', action, args, send) : send());
+  const read = ['dashboard', 'people'].includes(action);
+  const result = await (read ? readOnce(owner, session.access_token, 'bt_rpc', action, args, send, force) : send());
+  if (!read) invalidateReads();
   if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
   // An event is a client-side funnel indicator only; the authoritative matches
   // and moves tables determine whether a match actually completed.
@@ -60,7 +75,7 @@ export async function togetherRPC(action, args = {}) {
 // Live games have their own endpoint: rooms, the ordered action log, presence and snapshots (bt_live_rpc). It is
 // called a lot more often than togetherRPC (a heartbeat every 10 seconds, an action per click), so it carries no
 // telemetry events of its own.
-export async function liveRPC(action, args = {}) {
+export async function liveRPC(action, args = {}, { force = false } = {}) {
   if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');
   const owner = getSession()?.user?.id;
   const session = await freshSession();
@@ -69,7 +84,8 @@ export async function liveRPC(action, args = {}) {
     method: 'POST', body: { action, args }, token: session.access_token
   });
   const result = await (action === 'list'
-    ? readOnce(owner, 'bt_live_rpc', action, args, send) : send());
+    ? readOnce(owner, session.access_token, 'bt_live_rpc', action, args, send, force) : send());
+  if (action !== 'list' && !['heartbeat','hello','actions','game'].includes(action)) invalidateReads();
   if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
   // A room code that does not work is answered, not raised (a raised error would undo the server's count of tries):
   // {ok:false, error}. It reads as an ordinary refusal here, and never as a lost connection (it has a status).
