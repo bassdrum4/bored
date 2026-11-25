@@ -77,6 +77,9 @@ jobs:
 
   deploy:
     needs: build
+    # A push intentionally skips the Krillion job. Its skipped result must
+    # not propagate through a successful build and suppress deployment.
+    if: always() && !cancelled() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
