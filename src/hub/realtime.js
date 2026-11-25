@@ -14,8 +14,48 @@
 //   });
 //   channel.close();
 
+// Phoenix presence state, keyed by server connection refs. Never trust client
+// names; the presence UI resolves only server-issued tickets.
+export function createPresenceState() {
+  const members = new Map();
+  let ready = false, pending = [];
+  function apply(group, joining) {
+    for (const [key, entry] of Object.entries(group || {})) {
+      if (!Array.isArray(entry?.metas)) continue;
+      const refs = members.get(key) || new Map();
+      for (const meta of entry.metas) {
+        if (typeof meta?.phx_ref !== 'string') continue;
+        if (joining) {
+          if (typeof meta.phx_ref_prev === 'string') refs.delete(meta.phx_ref_prev);
+          refs.set(meta.phx_ref, typeof meta.ticket === 'string' ? meta.ticket : '');
+        } else refs.delete(meta.phx_ref);
+      }
+      if (refs.size) members.set(key, refs); else members.delete(key);
+    }
+  }
+  function diff(payload) { apply(payload?.joins, true); apply(payload?.leaves, false); }
+  return {
+    reset() { members.clear(); ready = false; pending = []; },
+    snapshot(payload) {
+      members.clear(); apply(payload, true); ready = true;
+      for (const item of pending) diff(item);
+      pending = [];
+    },
+    change(payload) {
+      if (!ready) { if (pending.length < 1000) pending.push(payload); return; }
+      diff(payload);
+    },
+    tickets() {
+      return ready ? [...new Set([...members.values()].flatMap(refs => [...refs.values()]).filter(Boolean))].sort() : null;
+    }
+  };
+}
+
 export function subscribeChanges(options) {
-  const { url, topic, changes, getToken, onChange, onState } = options;
+  const { url, topic, changes = [], getToken, onChange, onState, onPresence } = options;
+  const presence = typeof onPresence === 'function' ? createPresenceState() : null;
+  let desiredTicket = '', presenceRef = '';
+  const reportPresence = () => { try { onPresence?.(presence.tickets()); } catch {} };
   const Socket = options.WebSocket || globalThis.WebSocket;
   const heartbeatMs = options.heartbeatMs || 25000;
   const joinWaitMs = options.joinWaitMs || 10000;
@@ -30,13 +70,20 @@ export function subscribeChanges(options) {
   function send(event, payload, to) {
     if (!socket || socket.readyState !== 1) return;
     ref += 1;
-    try { socket.send(JSON.stringify({ topic: to || name, event, payload, ref: String(ref), join_ref: joinRef })); } catch (error) { /* the close handler follows */ }
+    try { socket.send(JSON.stringify({ topic: to || name, event, payload, ref: String(ref), join_ref: joinRef })); return String(ref); } catch (error) { /* the close handler follows */ }
+  }
+
+  function pushPresence() {
+    if (joined && presence && desiredTicket) {
+      presenceRef = send('presence', { type: 'presence', event: 'track', payload: { ticket: desiredTicket } });
+    }
   }
 
   // The socket is gone or useless: say so once, and try again a little later.
   function down(reason) {
     const was = joined;
     joined = false;
+    if (presence) { presence.reset(); reportPresence(); presenceRef = ''; }
     clearInterval(beatTimer); clearTimeout(joinTimer); clearInterval(tokenTimer);
     const old = socket;
     socket = null;
@@ -56,6 +103,7 @@ export function subscribeChanges(options) {
     if (m.event === 'phx_reply') {
       if (m.topic === 'phoenix') { missed = 0; return; }
       if (m.topic !== name) return;
+      if (presence && presenceRef && m.ref === presenceRef && m.payload?.status !== 'ok') { down('Presence was refused.'); return; }
       if (m.ref === joinRef) {
         const reply = m.payload || {};
         const bound = reply.response && Array.isArray(reply.response.postgres_changes) ? reply.response.postgres_changes.length : 0;
@@ -73,12 +121,15 @@ export function subscribeChanges(options) {
             try { const next = await getToken(); if (next && joined) send('access_token', { access_token: next }); } catch (error) { /* try again next time */ }
           }, tokenMs);
           tell(true);
+          pushPresence();
         } else down((reply.response && reply.response.reason) || 'The server refused the subscription.');
       }
       return;
     }
     if (m.topic !== name) return;
-    if (m.event === 'postgres_changes') {
+    if (presence && m.event === 'presence_state') { presence.snapshot(m.payload); reportPresence(); }
+    else if (presence && m.event === 'presence_diff') { presence.change(m.payload); reportPresence(); }
+    else if (m.event === 'postgres_changes') {
       const data = m.payload && m.payload.data;
       if (data && data.type === 'INSERT' && data.record && typeof data.record === 'object') {
         try { onChange(data.record, data); } catch (error) { /* a listener's problem */ }
@@ -99,7 +150,7 @@ export function subscribeChanges(options) {
     mine.onopen = () => {
       if (mine !== socket) return;
       joinRef = String(ref + 1);
-      send('phx_join', { config: { broadcast: { ack: false, self: false }, presence: { key: '' }, postgres_changes: changes, private: false }, access_token: token });
+      send('phx_join', { config: { broadcast: { ack: false, self: false }, presence: { key: '', ...(presence ? { enabled: true } : {}) }, postgres_changes: changes, private: options.private === true }, access_token: token });
       joinTimer = setTimeout(() => { if (mine === socket && !joined) down('The server did not answer.'); }, joinWaitMs);
     };
     mine.onmessage = event => { if (mine === socket) receive(event.data); };
@@ -110,10 +161,16 @@ export function subscribeChanges(options) {
   connect();
   return {
     isOpen: () => joined,
+    trackPresence(ticket) {
+      if (!presence || closed || typeof ticket !== 'string' || !ticket || desiredTicket === ticket) return;
+      desiredTicket = ticket;
+      pushPresence();
+    },
     // Try again now instead of at the next backoff, for when the network comes back.
     reconnect() { if (closed || socket) return; attempt = 0; clearTimeout(retryTimer); connect(); },
     close() {
       closed = true;
+      if (presence) { presence.reset(); reportPresence(); }
       clearTimeout(retryTimer); clearInterval(beatTimer); clearTimeout(joinTimer); clearInterval(tokenTimer);
       const old = socket;
       socket = null;

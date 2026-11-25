@@ -32,7 +32,7 @@ function frame(op, payload) {
 
 async function createMockRealtime() {
   const clients = new Set();
-  const state = { joins: [], heartbeats: 0, tokens: [], leaves: 0, refuse: false, silent: false, connections: 0, urls: [] };
+  const state = { tracks: [], joins: [], heartbeats: 0, tokens: [], leaves: 0, refuse: false, silent: false, connections: 0, urls: [] };
   const server = http.createServer((req, res) => { res.statusCode = 426; res.end('upgrade required'); });
   const send = (client, message) => { try { client.socket.write(frame(1, JSON.stringify(message))); } catch (error) { /* gone */ } };
 
@@ -46,6 +46,9 @@ async function createMockRealtime() {
       client.changes = (m.payload && m.payload.config && m.payload.config.postgres_changes) || [];
       send(client, { topic: m.topic, event: 'phx_reply', ref: m.ref, payload: { status: 'ok', response: { postgres_changes: client.changes.map((c, i) => Object.assign({ id: i + 1 }, c)) } } });
       send(client, { topic: m.topic, event: 'system', ref: null, payload: { status: 'ok', message: 'Subscribed to PostgreSQL', channel: m.topic, extension: 'postgres_changes' } });
+    } else if (m.event === 'presence') {
+      state.tracks.push(m.payload);
+      send(client, { topic: m.topic, event: 'phx_reply', ref: m.ref, payload: { status: 'ok', response: {} } });
     } else if (m.event === 'heartbeat') {
       state.heartbeats += 1;
       if (!state.silent) send(client, { topic: 'phoenix', event: 'phx_reply', ref: m.ref, payload: { status: 'ok', response: {} } });
@@ -85,6 +88,11 @@ async function createMockRealtime() {
   return {
     port, state,
     url: 'ws://127.0.0.1:' + port + '/realtime/v1/websocket?apikey=test&vsn=1.0.0',
+    presence(event, payload) {
+      for (const client of clients) {
+        if (client.topic) send(client, { topic: client.topic, event, ref: null, payload });
+      }
+    },
     subscribers: () => [...clients].filter(c => c.topic).length,
     // A new row in a table: everyone whose filter matches it hears about it.
     push(record, table = 'actions') {
