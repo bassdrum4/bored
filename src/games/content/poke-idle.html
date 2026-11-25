@@ -232,6 +232,8 @@
   .st-scenes { display: flex; flex-wrap: wrap; gap: 6px }
   .next { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--ink); border-radius: 4px }
   .yearmap { list-style: none; display: grid; gap: 4px; font-size: 13px; padding: 0 } .yearmap .mk { display: inline-block; width: 1.4em }
+  .testtools { display: grid; gap: 8px; margin-bottom: 12px; min-width: 0 } .testtools .row { flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0 }
+  .testtools label { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0 } .testtools select { max-width: 100%; min-width: 0 }
   .clues { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) }
   .clue { border: 1px solid var(--ink); border-radius: 4px; padding: 10px 12px; font-size: 13px } .clue b { display: block; margin-bottom: 4px }
   .syncask { margin: 0 0 12px }
@@ -401,6 +403,7 @@
         <div id="log" role="status"></div>
         <div id="throwbox" class="row small" hidden></div>
         <div id="finalbox" class="row small" hidden></div>
+        <div class="row small"><button class="lbl" id="testwin" type="button" hidden>Win this fight (test)</button></div>
         <div class="party" id="minis"></div>
         <div class="small muted" id="dps"></div>
       </div>
@@ -725,8 +728,12 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 // open is remembered in SLOT_KEY: "real", "story" or "test". Only the Classic save goes to the Bored account (sync,
 // below, reads KEY itself), and the leaderboard always reports Classic (see __boredSnapshot).
 const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", STORY_KEY = "bored.poke-idle.story", REPLAY_KEY = "bored.poke-idle.story.replay", SLOT_KEY = "bored.poke-idle.slot";
-const SLOT_NAME = { [KEY]: "real", [TEST_KEY]: "test", [STORY_KEY]: "story", [REPLAY_KEY]: "replay" };
-let slot = (() => { try { const v = localStorage.getItem(SLOT_KEY); return v === "test" ? TEST_KEY : v === "story" ? STORY_KEY : v === "replay" ? REPLAY_KEY : KEY; } catch { return KEY; } })();
+// The test account's Story save (testStoryAccount): its own slot, apart from the real Story save and the Classic test save.
+const TEST_STORY_KEY = "bored.poke-idle.test.story";
+const SLOT_NAME = { [KEY]: "real", [TEST_KEY]: "test", [STORY_KEY]: "story", [REPLAY_KEY]: "replay", [TEST_STORY_KEY]: "test-story" };
+const SLOT_OF = Object.fromEntries(Object.entries(SLOT_NAME).map(([k, v]) => [v, k]));
+let slot = (() => { try { return SLOT_OF[localStorage.getItem(SLOT_KEY)] || KEY; } catch { return KEY; } })();
+const testSlot = () => slot === TEST_KEY || slot === TEST_STORY_KEY;
 const setSlotPref = k => { try { localStorage.setItem(SLOT_KEY, SLOT_NAME[k]); } catch {} };
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
 const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, prestige: 0, lifeDex: {}, lifeShiny: {}, last: Date.now() });
@@ -1316,6 +1323,7 @@ function finalBreak() {
   renderFinalBox(); renderAll(); save();
 }
 function renderFinalBox() {
+  $("#testwin").hidden = !(S && S.test && B && B.foe);
   const el = $("#finalbox"), on = !!(B && B.brk != null);
   el.hidden = !on;
   el.innerHTML = on ? `<span>Phase ${(B.phase || 1) + 1} starts in <b id="finalwait">${Math.ceil(B.brk)}s</b>.</span><button class="lbl" type="button" data-final="go">Start phase ${(B.phase || 1) + 1}</button>` : "";
@@ -1444,7 +1452,7 @@ function startLoc(loc) {
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
-  if (isStory() && (loc.kind === "gym" || loc.kind === "champ") && leagueBreaks()) { leagueNotice(loc); return; }
+  if (isStory() && (loc.kind === "gym" || loc.kind === "champ") && !testOff("league") && leagueBreaks()) { leagueNotice(loc); return; }
   // The ticket is only used once the run is sure to start.
   if (loc.kind === "dungeon" || loc.kind === "raid") {
     const t = S.tickets[loc.r] || 0;
@@ -1788,7 +1796,7 @@ const lineKey = n => familyOf(n)[0];
 function readShinyLines() { try { const v = JSON.parse(localStorage.getItem(SHINY_KEY)); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } }
 const lineRecorded = n => !!readShinyLines()[lineKey(n)];
 function recordShinyLines() {
-  if (!S || !S.box || S.test || S.replay || slot === TEST_KEY) return;
+  if (!S || !S.box || S.test || S.replay || testSlot()) return;
   const store = readShinyLines(); let added = false;
   for (const k of Object.keys(S.box)) if (S.box[k].shiny && !store[lineKey(+k)]) { store[lineKey(+k)] = 1; added = true; }
   if (added) try { localStorage.setItem(SHINY_KEY, JSON.stringify(store)); } catch {}
@@ -3149,7 +3157,7 @@ const YEAR2_READY = false;
 const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
-const otherSlot = () => slot === KEY ? STORY_KEY : slot === STORY_KEY ? KEY : null;
+const otherSlot = () => ({ [KEY]: STORY_KEY, [STORY_KEY]: KEY, [TEST_KEY]: TEST_STORY_KEY, [TEST_STORY_KEY]: TEST_KEY })[slot] || null;
 // The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). silvally: 0 not
 // freed, 1 freed (Type: Null, its trust in nullTrust, up to TRUST_NEED), 2 evolved. The fields after epilogue are
 // reserved for the years to come and stay unused in Year 1, so later years need no migration.
@@ -3474,7 +3482,7 @@ const CHAPTERS = [
   { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", at: "the summit", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", letter: "story-silver", doneNote: "Shiny Charm" }
 ];
 const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
-const storyDex = () => lifeDex();
+const storyDex = () => S.test && S.debug && S.debug.dex === "met" ? Math.max(lifeDex(), 9999) : lifeDex();
 // After a first gym badge or Champion win in a region: its scene, and any clue or letter that comes with it.
 const STORY_EVENTS = {
   "gym:0": { scene: "kanto-gyms", clue: "badge" }, "gym:2": { scene: "hoenn-gyms" },
@@ -3646,7 +3654,7 @@ const chDone = id => !!(S && S.story && S.story.ch[id]);
 const chaptersDone = () => CHAPTERS.filter(c => chDone(c.id)).length;
 // What a chapter waits for: "champ", another chapter's id, or nothing.
 const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a)) || null;
-const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open());
+const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open() || !!(S.test && S.debug && S.debug.dex === "ignore"));
 function chapterRows(r) {
   return CHAPTERS.filter(c => c.r === r).map(c => {
     const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
@@ -3686,6 +3694,116 @@ function yearMap() {
     const done = chDone(c.id), cur = c === now, known = done || cur || chapterOpen(c) || c.finale;
     return { id: c.id, mark: done ? "✓" : cur ? "▶" : "🔒", name: known ? c.name : "???", optional: !!c.optional, note: c.finale && !done && c.note ? c.note() : "", r: c.r, grey: !done && !cur };
   });
+}
+// ── The test account in Story Mode (hold, hold, tap, tap, tap on the title, then the password; "Switch to Story" there).
+// A maxed save in its own slot (TEST_STORY_KEY), with test tools in the Story tab: jump to any chapter, win a fight,
+// reset a chapter, League rules and dex gates, the Giratina flags and the bond flags. It's a test save (S.test), so
+// nothing in it reaches the leaderboard, the shared shiny store, the account, or the real saves.
+function testStoryAccount() {
+  const t = testAccount();
+  t.mode = "story"; t.story = freshStory(); t.debug = { league: 1, dex: "normal" };
+  t.lifeDex = Object.fromEntries(Object.keys(t.box).map(k => [k, 1]));
+  t.tut = { seen: {}, off: 1 };
+  return t;
+}
+const testOff = k => !!(S && S.test && S.debug && S.debug[k] === 0);
+// Every point the story can be jumped to, in order. Jumping to one leaves everything before it done. Year 2 and 3
+// add theirs here (with their year transitions: Begin Year 2's reset, the Year 3 freeze, the pick-one, the thaw).
+function jumpPoints() {
+  const pts = [{ id: "prologue", label: "Prologue: starter picked" }];
+  REGIONS.forEach((R, r) => {
+    pts.push({ id: "gyms-" + r, label: `${R.name}: gyms`, r });
+    pts.push({ id: "champ-" + r, label: `${R.name}: Champion ${R.champ}`, r });
+    for (const c of CHAPTERS) if (c.r === r && c.type !== "red") pts.push({ id: "ch-" + c.id, label: `${R.name}: ${c.name}${c.optional ? " (optional)" : ""}`, r, c });
+  });
+  for (const c of CHAPTERS) if (c.type === "red") pts.push({ id: "ch-" + c.id, label: `Epilogue: ${c.name}`, r: c.r, c });
+  pts.push({ id: "year1-end", label: "Year 1 cleared: the Begin Year 2 screen", r: 1 });
+  return pts;
+}
+const JUMP_LATER = ["Year 2: Begin Year 2 and the level reset", "Year 2 chapters", "Year 3: the Box freeze and picking one", "Year 3: thawing region by region"];
+const pickChapters = () => CHAPTERS.filter(c => c.type === "pick");
+// Jump: the test save's story starts over, then everything before point i is marked done as if it had been played:
+// badges and Champions, chapters, version picks (picks: region -> dex number, or "random"), the scenes, clues and
+// letters on the way, the Key Stone, The Mask, Red. The Box, items and money stay as they are.
+function storyJump(i, picks = {}) {
+  if (!S || !S.test || !isStory()) return;
+  const pts = jumpPoints(), keepDex = S.story.lifeDex, see = id => { if (id && SCENES[id]) S.story.seen[id] = 1; };
+  S.badges = {}; S.champs = {}; S.kills = {}; S.dungeons = {}; S.mail.got = {};
+  S.story = { ...freshStory(), roulette: S.story.roulette, lifeDex: keepDex, seen: { "open-1": 1, "open-2": 1 } };
+  const event = (kind, r) => { const e = STORY_EVENTS[kind + ":" + r]; if (!e) return; see(e.scene); if (e.clue) S.story.clues[e.clue] = 1; if (e.letter) S.mail.got[e.letter] = 1; };
+  for (let j = 0; j < Math.min(i, pts.length); j++) {
+    const p = pts[j], c = p.c;
+    if (p.id.startsWith("gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; } event("gym", p.r); }
+    else if (p.id.startsWith("champ-")) { S.champs[p.r] = 1; event("champ", p.r); }
+    else if (c) {
+      S.story.ch[c.id] = 1;
+      if (c.type === "pick" || c.type === "legend") {
+        const want = picks[c.r], n = c.mons.includes(+want) ? +want : c.mons[Math.floor(Math.random() * c.mons.length)];
+        S.story.picks[c.r] = c.type === "legend" ? c.mons[0] : n;
+        see(`${REGIONS[c.r].name.toLowerCase()}-${S.story.picks[c.r]}`);
+      }
+      for (const id of [c.pre, c.post, c.after2]) see(id);
+      for (const id of [].concat(typeof c.letter === "function" ? c.letter() : c.letter || [])) S.mail.got[id] = 1;
+      if (c.type === "rival") S.rivals = { ...(S.rivals || {}), [c.rival]: 1 };
+      if (c.type === "rescue") { S.story.silvally = Math.max(1, S.story.silvally); S.story.nullTrust = 0; }
+      if (c.type === "red") S.story.epilogue = 1;
+    }
+  }
+  const at = pts[Math.min(i, pts.length - 1)];
+  S.loc = { kind: "route", r: at.r != null ? at.r : 0, k: 0 }; B = null; viewR = S.loc.r;
+  save(); backToRoute(); renderAll(); if (tab === "story") renderStory();
+  if (at.id === "year1-end") year2Confirm();
+  toast(`Jumped to ${at.label}.`);
+}
+// Reset a chapter: not done, its pick, scenes and letters cleared, so its scenes and fight play again.
+function resetChapter(id) {
+  const c = CHAPTER[id]; if (!c || !S.test) return;
+  delete S.story.ch[id];
+  for (const sid of [c.pre, c.post, c.after2]) if (sid) delete S.story.seen[sid];
+  if (c.type === "pick") { for (const n of c.mons) delete S.story.seen[`${REGIONS[c.r].name.toLowerCase()}-${n}`]; delete S.story.picks[c.r]; }
+  const letters = c.id === "johto-pick" ? ["story-johto-249", "story-johto-250"] : [].concat(typeof c.letter === "function" ? [] : c.letter || []);
+  for (const l of letters) delete S.mail.got[l];
+  if (c.type === "rescue") { S.story.silvally = 0; S.story.nullTrust = 0; }
+  if (c.type === "red") S.story.epilogue = 0;
+  save(); renderAll(); renderStory(); toast(`${c.name} can be played again.`);
+}
+// Skip the fight: win the current one at once (a boss's whole team, a phase of the finale).
+function testWin() {
+  if (!S || !S.test || !B || !B.foe || B.pause) return;
+  if (B.queue) B.idx = B.queue.length - 1;
+  B.foe.hp = 1; hit(1e12);
+}
+$("#testwin").onclick = testWin;
+// The Giratina easter egg flags (design doc Part F), kept on the test save only: Year 2 and 3 read them from
+// story.roulette. The cross-game flag Shotgun Roulette will share isn't touched here.
+const ROULETTE_FLAGS = [["hat", "Year 2: hat at the table"], ["dealer", "Beat Origin Giratina (Hard)"], ["replay", "Replay secret won"], ["paid", "Paid in full"]];
+function testTool(act, el) {
+  const d = S.debug = S.debug || { league: 1, dex: "normal" };
+  if (act === "jump") { const picks = {}; document.querySelectorAll("#t-story [data-pick-r]").forEach(x => { picks[x.dataset.pickR] = x.value; }); return storyJump(+$("#tj").value, picks); }
+  if (act === "randpicks") { document.querySelectorAll("#t-story [data-pick-r]").forEach(x => { x.value = x.options[1 + Math.floor(Math.random() * (x.options.length - 1))].value; }); return; }
+  if (act === "win") return testWin();
+  if (act === "reset") return resetChapter($("#tr").value);
+  if (act === "league") { d.league = d.league === 0 ? 1 : 0; toast(`League rules ${d.league ? "on" : "off"} (test save only).`); }
+  if (act === "bond") { const v = el.dataset.bond; for (const b of Object.values(S.box)) { if (v === "all" || (v === "random" && Math.random() < .5)) b.bond = 1; else delete b.bond; } toast(`Bond flags: ${v}.`); }
+  if (act === "set") {
+    if (el.dataset.testSet === "dex") d.dex = el.value;
+    if (el.dataset.testSet === "roulette") { S.story.roulette = { ...(S.story.roulette || {}), [el.dataset.flag]: el.checked ? 1 : 0 }; }
+  }
+  save(); renderAll(); renderStory();
+}
+function testToolsHtml() {
+  const d = S.debug || {}, ro = S.story.roulette || {}, pts = jumpPoints();
+  const bonded = Object.values(S.box).filter(b => b.bond).length;
+  return `<h2>Test tools</h2><div class="small testtools">
+    <div class="row"><label>Jump to <select id="tj">${pts.map((p, i) => `<option value="${i}">${esc(p.label)}</option>`).join("")}${JUMP_LATER.map(l => `<option disabled>${esc(l)} (not built yet)</option>`).join("")}</select></label><button class="lbl" type="button" data-test="jump">Jump</button></div>
+    <div class="row">Version picks: ${pickChapters().map(c => `<label>${esc(REGIONS[c.r].name)} <select data-pick-r="${c.r}"><option value="random">random</option>${c.mons.map(n => `<option value="${n}">${esc(mon(n).name)}</option>`).join("")}</select></label>`).join(" ")} <button class="lbl" type="button" data-test="randpicks">Random picks</button></div>
+    <div class="row"><button class="lbl" type="button" data-test="win">Win the current fight</button>
+      <label>Reset <select id="tr">${CHAPTERS.map(c => `<option value="${c.id}">${esc(REGIONS[c.r].name)}: ${esc(c.name)}${chDone(c.id) ? " ✓" : ""}</option>`).join("")}</select></label><button class="lbl" type="button" data-test="reset">Reset this chapter</button></div>
+    <div class="row"><button class="lbl" type="button" data-test="league">League rules: ${d.league === 0 ? "off" : "on"}</button>
+      <label>Dex gates <select data-test-set="dex">${[["normal", "as normal"], ["ignore", "ignored"], ["met", "met automatically"]].map(([v, l]) => `<option value="${v}"${(d.dex || "normal") === v ? " selected" : ""}>${l}</option>`).join("")}</select></label></div>
+    <div class="row">Giratina flags: ${ROULETTE_FLAGS.map(([k, l]) => `<label><input type="checkbox" data-test-set="roulette" data-flag="${k}"${ro[k] ? " checked" : ""}> ${esc(l)}</label>`).join(" ")}</div>
+    <div class="row">Bond flags (${bonded}/${Object.keys(S.box).length}): <button class="lbl" type="button" data-test="bond" data-bond="all">all</button><button class="lbl" type="button" data-test="bond" data-bond="none">none</button><button class="lbl" type="button" data-test="bond" data-bond="random">random</button></div>
+  </div>`;
 }
 // Story's leaderboard progress (for the Story board the hub doesn't have yet): year, chapters done, regions
 // liberated (a chapter with liberates: true closes its region), and the Story lifetime dex, which never goes down.
@@ -3742,9 +3860,14 @@ function renderStory() {
   $("#t-story").innerHTML = (next ? `<p class="next"><b>${esc(next)}</b></p>` : "") + `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
     ${map.length ? `<h2>Year ${st.year}: ${esc(YEARS[st.year] || "")}</h2><ul class="yearmap">${map.map(x => `<li class="${x.grey ? "muted" : ""}"><span class="mk">${x.mark}</span> ${esc(x.name)}${x.optional ? " (optional)" : ""}${x.note ? ` <span class="small">· ${esc(x.note)}</span>` : ""}</li>`).join("")}</ul>` : ""}
     <h2>Story so far</h2>${order.length ? order.map(g => `<div class="st-group"><h4>Year ${g.year}: ${esc(YEARS[g.year] || "")} · ${g.r < 0 ? "Prologue" : esc(REGIONS[g.r].name)}</h4><div class="st-scenes">${g.ids.map(id => `<button class="lbl" type="button" data-reread="${id}">${esc(SCENES[id].title)}</button>`).join("")}</div></div>`).join("") : '<p class="small muted">Nothing yet.</p>'}
+    ${S.test ? testToolsHtml() : ""}
     <h2>Clues</h2>${clues.length ? `<div class="clues">${clues.map(k => `<div class="clue"><b>${esc(CLUES[k].title)}</b>${esc(CLUES[k].text)}</div>`).join("")}</div>` : '<p class="small muted">No clues yet. Keep your eyes open.</p>'}`;
 }
-$("#t-story").onclick = e => { const b = e.target.closest("[data-reread]"); if (b) playScene(b.dataset.reread); };
+$("#t-story").onclick = e => {
+  const t = e.target.closest("[data-test]"); if (t && S.test) return testTool(t.dataset.test, t);
+  const b = e.target.closest("[data-reread]"); if (b) playScene(b.dataset.reread);
+};
+$("#t-story").onchange = e => { const t = e.target.closest("[data-test-set]"); if (t && S.test) testTool("set", t); };
 
 // ── Screens: title (the landing page), pick (a new save's starter), game.
 let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
@@ -3840,9 +3963,9 @@ $("#testdoor").onsubmit = e => {
   else $("#testmsg").textContent = "That's not it.";
 };
 function renderTitle() {
-  const other = otherSlot(), items = MENU[S ? "save" : "fresh"].filter(([id]) => !(slot === REPLAY_KEY && id === "new")).concat(slot === TEST_KEY ? [["back", "Back to my save"]] : slot === REPLAY_KEY ? [["endreplay", "End the replay"]]
-    : [...(other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []), ...(isStory() && S.story.epilogue ? [["replay", readSlot(REPLAY_KEY) ? "Back to the replay" : "Replay Year 1"]] : [])]);
-  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === REPLAY_KEY ? REPLAY_LINE : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
+  const other = otherSlot(), items = MENU[S ? "save" : "fresh"].filter(([id]) => !(slot === REPLAY_KEY && id === "new")).concat(testSlot() ? [["back", "Back to my save"], ["switch", slot === TEST_KEY ? "Switch to Story" : "Switch to Classic"]] : slot === REPLAY_KEY ? [["endreplay", "End the replay"]]
+    : [...(other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []), ...(isStory() && S.story.epilogue && !S.test ? [["replay", readSlot(REPLAY_KEY) ? "Back to the replay" : "Replay Year 1"]] : [])]);
+  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === TEST_STORY_KEY ? "Test account, Story Mode: maxed out, with test tools in the Story tab. Nothing here reaches the leaderboard or your real saves." : slot === REPLAY_KEY ? REPLAY_LINE : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
   $("#t-prest").hidden = !(S && S.prestige); $("#t-prest").textContent = S && S.prestige ? "P" + S.prestige : ""; $("#t-prest").title = S && S.prestige ? "Prestige " + S.prestige : "";
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
@@ -3879,6 +4002,7 @@ function go(id) {
   if (id === "continue") return enter("battle");
   if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail" || id === "ach") return enter(id);
   if (id === "back") return useSlot(KEY);
+  if (id === "switch" && testSlot()) { const k = otherSlot(); if (readSlot(k)) return useSlot(k); if (k === TEST_KEY) return useSlot(k, testAccount()); useSlot(k, testStoryAccount()); storyJump(0); return; }
   if (id === "switch" && otherSlot()) return useSlot(otherSlot());
   if (id === "replay" && isStory()) return readSlot(REPLAY_KEY) ? useSlot(REPLAY_KEY) : startReplay();
   if (id === "endreplay") return endReplay();
@@ -3962,7 +4086,7 @@ function syncText() {
   if (!syncBridge()) return "";
   if (SYNC.state === "start") return "Checking your Bored account…";
   if (!SYNC.acct) return "Sign in to Bored and your save follows you to any device.";
-  if (slot === TEST_KEY) return "The test account stays on this device; your own save is in your Bored account.";
+  if (testSlot()) return "The test account stays on this device; your own save is in your Bored account.";
   if (slot === STORY_KEY || slot === REPLAY_KEY) return "Story Mode stays on this device for now. Your Classic save is the one in your Bored account.";
   if (SYNC.ask) return "Two different saves: pick the one to keep.";
   if (syncTheirs(localSave() && localSave().s)) return "This save belongs to another Bored account on this browser, so it stays on this device.";
