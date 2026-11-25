@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 975,
+  "count": 976,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9cd8b08e","date":"2026-11-25","author":"bassdrum4","subject":"Fix Roulette mode feedback and reduce redundant backend requests"},
   {"sha":"eb0940eb","date":"2026-11-25","author":"Daniel Lowe","subject":"Test private opening deployment display for both Risk seats"},
   {"sha":"531026b6","date":"2026-11-25","author":"Daniel Lowe","subject":"Hide opposing troop counts during Bored Together opening deployment"},
   {"sha":"067a622f","date":"2026-11-25","author":"bassdrum4","subject":"Keep Krillion's run state so a finished dive gets its sounding"},
