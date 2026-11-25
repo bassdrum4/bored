@@ -42,7 +42,8 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
 #terminal-output .line{min-height:1.1em}
 .c-default{color:var(--fg)}.c-error{color:var(--error)}.c-warning{color:var(--accent)}.c-info{color:var(--info)}.c-success{color:var(--success)}.c-muted{color:var(--muted)}.c-highlight{color:#fff}.c-accent{color:var(--accent)}
 #input-line{display:flex;align-items:center;padding:8px 20px;background:var(--card);border-top:1px solid var(--border);flex-shrink:0}
-#prompt{color:var(--fg);font-size:13px;white-space:nowrap;margin-right:4px}
+#prompt{color:var(--fg);font-size:13px;white-space:nowrap;margin-right:4px;max-width:65%;overflow:hidden;text-overflow:ellipsis}
+#mobile-hud{display:none}
 #terminal-input{flex:1;background:transparent;border:none;color:var(--fg);font-family:inherit;font-size:13px;outline:none;caret-color:var(--fg)}
 #sidebar{width:260px;background:var(--sidebar);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
 .panel{padding:14px 16px;border-bottom:1px solid var(--border)}
@@ -63,7 +64,9 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
 @keyframes glitch-flicker{0%{background:rgba(255,60,56,.03)}50%{background:transparent}100%{background:rgba(0,212,255,.02)}}
 .glitch-active{animation:glitch-shake .1s infinite}
 @keyframes glitch-shake{0%{transform:translate(0)}25%{transform:translate(-1px,1px)}50%{transform:translate(1px,-1px)}75%{transform:translate(-1px,0)}100%{transform:translate(0)}}
-@media(max-width:768px){#sidebar{display:none}#top-bar .ver{display:none}}
+@media(max-width:768px){#sidebar{display:none}#top-bar .ver{display:none}
+  #mobile-hud{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 14px;background:var(--card);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);flex-shrink:0}
+  #mobile-hud strong{color:var(--fg);font-weight:400}}
 .fade-in{animation:fadeIn .4s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>
@@ -75,6 +78,7 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
     <span class="ver">v2.4.1</span>
     <div class="conn" id="conn-status"><span class="dot"></span><span id="conn-text">LOCAL</span></div>
   </div>
+  <div id="mobile-hud"><span>TRACE <strong id="m-trace">0%</strong></span><span id="m-mission">Mission 1</span></div>
   <div id="main">
     <div id="terminal-wrap">
       <div id="terminal-output"></div>
@@ -82,7 +86,7 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
       <div class="glitch-overlay"></div>
       <div id="input-line">
         <span id="prompt">ghost@localhost:~$ </span>
-        <input type="text" id="terminal-input" autofocus autocomplete="off" spellcheck="false">
+        <input type="text" id="terminal-input" autofocus autocomplete="off" spellcheck="false" aria-label="Terminal command">
       </div>
     </div>
     <div id="sidebar">
@@ -124,14 +128,17 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
 const CRACK_WORDS = {
   5: ['BRAIN','FLAME','GHOST','HEART','KNIFE','LIGHT','MAGIC','NIGHT','OCEAN','POWER','QUEEN','STORM'],
   6: ['BREACH','CIPHER','DELETE','ENIGMA','FALCON','HIDDEN','MATRIX','NEURAL','RENDER','SHADOW','TARGET','VECTOR'],
-  7: ['CONSOLE','CORRUPT','DECRYPT','ENCRYPT','EXPLOIT','GATEWAY','HACKING','NETWORK','ROOTKIT','CONTROL','ROUTINE','VOLTAGE']
+  7: ['CONSOLE','CORRUPT','DECRYPT','ENCRYPT','EXPLOIT','GATEWAY','HACKING','NETWORK','ROOTKIT','CONTROL','ROUTINE','VOLTAGE'],
+  8: ['BLACKOUT','DEADLINE','FIREWALL','KEYSTONE','LONGSHOT','MIDNIGHT','OVERRIDE','SHADOWED','TAKEDOWN','VANISHED','WATCHDOG','SIGNALED']
 };
 
 const SERVERS = {
   'localhost':{ip:'127.0.0.1',security:0,cracked:true,discovered:true,desc:'Your local machine',pwdLen:0,maxAttempts:0},
   'nexus-corp.net':{ip:'10.0.44.12',security:1,cracked:false,discovered:false,desc:'Nexus Corp public server',pwdLen:5,maxAttempts:4},
   'relay.nexus-corp.net':{ip:'10.0.44.50',security:2,cracked:false,discovered:false,desc:'Nexus Corp relay node',pwdLen:6,maxAttempts:4},
-  'vault.nexus-corp.net':{ip:'10.0.44.99',security:3,cracked:false,discovered:false,desc:'Nexus Corp secure vault',pwdLen:7,maxAttempts:3}
+  'vault.nexus-corp.net':{ip:'10.0.44.99',security:3,cracked:false,discovered:false,desc:'Nexus Corp secure vault',pwdLen:7,maxAttempts:4},
+  'drop.vega.net':{ip:'172.16.9.7',security:3,cracked:false,discovered:false,desc:'VEGA fallback relay',pwdLen:7,maxAttempts:4},
+  'meridian.archive.net':{ip:'203.0.113.44',security:4,cracked:false,discovered:false,desc:'Meridian Holdings archive',pwdLen:8,maxAttempts:3}
 };
 
 // File system: objects = dirs, strings = plain files, {content,encrypted,shift,classified} = encrypted files
@@ -172,7 +179,7 @@ const FS = {
     },
     etc:{
       'hosts':'127.0.0.1  localhost\n10.0.44.50  relay.nexus-corp.net\n10.0.44.99  vault.nexus-corp.net\n# Internal network - do not distribute',
-      'shadow':'Password hint for relay:\n"It lurks in darkness, following every move."\nLength: 6 characters'
+      'shadow':'Password hint for relay:\n"It is one of the six-letter words the\ncracker deals you. It answers with how many\nletters land in the right place — read that."\nLength: 6 characters'
     },
     var:{www:{'index.html':'<html><body><h1>Nexus Corp</h1><p>Under maintenance</p></body></html>'}}
   },
@@ -197,6 +204,25 @@ const FS = {
     },
     admin:{root:{'access_log.txt':'[2024-01-10] Reboot\n[2024-01-12] Keys rotated\n[2024-01-14] New protocol\n[2024-01-15] INTRUSION DETECTED\n[2024-01-15] LOCKDOWN INITIATED\n[2024-01-15] COUNTERMEASURES ACTIVE'}},
     etc:{security:{'protocols.txt':'SECURITY PROTOCOLS - VAULT\n==========================\n\n1. Classified data: Caesar protocol encrypted\n2. Auth: Valid credentials required\n3. Intrusion detection: Level 5\n4. Countermeasures: Active trace\n5. Data destruction: Remote wipe capable\n\nWARNING: Unauthorized access will be\ntraced and reported to authorities.'}}
+  },
+  'drop.vega.net':{
+    home:{vega:{
+      'readme.txt':'If you are reading this, the channel is gone.\n\nI kept one door open behind me. Nothing in here\nwas meant for you until Meridian moved.\n\nDo not trust the name on the file.\n\n- VEGA',
+      private:{
+        'vega_identity.dat':{content:'OPERATIVE DOSSIER - VEGA\n========================\n\nReal name: Elena Park\nNexus Corp: Head of Vault Security, 2019-2023\nHELIOS: wrote the key rotation, then kept a copy\n\nWhy I turned:\nMeridian paid Webb to sell HELIOS to four states.\nI signed the audit that hid it. Then I let it leak.\n\nWhat is left:\nMeridian keeps one ledger - every payment, every\nwitness, every price. With it we can pull the whole\nthing down. Without it, eleven people stay bought.\n\nArchive: meridian.archive.net (203.0.113.44)\nThe operator who built that cipher added four to the\nvault shift. Same hand. Same habit.\n\n- E.P.',encrypted:true,shift:9,classified:true}
+      }
+    }},
+    etc:{'shadow':'Password hint for VEGA relay:\n"It is one of the seven-letter words the\ncracker deals you. It answers with how many\nletters land in the right place — read that."\nLength: 7 characters'}
+  },
+  'meridian.archive.net':{
+    data:{ledger:{
+      'meridian_ledger.dat':{content:'MERIDIAN HOLDINGS - SETTLEMENT LEDGER\n=====================================\nACCOUNT: 88-114-CAYMAN\nCLEARING: ATLAS FUND / PHOENIX CAPITAL\n\nPAYMENTS\n  Harlow, P. (CEO, Nexus)     $45,000,000\n  Webb, M. (CTO, Nexus)       $28,000,000\n  Rodriguez, J. (CFO, Nexus)  $22,000,000\n  Park, E. (Vault Security)   $ 6,000,000 [RETURNED]\n  Four state buyers          $2,610,000,000\n\nSILENCE\n  11 witnesses - settled\n  2 witnesses - open (VEGA, GHOST)\n\nNOTE: HELIOS is a product. The list is the business.\nLosing the list costs more than losing HELIOS.\n\nEVIDENCE OF MONEY LAUNDERING AND WITNESS TAMPERING\n====================================================',encrypted:true,shift:17,classified:true,missionCritical:true}
+    }},
+    home:{ops:{
+      'watchlist.txt':'COUNTER-INTEL TASKING - 15 JAN\n\n1. Purge settlement archive if any trace > 60.\n2. Operator \'ghost\' - priority one.\n3. VEGA (Park, E.) - locate, do not engage.\n4. Burn contacts list on confirmation.\n\nDo not escalate above the archive. Ever.',
+      'contacts.txt':'meridian.archive.net  - 203.0.113.44\nops@meridian-holdings.example\n\nNo names in mail. No names on paper.'
+    }},
+    etc:{security:{'counter_intel.txt':'COUNTER-INTEL POSTURE\n=====================\n\n1. Archive cipher: Caesar, set four past the vault.\n2. Passphrase: eight characters, three attempts.\n3. Noise threshold: trace 60. Above it, wipe.\n4. The ledger is the only copy.\n\nIf this file is being read by an outsider,\nsomeone has already failed.'}}
   }
 };
 
@@ -207,7 +233,35 @@ const MISSIONS = [
   {id:4,name:'Relay Access',desc:'Find and infiltrate the Nexus Corp relay server.',obj:'Discover the relay server and crack its password',check:()=>SERVERS['relay.nexus-corp.net'].cracked,reward:300},
   {id:5,name:'The Key',desc:'Obtain and decrypt the vault encryption key from the relay.',obj:'Download and decrypt "vault_key.dat" from the relay',check:()=>state.decrypted.some(f=>f.includes('vault_key.dat')),reward:400},
   {id:6,name:'The Vault',desc:'Access the vault and steal the HELIOS blueprint.',obj:'Crack the vault, decrypt and download "helios_blueprint.txt"',check:()=>state.downloaded.includes('helios_blueprint.txt')&&state.decrypted.some(f=>f.includes('helios_blueprint.txt')),reward:500},
-  {id:7,name:'Exfiltration',desc:'Disconnect safely before being traced.',obj:'Disconnect with trace below 75 after getting the blueprint',check:()=>!state.connected&&state.trace<75&&state.downloaded.includes('helios_blueprint.txt'),reward:500}
+  {id:7,name:'Exfiltration',desc:'Disconnect safely before being traced.',obj:'Disconnect with trace below 75 after getting the blueprint (wipes are in the shop)',check:()=>!state.connected&&state.trace<75&&state.downloaded.includes('helios_blueprint.txt'),reward:500},
+
+  // Act two. The leak ends the Nexus contract, not the story: the money behind
+  // HELIOS is still solvent, and it starts closing its own people.
+  {id:8,name:'Silent Channel',desc:'VEGA went dark the moment the leak went out. Find the door left open behind her.',obj:'Run "scan" again to find VEGA\'s fallback relay',
+    intro:[
+      'VEGA: "The leak is out. Every feed on the planet has it."',
+      'VEGA: "Nexus is finished. Meridian is not - they are already',
+      'burning everyone who touched the files. I have to go dark."',
+      'VEGA: "If I am not back in ten minutes, scan the network again.',
+      'I left one door open behind me."',
+      '[VEGA disconnected]'
+    ],
+    check:()=>SERVERS['drop.vega.net'].discovered,reward:400},
+  {id:9,name:'The Handler',desc:'VEGA has been on both sides of this since HELIOS began.',obj:'Crack drop.vega.net, then decrypt and download "vega_identity.dat"',
+    intro:[
+      'VEGA: "So you found it. Then you might as well know."',
+      'VEGA: "Everything about me is in that file. Read it and decide',
+      'whether you still want the rest of the job."'
+    ],
+    check:()=>state.downloaded.includes('vega_identity.dat')&&state.decrypted.some(f=>f.includes('vega_identity.dat')),reward:600},
+  {id:10,name:'Meridian',desc:'The buyer was never a state. It is Meridian Holdings, and it keeps a list of everyone it paid for silence.',obj:'Crack meridian.archive.net, download "meridian_ledger.dat", then disconnect with trace below 60',
+    intro:[
+      'VEGA: "Meridian does not sell weapons. It sells silence."',
+      'VEGA: "Their archive holds the only copy of the ledger. Take it',
+      'and no one can bury this. Their counter-intel hears noise -',
+      'keep your trace under 60 before you disconnect."'
+    ],
+    check:()=>!state.connected&&state.trace<60&&state.downloaded.includes('meridian_ledger.dat'),reward:800}
 ];
 
 const SHOP = [
@@ -277,6 +331,8 @@ function clearTerm(){
 }
 
 function getPrompt(){
+  if(state.mode==='crack') return 'password> ';
+  if(state.mode==='decrypt') return 'shift> ';
   const srv = state.connected || 'localhost';
   let dir = state.currentDir;
   if(srv==='localhost' && dir==='/home/ghost') dir='~';
@@ -375,6 +431,13 @@ function updateUI(){
   bar.style.background = col;
   document.getElementById('trace-text').textContent = pct+'%';
 
+  // The sidebar is hidden on narrow screens, so trace and mission get a strip.
+  const mTrace = document.getElementById('m-trace');
+  if(mTrace) mTrace.textContent = pct+'%';
+  const mMission = document.getElementById('m-mission');
+  if(mMission) mMission.textContent = state.missionIdx < MISSIONS.length
+    ? MISSIONS[state.missionIdx].name : 'All missions done';
+
   // Stats
   document.getElementById('s-credits').textContent = state.credits+'cr';
   document.getElementById('s-server').textContent = state.connected||'localhost';
@@ -409,15 +472,18 @@ function updateUI(){
     mEl.innerHTML = `<div class="mission-obj" style="border-color:var(--success);color:var(--success)">All missions complete!</div>`;
   }
 
-  // Servers
+  // Servers — only the hosts the operator has actually found. Listing every
+  // name from the start would answer mission 1 for them.
   const sEl = document.getElementById('server-list');
-  sEl.innerHTML = Object.keys(SERVERS).filter(s=>s!=='localhost').map(s=>{
-    const srv = SERVERS[s];
-    let cls='s-unknown', icon='fa-question';
-    if(srv.cracked){cls='s-cracked';icon='fa-check';}
-    else if(srv.discovered){cls='s-discovered';icon='fa-eye';}
-    return `<div class="server-entry ${cls}"><span class="s-dot" style="background:currentColor"></span><i class="fas ${icon}"></i> ${s}</div>`;
-  }).join('');
+  const found = Object.keys(SERVERS).filter(s=>s!=='localhost' && SERVERS[s].discovered);
+  sEl.innerHTML = found.length === 0
+    ? '<div class="server-entry s-unknown"><span class="s-dot" style="background:currentColor"></span>No hosts found — run "scan".</div>'
+    : found.map(s=>{
+      const srv = SERVERS[s];
+      const cls = srv.cracked ? 's-cracked' : 's-discovered';
+      const icon = srv.cracked ? 'fa-check' : 'fa-eye';
+      return `<div class="server-entry ${cls}"><span class="s-dot" style="background:currentColor"></span><i class="fas ${icon}"></i> ${s}</div>`;
+    }).join('');
 
   // Glitch effect
   const wrap = document.getElementById('terminal-wrap');
@@ -436,13 +502,20 @@ function checkMissions(){
   if(m.check()){
     state.completedMissions.push(m.id);
     addCredits(m.reward);
-    print(`\n╔══════════════════════════════════╗`, 'c-success');
-    print(`║  MISSION COMPLETE: ${m.name.padEnd(14)}║`, 'c-success');
-    print(`║  Reward: ${m.reward}cr`.padEnd(37)+'║', 'c-success');
-    print(`╚══════════════════════════════════╝\n`, 'c-success');
+    print('', 'c-default');
+    print('══════════════════════════════════', 'c-success');
+    print(' MISSION COMPLETE: ' + m.name, 'c-success');
+    print(' Reward: ' + m.reward + 'cr', 'c-success');
+    print('══════════════════════════════════', 'c-success');
+    print('', 'c-default');
     state.missionIdx++;
     if(state.missionIdx < MISSIONS.length){
       const next = MISSIONS[state.missionIdx];
+      if(next.intro){
+        print('', 'c-default');
+        next.intro.forEach(line=>print(line, 'c-info'));
+        print('', 'c-default');
+      }
       print(`NEW MISSION: ${next.name}`, 'c-warning');
       print(`${next.desc}`, 'c-warning');
       print(`Objective: ${next.obj}\n`, 'c-info');
@@ -538,7 +611,19 @@ function cmdHelp(){
   print('    whoami          Display identity');
 }
 
+// A connection is not access: until the password is broken the remote machine
+// answers the network but shows nothing. Without this, the files — including the
+// briefing the third mission asks for — could be read around the crack.
+function accessDenied(){
+  const srv = state.connected && SERVERS[state.connected];
+  if(!srv || srv.cracked) return false;
+  print(`Access denied. ${state.connected} has not been cracked yet.`,'c-error');
+  print('Type "crack" to breach it, or "disconnect" to back out.','c-muted');
+  return true;
+}
+
 function cmdLs(){
+  if(accessDenied()) return;
   const srv = state.connected || 'localhost';
   const node = getNode(srv, state.currentDir);
   if(!node || isFile(node)){ print('Not a directory.','c-error'); return; }
@@ -563,6 +648,7 @@ function cmdCd(arg){
     else state.currentDir='/';
     updateUI(); return; 
   }
+  if(accessDenied()) return;
   const srv = state.connected || 'localhost';
   const newPath = resolvePath(state.currentDir, arg);
   const node = getNode(srv, newPath);
@@ -574,6 +660,7 @@ function cmdCd(arg){
 
 function cmdCat(arg){
   if(!arg){ print('Usage: cat <filename>','c-error'); return; }
+  if(accessDenied()) return;
   const srv = state.connected || 'localhost';
   const path = resolvePath(state.currentDir, arg);
   const node = getNode(srv, path);
@@ -618,6 +705,18 @@ function cmdScan(){
       state.discoveredServers.add('vault.nexus-corp.net');
       found.push('vault.nexus-corp.net (10.0.44.99) - Security: HIGH');
     }
+    // Act two: VEGA's fallback only answers once the leak is out, and the
+    // Meridian archive only shows itself once the fallback has been cracked.
+    if(state.completedMissions.includes(7) && !SERVERS['drop.vega.net'].discovered){
+      SERVERS['drop.vega.net'].discovered = true;
+      state.discoveredServers.add('drop.vega.net');
+      found.push('drop.vega.net (172.16.9.7) - Security: HIGH');
+    }
+    if(SERVERS['drop.vega.net'].cracked && !SERVERS['meridian.archive.net'].discovered){
+      SERVERS['meridian.archive.net'].discovered = true;
+      state.discoveredServers.add('meridian.archive.net');
+      found.push('meridian.archive.net (203.0.113.44) - Security: EXTREME');
+    }
 
     if(found.length===0){
       print('Scan complete. No new servers found.', 'c-muted');
@@ -660,6 +759,10 @@ function cmdConnect(arg){
 function cmdDisconnect(){
   if(!state.connected){ print('Not connected to any remote server.','c-error'); return; }
   print(`Disconnected from ${state.connected}.`, 'c-info');
+  if(state.trace >= 75 && state.downloaded.includes('helios_blueprint.txt')){
+    print('VEGA: "You are too hot to walk away clean. Wipe some trace first."', 'c-warning');
+    print('A "trace_wipe" (200cr) from the shop clears this up; the mission checks again after.', 'c-info');
+  }
   state.connected = null;
   state.currentDir = '/home/ghost';
   updateUI();
@@ -675,6 +778,7 @@ function cmdCrack(){
 
 function cmdDecrypt(arg){
   if(!arg){ print('Usage: decrypt <filename>','c-error'); return; }
+  if(accessDenied()) return;
   const srv = state.connected || 'localhost';
   const path = resolvePath(state.currentDir, arg);
   const node = getNode(srv, path);
@@ -688,6 +792,7 @@ function cmdDecrypt(arg){
 function cmdDownload(arg){
   if(!arg){ print('Usage: download <filename>','c-error'); return; }
   if(!state.connected){ print('Connect to a remote server first.','c-error'); return; }
+  if(accessDenied()) return;
   const srv = state.connected;
   const path = resolvePath(state.currentDir, arg);
   const node = getNode(srv, path);
@@ -729,25 +834,34 @@ function cmdAnalyze(){
   print(`Max attempts: ${srv.maxAttempts}`, 'c-default');
 
   if(state.connected==='nexus-corp.net'){
-    print(`Hint: Check /etc/shadow for clues.`, 'c-accent');
+    print(`Hint: Check /etc/shadow on nexus-corp.net for clues.`, 'c-accent');
   } else if(state.connected==='relay.nexus-corp.net'){
-    print(`Hint: The password hides in darkness.`, 'c-accent');
+    print(`Hint: The relay password is hinted at in /etc/shadow on nexus-corp.net.`, 'c-accent');
   } else if(state.connected==='vault.nexus-corp.net'){
-    print(`Hint: To exploit a system, you must think like one.`, 'c-accent');
+    print(`Hint: Vault files are Caesar-shifted — preview shifts with "try" once inside.`, 'c-accent');
+  } else if(state.connected==='drop.vega.net'){
+    print(`Hint: VEGA's relay uses the same lock as the last node — read /etc/shadow here.`, 'c-accent');
+  } else if(state.connected==='meridian.archive.net'){
+    print(`Hint: Meridian set the archive cipher four past the vault. Preview before submitting.`, 'c-accent');
   }
   print(`[Trace +5]`, 'c-warning');
 }
 
 function cmdStatus(){
-  print('╔═══════════════════════════════╗', 'c-accent');
-  print('║     OPERATIVE STATUS          ║', 'c-accent');
-  print('╠═══════════════════════════════╣', 'c-accent');
-  print(`║  Credits:  ${String(state.credits).padEnd(18)}║`, 'c-default');
-  print(`║  Trace:    ${(state.trace+'/100').padEnd(18)}║`, state.trace>60?'c-error':'c-default');
-  print(`║  Server:   ${(state.connected||'localhost').padEnd(18)}║`, 'c-default');
-  print(`║  Files:    ${String(state.downloadCount).padEnd(18)}║`, 'c-default');
-  print(`║  Missions: ${String(state.completedMissions.length+'/'+MISSIONS.length).padEnd(18)}║`, 'c-default');
-  print('╚═══════════════════════════════╝', 'c-accent');
+  // One width for every line: a 20-character host name used to push the box
+  // out of frame, so values are measured into the column instead.
+  const width = 33;
+  const line = text => '║' + text.padEnd(width) + '║';
+  const row = (label, value) => line('  ' + label.padEnd(10) + String(value).slice(0, 21));
+  print('╔' + '═'.repeat(width) + '╗', 'c-accent');
+  print(line('     OPERATIVE STATUS'), 'c-accent');
+  print('╠' + '═'.repeat(width) + '╣', 'c-accent');
+  print(row('Credits:', state.credits + 'cr'), 'c-default');
+  print(row('Trace:', state.trace + '/100'), state.trace>60?'c-error':'c-default');
+  print(row('Server:', state.connected || 'localhost'), 'c-default');
+  print(row('Files:', state.downloadCount), 'c-default');
+  print(row('Missions:', state.completedMissions.length + '/' + MISSIONS.length), 'c-default');
+  print('╚' + '═'.repeat(width) + '╝', 'c-accent');
 }
 
 function cmdMissions(){
@@ -798,16 +912,15 @@ function cmdBuy(arg){
 function cmdMap(){
   print('═══ NETWORK MAP ═══', 'c-accent');
   print('');
-  print('    [localhost]', SERVERS['localhost']?'c-success':'c-muted');
-  print('        │', 'c-muted');
-  print('    [nexus-corp.net]', SERVERS['nexus-corp.net'].cracked?'c-success':SERVERS['nexus-corp.net'].discovered?'c-info':'c-muted');
-  print('        │', 'c-muted');
-  print('    [relay.nexus-corp.net]', SERVERS['relay.nexus-corp.net'].cracked?'c-success':SERVERS['relay.nexus-corp.net'].discovered?'c-info':'c-muted');
-  print('        │', 'c-muted');
-  print('    [vault.nexus-corp.net]', SERVERS['vault.nexus-corp.net'].cracked?'c-success':SERVERS['vault.nexus-corp.net'].discovered?'c-info':'c-muted');
+  const names = Object.keys(SERVERS);
+  names.forEach((name, i) => {
+    const srv = SERVERS[name];
+    print('    ' + (srv.discovered ? '[' + name + ']' : '[???]'),
+      srv.cracked ? 'c-success' : srv.discovered ? 'c-info' : 'c-muted');
+    if(i < names.length - 1) print('        │', 'c-muted');
+  });
   print('');
   print('  Legend: ', 'c-muted');
-  print('    <span class="c-success">Accessed</span>  <span class="c-info">Discovered</span>  <span class="c-muted">Unknown</span>', 'c-default');
   printHTML(`  <span style="color:var(--success)">● Accessed</span>  <span style="color:var(--info)">● Discovered</span>  <span style="color:var(--muted)">● Unknown</span>`);
 }
 
@@ -832,6 +945,7 @@ function startCrackGame(server){
   state.crackState = {
     server, password, words, attemptsLeft: srv.maxAttempts, maxAttempts: srv.maxAttempts, eliminated
   };
+  updatePrompt();
 
   print('\n╔══════════════════════════════════════╗', 'c-warning');
   print('║      PASSWORD CRACK INTERFACE        ║', 'c-warning');
@@ -922,13 +1036,13 @@ function handleCrackInput(input){
 // --- MINI-GAME: DECRYPTION ---
 
 function startDecryptGame(filename, path, node){
+  const encText = caesarEnc(node.content, node.shift);
   state.mode = 'decrypt';
   state.decryptState = {
     filename, path, shift: node.shift, attemptsLeft:3,
-    content: node.content, server: state.connected||'localhost'
+    content: node.content, encText, server: state.connected||'localhost'
   };
-
-  const encText = caesarEnc(node.content, node.shift);
+  updatePrompt();
   const preview = encText.substring(0, 120) + (encText.length>120?'...':'');
 
   print('\n╔══════════════════════════════════════╗', 'c-warning');
@@ -973,6 +1087,7 @@ function handleDecryptInput(input){
     state.mode='normal';
     state.decryptState=null;
     print('Decryption aborted.','c-warning');
+    updatePrompt();
     return;
   }
 
@@ -1000,8 +1115,9 @@ function handleDecryptInput(input){
       print('Invalid shift. Use a number 0-25.','c-error');
       return;
     }
-    // Decrypt with the given shift (to reverse Caesar, shift by 26-shift)
-    const decrypted = caesarEnc(ds.content, 26-shift);
+    // Reverse the shift on the ciphertext, not on the plaintext: the old
+    // version re-shuffled the stored content, so no preview ever matched.
+    const decrypted = caesarEnc(ds.encText, 26-shift);
     const preview = decrypted.substring(0,150)+(decrypted.length>150?'...':'');
     print(`\nShift ${shift} preview:`, 'c-info');
     print('─'.repeat(40), 'c-muted');
@@ -1053,6 +1169,7 @@ function handleDecryptInput(input){
 
 function gameOver(){
   state.gameEnded = true;
+  dropSavedRun();
   state.mode = 'normal';
   print('\n╔══════════════════════════════════════╗', 'c-error');
   print('║       CONNECTION TERMINATED          ║', 'c-error');
@@ -1072,24 +1189,28 @@ function gameOver(){
 
 function gameWin(){
   state.gameEnded = true;
-  print('\n╔════════════════════════════════════════════╗', 'c-success');
-  print('║          MISSION COMPLETE                  ║', 'c-success');
-  print('╠════════════════════════════════════════════╣', 'c-success');
-  print('║                                            ║', 'c-success');
-  print('║  You\'ve exposed Project HELIOS.            ║', 'c-success');
-  print('║  The evidence has been leaked worldwide.   ║', 'c-success');
-  print('║  Nexus Corp stock has crashed.             ║', 'c-success');
-  print('║  Criminal investigations in 4 countries.   ║', 'c-success');
-  print('║                                            ║', 'c-success');
-  print(`║  Missions: ${String(state.completedMissions.length+'/'+MISSIONS.length).padEnd(33)}║`, 'c-default');
-  print(`║  Credits:  ${String(state.credits+'cr').padEnd(33)}║`, 'c-default');
-  print(`║  Trace:    ${String(state.trace+'/100').padEnd(33)}║`, 'c-default');
-  print('║                                            ║', 'c-success');
-  print('║  VEGA: "Outstanding work, operator.        ║', 'c-accent');
-  print('║  Payment transferred. Until next time."    ║', 'c-accent');
-  print('║                                            ║', 'c-success');
-  print('║  Type "restart" to play again.             ║', 'c-muted');
-  print('╚════════════════════════════════════════════╝\n', 'c-success');
+  dropSavedRun();
+  // One measured width: the old fixed column overflowed on long totals.
+  const width = 55;
+  const line = text => '║' + text.padEnd(width) + '║';
+  print('', 'c-default');
+  print('╔' + '═'.repeat(width) + '╗', 'c-success');
+  print(line('   OPERATION CLOSED - HELIOS AND MERIDIAN BURNED'), 'c-success');
+  print('╠' + '═'.repeat(width) + '╣', 'c-success');
+  print(line(''), 'c-success');
+  print(line('  The blueprint is public. The ledger is public.'), 'c-success');
+  print(line('  Eleven witnesses walk. Four states cancel orders.'), 'c-success');
+  print(line('  Nexus Corp is dissolved. Meridian is sanctioned.'), 'c-success');
+  print(line(''), 'c-success');
+  print(line('  Missions: ' + state.completedMissions.length + '/' + MISSIONS.length), 'c-default');
+  print(line('  Credits:  ' + state.credits + 'cr'), 'c-default');
+  print(line('  Trace:    ' + state.trace + '/100'), 'c-default');
+  print(line(''), 'c-success');
+  print(line('  VEGA: "You were never my first operator, ghost.'), 'c-accent');
+  print(line('  You are the only one who finished the job."'), 'c-accent');
+  print(line(''), 'c-success');
+  print(line('  Type "restart" to run it again.'), 'c-muted');
+  print('╚' + '═'.repeat(width) + '╝\n', 'c-success');
 }
 
 function restartGame(){
@@ -1126,6 +1247,7 @@ function restartGame(){
   const dl = getNode('localhost','/home/ghost/downloads');
   if(dl) Object.keys(dl).forEach(k=>delete dl[k]);
 
+  dropSavedRun();
   clearTerm();
   updateUI();
   print('System reset. Welcome back, operator.','c-success');
@@ -1156,7 +1278,7 @@ async function bootSequence(){
     {t:'',c:'c-default',d:80},
     {t:'VEGA says: "We\'ve got a job. Nexus Corp is hiding',c:'c-info',d:200},
     {t:'something big. Start by scanning the network.',c:'c-info',d:200},
-    {t:'Find their servers. Good luck."\\n',c:'c-info',d:200}
+    {t:'Find their servers. Good luck."\n',c:'c-info',d:200}
   ];
 
   for(const line of lines){
@@ -1199,7 +1321,7 @@ inputEl.addEventListener('keydown', e=>{
 
 // Keep focus on input
 document.addEventListener('click', ()=>{
-  if(!state.gameEnded || true) inputEl.focus();
+  inputEl.focus();
 });
 
 function tabComplete(){
@@ -1214,6 +1336,7 @@ function tabComplete(){
     const cmd = parts[0].toLowerCase();
     if(['cd','cat','download','decrypt','read','type'].includes(cmd)){
       const srv = state.connected||'localhost';
+      if(state.connected && !SERVERS[state.connected].cracked) return;
       const node = getNode(srv, state.currentDir);
       if(node && isDir(node)){
         const entries = Object.keys(node);
@@ -1259,11 +1382,17 @@ setInterval(()=>{
 // A session is the operator's standing amount: trace, credits, inventory and
 // which servers have been found and cracked. The scrollback is not saved; the
 // terminal reprints a single line so the screen is not confusingly blank.
+// A finished or restarted run must not be offered back: the save producer goes
+// quiet at the end, so the last autosave would otherwise outlive the run.
+function dropSavedRun(){
+  try{ if(window.__boredResume) window.__boredResume.clear(); }catch(error){}
+}
+
 function savedRun(){
   if(!state.booted || state.gameEnded || state.mode !== 'normal') return null;
   if(state.discoveredServers.size <= 1 && !state.downloadCount && !state.completedMissions.length) return null;
   return {
-    label:'trace ' + state.trace + '% \u00b7 ' + state.credits + ' CR \u00b7 mission ' + (state.missionIdx + 1),
+    label:'trace ' + state.trace + '% \u00b7 ' + state.credits + ' CR \u00b7 mission ' + Math.min(state.missionIdx + 1, MISSIONS.length),
     state:{
       connected:state.connected, currentDir:state.currentDir,
       trace:state.trace, credits:state.credits,
