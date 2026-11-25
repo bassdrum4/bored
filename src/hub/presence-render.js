@@ -4,7 +4,7 @@ import { backendReady, freshSession, getSession, hasIdentity, request } from './
 const GUEST='guest', PREF='bored.presence.guest.visible', KEY='bored.presence.guest.key';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const HEARTBEAT=60000, AUTH_RENEW=18*60000;
-const POLL=20000, POLL_TIMEOUT=15000;
+const POLL=45000, POLL_TIMEOUT=15000;
 let ephemeralKey='', ephemeralPref=null;
 
 export function renderSocketUrl(origin) {
@@ -144,7 +144,7 @@ export function mountRenderPresence(){
   }
   // A school or office proxy can refuse the WebSocket upgrade while plain HTTPS
   // still works. The same roster answers POST /presence, so a tab whose handshake
-  // never succeeded polls every 20 seconds instead of retrying forever.
+  // never succeeded polls every 45 seconds instead of retrying forever.
   async function pollOnce(id,v){
     if(!current(id,v)||ws||!pollUrl||visible!==true||paused)return false;
     let body;

@@ -6,11 +6,15 @@ import { createRoster, UUID } from './core.mjs';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://djdpttltfmwkofdrvkem.supabase.co';
 const API_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
 const ORIGINS = new Set((process.env.ALLOWED_ORIGINS || 'https://bassdrum4.github.io').split(','));
-const MAX_CLIENTS = 1000, MAX_IP = 250, MAX_BUFFER = 65536;
+const MAX_CLIENTS = 1000, MAX_BUFFER = 65536;
+// A school or office is one public address, so a whole class shares a bucket.
+// The cap still stops a single source from taking the entire roster.
+const MAX_IP = 800;
 const AUTH_MS = 20*60*1000, AUTH_CACHE_MS = 60*1000;
-// A network that refuses the WebSocket upgrade falls back to HTTPS polling. A
-// poll entry is live for 75 seconds so a throttled background timer does not flap.
-const POLL_TTL = 75000;
+// A network that refuses the WebSocket upgrade falls back to HTTPS polling every
+// 45 seconds. An entry stays live for 150 so a throttled background timer and one
+// missed poll do not drop a live tab off the count.
+const POLL_TTL = 150000;
 const roster = createRoster(), peers = new Map(), ipCounts = new Map(), pollers = new Map();
 const authCache = new Map(), pending = new Map();
 let authBudget = 24, budgetAt = Date.now(), flushTimer = null, authEpoch = 0;
