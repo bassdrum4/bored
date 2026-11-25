@@ -143,14 +143,14 @@ export function subscribeChanges(options) {
     let token = '';
     try { token = await getToken(); } catch (error) { token = ''; }
     if (closed || socket) return;
-    if (!token) { down('No session.'); return; }
+    if (!token && !options.allowGuest) { down('No session.'); return; }
     let mine;
     try { mine = new Socket(url); } catch (error) { down(String((error && error.message) || error)); return; }
     socket = mine;
     mine.onopen = () => {
       if (mine !== socket) return;
       joinRef = String(ref + 1);
-      send('phx_join', { config: { broadcast: { ack: false, self: false }, presence: { key: '', ...(presence ? { enabled: true } : {}) }, postgres_changes: changes, private: options.private === true }, access_token: token });
+      send('phx_join', { config: { broadcast: { ack: false, self: false }, presence: { key: '', ...(presence ? { enabled: true } : {}) }, postgres_changes: changes, private: options.private === true }, ...(token ? { access_token: token } : {}) });
       joinTimer = setTimeout(() => { if (mine === socket && !joined) down('The server did not answer.'); }, joinWaitMs);
     };
     mine.onmessage = event => { if (mine === socket) receive(event.data); };

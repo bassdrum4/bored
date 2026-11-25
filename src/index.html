@@ -200,7 +200,7 @@ try {
           </div></div>
           <div class="settings-row"><div><label for="setting-reduced-motion">Reduce animations</label></div>
             <input id="setting-reduced-motion" class="settings-checkbox" type="checkbox"></div>
-          <div class="settings-row"><div><label for="presence-enabled">Show when I'm online</label><p>Other signed-in players with online status enabled can see your display name. Applies to your account on all devices.</p><p id="presence-setting-status" role="status">Sign in to manage your online status.</p></div>
+          <div class="settings-row"><div><label for="presence-enabled">Show when I'm online</label><p>Signed-in players share their display name with other participating accounts. Guests are counted anonymously. Your preference applies to your account, or this browser if you're a guest.</p><p id="presence-setting-status" role="status">Loading online status…</p></div>
             <input id="presence-enabled" class="settings-checkbox" type="checkbox" disabled></div>
           <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Which games get played, and for how long.</p></div>
             <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
@@ -392,7 +392,7 @@ try {
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; pointer-lock; clipboard-write; encrypted-media; picture-in-picture"></iframe>
 </div>
 <script type="module" src="./hub/watchdog.js"></script>
-<script type="module" src="./hub/presence.js"></script>
+<script type="module" src="./hub/presence.js?v=2"></script>
 <script type="module" src="./main.js?bored-build=20261124-bo-loading-v2"></script>
 </body>
 </html>
