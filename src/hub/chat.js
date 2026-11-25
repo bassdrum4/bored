@@ -3,7 +3,7 @@ import {freshSession,hasIdentity,getSession} from './backend.js';
 const origin=(()=>{try{const u=new URL(PRESENCE_ORIGIN);return u.protocol==='https:'&&u.hostname.endsWith('.onrender.com')&&!u.username&&!u.password&&!u.port&&u.pathname==='/'&&!u.search&&!u.hash?u.origin:'';}catch{return '';}})();
 const $=id=>document.getElementById(id);
 const button=$('bored-chat-toggle'),panel=$('bored-chat'),close=$('bored-chat-close'),list=$('bored-chat-list'),form=$('bored-chat-form'),input=$('bored-chat-input'),send=$('bored-chat-send'),status=$('bored-chat-status'),replyBar=$('bored-chat-reply'),adminBar=$('bored-chat-admin');
-if(button&&panel&&origin&&location.hostname==='bassdrum4.github.io')mount();
+if(button&&panel&&origin&&location.hostname==='bassdrum4.github.io'&&/^\/bored(?:\/|$)/.test(location.pathname))mount();
 function mount(){
   let opened=false,controller=null,cursor='',mode='sse',messages=new Map(),retry=null,failures=0,admin=false,enabled=false,replyTo=null,posting=false,generation=0;
   const blocked=new Set();try{for(const id of JSON.parse(localStorage.getItem('bored.chat.blocked')||'[]'))blocked.add(id);}catch{}
@@ -45,6 +45,7 @@ function mount(){
       action('Reports',()=>void command({mode:'admin',action:'reports'},result=>{
         const section=document.createElement('div');section.className='bored-chat-reports';
         for(const r of result.reports||[]){const item=document.createElement('p');item.textContent=r.handle+': '+r.message+' — '+new Date(r.created_at).toLocaleString();item.append(action('Ban 24h',()=>void command({mode:'admin',action:'ban',user:r.author,seconds:86400})),action('Unban',()=>void command({mode:'admin',action:'unban',user:r.author})));section.append(item);}
+        panel.querySelectorAll('.bored-chat-reports').forEach(el=>el.remove());
         if(!section.childNodes.length)section.textContent='No reports.';section.prepend(action('Close reports',()=>section.remove()));list.before(section);
       })));
   }
@@ -52,7 +53,7 @@ function mount(){
     if(f.t==='idle'||f.t==='renew')return;
     if(f.t!=='chat'||typeof f.cursor!=='string')throw Error('Chat connection interrupted.');
     cursor=f.cursor;enabled=f.enabled===true;
-    if(!enabled){messages.clear();notice('Chat is disabled.');}
+    if(!enabled){messages.clear();notice('Chat is disabled.');cancel();}
     else{
       if(f.reset){messages.clear();for(const m of f.messages||[])messages.set(m.id,m);}
       for(const e of f.events||[]){if(e.type==='message')messages.set(e.message.id,e.message);else if(e.type==='delete')messages.delete(e.id);}
@@ -71,7 +72,7 @@ function mount(){
       arm(mode==='sse'?30000:40000);
       const r=await post({mode,cursor},c.signal);
       if(!active())return;
-      if(mode==='poll'){accept(await r.json());failures=0;}
+      if(mode==='poll'){const f=await r.json();if(!active())return;accept(f);failures=0;}
       else{
         if(!r.body||!r.headers.get('content-type')?.includes('text/event-stream'))throw Error('Streaming unavailable');
         const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='';
@@ -85,7 +86,7 @@ function mount(){
         if(!renew&&active())throw Error('Stream disconnected.');
       }
     }catch(e){if(active()){failed=true;failures++;mode='poll';notice(failures>2?'Chat reconnecting…':e.message);if(failures>2){enabled=false;updateForm();}}}
-    finally{clearTimeout(timer);if(controller===c){controller=null;c.abort();if(opened&&generation===g&&enabled!==false)retry=setTimeout(connect,failed?Math.min(1000*2**failures,30000):0);}}
+    finally{clearTimeout(timer);if(controller===c){controller=null;c.abort();if(opened&&generation===g&&(failed||enabled))retry=setTimeout(connect,failed?Math.min(1000*2**failures,30000):0);}}
   }
   async function restart(){
     const g=++generation;cancel();enabled=false;admin=false;updateForm();notice('Connecting…');
