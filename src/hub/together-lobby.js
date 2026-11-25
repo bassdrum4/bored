@@ -96,7 +96,7 @@ export function createLobbyBridge({ frame, game = 'ashcrown', deps = {} }) {
   }
   const dashboard = () => read('dashboard', () => together('dashboard'));
   const rooms = () => read('list', async () => {
-    const list = await rpc('list');
+    const list = await rpc('list', {}, { force: true });
     return (Array.isArray(list) ? list : []).filter(g => (g && g.game ? g.game : 'ashcrown') === game);
   });
   const uuid = value => { if (typeof value !== 'string' || !UUID.test(value)) throw new Error('Invalid request.'); return value; };

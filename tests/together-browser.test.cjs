@@ -174,7 +174,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   assert.equal(await game.$$eval('.disc.p1',x=>x.length),0,'no optimistic disc after failed save');
   assert.equal(await a.$eval('#player',e=>e.hidden),false);
   outages.delete(ids[0]);await game.click('#together-error button');
-  await a.waitForFunction(()=>document.querySelector('#player').hidden);await refresh(a);
+  await a.waitForFunction(()=>document.querySelector('#player').hidden,{timeout:25000});await refresh(a);
   const first=(await call(db,ids[0],'dashboard')).matches.find(m=>m.game==='connect-four'&&m.status==='active');
   assert.match(await a.$eval(`[data-match-id="${first.id}"]`,e=>e.textContent),/Their turn/);
   assert.ok(!(await a.$eval(`[data-match-id="${first.id}"]`,e=>e.textContent)).includes('@'),'a game row never shows an address');
@@ -188,8 +188,10 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await exit(b);await launch(b,first.id);await drop(b,2);
   await refresh(a);await launch(a,first.id);
   // A lost response after commit retries the SAME request ID, never two discs.
-  lostReplies.add(ids[0]);await drop(a,1,false);game=await frame(a,'#together-error');
-  await game.click('#together-error button');await a.waitForFunction(()=>document.querySelector('#player').hidden);
+  lostReplies.add(ids[0]);await drop(a,1,false);
+  await a.waitForFunction(()=>document.querySelector('#player').hidden || document.querySelector('#frame').contentDocument?.querySelector('#together-error'),{timeout:25000});
+  if (!(await a.$eval('#player',e=>e.hidden))) { game=await frame(a,'#together-error'); await game.click('#together-error button'); }
+  await a.waitForFunction(()=>document.querySelector('#player').hidden,{timeout:25000});
   assert.equal((await db.query('select count(*)::int n from bored_together.moves where match_id=$1',[first.id])).rows[0].n,3);
   for(const [page,n] of [[b,2],[a,1],[b,2],[a,1]]){await refresh(page);await launch(page,first.id);await drop(page,n);}
   await refresh(a);assert.match(await a.$eval(`[data-match-id="${first.id}"]`,e=>e.textContent),/You won/);

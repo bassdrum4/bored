@@ -245,7 +245,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
           catch (error) {
             if (!transient(error) || attempt >= 2) throw error;
             attempt += 1;
-            await new Promise(done => setTimeout(done, 350 * attempt));
+            await new Promise(done => setTimeout(done, Math.max(350 * attempt, (error.retryAfter || 0) + 100)));
           }
         }
         if (stamp !== generation) throw new Error('Your account changed.');

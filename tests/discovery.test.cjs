@@ -285,7 +285,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
   const page = await browser.newPage();
   const rows = [], posted = [], notes = [], state = [], activity = [], unexpected = [];
   const rules = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'src/games/score-rules.json')))).map(([game, rule]) => ({ game, ...rule }));
-  const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
+  const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS' };
   await page.setRequestInterception(true);
   page.on('request', request => {
     if (!/^https?:/.test(request.url())) return request.continue();
@@ -317,8 +317,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });
     if (url.pathname === '/rest/v1/profiles') return reply([{ handle: 'tester' }]);
     if (url.pathname === '/rest/v1/player_state') {
-      if (method === 'POST') { state.push(JSON.parse(request.postData())); return reply(null); }
-      return reply([]);
+      if (method === 'POST' || method === 'PATCH') { const row = {...state.at(-1), ...JSON.parse(request.postData())}; state.push(row); return reply([row]); }
+      return reply(state.length ? [state.at(-1)] : []);
     }
     if (url.pathname === '/rest/v1/rpc/submit_score' && method === 'POST') {
       const { p_game, p_value } = JSON.parse(request.postData());
@@ -388,7 +388,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
   assert.equal(posted[0].authorization, 'Bearer mock-access');
   // The account, not this browser, owns the state now: the arcade pushes it so
   // it turns up again on the next device.
-  await new Promise(resolve => setTimeout(resolve, 1200));
+  const deadline = Date.now() + 15000;
+  while (!state.some(row => row.data?.bests?.['lights-out'] === 2) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
   const pushed = state.at(-1);
   assert.ok(pushed, 'the player state is pushed to the account');
   assert.equal(pushed.user_id, 'test-user');
@@ -452,6 +453,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
   // note has to travel with the player's session rather than the public key.
   assert.equal(notes[0].authorization, 'Bearer mock-access', 'a signed-in note uses the player session');
   assert.equal(notes[0].user_id, 'test-user', 'the note carries the account the token belongs to');
+  if (!(await page.$eval('#profile-menu', el => el.open))) await page.click('#profile-menu > summary');
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('guest'));
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.session')), null);
