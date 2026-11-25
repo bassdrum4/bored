@@ -1,12 +1,11 @@
 import {PRESENCE_ORIGIN} from './presence-endpoint.js';
-import {freshSession,hasIdentity,getSession} from './backend.js';
+import {freshSession,hasIdentity} from './backend.js';
 const origin=(()=>{try{const u=new URL(PRESENCE_ORIGIN);return u.protocol==='https:'&&u.hostname.endsWith('.onrender.com')&&!u.username&&!u.password&&!u.port&&u.pathname==='/'&&!u.search&&!u.hash?u.origin:'';}catch{return '';}})();
 const $=id=>document.getElementById(id);
 const button=$('bored-chat-toggle'),panel=$('bored-chat'),close=$('bored-chat-close'),list=$('bored-chat-list'),form=$('bored-chat-form'),input=$('bored-chat-input'),send=$('bored-chat-send'),status=$('bored-chat-status'),replyBar=$('bored-chat-reply'),adminBar=$('bored-chat-admin');
 if(button&&panel&&origin&&location.hostname==='bassdrum4.github.io'&&/^\/bored(?:\/|$)/.test(location.pathname))mount();
 function mount(){
   let opened=false,controller=null,cursor='',mode='sse',messages=new Map(),retry=null,failures=0,admin=false,enabled=false,replyTo=null,posting=false,generation=0;
-  const blocked=new Set();try{for(const id of JSON.parse(localStorage.getItem('bored.chat.blocked')||'[]'))blocked.add(id);}catch{}
   function notice(text){status.textContent=text;}
   function updateForm(){input.disabled=send.disabled=!opened||!enabled||!hasIdentity()||posting;input.placeholder=hasIdentity()?'Say something…':'Sign in to send messages';}
   async function token(){return hasIdentity()?(await freshSession())?.access_token:null;}
@@ -23,7 +22,6 @@ function mount(){
     const frag=document.createDocumentFragment(),now=Date.now();
     for(const [id,m] of messages){
       if(m.at<now-86400000){messages.delete(id);continue;}
-      if(blocked.has(m.author))continue;
       const row=document.createElement('article');row.className='bored-chat-message';
       const head=document.createElement('div');head.className='bored-chat-meta';
       const name=document.createElement('strong');name.textContent=m.handle;
@@ -33,9 +31,8 @@ function mount(){
       const body=document.createElement('p');body.textContent=m.text;
       const menu=document.createElement('details');menu.className='bored-chat-menu';const summary=document.createElement('summary');summary.textContent='···';summary.setAttribute('aria-label','Message options');menu.append(summary);
       if(hasIdentity()){menu.append(action('Reply',()=>{menu.open=false;setReply(m);}),action('Report',()=>{menu.open=false;if(confirm('Report this message to Bored moderators?'))void command({mode:'report',id:m.id},()=>notice('Report submitted.'));}));}
-      menu.append(action('Block locally',()=>{blocked.add(m.author);try{localStorage.setItem('bored.chat.blocked',JSON.stringify([...blocked].slice(-200)));}catch{}draw();}));
       if(admin){menu.append(action('Delete',()=>void command({mode:'admin',action:'delete',id:m.id})),action('Mute 10 min',()=>void command({mode:'admin',action:'ban',id:m.id,seconds:600})),action('Ban 24h',()=>void command({mode:'admin',action:'ban',id:m.id,seconds:86400})));}
-      head.append(menu);row.append(head,body);frag.append(row);
+      if(hasIdentity()||admin)head.append(menu);row.append(head,body);frag.append(row);
     }
     list.replaceChildren(frag);if(follow)list.scrollTop=list.scrollHeight;
   }
@@ -58,7 +55,7 @@ function mount(){
       if(f.reset){messages.clear();for(const m of f.messages||[])messages.set(m.id,m);}
       for(const e of f.events||[]){if(e.type==='message')messages.set(e.message.id,e.message);else if(e.type==='delete')messages.delete(e.id);}
       while(messages.size>200)messages.delete(messages.keys().next().value);
-      notice('Public chat · Be kind. No personal information.');
+      notice('');
     }
     draw();updateForm();renderAdmin();
   }
@@ -104,7 +101,6 @@ function mount(){
     try{const jwt=await token();if(!jwt)throw Error('Sign in first.');await post({mode:'send',jwt,text,reply:replyTo?.id},AbortSignal.timeout(15000));input.value='';setReply(null);}
     catch(err){notice(err.message);}finally{posting=false;updateForm();if(opened)input.focus();}
   });
-  $('bored-chat-unblock').addEventListener('click',()=>{blocked.clear();try{localStorage.removeItem('bored.chat.blocked');}catch{}draw();notice('Local blocks cleared.');});
   window.addEventListener('bored:identity',()=>{if(opened){messages.clear();cursor='';setReply(null);void restart();}});
   window.addEventListener('pagehide',()=>{cancel();opened=false;generation++;panel.hidden=true;button.setAttribute('aria-expanded','false');});
 }
