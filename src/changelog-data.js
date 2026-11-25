@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 950,
+  "count": 951,
   "newest": "2026-11-24",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3dbb4d7d","date":"2026-11-24","author":"Daniel Lowe","subject":"Include anonymous boring people in Bored presence","pr":347},
   {"sha":"33050700","date":"2026-11-24","author":"Daniel Lowe","subject":"Include QA-mode signed-in players in online presence"},
   {"sha":"84347091","date":"2026-11-24","author":"Daniel Lowe","subject":"Squaretato leaderboard and 21 illustrated characters","pr":346},
   {"sha":"4118ec44","date":"2026-11-24","author":"Daniel Lowe","subject":"Add signed-in online presence with account-wide opt-out","pr":345},
