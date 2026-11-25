@@ -245,7 +245,6 @@ function renderRecent() {
     ? [...state.recentGames, ...saved].slice(0, SHELF_LIMIT) : starterGames;
   $('#recent').dataset.shelf = hasHistory ? 'history' : 'discover';
   $('#recent-heading').textContent = hasHistory ? 'Jump Back In' : 'Start playing';
-  $('#recent .eyebrow').textContent = hasHistory ? '01 / Your corner' : '01 / Pick a game';
   $('#recent-list').replaceChildren(...shown.map(slug => shelfGame(slug,
     hasHistory
       ? (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
