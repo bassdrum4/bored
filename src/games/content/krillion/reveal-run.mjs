@@ -62,8 +62,9 @@ export function createRevealRun({ call }) {
   };
 
   const remember = state => {
+    if (!state || typeof state !== 'object') return state;
     run = state;
-    if (Array.isArray(state?.prompts)) book = align(book, state.prompts);
+    if (Array.isArray(state.prompts)) book = align(book, state.prompts);
     return state;
   };
 
@@ -108,20 +109,24 @@ export function createRevealRun({ call }) {
       const scored = match && TIERS[match.tier]
         ? { answer: match.answer, tier: match.tier, quip: match.quip || null }
         : null;
-      return remember(await call('answer', {
+      // The server answers with { result, state }; keep the state as the run,
+      // not the envelope, or the sounding below loses its mode and id.
+      const response = await call('answer', {
         runId: data?.runId,
         round,
         answer: raw,
         timeout: data?.timeout === true,
         result: scored
-      }));
+      });
+      remember(response?.state);
+      return response;
     }
 
     if (route === 'hint') {
       await load();
       const prompt = book.prompts[Number(data?.round)];
       const response = await call('hint', { runId: data?.runId, round: data?.round });
-      if (response?.state) remember(response.state);
+      remember(response?.state);
       return { used: true, hint: prompt ? hintFor(prompt) : 'That answer sheet is unavailable.' };
     }
 
@@ -139,8 +144,10 @@ export function createRevealRun({ call }) {
           score: TIERS[answer.tier].score
         }))
       }));
-      const comparison = run?.mode === 'daily'
-        ? await call('population?run=' + encodeURIComponent(run.id))
+      const requestedRun = new URLSearchParams(String(path).split('?')[1] || '').get('run');
+      const runId = run?.runId || requestedRun;
+      const comparison = run?.mode === 'daily' && runId
+        ? await call('population?run=' + encodeURIComponent(runId))
           .catch(() => ({ population: 0, betterThan: null, dist: Array(71).fill(0) }))
         : { population: 0, betterThan: null, dist: Array(71).fill(0) };
       return { prompts, ...comparison };

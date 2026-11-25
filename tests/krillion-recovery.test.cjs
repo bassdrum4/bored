@@ -155,6 +155,55 @@ test('an unknown tier or a late answer scores nothing', async () => {
   assert.equal(late.body.result.tier, null);
 });
 
+test('the finished dive asks the sounding for its own run', async () => {
+  const { createRevealRun } = await import('../src/games/content/krillion/reveal-run.mjs');
+  const bookPrompts = Array.from({ length: 7 }, (_, i) => ({
+    id: `p${i + 1}`,
+    text: `Name something ${i + 1}`,
+    answers: [
+      { answer: 'Nanda Devi', tier: 'krillion' },
+      { answer: 'Mercury', tier: 'schooler' }
+    ]
+  }));
+  const publicPrompts = bookPrompts.map(({ id, text }) => ({ id, text }));
+  const state = extra => ({
+    date,
+    runId: 'run-1',
+    mode: 'daily',
+    completed: false,
+    round: 0,
+    roundStart: Date.parse(date + 'T12:00:00Z'),
+    results: [],
+    prompts: publicPrompts,
+    ...extra
+  });
+  const calls = [];
+  const api = createRevealRun({
+    call: async (path, data) => {
+      calls.push(path);
+      if (path === 'today') return { date };
+      if (path.startsWith('reveal?date=')) return { date, prompts: bookPrompts };
+      if (path === 'start') return state();
+      if (path === 'answer') {
+        assert.equal(data.result.tier, 'krillion');
+        return {
+          result: { round: 0, answer: 'Nanda Devi', tier: 'krillion', score: 100 },
+          state: state({ completed: true, round: 7, results: [{ round: 0, answer: 'Nanda Devi', tier: 'krillion', score: 100 }] })
+        };
+      }
+      if (path === 'population?run=run-1') return { population: 12, betterThan: 50, dist: Array(71).fill(0) };
+      throw new Error('Unexpected request ' + path);
+    }
+  });
+  await api('start', { runId: 'run-1' });
+  await api('answer', { runId: 'run-1', round: 0, answer: 'Nanda Devi' });
+  const review = await api('review?run=run-1');
+  assert.equal(review.population, 12);
+  assert.equal(review.betterThan, 50);
+  assert.equal(review.prompts.length, 7);
+  assert.equal(calls.filter(path => path === 'population?run=run-1').length, 1);
+});
+
 test('the hint is spent once and the sounding follows the finished dive', async () => {
   const h = harness(), runId = randomUUID();
   await h.call('start', { runId });
