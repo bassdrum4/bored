@@ -17,7 +17,8 @@ revoke all on all tables in schema bored_chat from public,anon,authenticated;
 create or replace function bored_chat.control(action text,args jsonb)
 returns jsonb language plpgsql security definer set search_path='' as $$
 begin
-  if (select auth.jwt()->>'role') is distinct from 'service_role' then raise exception 'Forbidden' using errcode='42501'; end if;
+  -- PostgREST selects the database role from the API key; opaque keys need no user JWT.
+  if current_setting('role',true) is distinct from 'service_role' then raise exception 'Forbidden' using errcode='42501'; end if;
   if action='state' then
     return jsonb_build_object('enabled',(select enabled from bored_chat.config where id),
       'bans',coalesce((select jsonb_object_agg(user_id,until_at) from bored_chat.bans where until_at>now()),'{}'::jsonb));
