@@ -1743,7 +1743,8 @@ test('browser regressions', async t => {
     assert.equal(await page.evaluate(() => document.activeElement.id), 'daily-play');
     assert.match(await text(page, '#daily-status'), /Automatically verified/);
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Denied'); } }, configurable: true }));
-    await page.click('#daily-share');
+    await page.click('#daily-details summary');
+     await page.click('#daily-share');
     assert.match(await page.$eval('#daily-result', el => el.value), /8 moves/);
     assert.equal(await page.$eval('#daily-result', el => el.hidden), false);
     await page.evaluate(() => { window.copied = ''; navigator.clipboard.writeText = async value => { window.copied = value; }; });

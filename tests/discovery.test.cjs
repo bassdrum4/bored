@@ -195,6 +195,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.equal(await page.$eval('#library', el => el.hidden), true);
     assert.equal(new URL(page.url()).hash, '#leaderboard');
 
+    await page.click('#profile-menu summary');
     await page.click('#settings-nav');
     assert.equal(await page.$eval('#settings', el => el.hidden), false);
     assert.equal(await page.$eval('#setting-theme', el => el.value), 'light');

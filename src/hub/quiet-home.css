@@ -1,0 +1,82 @@
+/* Play first: keep the paper identity, remove competing chrome. */
+#hub { padding-top: 22px; }
+.masthead { border-bottom: 1px solid var(--rule); padding-bottom: 12px; }
+.masthead-top { gap: 16px; flex-wrap: wrap; }
+.masthead-top h1 { font-size: clamp(40px, 4vw, 60px); }
+.site-nav { gap: clamp(10px, 1.3vw, 20px); }
+.site-nav #together-nav { background: transparent; border: 0; padding: 10px 0; }
+.site-nav #together-nav[aria-current="page"] { color: var(--red); border-bottom: 2px solid var(--red); }
+.sub { margin-top: 2px; }
+.intro-row { margin-top: 5px; gap: 9px; }
+.intro-row .bo { width: 30px; height: 30px; }
+.intro-row .intro { font-size: 14px; }
+.header-tools { display: flex; align-items: center; gap: 10px; margin-left: auto; min-width: 0; position: relative; font: 12px/1.4 var(--mono); }
+.header-tools .online-presence { font: inherit; }
+.header-tools .online-presence summary { padding: 8px 4px; }
+.header-icon { position: relative; display: grid; place-items: center; width: 36px; height: 36px; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
+.header-icon .badge { position: absolute; top: 0; right: 0; }
+#profile-menu { position: relative; min-width: 0; }
+#profile-menu summary { display: flex; align-items: center; gap: 5px; cursor: pointer; list-style: none; min-height: 36px; }
+#profile-menu summary::-webkit-details-marker { display: none; }
+#profile-menu summary::after { content: "▾"; font-size: 10px; }
+#profile-label { overflow-wrap: anywhere; }
+#account-buddy { width: 26px; height: 26px; margin: 0; }
+#account.profile-panel { position: absolute; top: calc(100% + 5px); right: 0; z-index: 51; display: grid; width: min(240px, calc(100vw - 32px)); min-width: 0; gap: 4px; padding: 10px; border: 1px solid var(--ink); background: var(--paper); box-shadow: 3px 3px 0 var(--rule); }
+#profile-menu:not([open]) #account { display: none; }
+#account-state { min-width: 0; padding: 5px; overflow-wrap: anywhere; }
+#account.profile-panel button, #account.profile-panel a { text-align: left; padding: 9px; min-height: 34px; font: 12px/1.4 var(--mono); text-decoration: none; }
+#account.profile-panel a:hover, #account.profile-panel a:focus-visible { text-decoration: underline; background: var(--field-wash); }
+#recent { margin-top: 20px; }
+#recent .section-heading, #library .section-heading { margin-bottom: 10px; align-items: center; }
+#recent h2, #library h2 { margin-top: 0; }
+#recent .shelf-play { border-color: transparent; }
+#recent .shelf-play:hover, #recent .shelf-play:focus-visible { border-color: var(--ink); }
+#recent .game-preview { border: 0; }
+#recent .shelf-note { display: none; }
+#daily { grid-template-columns: 88px minmax(0, 1fr) auto auto; gap: 12px; margin-top: 18px; padding: 12px; border-top: 1px solid var(--rule); border-left: 3px solid var(--red); align-items: center; }
+#daily .daily-visual { max-width: 88px; justify-self: stretch; }
+#daily .daily-kicker { justify-content: flex-start; gap: 6px 12px; margin: 0 0 3px; }
+#daily-state, #daily.completed #daily-state { border: 0; padding: 0; color: var(--dim); }
+#daily h2 { font-size: clamp(20px, 2vw, 25px); margin: 0 0 3px; text-wrap: initial; }
+#daily-goal { font-size: 14px; margin: 0; }
+#daily .daily-actions { margin: 0; }
+#daily .primary-action { min-height: 34px; white-space: nowrap; }
+#daily-details { min-width: 0; font: 11px/1.5 var(--mono); }
+#daily-details summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0; }
+#daily-details[open] { grid-column: 2 / -1; }
+.daily-detail-content { padding: 8px 0 0; }
+#daily-streak { font-size: 10px; }
+#library { border-top: 0; padding-top: 0; margin-top: 24px; }
+#library #game-finder { display: inline; margin: 0; padding: 0; border: 0; background: transparent; }
+#library #game-finder[hidden] { display: none; }
+#game-finder-open { color: var(--dim); }
+#library .tools { margin-top: 8px; }
+.foot #feedback-open { padding: 0; }
+@media (max-width: 1100px) and (min-width: 701px) {
+  .masthead-top .site-nav { order: 2; flex-basis: 100%; margin-left: 0; }
+}
+@media (max-width: 700px) {
+  #hub { padding-top: 14px; }
+  .masthead-top { flex-wrap: nowrap; align-items: center; gap: 8px; }
+  .masthead-top h1 { font-size: 40px; }
+  .header-tools { gap: 4px; font-size: 10px; }
+  .site-nav #together-nav { padding: 7px 4px; }
+  #profile-label { max-width: 85px; }
+  .header-tools .online-presence { position: static; }
+  .header-tools .online-panel { right: 0; top: 100%; }
+  #daily { grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding: 10px; }
+  #daily .daily-visual { display: none; }
+  #daily .daily-copy { grid-column: 1 / -1; }
+  #daily-details[open] { grid-column: 1 / -1; }
+  #daily .daily-actions { justify-self: start; }
+  #daily h2 { font-size: 21px; }
+  #daily-goal { font-size: 13px; }
+  #recent { margin-top: 16px; }
+  #library { margin-top: 20px; }
+  #library .section-links { gap: 5px; }
+}
+@media (max-width: 380px) {
+  .masthead-top h1 { font-size: 34px; }
+  #profile-label { max-width: 64px; }
+  #account-buddy { display: none; }
+}
