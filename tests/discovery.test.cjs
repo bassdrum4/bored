@@ -306,6 +306,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     if (url.pathname === '/rest/v1/rpc/my_invite' || url.pathname === '/rest/v1/rpc/sync_invite') return reply(null);
     if (url.pathname === '/rest/v1/announcements' || url.pathname === '/rest/v1/announcement_reads'
       || url.pathname === '/rest/v1/announcement_responses') return reply([]);
+    if (url.pathname === '/rest/v1/rpc/my_analytics_access') return reply({admin:false,games:[]});
     // Role checks are expected on sign-in; this ordinary tester has no analytics access.
     if (url.pathname === '/rest/v1/analytics_admins' || url.pathname === '/rest/v1/game_analytics_readers') return reply([]);
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
@@ -357,6 +358,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
   });
   await page.goto(site.url);
   await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
+  await page.click('#profile-menu > summary');
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
   // Click each field before typing: a dialog that opens while the page is still
