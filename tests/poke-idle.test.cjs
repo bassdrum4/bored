@@ -682,3 +682,91 @@ test('Story Champions give no Master Ball (Year 1 has four, from chapters); Clas
   assert.deepEqual(got, { classic: 1, story: 0 });
   assert.deepEqual(errors, []);
 });
+
+test('the test account\'s Story save: its own slot, maxed, and nothing leaks into the real saves, the shiny store or the board', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(() => {
+    // A real Classic and a real Story save first.
+    const real = fresh(); real.box[1] = { xp: 125, shiny: false }; real.party = [1]; localStorage.setItem(KEY, JSON.stringify(real));
+    const story = fresh(); story.mode = 'story'; story.story = freshStory(); story.box[4] = { xp: 125, shiny: false }; story.party = [4]; localStorage.setItem(STORY_KEY, JSON.stringify(story));
+    localStorage.setItem(SHINY_KEY, JSON.stringify({ 1: 1 }));
+    const before = { story: localStorage.getItem(STORY_KEY), classic: localStorage.getItem(KEY), shiny: localStorage.getItem(SHINY_KEY) };
+    slot = KEY; S = readSlot(KEY); boot();
+    useSlot(TEST_KEY, testAccount());
+    const menu = [...document.querySelectorAll('#menu [data-go]')].map(b => b.textContent);
+    go('switch');
+    const ts = { slot, mode: S.mode, test: S.test, lv100: Object.values(S.box).every(b => lvlOf(b.xp) === 100), mewtwo: !!S.box[150], koraidon: !!S.box[1007], master: S.balls.master, charm: S.charm, key: S.key, badges: Object.keys(S.badges).length, tag: $('#tagline').textContent };
+    // Play a little: a shiny catch, a win, an achievement check, a save.
+    S.loc = { kind: 'route', r: 0, k: 0 }; B = { kind: 'route', r: 0, k: 0 }; addMon(10, 5, true); S.box[25] = S.box[25] || { xp: 1e6 }; checkAch(true); save();
+    const snap = __boredSnapshot();
+    showTitle(); go('back');
+    return { menu, ts, snap, after: { slot, classic: S.box[1] ? 'real' : 'other', story: localStorage.getItem(STORY_KEY) === before.story, shiny: localStorage.getItem(SHINY_KEY) === before.shiny,
+      testStory: !!readSlot(TEST_STORY_KEY) && readSlot(TEST_STORY_KEY).test } };
+  });
+  assert.ok(got.menu.includes('Back to my save') && got.menu.includes('Switch to Story'));
+  assert.deepEqual([got.ts.slot, got.ts.mode, got.ts.test, got.ts.lv100, got.ts.mewtwo, got.ts.koraidon, got.ts.master, got.ts.charm, got.ts.key, got.ts.badges],
+    ['bored.poke-idle.test.story', 'story', 1, true, true, true, 99, 1, 1, 0], 'a maxed Story save, at the start of the story');
+  assert.match(got.ts.tag, /^Test account, Story Mode/);
+  assert.deepEqual([got.snap.score, got.snap.caught, got.snap.finished, got.snap.story], [0, 0, false, undefined], 'nothing for the leaderboard');
+  assert.deepEqual(got.after, { slot: 'bored.poke-idle.save', classic: 'real', story: true, shiny: true, testStory: 1 }, 'the real saves and the shiny store are untouched');
+  assert.deepEqual(errors, []);
+});
+
+test('the test account\'s Story tools: jump with version picks, reset a chapter, win a fight, League rules, dex gates, Giratina and bond flags', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(async () => {
+    const sleep = ms => new Promise(f => setTimeout(f, ms));
+    useSlot(TEST_STORY_KEY, testStoryAccount()); storyJump(0); enter('battle'); while (sceneNow) endScene();
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    const labels = pts.map(p => p.label);
+    // Jump to Unova's pick, choosing Kyogre in Hoenn and Lugia in Johto.
+    storyJump(to('ch-unova-pick'), { 1: '249', 2: '382' }); while (sceneNow) endScene();
+    const j = { badges: Object.keys(S.badges).length, champs: Object.keys(S.champs).map(Number), picks: { ...S.story.picks }, next: storyNext().text, open: chapterOpen(CHAPTER['unova-pick']),
+      seen: ['hoenn-slush-after', 'johto-249', 'sinnoh-letter'].map(id => !!S.story.seen[id]), clue: !!S.story.clues.badge, mail: inbox().map(m => m.id).filter(x => /^story-(r1|johto-249|r2)$/.test(x)).sort(), r2: S.rivals && S.rivals.mid };
+    // The Story tab shows the tools.
+    openTab('story'); const tools = !!document.querySelector('#t-story #tj') && document.querySelectorAll('#t-story [data-pick-r]').length;
+    // Reset Hoenn's pick.
+    resetChapter('hoenn-pick'); const reset = { done: chDone('hoenn-pick'), pick: S.story.picks[2] || null };
+    // League rules: two Tier 3s in the party block a gym, until the test switch turns them off.
+    S.party = [150, 249]; B = null; startLoc({ kind: 'gym', r: 0, k: 0 }); const blocked = !$('#league').hidden; $('#league').hidden = true;
+    testTool('league'); startLoc({ kind: 'gym', r: 0, k: 0 }); const off = B && B.kind;
+    // Win the fight at once.
+    const winBtn = !$('#testwin').hidden; testWin(); await sleep(800); while (sceneNow) endScene();
+    const won = !!S.badges['0-0'];
+    // Dex gates.
+    for (const id of LEGENDS) S.story.ch[id] = 1; S.champs[8] = 1; S.lifeDex = { 1: 1 };
+    const gate = chapterOpen(CHAPTER['paldea-finale']);
+    S.debug.dex = 'met'; const met = chapterOpen(CHAPTER['paldea-finale']);
+    S.debug.dex = 'ignore'; const ign = chapterOpen(CHAPTER['paldea-finale']);
+    // Giratina flags and bond flags.
+    const box = document.querySelector('#t-story [data-flag="dealer"]'); renderStory();
+    const cb = document.querySelector('#t-story [data-flag="dealer"]'); cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true }));
+    testTool('bond', { dataset: { bond: 'all' } }); const all = Object.values(S.box).every(b => b.bond);
+    testTool('bond', { dataset: { bond: 'none' } }); const none = Object.values(S.box).every(b => !b.bond);
+    // Year 1 cleared: the Begin Year 2 screen.
+    storyJump(to('year1-end')); while (sceneNow) endScene(); const y2 = !$('#scene').hidden && $('#scene').textContent.includes('Begin Year 2.');
+    return { labels, j, tools, reset, blocked, off, winBtn, won, gates: [gate, met, ign], roulette: S.story.roulette, all, none, y2, epi: S.story.epilogue, real: localStorage.getItem(STORY_KEY) };
+  });
+  assert.deepEqual(got.labels.slice(0, 4), ['Prologue: starter picked', 'Kanto: gyms', 'Kanto: Champion Blue', 'Kanto: Team Thaw: Rime']);
+  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels.at(-2) === 'Epilogue: Mt. Silver' && got.labels.at(-1).startsWith('Year 1 cleared'));
+  assert.deepEqual(got.j.champs, [0, 1, 2, 3, 4]);
+  assert.equal(got.j.badges, 20);
+  assert.deepEqual(got.j.picks, { 0: 150, 1: 249, 2: 382, 3: got.j.picks[3] }, 'the picks asked for, and random where none was');
+  assert.ok([483, 484].includes(got.j.picks[3]));
+  assert.equal(got.j.open, true);
+  assert.match(got.j.next, /^Next: Reshiram or Zekrom/);
+  assert.deepEqual(got.j.seen, [true, true, true]);
+  assert.equal(got.j.clue, true);
+  assert.deepEqual(got.j.mail, ['story-johto-249', 'story-r1', 'story-r2']);
+  assert.equal(got.j.r2, 1);
+  assert.equal(got.tools, 8, 'a version pick for each region with two mascots (Kanto has only Mewtwo)');
+  assert.deepEqual(got.reset, { done: false, pick: null });
+  assert.deepEqual([got.blocked, got.off], [true, 'gym'], 'League rules apply, and the test switch turns them off');
+  assert.deepEqual([got.winBtn, got.won], [true, true]);
+  assert.deepEqual(got.gates, [false, true, true]);
+  assert.equal(got.roulette.dealer, 1);
+  assert.deepEqual([got.all, got.none], [true, true]);
+  assert.deepEqual([got.y2, got.epi], [true, 1]);
+  assert.equal(got.real, null, 'the real Story save is never made');
+  assert.deepEqual(errors, []);
+});
