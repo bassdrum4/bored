@@ -10,7 +10,7 @@ const MAX_CLIENTS = 1000, MAX_IP = 250, MAX_BUFFER = 65536;
 const AUTH_MS = 20*60*1000, AUTH_CACHE_MS = 60*1000;
 const roster = createRoster(), peers = new Map(), ipCounts = new Map();
 const authCache = new Map(), pending = new Map();
-let authBudget = 24, budgetAt = Date.now(), flushTimer = null;
+let authBudget = 24, budgetAt = Date.now(), flushTimer = null, authEpoch = 0;
 let lastCount = '', lastNames = '', shuttingDown = false;
 
 function send(ws, value) {
@@ -49,12 +49,13 @@ async function verify(token) {
   authBudget = Math.min(24, authBudget + (now-budgetAt)/1000*8); budgetAt = now;
   if (authBudget < 1 || pending.size >= 16) throw Error('Busy');
   authBudget--;
+  const startedEpoch = authEpoch;
   const task = (async () => {
     const res = await fetch(SUPABASE_URL+'/rest/v1/rpc/bored_presence_account',{
       method:'POST',headers:{apikey:API_KEY,authorization:'Bearer '+token,'content-type':'application/json'},
       body:'{"action":"get"}',signal:AbortSignal.timeout(8000)
     });
-    if (!res.ok) throw Error('Account verification failed');
+    if (!res.ok || startedEpoch !== authEpoch) throw Error('Account verification failed');
     const value = await res.json();
     if (!UUID.test(value?.id || '') || typeof value.visible !== 'boolean') throw Error('Invalid identity');
     const clean = {id:value.id,visible:value.visible,handle:typeof value.handle==='string'?value.handle.slice(0,160):''};
@@ -110,7 +111,9 @@ wss.on('connection',(ws,ip)=>{
        now-state.authAt>=3000){
       state.checking=true;state.authAt=now;
       try{
+        const version=authEpoch;
         const profile=await verify(m.jwt);
+        if(version!==authEpoch){ws.close(1013);return;}
         if(!peers.has(ws)||ws.readyState!==WebSocket.OPEN)return;
         if(who&&who.id!==profile.id){ws.close(1008);return;}
         if(!profile.visible){evict(profile.id);send(ws,{t:'off'});ws.close(4003);return;}
@@ -127,7 +130,7 @@ wss.on('connection',(ws,ip)=>{
       if(state.watch)send(ws,namesFrame());
     }else if(m?.t==='hide'&&!who.guest){
       // An authenticated socket may hide its own account, never anyone else.
-      authCache.clear();evict(who.id);
+      authEpoch++;authCache.clear();evict(who.id);
     }
   });
 });
