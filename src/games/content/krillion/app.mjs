@@ -4,6 +4,7 @@ import { Sound } from './sound.mjs';
 import { DROP_MS, easeInOut, easeOut, iconFor, tierImage, diveChart, distributionChart, leaderboardList } from './presentation.mjs';
 import { connectLive } from './live.mjs';
 import { createClassSet } from './class-set.mjs';
+import { createRevealRun } from './reveal-run.mjs';
 
 const $=id=>document.getElementById(id);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,45 +35,12 @@ const API_BASE='https://djdpttltfmwkofdrvkem.supabase.co/functions/v1/krillion';
 const API_KEY='sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
 const setName=(queryParams.get('set')||'').toLowerCase();
 const classSet=/^[a-z0-9][a-z0-9-]{0,40}$/.test(setName)?createClassSet(setName):null;
-let staticWorker=null,staticSeq=0;
-const staticWaiters=new Map();
-function answerWorker(){
-  if(!staticWorker){
-    staticWorker=new Worker(new URL('./static-worker.mjs',import.meta.url),{type:'module'});
-    staticWorker.onmessage=({data})=>staticWaiters.get(data.id)?.(data.key);
-  }
-  return staticWorker;
-}
-function staticRound(){
-  if(!game||game.completed)return null;
-  const p=game.prompts?.[game.round];
-  return p?.staticDate?{date:p.staticDate,round:p.staticRound}:game.staticAnswers?{date:game.date,round:game.round}:null;
-}
-function warmStaticRound(){
-  const target=staticRound();if(!target)return;
-  try{answerWorker().postMessage(target);}catch{}
-}
-async function staticCandidate(input){
-  try{
-    const worker=answerWorker(),id=++staticSeq;
-    return await new Promise(resolve=>{
-      const finish=value=>{clearTimeout(timer);staticWaiters.delete(id);resolve(value);};
-      const timer=setTimeout(()=>finish(null),900);
-      staticWaiters.set(id,finish);
-      worker.postMessage({id,...staticRound(),input});
-    });
-  }catch{return null;}
-}
-async function api(path,data){if(classSet)return classSet(path,data);
-  if(path==='answer'&&staticRound()&&data?.answer){
-    const candidate=await staticCandidate(data.answer);
-    if(candidate)data={...data,candidate};
-  }
+async function remote(path,data){
   const safe=data===undefined||(path==='start'&&!!data.runId);
-  const timeout=path==='start'||path==='today'?35000:15000;
+  const timeout=path.startsWith('reveal')?120000:path==='start'||path==='today'?35000:15000;
   for(let attempt=0;;attempt++){
     try{
-      const response=await fetch(API_BASE+'/'+path,{cache:'no-store',headers:{apikey:API_KEY,...(data===undefined?{}:{'Content-Type':'application/json'})},...(data===undefined?{}:{method:'POST',body:JSON.stringify(data)}),signal:AbortSignal.timeout(timeout)});
+      const response=await fetch(API_BASE+'/'+path,{cache:path.startsWith('reveal')?'default':'no-store',headers:{apikey:API_KEY,...(data===undefined?{}:{'Content-Type':'application/json'})},...(data===undefined?{}:{method:'POST',body:JSON.stringify(data)}),signal:AbortSignal.timeout(timeout)});
       if(response.ok)return await response.json();
       const body=await response.json().catch(()=>({}));
       const error=new Error(body.error||'The signal is lost. Please retry.');error.status=response.status;throw error;
@@ -82,6 +50,10 @@ async function api(path,data){if(classSet)return classSet(path,data);
     }
   }
 }
+// The daily dive's own answers are fetched and matched here; classroom sets and
+// everything else keep their own paths.
+const revealRun=createRevealRun({call:remote});
+const api=(path,data)=>classSet?classSet(path,data):revealRun(path,data);
 function setPhase(value){if(value!=='done')stopLive();const card=$('prompt-card'),exiting=value==='plunge'&&!card.hidden;clearTimeout(promptExitTimer);card.classList.toggle('leaving',exiting);if(exiting)promptExitTimer=setTimeout(()=>{if(phase==='plunge')card.hidden=true;},testMode?40:650);phase=value;if(value!=='answering')document.body.classList.remove('timer-hot');document.body.dataset.phase=value;scene.setPhase(value);$('hero').hidden=false;$('intro').hidden=value!=='intro';card.hidden=!exiting&&!['preview','answering'].includes(value);$('answer-dock').hidden=value!=='answering';$('preview-label').hidden=value!=='preview';$('landing').hidden=value!=='landed';$('next-wrap').hidden=value!=='landed';$('results').hidden=value!=='done';$('falling-answer').hidden=value!=='plunge';$('tier-ladder').hidden=value!=='plunge';}
 function applySettings(){scene.lowPower=settings.lowPower;document.body.classList.toggle('low-power',settings.lowPower);document.body.classList.toggle('colorblind',settings.colorblind);document.querySelectorAll('[data-setting]').forEach(input=>input.checked=!!settings[input.dataset.setting]);sound.mute(!!settings.muted);$('mute-btn').setAttribute('aria-pressed',String(!!settings.muted));$('mute-btn').setAttribute('aria-label',settings.muted?'Turn sound on':'Turn sound off');$('mute-btn').innerHTML=`<svg viewBox="0 0 20 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true"><path d="M2 6h3l4-4v12l-4-4H2z"/>${settings.muted?'<path d="m12 5 5 6m0-6-5 6" stroke="currentColor" stroke-width="2"/>':'<path d="M11 6h2v4h-2zm4-3h2v10h-2z"/>'}</svg>`;$('mascot').dataset.buddy=settings.buddy;const buddy=buddyOptions.find(b=>b.id===settings.buddy)||buddyOptions[0];$('mascot').querySelector('img').src=buddy.src;$('mascot').querySelector('img').alt=buddy.name;syncBuddyGold();}
 const buddyOptions=[{id:'krill',name:'The Krill',streak:0,src:'assets/krill.svg'},{id:'schooler',name:'Schooler',streak:5,src:'assets/schooler.svg'},{id:'rare',name:'Rare Squid',streak:14,src:'assets/rare.svg'},{id:'deepcut',name:'Deep Cut Angler',streak:30,src:'assets/deepcut.svg'},{id:'evil',name:'Evil Krill',streak:45,src:'assets/evil.svg'}];
@@ -91,7 +63,7 @@ function saveRun(){if(!game||game.mode==='set'||game.mode==='practice')return;wr
 function setGame(value){game=value;clockOffset=0;clockAtServer=typeof game.serverNow==='number'?game.serverNow-Date.now():0;visualScore=game.results.reduce((sum,r)=>sum+r.score,0);saveRun();updateHud();}
 async function begin(practice=false,archive=null,pack=null){if(busy)return;busy=true;$('start-btn').disabled=true;$('boot-error').hidden=true;try{await sound.init();const unlimited=endless&&!pack&&!archive;const daily=!practice&&!archive&&!pack&&!unlimited&&!classSet;let runId;if(daily){const date=etDate();const saved=read('ok:run',null),pending=read('ok:pending-daily',null);runId=saved?.date===date&&saved.runId?saved.runId:pending?.date===date&&pending.runId?pending.runId:crypto.randomUUID();write('ok:pending-daily',{date,runId});}let response;try{response=await api('start',{practice,...(runId?{runId}:{}),...(archive?{archive}:{}),...(pack?{pack}:{}),...(unlimited?{unlimited:true,chapter:sessionChapters}:{})});}catch(error){if(!daily||error.status!==409)throw error;write('ok:run',null);write('ok:pending-daily',null);throw new Error('This saved dive has expired. Start again.');}if(response.pausedAt)response=await api('pause',{runId:response.runId,paused:false});paused=false;setGame(response);if(daily)write('ok:pending-daily',null);$('day-number').textContent=game.title?String(game.title).toUpperCase():game.pack?String(PACK_NAMES[game.pack]||'Pack').toUpperCase()+' · CHAPTER 1':game.unlimited?'UNLIMITED · CHAPTER '+game.chapter:'DIVE #'+game.dayNumber;sound.event('begin');scene.targetActive=1;review=null;if(game.completed){await showResults();return;}if(game.roundStart===null&&game.results.length){const last=game.results.at(-1);showLanding({...last,promptText:game.prompts[last.round]?.text});}else showRound();track('Dive Started',{mode:game.mode,day:game.dayNumber});}catch(e){setPhase('intro');$('boot-error').textContent=e.message;$('boot-error').hidden=false;}finally{busy=false;$('start-btn').disabled=false;}}
 let autoRetries=0,autoRetryAt=0;
-function showRound(){warmStaticRound();setPhase('preview');syncBuddyGold();correction=null;autoSent=false;autoRetries=0;autoRetryAt=0;lastTick=-1;  $('answer-status').textContent='';$('answer-status').className='answer-status';const hintBtn=$('hint-btn');if(hintBtn){hintBtn.hidden=!['daily','set','practice'].includes(game.mode);hintBtn.disabled=!!game.hintUsed;hintBtn.textContent=game.hintUsed?'HINT USED':'HINT';}const p=game.prompts[game.round];$('prompt-number').textContent=`PROMPT ${game.round+1} OF 7`;$('prompt-text').textContent=p.text;$('answer').value=read('ok:draft:'+game.runId+':'+game.round,'');$('answer').disabled=true;$('submit-btn').disabled=true;scene.setDepth(currentScore*10);scene.roundBase=currentScore*10;scene.roundIndex=game.round;scene.round(currentScore*10);tick();}
+function showRound(){setPhase('preview');syncBuddyGold();correction=null;autoSent=false;autoRetries=0;autoRetryAt=0;lastTick=-1;  $('answer-status').textContent='';$('answer-status').className='answer-status';const hintBtn=$('hint-btn');if(hintBtn){hintBtn.hidden=!['daily','set','practice'].includes(game.mode);hintBtn.disabled=!!game.hintUsed;hintBtn.textContent=game.hintUsed?'HINT USED':'HINT';}const p=game.prompts[game.round];$('prompt-number').textContent=`PROMPT ${game.round+1} OF 7`;$('prompt-text').textContent=p.text;$('answer').value=read('ok:draft:'+game.runId+':'+game.round,'');$('answer').disabled=true;$('submit-btn').disabled=true;scene.setDepth(currentScore*10);scene.roundBase=currentScore*10;scene.roundIndex=game.round;scene.round(currentScore*10);tick();}
 async function submit(timeout=false){if(!game||busy||!['preview','answering'].includes(phase)||paused)return;const raw=$('answer').value.trim();if(!raw&&!timeout&&now()<game.roundStart+ROUND_MS)return;busy=true;$('submit-btn').disabled=true;try{const response=await api('answer',{runId:game.runId,round:game.round,answer:raw,timeout:timeout||now()>=game.roundStart+ROUND_MS,confirm:correction===raw,previewCorrection:settings.corrections});if(response.rejected){$('answer-status').className='answer-status';$('answer-status').textContent=response.message;sound.event('reject');$('answer').classList.remove('shake');void $('answer').offsetWidth;$('answer').classList.add('shake');if(settings.clearRejected)$('answer').value='';correction=null;}else if(response.correction){correction=response.correction;$('answer-status').className='answer-status correction';$('answer-status').innerHTML=`“${escape(raw)}” → corrects to “${escape(correction)}”<small>submit again to confirm · or edit</small>`;$('answer').value=correction;write('ok:draft:'+game.runId+':'+game.round,correction);}else if(response.alreadyScored){setGame(response.state);if(game.completed)await showResults();else if(game.roundStart===null)showLanding(game.results.at(-1));else showRound();}else{const oldScore=currentScore;setGame(response.state);sound.event('submit');{const rect=$('answer').getBoundingClientRect();for(let i=0;i<12;i++)scene.typeAt(rect.left+Math.random()*rect.width,rect.top+Math.random()*rect.height,1);}track('Answer Scored',{mode:game.mode,round:response.result.round+1,tier:response.result.tier||'miss'});await plunge(response.result,oldScore);}}catch(e){$('answer-status').textContent=e.message+' You can retry without restarting the dive.';$('answer-status').className='answer-status';if(timeout&&autoRetries<1){autoRetries++;autoSent=false;autoRetryAt=Date.now()+1500;}}finally{busy=false;if(phase==='answering'){$('submit-btn').disabled=!$('answer').value.trim()&&now()<game.roundStart+ROUND_MS;$('answer').focus({preventScroll:true});}}}
 function animateScore(from,to,gold=false){
   if(scoreAnimation)cancelAnimationFrame(scoreAnimation);

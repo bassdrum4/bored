@@ -1,8 +1,8 @@
 name: Warm Krillion daily
 on:
   schedule:
-    # Give the scheduled Pages deployment time to publish its static snapshot.
-    # If that fails, /today still starts the legacy bounded answer-bank build.
+    # The prompts come straight from the reference site, so this is the canary:
+    # it catches a day the reference never publishes.
     - cron: '30 6 * * *'
   workflow_dispatch:
 permissions:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Verify today's static snapshot or warm the existing fallback
+      - name: Verify today's dive is served
         env:
           KRILLION_URL: https://djdpttltfmwkofdrvkem.supabase.co/functions/v1/krillion/today
           KRILLION_PUBLIC_KEY: sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ
