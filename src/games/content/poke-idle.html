@@ -3807,11 +3807,17 @@ function testToolsHtml() {
 }
 // Story's leaderboard progress (for the Story board the hub doesn't have yet): year, chapters done, regions
 // liberated (a chapter with liberates: true closes its region), and the Story lifetime dex, which never goes down.
+// ranked is the board's one number, like Classic's: furthest progress first (the year; in Year 3 the regions
+// liberated; then chapters done), then the lifetime dex. Each part fits under the next one's step (dex < 10^4,
+// chapters < 100, regions < 10), so a step up in progress always outranks any dex.
+const STORY_RANK = { year: 1e8, liberated: 1e6, chapter: 1e4 };
 function storyProgress(st) {
   if (!st || st.mode !== "story" || !st.story) return null;
   const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
-  return { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
+  const p = { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
     lifeDex: new Set([...keys(st.lifeDex), ...keys(st.story.lifeDex), ...keys(st.box)]).size };
+  p.ranked = p.year * STORY_RANK.year + (p.year === 3 ? p.regionsLiberated * STORY_RANK.liberated : 0) + Math.min(99, p.chapter) * STORY_RANK.chapter + Math.min(9999, p.lifeDex);
+  return p;
 }
 
 // The scene box. playScene(id, then): then runs once it's closed, skipped or not. A scene you've already seen plays
