@@ -26,40 +26,26 @@ If creating a Web Service manually instead of a Blueprint:
 - Node 22, Supabase URL/publishable key as in `render.yaml`. No service-role key.
 - Automatic deploys only when files under `server/` change.
 
-## Efficiency and limits
+## HTTP event transport
 
-One socket per participating tab, with unique guest browser IDs and account IDs
-deduplicated in RAM. Only small count frames are broadcast, at most once every
-five seconds and only when counts change. A named roster is sent exclusively to
-signed-in sockets with the dropdown open; it is not sent to guests. One shared
-30-second liveness sweep plus a one-byte client message every 60 seconds.
-No disk, per-event database writes, guest authentication or roster RPC polling.
-Signed-in clients read the preference on entry and the server validates their
-identity on join and approximately every 18 minutes. Concurrent validations for
-the same token are coalesced and results cached for 60 seconds. The server
-limits sockets to 1,000 and 250 per source IP, bounds incoming frames and
-authentication concurrency, and drops slow consumers. These are protective
-caps, not measured Render performance guarantees. Guest counts are approximate
-and can be inflated by deliberately fabricated browser IDs.
+New clients use POST /presence/events with an authenticated fetch SSE stream first.
+JWTs are sent only in the HTTPS request body, never in URLs. An initial snapshot
+contains aggregate counts, and names only for a signed-in user with the dropdown
+open. Count/roster changes are batched by the shared five-second dispatcher.
+SSE keepalives are sent every 25 seconds; streams renew at most every 12 minutes
+(or before token expiry). If the initial stream or subsequent streaming fails,
+the page switches to long polling: one request held for up to 25 seconds, returned
+early on a changed snapshot. No WebSocket attempts from new clients.
 
-## Blocked WebSockets
+The same in-memory roster deduplicates accounts and guest browser IDs across
+transports. A per-tab session identifies a connection; abandoned sessions expire
+after approximately 90–95 seconds. Explicit leave is best effort on page exit.
+Account verification is cached for at most 18 minutes and never past JWT expiry.
+An account opt-out persists in Supabase and invalidates live Render sessions;
+if delivery fails, periodic verification provides a fallback. No guest database
+traffic or per-event writes. The old /ws and /presence endpoints remain for
+cached clients during rollout; no changes to game realtime or Bored Together.
 
-Some school and office proxies refuse the `Upgrade` request while allowing ordinary
-HTTPS. A tab whose handshake never succeeds then posts to `POST /presence` on the
-same service every 45 seconds: the same guest ID or verified account token, the
-same roster and the same counts. A poll entry expires 150 seconds after its last
-request, which covers a throttled background timer and one missed poll. Only a
-socket that never opened switches a tab to polling for the rest of
-that page load; a socket that worked and then dropped still reconnects as a socket.
-The endpoint applies the socket's origin allowlist through CORS. Polling keeps a
-free instance awake while the tab is open, which is the aim rather than a side
-effect.
-
-Free instances sleep after inactivity; no artificial uptime pings. The hub
-backs off with jitter and never blocks game loading. Ordinary game pushes do
-not restart the service. Restarting loses the ephemeral roster; browsers reconnect.
-
-The former Supabase channel/policies are retained for rollback and cached
-clients, but the new page no longer opens them. After checking the live
-Render service, disable the old presence channels if no legacy clients remain;
-do not touch Bored Together's realtime transport or persistent privacy settings.
+Tests: npm test in server/ includes HTTP transport tests with a local HTTP server.
+Validate SSE and fallback on the embedded school network, and check Render
+bandwidth and Supabase RPC traffic before extending this protocol to chat.

@@ -2,6 +2,7 @@ import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createRoster, UUID } from './core.mjs';
+import { createEventPresence } from './event-presence.mjs';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://djdpttltfmwkofdrvkem.supabase.co';
 const API_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
@@ -62,6 +63,7 @@ function changed() {
     const count = countFrame(), countChanged = count !== lastCount;
     const names = namesFrame(), namesChanged = names !== lastNames;
     lastCount = count; lastNames = names;
+    events.flush();
     for (const [ws,state] of peers) {
       const who = roster.identity(ws);
       if (!who) continue;
@@ -71,9 +73,11 @@ function changed() {
   },5000);
 }
 function evict(id) {
+  events.evict(id);
   const poller = 'a:'+id;
   if (pollers.delete(poller)) roster.remove(poller);
   for (const ws of roster.accountClients(id)) {
+    if (!peers.has(ws)) continue;
     roster.remove(ws); send(ws,{t:'off'}); ws.close(4003,'Presence disabled');
   }
   changed();
@@ -145,10 +149,15 @@ async function presence(req,res) {
   const counts = roster.counts();
   reply(res,200,identity.guest?{t:'ok',...counts}:{t:'ok',...counts,n:roster.names()},origin);
 }
+const events = createEventPresence({roster,verify,changed,reply,readBody,origins:ORIGINS,clientSource,maxClients:MAX_CLIENTS,maxIp:MAX_IP,
+  hideAccount(id){authEpoch++;authCache.clear();evict(id);}
+});
 const server = http.createServer((req,res)=>{
   if (req.method==='GET' && req.url==='/health') {
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
     res.end(JSON.stringify({ok:true,service:'bored-presence',version:1}));
+  } else if (['POST','OPTIONS'].includes(req.method) && req.url==='/presence/events') {
+    void events.handle(req,res).catch(()=>{if(!res.headersSent)reply(res,500,{t:'err'},req.headers.origin);else res.destroy();});
   } else if (req.method==='POST' && req.url==='/presence') {
     void presence(req,res);
   } else if (req.method==='OPTIONS' && req.url==='/presence') {
@@ -234,7 +243,7 @@ const pollSweep = setInterval(()=>{
 },10000);
 pollSweep.unref();
 function shutdown(){
-  shuttingDown=true;clearInterval(sweep);clearInterval(pollSweep);clearTimeout(flushTimer);
+  shuttingDown=true;events.close();clearInterval(sweep);clearInterval(pollSweep);clearTimeout(flushTimer);
   for(const ws of peers.keys())ws.close(1012,'Restarting');
   server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),5000).unref();
 }
