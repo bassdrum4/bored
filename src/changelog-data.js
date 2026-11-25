@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 973,
+  "count": 975,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"eb0940eb","date":"2026-11-25","author":"Daniel Lowe","subject":"Test private opening deployment display for both Risk seats"},
+  {"sha":"531026b6","date":"2026-11-25","author":"Daniel Lowe","subject":"Hide opposing troop counts during Bored Together opening deployment"},
   {"sha":"067a622f","date":"2026-11-25","author":"bassdrum4","subject":"Keep Krillion's run state so a finished dive gets its sounding"},
   {"sha":"6bb9cba1","date":"2026-11-25","author":"Codebuff","subject":"Poll presence every 45 seconds and raise the per-address cap"},
   {"sha":"83101baa","date":"2026-11-25","author":"Codebuff","subject":"Keep online presence working when a network blocks WebSocket upgrades"},
