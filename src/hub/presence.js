@@ -1,10 +1,30 @@
-import { backendReady, freshSession, getSession, hasIdentity, realtimeURL, request } from './backend.js';
+import { ANON_TOKEN, backendReady, freshSession, getSession, hasIdentity, realtimeURL, request } from './backend.js';
 import { subscribeChanges } from './realtime.js';
 
-const TOPIC = 'bored-online-v1';
+const TOPIC = 'bored-online-v2';
+const GUEST = 'guest';
+const GUEST_PREF = 'bored.presence.guest.visible';
+const GUEST_KEY = 'bored.presence.guest.key';
 const TICKET_REFRESH_MS = 4 * 60 * 1000;
 const VERIFY_MS = 60 * 1000;
-const TICKET = /^[0-9a-f-]{36}\.[0-9a-f-]{36}\.[0-9]{1,12}\.[0-9a-f]{64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const TICKET = /^(?:p2:(?:[0-9a-f]{32}){2,14}:[0-9a-f]{64}|guest:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+function guestVisible() {
+  try { return localStorage.getItem(GUEST_PREF) !== 'off'; } catch { return true; }
+}
+let ephemeralGuestKey = '';
+function guestTicket() {
+  let key = ephemeralGuestKey;
+  try { key = localStorage.getItem(GUEST_KEY) || key; } catch {}
+  if (!UUID.test(key || '')) key = crypto.randomUUID();
+  ephemeralGuestKey = key;
+  try { localStorage.setItem(GUEST_KEY,key); key = localStorage.getItem(GUEST_KEY) || key; } catch {}
+  return 'guest:' + key;
+}
+function viewerId() { return hasIdentity() ? getSession()?.user?.id || GUEST : GUEST; }
+
+export function boringLabel(count) { return count + (count === 1 ? ' boring person' : ' boring people'); }
 
 // QA is an analytics preference, not a social visibility preference.
 export function isLivePresenceUrl(href) {
@@ -19,8 +39,8 @@ export function validPresenceTickets(tickets) {
   return [...new Set((tickets || []).filter(t => typeof t === 'string' && TICKET.test(t)))].sort().slice(0, 300);
 }
 
-export function onlineLabel(names) {
-  return names.length + ' online';
+export function onlineLabel(names, guests = 0, registered = names.length) {
+  return (registered + guests) + ' online';
 }
 
 export function mountPresence() {
@@ -40,25 +60,43 @@ export function mountPresence() {
     typeof WebSocket !== 'undefined';
 
   function current(id, version) {
-    return !suspended && owner === id && epoch === version && hasIdentity() && getSession()?.user?.id === id;
+    return !suspended && owner === id && epoch === version && viewerId() === id;
   }
   async function rpc(id, action, args = {}) {
+    if (id === GUEST) {
+      const result = await request('/rest/v1/rpc/bored_presence_v2', {
+        method: 'POST', body: { action, args }, token: ANON_TOKEN
+      });
+      if (viewerId() !== id) throw new Error('Account changed');
+      return result;
+    }
     const session = await freshSession();
     if (!session || session.user?.id !== id || getSession()?.user?.id !== id) throw new Error('Account changed');
-    const result = await request('/rest/v1/rpc/bored_presence_rpc', {
+    const result = await request('/rest/v1/rpc/bored_presence_v2', {
       method: 'POST', body: { action, args }, token: session.access_token
     });
     if (getSession()?.user?.id !== id) throw new Error('Account changed');
     return result;
   }
-  function paint(names, message = '') {
+  function paint(names, message = '', guests = 0, registered = names?.length || 0) {
     list.replaceChildren();
     if (Array.isArray(names)) {
-      summary.textContent = onlineLabel(names);
-      status.textContent = names.length ? '' : 'Nobody is online right now.';
+      summary.textContent = onlineLabel(names, guests, registered);
+      status.textContent = registered + guests ? '' : 'Nobody is online right now.';
       for (const name of names) {
         const li = document.createElement('li');
         li.textContent = name;
+        list.appendChild(li);
+      }
+      if (owner === GUEST && registered > 0) {
+        const li = document.createElement('li');
+        li.textContent = registered + (registered === 1 ? ' signed-in player' : ' signed-in players');
+        list.appendChild(li);
+      }
+      if (guests > 0) {
+        const li = document.createElement('li');
+        li.className = 'online-guests';
+        li.textContent = boringLabel(guests);
         list.appendChild(li);
       }
     } else {
@@ -78,7 +116,7 @@ export function mountPresence() {
     setting.disabled = preferencePending || !owner || next === null || !eligible;
     document.getElementById('presence-privacy-note').firstChild.textContent = next === false
       ? 'Your online status is hidden. You can turn it back on in '
-      : 'Your online status is visible to other participating players. You can turn it off in ';
+      : (owner === GUEST ? 'You are counted anonymously. You can turn it off in ' : 'Your online status is visible to other participating players. You can turn it off in ');
     if (next !== true) {
       stopChannel();
       paint(null, next === false ? 'You are hidden. Turn online status back on in Settings to see the list.' : 'Checking online status…');
@@ -95,8 +133,8 @@ export function mountPresence() {
         if (result?.visible === false) {
           setVisible(false); settingNote.textContent = 'Online status is off.'; return;
         }
-        if (!Array.isArray(result?.names)) throw new Error('Invalid presence response');
-        paint(result.names.filter(n => typeof n === 'string').sort((a,b) => a.localeCompare(b)));
+        if (!Array.isArray(result?.names) || !Number.isInteger(result.guests) || !Number.isInteger(result.registered)) throw new Error('Invalid presence response');
+        paint(result.names.filter(n => typeof n === 'string').sort((a,b) => a.localeCompare(b)), '', result.guests, result.registered);
       } catch {
         if (current(id, version) && serial === resolveSerial) paint(null, 'Online list temporarily unavailable.');
       }
@@ -107,9 +145,10 @@ export function mountPresence() {
     if (channel) { channel.trackPresence(ticket); return; }
     paint(null, 'Connecting…');
     const socket = subscribeChanges({
-      url: realtimeURL(), topic: TOPIC, private: true,
+      url: realtimeURL(), topic: TOPIC, private: true, allowGuest: id === GUEST,
       getToken: async () => {
         if (!current(id, version) || visible !== true) return '';
+        if (id === GUEST) return '';
         const session = await freshSession();
         return current(id, version) && session?.user?.id === id ? session.access_token : '';
       },
@@ -133,6 +172,13 @@ export function mountPresence() {
   async function refresh() {
     if (!owner || !eligible || suspended || preferencePending || preferenceReading || paused) return;
     const id = owner, version = epoch;
+    if (id === GUEST) {
+      const enabled = guestVisible();
+      setVisible(enabled);
+      settingNote.textContent = enabled ? 'Guests are counted anonymously on this browser.' : 'Online status is off on this browser.';
+      if (enabled) connect(guestTicket(), id, version);
+      return;
+    }
     preferenceReading = true;
     try {
       const result = await rpc(id, 'get');
@@ -155,14 +201,13 @@ export function mountPresence() {
     }
   }
   function identityChanged() {
-    const id = hasIdentity() ? getSession()?.user?.id || null : null;
+    const id = viewerId();
     if (id === owner && !suspended) return;
     epoch++; stopChannel(); clearInterval(refreshTimer);
     owner = id; visible = null; preferencePending = false; preferenceReading = false; paused = false;
     details.hidden = !id || !eligible; details.open = false;
     setting.checked = false; setting.disabled = true;
-    settingNote.textContent = !id ? 'Sign in to manage your online status.' :
-      !eligible ? 'Online status is available on the live site.' : 'Loading your preference…';
+    settingNote.textContent = !eligible ? 'Online status is available on the live site.' : 'Loading your preference…';
     if (id && eligible && !suspended) {
       paint(null, 'Checking online status…');
       void refresh();
@@ -172,6 +217,11 @@ export function mountPresence() {
   setting.addEventListener('change', async () => {
     if (!owner || visible === null || preferencePending || !eligible) return;
     const desired = setting.checked, id = owner, before = visible;
+    if (id === GUEST) {
+      try { localStorage.setItem(GUEST_PREF, desired ? 'on' : 'off'); }
+      catch { paused = true; epoch++; stopChannel(); setVisible(false); settingNote.textContent = 'Browser storage unavailable; presence is paused for this page.'; return; }
+      epoch++; stopChannel(); paused = false; void refresh(); return;
+    }
     epoch++; const version = epoch;
     preferenceReading = false; preferencePending = true; paused = false;
     stopChannel();
@@ -205,6 +255,11 @@ export function mountPresence() {
     if (e.key === 'Escape') { details.open = false; summary.focus(); }
   });
   window.addEventListener('bored:identity', identityChanged);
+  window.addEventListener('storage', e => {
+    if (owner === GUEST && (e.key === GUEST_PREF || e.key === GUEST_KEY || e.key === null)) {
+      epoch++; stopChannel(); void refresh();
+    }
+  });
   window.addEventListener('online', () => { channel?.reconnect(); if (!channel) void refresh(); });
   window.addEventListener('pagehide', () => {
     suspended = true; epoch++; stopChannel(); clearInterval(refreshTimer); owner = null;
@@ -213,7 +268,6 @@ export function mountPresence() {
     if (e.persisted) { suspended = false; identityChanged(); }
   });
   identityChanged();
-  if (!owner) settingNote.textContent = 'Sign in to manage your online status.';
 }
 
 if (typeof document !== 'undefined') mountPresence();
