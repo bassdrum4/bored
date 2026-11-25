@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 984,
+  "count": 985,
   "newest": "2026-11-25",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d0073d19","date":"2026-11-25","author":"bassdrum4","subject":"Give shadow.net a second story act and repair the first"},
   {"sha":"8f826c70","date":"2026-11-25","author":"Codebuff","subject":"Give the header nav Settings and Feedback, and put account actions on Settings"},
   {"sha":"80e1bd84","date":"2026-11-25","author":"Daniel Lowe","subject":"Fix multiplayer retry cooldown, stale lobby reads and cloud-save CI","pr":361},
   {"sha":"19c316ea","date":"2026-11-25","author":"Daniel Lowe","subject":"Simplify global chat controls","pr":360},
