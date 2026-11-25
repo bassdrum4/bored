@@ -1,0 +1,16 @@
+{
+  "name": "bored-presence",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test core.test.mjs"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
+  }
+}
