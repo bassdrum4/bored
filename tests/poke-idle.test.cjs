@@ -388,10 +388,10 @@ test('Story chapters: rows after the Champion that wait for what they need, scen
     const after = rows().filter(x => x.text.startsWith('Test'));
     // Bond comes from a win in the active party only.
     S.box[26] = { xp: 1e6 }; S.balls = { poke: 0, great: 0, ultra: 0, master: 0 }; startLoc({ kind: 'route', r: 0, k: 0 }); defeat();   // no balls: no random catch
-    return { before, after, order: oneAt === champAt + 1, pre, post, ch: S.story.ch, clue: S.story.clues, snap: storyProgress(S), bond: [S.box[25].bond, S.box[26].bond], peak: S.box[25].peak };
+    return { before, after, order: rows()[champAt + 1].text.startsWith('Team Thaw: Rime') && oneAt > champAt, pre, post, ch: S.story.ch, clue: S.story.clues, snap: storyProgress(S), bond: [S.box[25].bond, S.box[26].bond], peak: S.box[25].peak };
   });
   assert.deepEqual(got.before.map(x => [x.text, x.open]), [['Test oneafter Blue', false], ['Test twoafter Test one', false]]);
-  assert.equal(got.order, true, 'chapters come right after the Champion');
+  assert.equal(got.order, true, 'chapters come right after the Champion, in order');
   assert.deepEqual([got.pre, got.post], ['t-pre', 't-post']);
   assert.deepEqual(got.ch, { 't-1': 1 });
   assert.deepEqual(got.clue, { t: 1 });
@@ -399,5 +399,112 @@ test('Story chapters: rows after the Champion that wait for what they need, scen
   assert.deepEqual(got.snap, { year: 1, chapter: 1, regionsLiberated: 1, lifeDex: 2 });
   assert.deepEqual(got.bond, [1, null], 'only the party member that fought bonds');
   assert.equal(got.peak, 100);
+  assert.deepEqual(errors, []);
+});
+
+// ── Story Mode Year 1: the content.
+const storyAllChamps = () => {
+  slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25]; S.balls.master = 50; S.set.fresh = 'master'; S.set.dupe = 'master';   // a Master Ball always holds
+  for (let r = 0; r < 9; r++) { for (let k = 0; k < 4; k++) { S.badges[r + '-' + k] = 1; S.kills[r + '-' + k] = 10; } S.champs[r] = 1; }
+};
+
+test('Story Year 1 plays through: admins, rivals with the mascot you left, picks, prizes, the finale and Red', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(`(${storyAllChamps})()`).then(() => tab.evaluate(() => {
+    const done = [], fights = {};
+    const skip = () => { let n = 0; while (sceneNow && n++ < 20) endScene(); };
+    const win = () => { B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); if (!B.manual) next(); };
+    for (let i = 0; i < 160; i++) S.lifeDex[2000 + i] = 1;
+    viewR = 0; enter('battle'); skip();
+    const gated = chapterOpen(CHAPTER['paldea-finale']);
+    for (const c of CHAPTERS) {
+      skip(); if (!chapterOpen(c)) continue;
+      startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+      if (pickNow) { pickClick({ dataset: { pick: String(c.mons[1]) } }); pickClick({ dataset: { pick: 'mine' } }); skip(); }
+      fights[c.id] = B.queue.map(f => f.name);
+      win(); while (B && B.brk != null) { storyGo(); fights[c.id] = fights[c.id].concat(B.queue.map(f => f.name)); win(); }
+      skip(); if (chDone(c.id)) done.push(c.id);
+    }
+    return { gated, done, fights, picks: S.story.picks, stones: Object.keys(S.stones).map(Number).sort(), key: S.key, charm: S.charm, silvally: !!S.box[773] && S.story.silvally,
+      mail: inbox().map(m => m.id).filter(x => /^(story|rival)-/.test(x)), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+  }));
+  assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
+  assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
+  assert.deepEqual(got.fights['johto-rival'], ['Snivy', 'Ekans', 'Silicobra']);
+  assert.deepEqual(got.fights['unova-rival'], ['Servine', 'Arbok', 'Sandaconda', 'Milotic', 'Groudon'], 'Rival 2 has the Hoenn mascot you left');
+  assert.deepEqual(got.fights['galar-rival'], ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme', 'Reshiram'], 'Rival 3 has the Unova mascot you left');
+  assert.equal(got.fights['paldea-finale'].length, 18, 'the finale is all three admins, six each');
+  assert.deepEqual(got.picks, { 0: 150, 1: 250, 2: 382, 3: 484, 4: 644, 5: 717, 6: 792, 7: 889, 8: 1008 });
+  assert.deepEqual(got.stones, [10049, 10058, 10076, 10089, 10281, 10309, 10325]);
+  assert.deepEqual([got.key, got.charm, got.silvally], [1, 1, 1]);
+  assert.ok(got.mail.includes('story-started') && got.mail.includes('rival-late'));
+  assert.deepEqual(got.progress, { year: 1, chapter: 23, regionsLiberated: 9, lifeDex: got.progress.lifeDex });
+  assert.deepEqual(got.seen, [true, true, true, true]);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1: the finale waits for 150 in the Story dex, runs three phases, and starts over from Rime on a loss', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  await tab.evaluate(`(${storyAllChamps})()`);
+  const got = await tab.evaluate(() => {
+    for (const id of LEGENDS) S.story.ch[id] = 1;
+    const before = chapterOpen(CHAPTER['paldea-finale']), note = chapterRows(8).find(x => x.x === 'paldea-finale').note;
+    for (let i = 0; i < 150; i++) S.lifeDex[3000 + i] = 1;
+    viewR = 8; enter('battle');
+    startLoc({ kind: 'story', r: 8, x: 'paldea-finale' });
+    const p1 = { phase: B.phase, use: B.tune, L: B.L };
+    B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next();
+    const brk = B.brk != null && !bossLocked();
+    storyGo(); const p2 = B.phase;
+    B.time = 0.001; lastTick = performance.now() - 500; tick();
+    return { before, note, p1, brk, p2, after: B && B.kind, done: chDone('paldea-finale') };
+  });
+  assert.equal(got.before, false);
+  assert.match(got.note, /^Story dex \d+\/150$/);
+  assert.equal(got.p1.phase, 1);
+  assert.equal(got.p1.L, 100);
+  assert.equal(got.brk, true, 'the party is free during the break');
+  assert.equal(got.p2, 2);
+  assert.equal(got.after, 'route', 'out of time anywhere: back to the route, and it starts over from Rime');
+  assert.equal(got.done, false);
+  assert.deepEqual(errors, []);
+});
+
+test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the scenes, clues and letters on the way', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-24');
+  const got = await tab.evaluate(async () => {
+    const classicDen = (slot = KEY, S = fresh(), dungeonBosses(0).map(m => m.num));
+    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25]; viewR = 0; enter('battle'); hideTip();
+    const sleep = ms => new Promise(f => setTimeout(f, ms)), seen = [];
+    const beat = async loc => { S.kills[loc.r + '-' + (loc.k || 0)] = 10; startLoc(loc); B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); next(); await sleep(800); seen.push(sceneNow && sceneNow.id); while (sceneNow) endScene(); };
+    await beat({ kind: 'gym', r: 0, k: 0 }); await beat({ kind: 'gym', r: 0, k: 1 });
+    for (let k = 1; k < 4; k++) S.badges['0-' + k] = 1;
+    await beat({ kind: 'champ', r: 0 });
+    for (const r of [1, 2, 4, 5]) S.champs[r] = 1;
+    for (const r of [3, 6]) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; await beat({ kind: 'champ', r }); }
+    for (let r = 0; r < 9; r++) S.champs[r] = 1;
+    const kinds = r => (viewR = r, renderLocs(), [...document.querySelectorAll('#locs [data-loc]')].map(b => JSON.parse(b.dataset.loc).kind));
+    const k0 = kinds(0), k1 = kinds(1), k7 = kinds(7);
+    // League rules: two Tier 3s, then a saved team that fits.
+    S.box[150] = { xp: 1e6 }; S.box[249] = { xp: 1e6 }; S.party = [150, 249]; S.teams = [{ name: 'Fits', party: [150, 25] }]; B = null;
+    startLoc({ kind: 'gym', r: 0, k: 0 });
+    const notice = !$('#league').hidden && $('#league').textContent;
+    $('#league [data-league="0"]').click();
+    return { classicDen, storyDen: dungeonBosses(0).map(m => m.num), galar: dungeonBosses(7).map(m => m.num), seen, clues: S.story.clues, mail: inbox().map(m => m.id).filter(x => x.startsWith('story')),
+      k0, k1, k7, notice, party: S.party, fighting: B && B.kind, arceus: (S.box[493] = { xp: 1e6 }, leagueBreaks([493])), megaT3: tierOf(formById(10281)) };
+  });
+  assert.ok(got.classicDen.includes(150), 'Classic keeps Mewtwo in the Kanto dungeon');
+  assert.deepEqual(got.storyDen, [144, 145, 146, 151]);
+  assert.ok(![888, 889, 890].some(n => got.galar.includes(n)));
+  assert.deepEqual(got.seen, ['kanto-gyms', null, 'kanto-alarm', 'sinnoh-letter', 'alola-memo']);
+  assert.deepEqual(got.clues, { badge: 1, memo: 1 });
+  assert.deepEqual(got.mail.sort(), ['story-memo', 'story-sinnoh']);
+  for (const k of ['final', 'hof', 'rival', 'quest', 'summit']) assert.ok(![...got.k0, ...got.k1].includes(k), `no ${k} row in Story`);
+  assert.ok(got.k1.includes('chapter') && !got.k7.includes('darkest'));
+  assert.ok(got.notice && got.notice.includes('Mascot legends and Mega pseudo forms are both Tier 3.'), 'the League rules notice');
+  assert.deepEqual(got.party, [150, 25]);
+  assert.equal(got.fighting, 'gym', 'loading a team that fits starts the fight');
+  assert.match(got.arceus, /Tier 1 or stronger/);
+  assert.equal(got.megaT3, 3);
   assert.deepEqual(errors, []);
 });

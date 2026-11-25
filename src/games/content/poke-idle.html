@@ -218,6 +218,13 @@
   .modes { display: grid; gap: 8px }
   .modes button { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
   .modes button span { font-size: 12px; color: var(--dim) }
+  .face { float: left; width: 40px; height: 40px; margin: 0 10px 4px 0; border: 1px solid var(--ink); border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 700; text-align: center; overflow: hidden; background: var(--paper) }
+  .face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated }
+  .picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+  .picks button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
+  .picks button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px }
+  .picks img { width: 72px; height: 72px; filter: brightness(0); image-rendering: pixelated }
+  .picks span { font-size: 12px; color: var(--dim) }
   .mon .peak { position: absolute; bottom: 2px; right: 3px; font-size: 9px; color: var(--xp); font-weight: 700 }
   .st-group { margin: 6px 0 12px } .st-group h4 { margin: 8px 0 4px; font-size: 12px; color: var(--dim) }
   .st-scenes { display: flex; flex-wrap: wrap; gap: 6px }
@@ -372,6 +379,7 @@
       <button data-tab="story" type="button" hidden>Story</button>
     </div>
     <div class="tip" id="tip" role="status" hidden></div>
+    <div class="tip" id="league" role="alertdialog" hidden></div>
     <div class="credits" id="credits" role="dialog" aria-modal="true" aria-labelledby="credits-h" hidden></div>
 
     <section id="t-battle" class="cols">
@@ -678,7 +686,7 @@ const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && !tripOnly(m)
 // Only Tier 3 and 4 come from dungeons (Arceus, Tier 1, is the Hall of Origin's), and never a quest-only species: those
 // come from their quests (or, for Cosmog, as a gift).
 const QUEST_ONLY = new Set([772, 773, 789, 790, 808, 809, 891, 892, 898, 1017, 1024]);
-const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >= 3 && tierOf(m) <= 4 && !QUEST_ONLY.has(m.num)).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
+const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >= 3 && tierOf(m) <= 4 && !QUEST_ONLY.has(m.num) && !(isStory() && STORY_NO_DEN.has(m.num))).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
 // Boss stats shape the fight. A team's Attack and Speed set how long you last: against the other bosses of its region,
 // a faster, harder-hitting team gives you up to 20% less time and a slow one up to 20% more (a dungeon's random
 // legendary: -10% to +15%). Each boss Pokémon's HP comes from its HP, Defense and Sp. Def together.
@@ -741,7 +749,7 @@ function areaCap(loc = S.loc) {
   if (!loc || loc.kind === "summit" || loc.kind === "tower") return 100;
   if (loc.kind === "final" || loc.kind === "daily" || loc.kind === "hof") return levelCap();
   // Sssssssnakes fights under that region's Champion's cap, whenever you come back.
-  if (loc.kind === "rival") return Math.min(100, champLevel(loc.r) + CAP_OVER);
+  if (loc.kind === "rival" || loc.kind === "story") return Math.min(100, champLevel(loc.r) + CAP_OVER);
   // Side quests, the Darkest Day, and the Ultra Wormhole and Area Zero come after a Champion: your level cap.
   if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || loc.kind === "quest" || loc.kind === "darkest") return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
@@ -1113,7 +1121,9 @@ const kills = (r, k) => S.kills[r + "-" + k] || 0;
 function unlocked(loc) {
   const { kind, r, k } = loc;
   if (kind === "chapter") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
-  if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
+  if (isStory() && STORY_HIDDEN.has(kind)) return false;
+  if (kind === "story") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
+  if (kind === "summit") return isStory() ? chDone(SILVER_AFTER) : Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
   if (kind === "hof") return HOF_READY && labBeaten();
   if (kind === "daily") return S.party.length > 0;
@@ -1140,7 +1150,7 @@ function locName(loc) {
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
   if (loc.kind === "dungeon") return loc.x ? TRIP[loc.x].place : `${R.name} dungeon`;
-  if (loc.kind === "chapter") return CHAPTER[loc.x] ? CHAPTER[loc.x].name : "Story";
+  if (loc.kind === "chapter" || loc.kind === "story") return CHAPTER[loc.x] ? CHAPTER[loc.x].name : "Story";
   if (loc.kind === "summit") return "Mt. Silver";
   if (loc.kind === "darkest") return "Energy Plant";
   if (loc.kind === "tower") return "Battle Tower";
@@ -1182,14 +1192,14 @@ function refPool(r, k, cap, tier) {
 }
 // The best six of a pool against foes [{ f, hp }]: one at a time, whichever cuts the fight's total time most, each
 // species once, at most one Mega and one Gigantamax (as in a real party).
-function refPick(P, foes, hit, size = 6) {
+function refPick(P, foes, hit, size = 6, rule) {
   const H = P.map(m => foes.map(({ f }) => hit(m, f))), dps = foes.map(() => 0), out = [], nums = new Set();
   let mega = false, gmax = false;
   while (out.length < size) {
     let best = -1, cost = Infinity;
     for (let i = 0; i < P.length; i++) {
       const m = P[i];
-      if (nums.has(m.num) || (mega && m.kind === "mega") || (gmax && m.kind === "gmax")) continue;
+      if (nums.has(m.num) || (mega && m.kind === "mega") || (gmax && m.kind === "gmax") || (rule && !rule(out, m))) continue;
       const c = foes.reduce((s, { hp }, j) => s + hp / Math.max(1e-9, dps[j] + H[i][j]), 0);
       if (c < cost) { cost = c; best = i; }
     }
@@ -1295,10 +1305,11 @@ function finalBreak() {
 function renderFinalBox() {
   const el = $("#finalbox"), on = !!(B && B.brk != null);
   el.hidden = !on;
-  el.innerHTML = on ? `<span>Phase 2 starts in <b id="finalwait">${Math.ceil(B.brk)}s</b>.</span><button class="lbl" type="button" data-final="go">Start phase 2</button>` : "";
+  el.innerHTML = on ? `<span>Phase ${(B.phase || 1) + 1} starts in <b id="finalwait">${Math.ceil(B.brk)}s</b>.</span><button class="lbl" type="button" data-final="go">Start phase ${(B.phase || 1) + 1}</button>` : "";
 }
 function finalGo() {
   if (!B || B.brk == null) return;
+  if (B.kind === "story") return storyGo();
   if (!S.party.length) { say("Put at least one Pokémon in your party. The showdown starts over from phase 1.", true); backToRoute(); return; }
   B.brk = null; B.phase = 2; B.queue = finalTeam(); B.idx = 0;
   B.time = fightTime(FINAL_TIME, B.queue, RED_OFFENSE, .8, 1.2); B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def);
@@ -1308,7 +1319,7 @@ function finalGo() {
 }
 $("#finalbox").onclick = e => { if (e.target.closest("[data-final]")) finalGo(); };
 // Party changes wait for the end of a boss fight, but the break in Prof Penguin's showdown is free.
-const bossLocked = () => !!(B && B.kind !== "route" && !(B.kind === "final" && B.brk != null));
+const bossLocked = () => !!(B && B.kind !== "route" && !((B.kind === "final" || B.kind === "story") && B.brk != null));
 function finalWin() {
   const first = !S.beat, prize = rewardFor(B.L, B.i, 50); S.money += prize; S.pbeat = 1;
   if (first) {
@@ -1383,8 +1394,8 @@ const RIVALS = [
 const RIVAL_AT = Object.fromEntries(RIVALS.map(x => [x.r, x])), RIVAL = Object.fromEntries(RIVALS.map(x => [x.id, x]));
 const rivalWon = id => !!(S && S.rivals && S.rivals[id]);
 const rivalTime = x => fightTime(CHAMP_TIME, x.team, regionOffense(x.r), .8, 1.2);
-function rivalWin() {
-  const x = RIVAL_AT[B.r], first = !rivalWon(x.id), prize = rewardFor(B.L, B.i, first ? RIVAL_PAY : RIVAL_REMATCH);
+function rivalWin(x = RIVAL_AT[B.r]) {
+  const first = !rivalWon(x.id), prize = rewardFor(B.L, B.i, first ? RIVAL_PAY : RIVAL_REMATCH);
   S.money += prize; S.rivals = { ...(S.rivals || {}), [x.id]: 1 };
   if (first && x.master) S.balls.master++;
   if (first) S.mail.got["rival-" + x.id] = 1;
@@ -1419,6 +1430,7 @@ function startLoc(loc) {
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
+  if (isStory() && (loc.kind === "gym" || loc.kind === "champ") && leagueBreaks()) { leagueNotice(loc); return; }
   // The ticket is only used once the run is sure to start.
   if (loc.kind === "dungeon" || loc.kind === "raid") {
     const t = S.tickets[loc.r] || 0;
@@ -1442,6 +1454,7 @@ function startLoc(loc) {
   else if (loc.kind === "hof") { const L = Math.max(champLevel(r), levelCap()), q = HOF_TEAM(); B = { kind: "hof", r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: q, L, base: FINAL_TIME, time: fightTime(FINAL_TIME, q, RED_OFFENSE, .8, 1.2), idx: 0 }; }
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
+  else if (loc.kind === "story") B = storyFight(CHAPTER[loc.x]);
   else if (loc.kind === "rival") { const x = RIVAL_AT[r]; B = { kind: "rival", r, i: r * 4 + 3, queue: x.team.slice(), L: areaCap(S.loc), base: CHAMP_TIME, time: rivalTime(x), idx: 0 }; }
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
   else {
@@ -1456,6 +1469,7 @@ function startLoc(loc) {
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "rival") B.tune = gymTuning(B, 3, 6, [B.r, 3], RIVAL_USE);
+  else if (B.kind === "story") B.tune = storyTune(B);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
   else if (B.kind === "raid") B.tune = raidTuning(B);
   else if (B.kind === "quest") B.tune = tierTuning(B, QUEST[B.q].tier, refArea(B.r, 3));
@@ -1463,7 +1477,7 @@ function startLoc(loc) {
   else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
   else if (B.kind === "hof") B.tune = finalTuning(B, HOF_USE);
   else if (B.kind === "daily") B.tune = tierTuning(B, 5, dailyArea(B.r));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "story" ? storySay(B) : B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1476,9 +1490,9 @@ function spawn() {
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" || B.kind === "raid" ? CHAMP_HP : GYM_HP;
     mult = B.kind === "dungeon" && !boss ? (B.fodder || fodderHp(B.i)) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
-    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final" || B.kind === "rival" || B.kind === "hof") pay = CHAMP_HP;
+    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final" || B.kind === "rival" || B.kind === "hof" || B.kind === "story") pay = CHAMP_HP;
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
-    shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
+    shiny = (B.kind === "dungeon" || (B.catchIt && boss)) && Math.random() < shinyOdds();
   }
   B.foe = { m, L, shiny, max: (boss ? bossHpFor : hpFor)(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
   B.foe.hp = B.foe.max; B.pause = 0;
@@ -1505,7 +1519,7 @@ function defeat() {
   if (f.wild && Math.random() < 1 / CELL_ODDS) text += gainCells(1);
   if (f.wild && B.r === PIECES_FROM && Math.random() < 1 / PIECE_ODDS) text += gainPieces(1);
   if (f.wild && B.r === PLATES_FROM && Math.random() < 1 / PLATE_ODDS) text += gainPlates(1);
-  const boss = f.wild && B.kind === "dungeon" && B.idx === B.queue.length - 1;
+  const boss = ((f.wild && B.kind === "dungeon") || B.catchIt) && B.idx === B.queue.length - 1;
   if ((boss || (f.wild && f.shiny)) && S.set.manual && BALLS.some(b => S.balls[b.id] > 0)) { say(text); startManual(f, boss); return; }
   if (boss) text += bossThrows(f);
   else if (f.wild) {
@@ -1652,11 +1666,14 @@ function next() {
   if (B.idx < B.queue.length) { spawn(); return; }
   if (B.kind === "tower") { towerFloor(); return; }
   if (B.kind === "final" && B.phase === 1) { finalBreak(); return; }
+  if (B.kind === "story" && B.phases && B.phase < B.phases.length) { storyBreak(); return; }
   // Bosses in Galar bring Wishing Pieces, in Sinnoh Plates.
   const R = REGIONS[B.r], galar = (B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "") + (B.r === PLATES_FROM && B.kind !== "quest" ? gainPlates(PLATE_BOSS) : "");
+  if (B.kind === "gym" && isStory() && !badge(B.r, B.k)) storyEvent("gym", B.r);
+  if (B.kind === "champ" && isStory() && !S.champs[B.r]) storyEvent("champ", B.r);
   if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++;
-    const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
+    const unlock = first && B.r === KEY_STONE_FROM && !S.key ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
     toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS)); }
   if (B.kind === "dungeon" && B.bossCaught !== false) delete (S.den || {})[B.x || "d" + B.r];
@@ -1687,6 +1704,7 @@ function next() {
   }
   if (B.kind === "final") finalWin();
   if (B.kind === "rival") rivalWin();
+  if (B.kind === "story" || B.storyCh) storyWin();
   if (B.kind === "hof") hofWin();
   if (B.kind === "daily") {
     const first = !dailyWon(), prize = rewardFor(B.L, B.i, 15); S.money += prize;
@@ -1875,7 +1893,7 @@ function tick() {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
       B.time -= dt * clockRate(B.foe.m);
-      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : B.kind === "rival" ? `${RIVAL_NAME}: "Too ssslow. Come back when you're ready."` : B.kind === "hof" ? `${RIVAL_NAME}: "The Hall of Fame isn't for everyone."` : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
+      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : B.kind === "story" ? storyLose(B) : B.kind === "rival" ? `${RIVAL_NAME}: "Too ssslow. Come back when you're ready."` : B.kind === "hof" ? `${RIVAL_NAME}: "The Hall of Fame isn't for everyone."` : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
     }
   }
   drawBattle();
@@ -1944,10 +1962,10 @@ function renderLocs() {
     + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Sssssssnakes sits at the very top of each of those regions' lists.
-  if (RIVAL_AT[r]) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
+  if (RIVAL_AT[r] && !isStory()) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
   // Prof Penguin's Lab sits at the top of every list.
-  const hofRow = HOF_READY ? { kind: "hof", r: HOF_R, note: !labBeaten() ? "after Prof Penguin" : `${RIVAL_NAME}, first graduate${hofWon() ? " · won" : ""}`, done: hofWon() } : null;
-  items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
+  const hofRow = HOF_READY && !isStory() ? { kind: "hof", r: HOF_R, note: !labBeaten() ? "after Prof Penguin" : `${RIVAL_NAME}, first graduate${hofWon() ? " · won" : ""}`, done: hofWon() } : null;
+  if (!isStory()) items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
   // The Hall of Fame right after the Lab.
   if (hofRow) items.push(hofRow);
   // Today's boss, the same for every player, under the Lab in every list.
@@ -1961,14 +1979,14 @@ function renderLocs() {
     }
     items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
     if (isStory()) items.push(...chapterRows(r));
-    if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
+    if (r === PIECES_FROM && !isStory()) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
     if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
     for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, types: unlocked({ kind: "dungeon", r, x: T.id }) ? denFoe(r, T.id).types : null, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
-    for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
+    if (!isStory()) for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
     if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
-    if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
+    if (r === 1 && !isStory()) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   }
-  const quest = r === CELLS_FROM ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
+  const quest = r === CELLS_FROM && !isStory() ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
   $("#locs").innerHTML = items.map(it => {
     const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0) && (S.loc.q || "") === (it.q || "") && (S.loc.x || "") === (it.x || "");
     return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}), ...(it.x ? { x: it.x } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${it.train ? `${tyChip(it.train)} area` : esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}${it.types ? " " + it.types.map(tyChip).join(" ") : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
@@ -2292,6 +2310,14 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "story-started", chapter: true, date: "Year 1", from: "Prof Penguin", title: "It's started",
+    body: `<p>It's started. Go.</p>` },
+  { id: "story-memo", chapter: true, date: "Year 1", from: "(no sender)", title: "INTERNAL",
+    body: `<p><b>INTERNAL. Do not forward.</b></p><p>The Engine is on schedule. It wakes and binds each legend in turn, per the list. Units are assigned per site.</p><p>Unit 1: Aether, contained. Unit 2: assigned to the Director.</p>` },
+  { id: "story-kalos", chapter: true, date: "Year 1", from: "Prof Penguin", title: "A pattern",
+    body: `<p>I've been plotting the freeze on the map. It isn't random. It moves from legend to legend in a set order, like someone is following a list.</p><p>Keep writing things down.</p><p>Prof Penguin</p>` },
+  { id: "story-sinnoh", chapter: true, date: "Year 1", from: "Prof Penguin", title: "About Team Thaw",
+    body: `<p>You asked about Team Thaw. I knew their leader once. A long time ago. Let's leave it there.</p><p>Prof Penguin</p>` },
   { id: "update-hall-of-fame", hof: true, date: "Hall of Fame", from: "Prof Penguin", title: "The Hall of Fame",
     body: `<ul><li>The <b>Hall of Fame</b> is open, right under my Lab in every list, once you've beaten me.</li>
       <li>Sssssssnakes, the first trainer ever to graduate, is waiting there with Serperior, Arbok, Gigantamax Sandaconda, Milotic, Zygarde in its 50% Forme and a Mega Hydrapple nobody has seen before.</li>
@@ -2462,7 +2488,7 @@ const arcadeDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/De
 // One with rival: true arrives when you first beat Sssssssnakes there (S.mail.got).
 // One with hof: true waits for HOF_READY.
 // A Story save skips Classic's update notes (update- letters with no gift); a letter with story: true is for both.
-const delivered = m => !(m.hof && !HOF_READY) && !(isStory() && /^update-/.test(m.id) && !m.story && !m.gift) && ((m.beat ? !!S.beat : !m.day && !m.rival) || !!S.mail.got[m.id]);
+const delivered = m => !(m.hof && !HOF_READY) && !(isStory() && /^update-/.test(m.id) && !m.story && !m.gift) && ((m.beat ? !!S.beat : !m.day && !m.rival && !m.chapter) || !!S.mail.got[m.id]);
 function deliverMail(today = arcadeDay()) {
   if (!S) return;
   const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
@@ -3084,13 +3110,329 @@ const SCENES = {
     ["Prof Penguin", "Pick a partner. Any of these three will do."]] },
   "open-2": { year: 1, r: -1, title: "The notebook", lines: [
     ["", "Prof Penguin hands you a notebook. The cover is already a little frosty."],
-    ["Prof Penguin", "Write down everything, especially the things that seem small."]] }
+    ["Prof Penguin", "Write down everything, especially the things that seem small."]] },
+  // Year 1, The Long Freeze. Who speaks: "" is the narrator.
+  "kanto-gyms": { year: 1, r: 0, title: "Hand warmers", lines: [
+    ["", "Outside the gym, a grunt in a white jacket is handing out hand warmers."],
+    ["Team Thaw grunt", "Free hand warmer! Stay warm out there. Team Thaw's got you."],
+    ["", "The badge on the jacket is a snowflake, melting."],
+    ["", "It seems small. You write it down."]] },
+  "kanto-alarm": { year: 1, r: 0, title: "The alarm", lines: [
+    ["", "An alarm goes off across Kanto."],
+    ["Prof Penguin", "That's Team Thaw's lab out at Cerulean. Someone's breached it. Go and look. Carefully."]] },
+  "kanto-rime": { year: 1, r: 0, title: "Containment", lines: [
+    ["", "The lab doors hang open. Frost covers every screen."],
+    ["Rime", "Containment variance. Within tolerance."],
+    ["Rime", "You aren't on the list. Leave, or be removed."]] },
+  "kanto-rime-after": { year: 1, r: 0, title: "Rime leaves", lines: [
+    ["Rime", "Noted."],
+    ["", "Rime walks out without hurrying. Behind her, in the deepest tank, something opens its eyes."]] },
+  "kanto-cage": { year: 1, r: 0, title: "The cage", lines: [
+    ["Prof Penguin", "That lab was built to hold a legend. Who builds a cage before there's anything to put in it?"],
+    ["Prof Penguin", "Take this Key Stone. You'll want Mega Evolution before this is over."]] },
+  "johto-r1": { year: 1, r: 1, title: "Sssssssnakes", lines: [
+    ["Sssssssnakes", "Oh, you're Penguin's new one? Cute. Try to keep up."]] },
+  "johto-r1-after": { year: 1, r: 1, title: "Better coffee", lines: [
+    ["Sssssssnakes", "Whatever. Team Thaw says the freeze is natural, and they're the ones fixing it. You should come work with us. Better coffee."]] },
+  "johto-hail": { year: 1, r: 1, title: "Chained", lines: [
+    ["", "At the Bell Tower, Lugia and Ho-Oh are chained to the ground."],
+    ["Hail", "For their own protection. Move along."]] },
+  "johto-hail-after": { year: 1, r: 1, title: "One of them", lines: [
+    ["Hail", "Fine. Take one. The other one's already spoken for."]] },
+  "johto-249": { year: 1, r: 1, title: "Lugia", lines: [["Prof Penguin", "The sea one. Of course you'd pick the cold."]] },
+  "johto-250": { year: 1, r: 1, title: "Ho-Oh", lines: [["Prof Penguin", "Fire. Good. We'll need it before this is over."]] },
+  "hoenn-gyms": { year: 1, r: 2, title: "Flyers", lines: [
+    ["", "Grunts are handing out flyers outside the gym."],
+    ["", "THE FREEZE IS COMING. THAW IS HERE."]] },
+  "hoenn-slush": { year: 1, r: 2, title: "See what happens", lines: [
+    ["", "Groudon on one side of the cave, Kyogre on the other, both awake and both furious."],
+    ["Slush", "I just want to see what happens. Science!"]] },
+  "hoenn-slush-after": { year: 1, r: 2, title: "The nice one", lines: [
+    ["Slush", "Don't look at me like that. I'm the nice one."]] },
+  "hoenn-383": { year: 1, r: 2, title: "Groudon", lines: [["Prof Penguin", "The land, then. Keep it warm."]] },
+  "hoenn-382": { year: 1, r: 2, title: "Kyogre", lines: [["Prof Penguin", "The sea. Mind the cold."]] },
+  "sinnoh-letter": { year: 1, r: 3, title: "A letter", lines: [
+    ["", "A letter from Prof Penguin."],
+    ["Prof Penguin", "I knew their leader once. A long time ago. Let's leave it there."]] },
+  "sinnoh-rime": { year: 1, r: 3, title: "Spear Pillar", lines: [
+    ["Rime", "Spear Pillar. You again."],
+    ["Rime", "Choose carefully. Someone will be reading the result."]] },
+  "sinnoh-rime-after": { year: 1, r: 3, title: "Proceed", lines: [
+    ["Rime", "Proceed. I'll be watching which one you take."]] },
+  "sinnoh-483": { year: 1, r: 3, title: "Dialga", lines: [["Rime", "You chose time. He always did too."]] },
+  "sinnoh-484": { year: 1, r: 3, title: "Palkia", lines: [["Rime", "Space. He never did. Interesting."]] },
+  "unova-r2": { year: 1, r: 4, title: "On loan", lines: [
+    ["Sssssssnakes", "Team Thaw lent me this. Don't be jealous."]] },
+  "unova-r2-after": { year: 1, r: 4, title: "Good scouting", lines: [
+    ["Sssssssnakes", "Weird thing. Team Thaw always gets to a legend site before it freezes. Like they know."],
+    ["Sssssssnakes", "...Probably just good scouting."]] },
+  "unova-hail": { year: 1, r: 4, title: "Dragonspiral", lines: [
+    ["Hail", "Dragonspiral Tower is closed. Thaw business."]] },
+  "unova-hail-after": { year: 1, r: 4, title: "Go on", lines: [["Hail", "Hmph. Go on, then."]] },
+  "unova-643": { year: 1, r: 4, title: "Reshiram", lines: [["Prof Penguin", "White fire. It'll keep you warm."]] },
+  "unova-644": { year: 1, r: 4, title: "Zekrom", lines: [["Prof Penguin", "Black lightning. Loud, but useful."]] },
+  "unova-kyurem": { year: 1, r: 4, title: "A roar", lines: [
+    ["", "Far off, something roars. The air goes still and very cold."],
+    ["Prof Penguin", "That one's ice is... different. Keep away from it this year."]] },
+  "kalos-letter": { year: 1, r: 5, title: "A pattern", lines: [
+    ["", "A letter from Prof Penguin."],
+    ["Prof Penguin", "The freeze moves from legend to legend in a set order. Like someone is following a list."]] },
+  "kalos-slush": { year: 1, r: 5, title: "The list", lines: [
+    ["Slush", "Ever wonder who wrote the list?"],
+    ["Slush", "...No? Okay. Never mind."]] },
+  "kalos-slush-after": { year: 1, r: 5, title: "You didn't hear it", lines: [["Slush", "You didn't hear any of that from me."]] },
+  "kalos-716": { year: 1, r: 5, title: "Xerneas", lines: [["Prof Penguin", "Life, then. Good."]] },
+  "kalos-717": { year: 1, r: 5, title: "Yveltal", lines: [["Prof Penguin", "Hm. Keep a close eye on that one."]] },
+  "alola-memo": { year: 1, r: 6, title: "The memo", lines: [
+    ["", "A letter arrives with no sender. Inside is one page, stamped INTERNAL."],
+    ["", "The Engine wakes and binds each legend in turn, per the list."],
+    ["", "You put it in the notebook."]] },
+  "alola-rime": { year: 1, r: 6, title: "Aether", lines: [
+    ["Rime", "Aether Paradise is a Thaw facility now. Turn around."]] },
+  "alola-rime-after": { year: 1, r: 6, title: "Nothing changes", lines: [["Rime", "This changes nothing."]] },
+  "alola-791": { year: 1, r: 6, title: "Solgaleo", lines: [["Prof Penguin", "The sun. We could use more of it."]] },
+  "alola-792": { year: 1, r: 6, title: "Lunala", lines: [["Prof Penguin", "The moon. Quiet, and it sees in the dark."]] },
+  "alola-null": { year: 1, r: 6, title: "Unit 1", lines: [
+    ["", "Deep in the lab, a Type: Null thrashes against its mask."],
+    ["", "A tag on the cage: UNIT 1. Under it, half scratched out: UNIT 2, ASSIGNED TO THE DIRECTOR."]] },
+  "alola-null-after": { year: 1, r: 6, title: "Silvally", lines: [
+    ["", "The mask cracks and falls away. Type: Null is Silvally now, and it isn't going back in a cage."]] },
+  "galar-r3": { year: 1, r: 7, title: "Too quiet", lines: [
+    ["Sssssssnakes", "Team Thaw gave me a Zygarde. Said the land would be safer with me."],
+    ["Sssssssnakes", "...It's been quiet since. Zygarde's never quiet."]] },
+  "galar-r3-after": { year: 1, r: 7, title: "Myself", lines: [
+    ["Sssssssnakes", "If they're lying to me, I'll find out myself. Not because you said anything."]] },
+  "galar-hail": { year: 1, r: 7, title: "The Weald", lines: [["Hail", "The Slumbering Weald is closed. Thaw business."]] },
+  "galar-hail-after": { year: 1, r: 7, title: "Take your pick", lines: [["Hail", "Take your pick. Sssssssnakes gets the other one."]] },
+  "galar-888": { year: 1, r: 7, title: "Zacian", lines: [["Prof Penguin", "The sword. Cut a way through."]] },
+  "galar-889": { year: 1, r: 7, title: "Zamazenta", lines: [["Prof Penguin", "The shield. Someone has to stand still."]] },
+  "paldea-white": { year: 1, r: 8, title: "White sky", lines: [["", "The sky over Paldea goes white."]] },
+  "paldea-admins": { year: 1, r: 8, title: "All three", lines: [
+    ["Rime", "All three of us. Don't take it personally."],
+    ["Slush", "I'd take it a little personally."],
+    ["Hail", "Enough. Begin."]] },
+  "paldea-admins-after": { year: 1, r: 8, title: "Go", lines: [["Hail", "...Go. Take your legend. It won't matter."]] },
+  "paldea-1007": { year: 1, r: 8, title: "Koraidon", lines: [["Prof Penguin", "The old land. It knows the way."]] },
+  "paldea-1008": { year: 1, r: 8, title: "Miraidon", lines: [["Prof Penguin", "What comes next. Let's hope it's warmer."]] },
+  "paldea-freeze": { year: 1, r: 8, title: "The same night", lines: [
+    ["", "That night every legend site in the world freezes, all at once."],
+    ["", "Every screen in every city shows the same message:"],
+    ["", "WE WARNED YOU. THAW PACKS AVAILABLE NOW."],
+    ["", "A letter from Prof Penguin. Three words."],
+    ["Prof Penguin", "It's started. Go."]] },
+  "silver": { year: 1, r: 1, title: "Mt. Silver", lines: [
+    ["", "Mt. Silver. Red is waiting in the snow."],
+    ["", "He doesn't say anything."]] },
+  "silver-after": { year: 1, r: 1, title: "Red", lines: [
+    ["", "Red hands you a Shiny Charm, nods once, and turns back to the snow."]] }
 };
-const CLUES = {};
-const CHAPTERS = [];
+const CLUES = {
+  badge: { title: "The melting snowflake", text: "Team Thaw's grunts wear a badge: a snowflake, melting. They hand out hand warmers outside the gyms." },
+  memo: { title: "The leaked memo", text: "No sender. \"The Engine wakes and binds each legend in turn, per the list.\" A second unit is \"assigned to the Director\"." }
+};
+// ── Year 1 chapters. Per region: gyms, the Champion, then (Johto, Unova, Galar) Sssssssnakes, the Team Thaw admin, and
+// the legend: Mewtwo in Kanto, a pick of two mascots elsewhere (Sssssssnakes takes the other), caught the usual way and
+// tried again at once if it gets away. Paldea's admins come all three in a row (the finale), then its pick. Each
+// legend chapter has a prize: a Mega pseudo stone where one exists, a Master Ball where none does. Red waits on Mt.
+// Silver (Johto) once the year is over.
+const ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
+const ADMIN_PIC = { Rime: "thaw-rime.png", Hail: "thaw-hail.png", Slush: "thaw-slush.png", Sssssssnakes: "sssssssnakes.png", "Team Thaw grunt": "thaw-grunt.png", "Prof Penguin": "prof-penguin.png" };
+const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
+// Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
+const ADMIN_TEAMS = {
+  kanto: ["Rime", [124, 91, 87, 82, 65, 131]],
+  johto: ["Hail", [208, 212, 227, 221, 205, 91]],
+  hoenn: ["Slush", [319, 342, 359, 275, 365, 362]],
+  sinnoh: ["Rime", [478, 471, 473, 460, 437, 476]],
+  unova: ["Hail", [614, 530, 625, 589, 598, 584]],
+  kalos: ["Slush", [658, 687, 689, 675, 693, 713]],
+  alola: ["Rime", ["v10104", "v10102", 740, 779, 765, 376]],
+  galar: ["Hail", [879, 823, 863, "v10177", 881, 884]],
+  "paldea-rime": ["Rime", [998, 956, 1000, 981, 478, 471]],
+  "paldea-hail": ["Hail", [975, 983, 959, 968, 966, 473]],
+  "paldea-slush": ["Slush", [977, 976, 943, 962, 461, 91]]
+};
+const adminTeam = k => ADMIN_TEAMS[k][1].map(foeFrom);
+// Every mascot and Mewtwo stay out of Story's dungeons, and so do the legends saved for the years to come.
+const STORY_NO_DEN = new Set([150, 249, 250, 382, 383, 384, 483, 484, 487, 643, 644, 646, 716, 717, 791, 792, 888, 889, 890, 1007, 1008]);
+const STORY_HIDDEN = new Set(["final", "hof", "rival", "darkest", "quest"]);
+const LEGENDS = ["kanto-legend", "johto-pick", "hoenn-pick", "sinnoh-pick", "unova-pick", "kalos-pick", "alola-pick", "galar-pick"];
+const admin = (id, r, team, pre, post, after = ["champ"]) => ({ id, r, type: "admin", team, name: `Team Thaw: ${ADMIN_TEAMS[team][0]}`, after, pre, post });
+const pick = (id, r, mons, hints, prize, after) => ({ id, r, type: "pick", mons, hints, prize, name: `${mons.map(n => mon(n).name).join(" or ")}`, after, liberates: true });
+const CHAPTERS = [
+  admin("kanto-admin", 0, "kanto", "kanto-rime", "kanto-rime-after"),
+  { id: "kanto-legend", r: 0, type: "legend", mons: [150], name: "Mewtwo", after: ["kanto-admin"], post: "kanto-cage", prize: { stone: 10281, key: 1 }, liberates: true },
+  { id: "johto-rival", r: 1, type: "rival", rival: "early", name: `Rival ${RIVAL_NAME}`, pre: "johto-r1", post: "johto-r1-after" },
+  admin("johto-admin", 1, "johto", "johto-hail", "johto-hail-after", ["johto-rival"]),
+  pick("johto-pick", 1, [249, 250], ["It sleeps under the sea and calms the storms.", "It brings the sun back wherever it lands."], { stone: 10049 }, ["johto-admin"]),
+  admin("hoenn-admin", 2, "hoenn", "hoenn-slush", "hoenn-slush-after"),
+  pick("hoenn-pick", 2, [383, 382], ["It raises the land and dries up the rain.", "It fills the sea and brings the rain."], { stone: [10089, 10076] }, ["hoenn-admin"]),
+  admin("sinnoh-admin", 3, "sinnoh", "sinnoh-rime", "sinnoh-rime-after"),
+  pick("sinnoh-pick", 3, [483, 484], ["It keeps time moving.", "It holds space together."], { stone: 10058 }, ["sinnoh-admin"]),
+  { id: "unova-rival", r: 4, type: "rival", rival: "mid", extra: "hoenn-pick", name: `Rival ${RIVAL_NAME}`, pre: "unova-r2", post: "unova-r2-after", after: ["champ", "hoenn-pick"] },
+  admin("unova-admin", 4, "unova", "unova-hail", "unova-hail-after", ["unova-rival"]),
+  { ...pick("unova-pick", 4, [643, 644], ["White fire, for truth.", "Black lightning, for ideals."], { master: 1 }, ["unova-admin"]), after2: "unova-kyurem" },
+  admin("kalos-admin", 5, "kalos", "kalos-slush", "kalos-slush-after"),
+  pick("kalos-pick", 5, [716, 717], ["It gives life.", "It takes it."], { stone: 10309 }, ["kalos-admin"]),
+  admin("alola-admin", 6, "alola", "alola-rime", "alola-rime-after"),
+  pick("alola-pick", 6, [791, 792], ["It eats the sun.", "It drinks the moon."], { master: 1 }, ["alola-admin"]),
+  { id: "alola-silvally", r: 6, type: "rescue", name: "Free Type: Null", optional: true, after: ["alola-admin"], pre: "alola-null", post: "alola-null-after", doneNote: "Silvally" },
+  { id: "galar-rival", r: 7, type: "rival", rival: "late", extra: "unova-pick", name: `Rival ${RIVAL_NAME}`, pre: "galar-r3", post: "galar-r3-after", after: ["champ", "unova-pick"] },
+  admin("galar-admin", 7, "galar", "galar-hail", "galar-hail-after", ["galar-rival"]),
+  pick("galar-pick", 7, [888, 889], ["The sword.", "The shield."], { master: 1 }, ["galar-admin"]),
+  { id: "paldea-finale", r: 8, type: "finale", name: "Team Thaw: all three", after: ["champ", ...LEGENDS], pre: "paldea-admins", post: "paldea-admins-after",
+    open: () => storyDex() >= FINALE_DEX, note: () => storyDex() >= FINALE_DEX ? "3 admins, back to back" : `Story dex ${storyDex()}/${FINALE_DEX}` },
+  { ...pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"]), after2: "paldea-freeze", letter: "story-started", year: 1 },
+  { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", doneNote: "Shiny Charm" }
+];
 const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
-// How each type of chapter plays once its opening scene is done. A type with no entry here is a scene chapter.
-const CHAPTER_RUN = {};
+const storyDex = () => lifeDex();
+// After a first gym badge or Champion win in a region: its scene, and any clue or letter that comes with it.
+const STORY_EVENTS = {
+  "gym:0": { scene: "kanto-gyms", clue: "badge" }, "gym:2": { scene: "hoenn-gyms" },
+  "champ:0": { scene: "kanto-alarm" }, "champ:3": { scene: "sinnoh-letter", letter: "story-sinnoh" }, "champ:5": { scene: "kalos-letter", letter: "story-kalos" },
+  "champ:6": { scene: "alola-memo", letter: "story-memo", clue: "memo" }, "champ:8": { scene: "paldea-white" }
+};
+function storyEvent(kind, r) {
+  if (kind === "gym" && Object.keys(S.badges).some(k => k.startsWith(r + "-"))) return;
+  const e = STORY_EVENTS[kind + ":" + r]; if (!e) return;
+  if (e.clue) S.story.clues[e.clue] = 1;
+  if (e.letter) S.mail.got[e.letter] = 1;
+  setTimeout(() => playScene(e.scene), 700);
+}
+// The mascot Sssssssnakes took: the one you didn't pick there.
+const otherPick = id => { const c = CHAPTER[id], p = c && S.story.picks[c.r]; return p ? c.mons.find(n => n !== p) : null; };
+// How each type of chapter plays once its opening scene is done.
+const CHAPTER_RUN = {
+  admin: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  rival: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  rescue: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  finale: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  legend: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  pick: c => S.story.picks[c.r] ? startLoc({ kind: "story", r: c.r, x: c.id }) : pickScreen(c),
+  red: c => { startLoc({ kind: "summit", r: 1 }); if (B && B.kind === "summit") B.storyCh = c.id; }
+};
+// The fight for a chapter (startLoc builds the rest).
+function storyFight(c) {
+  const r = c.r, L = Math.min(100, champLevel(r) + CAP_OVER), base = { kind: "story", ch: c.id, r, i: r * 4 + 3, L, idx: 0 };
+  const boss = (q, t = CHAMP_TIME) => ({ ...base, queue: q, base: t, time: fightTime(t, q, regionOffense(r), .8, 1.2) });
+  if (c.type === "admin") return boss(adminTeam(c.team));
+  if (c.type === "rival") { const x = RIVAL[c.rival], extra = otherPick(c.extra); return { ...boss([...x.team, ...(extra ? [mon(extra)] : [])]), rival: x.id }; }
+  if (c.type === "rescue") return boss([mon(772)]);
+  if (c.type === "finale") { const phases = ["paldea-rime", "paldea-hail", "paldea-slush"]; return { ...boss(adminTeam(phases[0]), FINAL_TIME), phases, phase: 1 }; }
+  // A legend: one fight, then the throws a dungeon's legend gets.
+  const lg = mon(c.type === "pick" ? S.story.picks[r] : c.mons[0]);
+  return { ...base, queue: [lg], base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [lg], regionOffense(r), .9, 1.15), catchIt: true };
+}
+// Admins and Sssssssnakes: the Champion's method, a little harder. Legends: as a dungeon's. The finale: Prof Penguin's
+// phase 2 method (every matchup 1×), against the best team the League rules allow.
+function storyTune(B) {
+  const c = CHAPTER[B.ch];
+  if (B.catchIt) return legendTuning(B);
+  if (c.type === "finale") return leagueTuning(B, FINALE_USE);
+  return gymTuning(B, 3, 6, [B.r, 3], c.type === "rival" ? RIVAL_USE : ADMIN_USE);
+}
+function leagueTuning(B, use) {
+  const cap = areaCap(), hit = (m, f) => refHit(m, cap, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) * clockRate(f) }));
+  const P = refPick(refPool(...refArea(B.r, 3), cap, 2), foes, hit, 6, leagueRule), boost = bossBoost();
+  const secs = foes.reduce((s, { f, hp }) => s + hp / (P.reduce((d, m) => d + hit(m, f), 0) * boost), 0);
+  return use * B.bossTime * refDef(P) / secs;
+}
+function storySay(B) {
+  const c = CHAPTER[B.ch];
+  if (c.type === "finale") return `Phase ${B.phase} of 3: ${ADMIN_TEAMS[B.phases[B.phase - 1]][0]}. Lose anywhere and it starts over from Rime.`;
+  if (B.catchIt) return `${B.queue[0].name} is awake, and it isn't happy. Beat it, then the throws are yours.`;
+  if (c.type === "rival") return `${RIVAL_NAME} sends out ${B.queue.map(f => f.name).join(", ")}.`;
+  if (c.type === "rescue") return "Type: Null thrashes against its mask. Calm it down.";
+  return `${ADMIN_TEAMS[c.team][0]} of Team Thaw: ${B.queue.map(f => f.name).join(", ")}.`;
+}
+function storyLose(B) {
+  const c = CHAPTER[B.ch];
+  return c.type === "finale" ? "The admins regroup. It starts over from Rime." : B.catchIt ? `${B.queue[0].name} is still here. Try again when you're ready.` : c.type === "rival" ? `${RIVAL_NAME}: "Too ssslow."` : "Build a team for this fight and try again.";
+}
+// The finale's break between admins: the party is free, like Prof Penguin's.
+function storyBreak() {
+  B.foe = null; B.queue = null; B.brk = FINAL_BREAK;
+  const next = B.phases[B.phase]; $("#shiny").hidden = true; $("#timerwrap").hidden = true;
+  $("#foeimg").src = sprite(ADMIN_TEAMS[next][1].find(x => typeof x === "number"));
+  $("#hpbar").style.width = "0%"; $("#hptext").textContent = ""; $("#where").textContent = `${CHAPTER[B.ch].name} · break`;
+  $("#foeinfo").innerHTML = `<b>${ADMIN_TEAMS[next][0]}</b> <span class="muted small">is next</span>`;
+  say(`${ADMIN_TEAMS[B.phases[B.phase - 1]][0]} is down. Your party is free: load a saved team in Party & Box. ${ADMIN_TEAMS[next][0]} is next.`);
+  renderFinalBox(); renderAll(); save();
+}
+function storyGo() {
+  if (!S.party.length) { say("Put at least one Pokémon in your party. It starts over from Rime.", true); backToRoute(); return; }
+  B.brk = null; B.phase++; B.queue = adminTeam(B.phases[B.phase - 1]); B.idx = 0;
+  B.time = fightTime(FINAL_TIME, B.queue, regionOffense(B.r), .8, 1.2); B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def);
+  B.tune = storyTune(B); B.total = B.time;
+  say(storySay(B)); renderFinalBox(); spawn(); renderAll(); save();
+}
+// A won Story fight. A legend that got away keeps its chapter open.
+function storyWin() {
+  const c = CHAPTER[B.ch || B.storyCh]; if (!c) return;
+  if (B.catchIt && !B.bossCaught) { toast(`${B.queue[0].name} got away. It's still here: try again from the list.`); return; }
+  const first = !chDone(c.id);
+  if (c.type === "rival") rivalWin(RIVAL[c.rival]);
+  else if (c.type === "admin" || c.type === "finale") { const prize = rewardFor(B.L, B.i, first ? (c.type === "finale" ? FINALE_PAY : ADMIN_PAY) : 30); S.money += prize; toast(`${c.name} beaten! +$${fmt(prize)}.`); }
+  if (first) chapterPrize(c);
+  finishChapter(c);
+}
+function chapterPrize(c) {
+  const p = c.prize || {}, got = [];
+  for (const id of [].concat(p.stone || [])) { S.stones[id] = 1; got.push(formById(id).name.replace(/^Mega /, "") + "ite"); }
+  if (p.master) { S.balls.master++; got.push("a Master Ball"); }
+  if (p.key && !S.key) { S.key = 1; got.push("a Key Stone (Mega Evolution is open)"); }
+  if (c.type === "pick" || c.type === "legend") S.story.picks[c.r] = S.story.picks[c.r] || c.mons[0];
+  if (c.type === "rescue") { S.story.silvally = 1; if (!S.box[773]) { S.box[773] = { xp: Math.pow(Math.min(100, champLevel(c.r) + CAP_OVER), 3), shiny: lineShiny(772), from: c.r }; if (joinsParty()) joinParty(773); } got.push("Silvally"); }
+  if (c.type === "red") S.story.epilogue = 1;
+  if (c.letter) S.mail.got[c.letter] = 1;
+  if (got.length) setTimeout(() => toast(`${c.name}: ${got.join(", ")}.`), 3400);
+}
+// The pick: two silhouettes, a line from Prof Penguin under each, and "This one's mine." The pick is saved, and
+// Sssssssnakes gets the other one.
+let pickNow = null;
+function pickScreen(c) {
+  pickNow = { c, n: null }; hideTip();
+  renderPick();
+}
+function renderPick() {
+  const { c, n } = pickNow;
+  $("#scene").innerHTML = `<span class="who">Prof Penguin</span><p>Both of them are awake. Team Thaw will take whichever you leave. Pick one.</p>
+    <div class="picks">${c.mons.map((m, i) => `<button type="button" data-pick="${m}" aria-pressed="${n === m}"><img src="${sprite(m)}" alt="A silhouette"><span>${esc(c.hints[i])}</span></button>`).join("")}</div>
+    <div class="row"><button class="skip" type="button" data-pick="later">Not yet</button><button class="lbl" type="button" data-pick="mine"${n ? "" : " disabled"}>This one's mine.</button></div>`;
+  $("#scene").hidden = false;
+}
+function pickClick(b) {
+  const v = b.dataset.pick, c = pickNow.c;
+  if (v === "later") { pickNow = null; $("#scene").hidden = true; return; }
+  if (v === "mine") { const n = pickNow.n; pickNow = null; $("#scene").hidden = true; S.story.picks[c.r] = n; save(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
+  pickNow.n = +v; renderPick();
+}
+// ── The League rules, for Story's gyms and Champions: no Tier 0 to 2, at most one Tier 3 and two Tier 4s.
+const LEAGUE_MAX = { 3: 1, 4: 2 };
+const leagueRule = (out, m) => { const t = tierOf(m); if (t != null && t < 3) return false; return !LEAGUE_MAX[t] || out.filter(x => tierOf(x) === t).length < LEAGUE_MAX[t]; };
+function leagueBreaks(party = S.party) {
+  const ts = party.map(n => tierOf(fighter(n))), low = party.filter((n, i) => ts[i] != null && ts[i] < 3);
+  if (low.length) return `${low.map(n => lookOf(n).name).join(", ")} ${low.length > 1 ? "are" : "is"} Tier ${Math.min(...low.map(n => tierOf(fighter(n))))} or stronger: not allowed.`;
+  for (const t of [3, 4]) { const k = ts.filter(x => x === t).length; if (k > LEAGUE_MAX[t]) return `${k} Tier ${t}s in the party: at most ${LEAGUE_MAX[t]}.`; }
+  return "";
+}
+let leagueFor = null;
+function leagueNotice(loc) {
+  leagueFor = loc; hideTip();
+  const teams = (S.teams || []).map((t, i) => [t, i]).filter(([t]) => !leagueBreaks(t.party.filter(n => S.box[n])));
+  $("#league").innerHTML = `<span class="who">League rules</span><p>Gyms and Champions in Story Mode allow no Tier 0, 1 or 2 Pokémon, at most one Tier 3 and at most two Tier 4s. ${esc(leagueBreaks())}</p>
+    <p class="small muted">Mascot legends and Mega pseudo forms are both Tier 3.</p>
+    <div class="row">${teams.length ? teams.map(([t, i]) => `<button class="lbl" type="button" data-league="${i}">Load ${esc(t.name)}</button>`).join("") : '<span class="small muted">No saved team fits. Save one in Party &amp; Box.</span>'}<button class="skip" type="button" data-league="close">Close</button></div>`;
+  $("#league").hidden = false;
+}
+$("#league").onclick = e => {
+  const b = e.target.closest("[data-league]"); if (!b) return;
+  $("#league").hidden = true;
+  if (b.dataset.league === "close") return;
+  loadTeam(+b.dataset.league);
+  if (leagueFor && !leagueBreaks()) startLoc(leagueFor);
+};
 const chDone = id => !!(S && S.story && S.story.ch[id]);
 const chaptersDone = () => CHAPTERS.filter(c => chDone(c.id)).length;
 const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open());
@@ -3098,12 +3440,14 @@ function chapterRows(r) {
   return CHAPTERS.filter(c => c.r === r).map(c => {
     const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
     return { kind: "chapter", r, x: c.id, done: chDone(c.id),
-      note: chDone(c.id) ? c.doneNote || "done" : !wait ? (c.note ? c.note() : "story") : wait === "champ" ? `after ${REGIONS[r].champ}` : `after ${CHAPTER[wait].name}` };
+      note: chDone(c.id) ? c.doneNote || (c.type === "pick" && S.story.picks[c.r] ? mon(S.story.picks[c.r]).name : "done") : !wait ? (c.note ? c.note() : c.optional ? "optional" : "story")
+        : wait === "champ" ? `after ${REGIONS[r].champ}` : `after ${CHAPTER[wait].name}${CHAPTER[wait].r !== r ? ` (${REGIONS[CHAPTER[wait].r].name})` : ""}` };
   });
 }
 function runChapter(c) {
   if (!c || !(chapterOpen(c) || chDone(c.id))) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
+  if (chDone(c.id) && c.type !== "scene") { playScene(c.pre, () => playScene(c.post)); return; }
   const go = CHAPTER_RUN[c.type];
   playScene(c.pre, () => go ? go(c) : finishChapter(c));
 }
@@ -3112,7 +3456,7 @@ function finishChapter(c) {
   S.story.ch[c.id] = 1;
   if (first) { if (c.clue) S.story.clues[c.clue] = 1; if (c.won) c.won(); }
   save(); renderAll();
-  playScene(c.post);
+  playScene(c.post, () => playScene(c.after2));
 }
 // Story's leaderboard progress (for the Story board the hub doesn't have yet): year, chapters done, regions
 // liberated (a chapter with liberates: true closes its region), and the Story lifetime dex, which never goes down.
@@ -3137,7 +3481,7 @@ function playScene(id, then) {
 }
 function renderScene() {
   const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], last = sceneNow.i === sc.lines.length - 1;
-  $("#scene").innerHTML = (who ? `<span class="who">${esc(who)}</span>` : "") + `<p>${esc(text)}</p><div class="row"><button class="skip" type="button" data-scene="skip">Skip</button><span class="muted small count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next">${last ? "Close" : "Next"}</button></div>`;
+  $("#scene").innerHTML = (who ? `<span class="who">${esc(who)}</span>${ADMIN_PIC[who] ? `<span class="face"><img src="${SPRITE_DIR + ADMIN_PIC[who]}" alt="" onerror="this.parentNode.textContent='${esc(who.split(" ").pop().toUpperCase())}'"></span>` : ""}` : "") + `<p>${esc(text)}</p><div class="row"><button class="skip" type="button" data-scene="skip">Skip</button><span class="muted small count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next">${last ? "Close" : "Next"}</button></div>`;
   $("#scene").hidden = false;
   $("#scene [data-scene=next]").focus({ preventScroll: true });
 }
@@ -3151,6 +3495,7 @@ function endScene() {
 }
 function markSeen(id) { if (S && S.story) { if (!S.story.seen[id]) { S.story.seen[id] = 1; save(); } } else if (!preSeen.includes(id)) preSeen.push(id); }
 $("#scene").onclick = e => {
+  const p = e.target.closest("[data-pick]"); if (p && pickNow) return pickClick(p);
   const b = e.target.closest("[data-scene]"); if (!b || !sceneNow) return;
   if (b.dataset.scene === "skip" || sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
   else { sceneNow.i++; renderScene(); }
