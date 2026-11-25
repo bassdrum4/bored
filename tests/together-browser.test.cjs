@@ -38,6 +38,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
         calls.push({identity,action:'pool-end',status:response.status});
         return req.respond({status:response.status,headers:cors,contentType:'application/json',body:await response.text()});
       }
+      if(url.pathname==='/rest/v1/rpc/my_analytics_access')return reply({admin:false,games:[]});
       if(url.pathname==='/rest/v1/rpc/bored_popular_games')return reply([{game:'trackbound',ranking:1}]);
       // Invite codes and recruiter medals are account-wide hub reads; the real SQL answers them, as it does the rest.
       if(url.pathname==='/rest/v1/recruiter_board'||/^\/rest\/v1\/rpc\/(my_invite|sync_invite)$/.test(url.pathname)) {
@@ -96,7 +97,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     await page.$$eval('#together button',(buttons,text)=>buttons.find(b=>b.textContent===text).click(),text);
     await page.waitForFunction(()=>!document.querySelector('#together').hasAttribute('aria-busy'));
   }
-  async function open(page){await page.click('#together-nav');await page.waitForFunction(()=>!document.querySelector('#together').hidden);}
+  async function open(page){await page.waitForFunction(()=>document.querySelector('#hub-loading')?.hidden===true);await page.click('#together-nav');await page.waitForFunction(()=>!document.querySelector('#together').hidden);}
   async function refresh(page){await click(page,'Refresh');}
   async function frame(page,selector){
     await page.waitForFunction(selector=>document.querySelector('#frame').contentDocument?.querySelector(selector),{},selector);
