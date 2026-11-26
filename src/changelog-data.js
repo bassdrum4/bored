@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 996,
+  "count": 997,
   "newest": "2026-11-26",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -19,6 +19,7 @@ export const CHANGELOG = [
   {"sha":"672bb07a","date":"2026-11-26","author":"bassdrum4","subject":"Give shadow.net a second cipher, a hostile archive and a real shop"},
   {"sha":"ea99df83","date":"2026-11-26","author":"bassdrum4","subject":"Teach shadow.net's tutorial to read the board and the meter"},
   {"sha":"37d0f5ce","date":"2026-11-26","author":"bassdrum4","subject":"Give shadow.net an optional tutorial for its first mission"},
+  {"sha":"964506b1","date":"2026-11-25","author":"Daniel Lowe","subject":"Redesign Battleship as a navy plotting board","pr":363},
   {"sha":"1a49c0bf","date":"2026-11-25","author":"Daniel Lowe","subject":"Add Battleship solo and private async matches","pr":362},
   {"sha":"d0073d19","date":"2026-11-25","author":"bassdrum4","subject":"Give shadow.net a second story act and repair the first"},
   {"sha":"8f826c70","date":"2026-11-25","author":"Codebuff","subject":"Give the header nav Settings and Feedback, and put account actions on Settings"},
