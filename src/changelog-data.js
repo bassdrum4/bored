@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 988,
+  "count": 989,
   "newest": "2026-11-26",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"8ac133a1","date":"2026-11-26","author":"bassdrum4","subject":"Score shadow.net on a finished contract, not a file count"},
   {"sha":"672bb07a","date":"2026-11-26","author":"bassdrum4","subject":"Give shadow.net a second cipher, a hostile archive and a real shop"},
   {"sha":"ea99df83","date":"2026-11-26","author":"bassdrum4","subject":"Teach shadow.net's tutorial to read the board and the meter"},
   {"sha":"37d0f5ce","date":"2026-11-26","author":"bassdrum4","subject":"Give shadow.net an optional tutorial for its first mission"},
