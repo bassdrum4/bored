@@ -75,6 +75,20 @@
 
   /* The table plane. */
   /* The room spans the stage but only the table takes the mouse, so the orbs above it can be hovered. */
+  /* Poké Idle's Story, Year 2 (its design doc, Part F): once you've beaten the dealer at the Distortion World camp,
+     Prof Penguin's empty chair and top hat wait at this table. PLACEHOLDER drawn in CSS until penguin-chair.png
+     (pokedoku/sprites/) exists. Tap the hat for the note. */
+  .pchair { position: absolute; left: 34px; top: 372px; width: 112px; height: 170px; z-index: 3; border: 0; background: none; padding: 0; cursor: pointer }
+  .pchair[hidden] { display: none }
+  .pchair .back { position: absolute; left: 22px; top: 52px; width: 68px; height: 74px; border: 3px solid #4a3a2e; border-bottom: 0; border-radius: 6px 6px 0 0; background: #2a201a }
+  .pchair .seat { position: absolute; left: 14px; top: 122px; width: 84px; height: 12px; background: #4a3a2e; border-radius: 2px }
+  .pchair .legs { position: absolute; left: 20px; top: 134px; width: 72px; height: 34px; border-left: 5px solid #3a2c22; border-right: 5px solid #3a2c22 }
+  .pchair .hat { position: absolute; left: 30px; top: 6px; width: 52px; height: 46px }
+  .pchair .hat::before { content: ""; position: absolute; left: 10px; top: 0; width: 32px; height: 38px; background: #111; border-radius: 3px 3px 0 0; box-shadow: inset 0 -8px 0 #6a5a8e }
+  .pchair .hat::after { content: ""; position: absolute; left: 0; top: 36px; width: 52px; height: 8px; background: #111; border-radius: 4px }
+  .pchair .frost { position: absolute; left: 40px; top: 6px; width: 32px; height: 4px; background: #d8ecff; opacity: .7; pointer-events: none }
+  .pnote { position: absolute; left: 34px; top: 312px; max-width: 300px; z-index: 4; padding: 10px 12px; background: #e9e1c8; color: #2a2118; border: 1px solid #6b5a3e; border-radius: 3px; font: italic 15px/1.4 Georgia, serif }
+  .pnote[hidden] { display: none }
   .room { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 8%; pointer-events: none }
   .table { pointer-events: auto }
   .table { position: absolute; left: 150px; top: 296px; width: 980px; height: 720px; transform-origin: 50% 100%;
@@ -481,6 +495,9 @@
     </svg>
 
     <div class="dealer away" id="dealer"><img id="dealer-img" alt="Giratina" width="84" height="84"></div>
+    <!-- Prof Penguin's chair and hat (placeholder art in CSS, see .pchair) -->
+    <button class="pchair" id="pchair" type="button" aria-label="An empty chair with a frosted top hat on it" data-placeholder="penguin-chair.png" hidden><span class="back"></span><span class="seat"></span><span class="legs"></span><span class="hat"></span><span class="frost"></span></button>
+    <p class="pnote" id="pnote" role="status" hidden></p>
 
     <div class="room">
       <div class="table" id="felt">
@@ -3549,6 +3566,16 @@ if (mpLobby && !mpLive) {
   $("#mp-together").onclick = () => mpLobby.call($("#mp-together").dataset.op || "open-together").catch(() => {});
   mpLobby.on(event => { if (event && event.event === "account" && !$("#mp-panel").hidden) mpPanel(); });
 }
+
+// Poké Idle's flag (Story Year 2, after the camp): Prof Penguin's chair and hat at this table. Read-only here.
+const PENGUIN_KEY = "bored.poke-idle.roulette.v1";
+const penguinFlags = () => { try { return JSON.parse(localStorage.getItem(PENGUIN_KEY) || "{}") || {}; } catch { return {}; } };
+function showPenguinChair() {
+  const f = penguinFlags();
+  $("#pchair").hidden = !f.hat;
+  $("#pchair").onclick = () => { const n = $("#pnote"); n.textContent = "P. — you still owe me a rematch. — G."; n.hidden = !n.hidden; };
+}
+showPenguinChair();
 
 // The hub reads this. Unscored in the arcade: rounds you've won this game, and whether it ended.
 // The board ranks `profit` from a real, won game. The frame is sandboxed, so the

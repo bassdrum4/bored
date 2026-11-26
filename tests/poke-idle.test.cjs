@@ -435,7 +435,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
       sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
       silver: MAIL.find(m => m.id === 'story-silver').body,
       signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
-      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief').map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief' && !k.startsWith('y2-')).map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
   assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
   assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
@@ -933,7 +933,7 @@ test('Year 2 begins (test save): the reset keeps the A10 list, the new League ha
     openTab('story');
     const tabText = $('#t-story').textContent;
     const crown = yearMap().find(x => x.id === 'y2-crown');
-    const story = { crown, next: storyNext().text, red: chapterRows(1).some(x => x.x === 'johto-silver'), y1rows: chapterRows(0).length, header: tabText.includes('Year 2: The Hunt') };
+    const story = { crown, next: storyNext().text, red: chapterRows(1).some(x => x.x === 'johto-silver'), y1rows: chapterRows(0).filter(x => !x.x.startsWith('y2-')).length, header: tabText.includes('Year 2: The Hunt') };
     // Three Words: secret, so not listed until the letter is read.
     openTab('ach'); const unread = { listed: $('#t-ach').textContent.includes('Three Words'), secret: /\+\d+ secret/.test($('#t-ach').textContent) };
     openTab('mail'); document.querySelector('#mail [data-mail="story-y2-start"]').click();
@@ -975,5 +975,78 @@ test('Year 2 begins (test save): the reset keeps the A10 list, the new League ha
   assert.ok(got.three && got.listed, 'reading the letter earns Three Words');
   assert.deepEqual(got.back, { ...got.classic, place: got.back.place }, 'Classic keeps its own teams and leaders');
   assert.equal(got.back.place, "Misty's Water gym");
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2, the other half: guards, the bound legends you left, Rayquaza, the camp and its dealer, Kyurem, Memo #2, Eternatus, and the hat at the Shotgun Roulette table', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const scenes = {};
+    const skip = () => { let n = 0; while (sceneNow && n++ < 30) { if (sceneNow.id === 'y2-johto-r1-after') { sceneNow.i = 1; renderScene(); typeFinish(); scenes.johto = $('#scene .dlg-text').textContent; } endScene(); } };
+    const win = () => { B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); if (!B.manual) next(); };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    storyJump(to('y2-begin') + 1, { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' });
+    skip();
+    for (const b of [250, 382, 484, 644, 717, 792, 889, 1008, 384, 646, 890, 487]) delete S.box[b];
+    delete S.seen[487]; S.party = S.party.filter(n => S.box[n]); if (!S.party.length) S.party = [Object.keys(S.box).map(Number)[0]];
+    for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
+    S.balls.master = 50; save(); viewR = 0; enter('battle'); skip();
+    const done = [], fights = {}, dealer = {};
+    const chapters = chaptersNow().filter(c => c.type !== 'crown');
+    for (const c of chapters) {
+      skip(); if (!chapterOpen(c)) continue;
+      startLoc({ kind: 'chapter', r: c.r, x: c.id });
+      skip();
+      if (!B || B.kind !== 'story') { if (chDone(c.id)) done.push(c.id); continue; }
+      fights[c.id] = B.queue.map(f => f.name);
+      if (c.type === 'dealer') Object.assign(dealer, { name: B.queue[0].name, info: $('#foeinfo').textContent, shade: $('#foeimg').classList.contains('shade'), seen: !!S.seen[487], log: $('#log').textContent, where: $('#where').textContent });
+      win(); skip(); if (chDone(c.id)) done.push(c.id);
+    }
+    if (B) B = null;
+    const caught = Object.fromEntries([250, 382, 484, 644, 717, 792, 889, 1008, 384, 646, 890].map(n => [n, S.box[n] ? S.box[n].from : null]));
+    const mail = inbox().map(m => m.id).filter(x => x.startsWith('story-y2'));
+    const sig = id => (MAIL.find(m => m.id === id).body.match(/— Ss*nakes/) || [''])[0];
+    checkAch(true);
+    const dealerAfter = { seen: !!S.seen[487], box: !!S.box[487], clue: !!S.story.clues.table, hat: S.story.roulette && S.story.roulette.hat, shared: localStorage.getItem(ROULETTE_KEY) };
+    const texts = [$('#t-story').textContent, ...MAIL.filter(m => m.id.startsWith('story-y2')).map(m => m.body + m.title), ...Object.entries(SCENES).filter(([id]) => id.startsWith('y2-')).flatMap(([, s]) => s.lines.map(l => l[1])), ...Object.values(CLUES).map(c => c.title + c.text),
+      ...ACH.filter(a => a.story).map(a => a.title + a.desc), ...chaptersNow().map(c => c.name + (c.doneNote || ''))];
+    openTab('story'); texts.push($('#t-story').textContent);
+    const named = texts.filter(x => /Giratina/.test(x));
+    // The real Story save (not a test save, not Replay) shares the flag.
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug; localStorage.setItem(STORY_KEY, JSON.stringify(real));
+    useSlot(STORY_KEY); shareRoulette('hat');
+    return { done, fights, dealer, scenes, caught, mail, sigs: [sig('story-y2-r1'), sig('story-y2-r2')], pickLines: Object.keys(S.story.pickLinesSeen).filter(k => k.startsWith('y2:')).sort(),
+      master: S.balls.master, dealerAfter, named, ach: ['st_battery', 'st_otherhalf', 'st_debt'].map(id => !!S.ach[id]),
+      johtoLetter: MAIL.find(m => m.id === 'story-y2-johto-249').body, shared: JSON.parse(localStorage.getItem(ROULETTE_KEY)) };
+  });
+  assert.equal(got.done.length, 22, 'every other-half chapter plays through: ' + got.done.join(', '));
+  assert.ok(got.done.includes('y2-kanto-lab'), 'Kanto: the sealed lab');
+  assert.deepEqual(got.fights['y2-johto-rival'], ['Servine', 'Arbok', 'Sandaconda', 'Milotic'], 'Rival Y2-1 has no borrowed legend');
+  assert.deepEqual(got.fights['y2-unova-rival'], ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme']);
+  assert.deepEqual(['johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'].map(r => got.fights[`y2-${r}-bound`][0]), ['Ho-Oh', 'Kyogre', 'Palkia', 'Zekrom', 'Yveltal', 'Lunala', 'Zamazenta', 'Miraidon'], 'each region’s bound legend is the one you didn’t pick');
+  assert.deepEqual(['hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'].map(r => got.fights[`y2-${r}-admin`].length), [6, 6, 6, 6, 6, 6, 6]);
+  assert.deepEqual(got.caught, { 250: 1, 382: 2, 484: 3, 644: 4, 717: 5, 792: 6, 889: 7, 1008: 8, 384: 2, 646: 4, 890: 7 }, 'every catch has its region (A17)');
+  assert.equal(got.dealer.name, '???');
+  assert.ok(got.dealer.info.startsWith('???') && got.dealer.shade && !got.dealer.seen, 'the dealer: ???, shadowed, not seen');
+  assert.ok(!/Giratina/.test(got.dealer.log + got.dealer.where + got.dealer.info), 'the battle never names it');
+  assert.deepEqual([got.dealerAfter.seen, got.dealerAfter.box, got.dealerAfter.clue, got.dealerAfter.hat, got.dealerAfter.shared], [false, false, true, 1, null], 'not caught, not seen; the clue and the hat flag; a test save shares nothing');
+  assert.deepEqual(got.named, [], 'nothing names it: Mail, scenes, clues, achievements, rows, the Story tab');
+  assert.match(got.scenes.johto, /Ho-Oh strains against the cables/);
+  for (const id of ['story-y2-r1', 'story-y2-johto-249', 'story-y2-hoenn-383', 'story-y2-rayquaza', 'story-y2-sinnoh-483', 'story-y2-camp', 'story-y2-unova-643', 'story-y2-r2', 'story-y2-kyurem', 'story-y2-kalos-716', 'story-y2-alola-791', 'story-y2-memo2', 'story-y2-galar-888', 'story-y2-eternatus', 'story-y2-paldea-1007']) assert.ok(got.mail.includes(id), id);
+  assert.ok(!got.mail.includes('story-y2-johto-250'), 'only your pick’s line');
+  assert.equal(got.johtoLetter, "<p>Ho-Oh too, now. Your Lugia's been restless all year. I think it missed the other one.</p><p>Prof Penguin</p>");
+  assert.deepEqual(got.sigs, ['— Sssssnakes', '— Ssssssnakes'], 'the s count in each signature');
+  assert.deepEqual(got.pickLines, ['y2:alola-791', 'y2:galar-888', 'y2:hoenn-383', 'y2:johto-249', 'y2:kalos-716', 'y2:paldea-1007', 'y2:sinnoh-483', 'y2:unova-643']);
+  assert.equal(got.master, 50 - 11 + 1, 'eleven thrown, and Rival Y2-2’s Master Ball');
+  assert.deepEqual(got.ach, [true, true, true]);
+  assert.deepEqual(got.shared, { hat: 1 }, 'the real Story save shares the hat flag');
+  // Shotgun Roulette, same origin: the chair and hat wait at the table, and the hat has a note.
+  const sr = tab.url().replace('poke-idle.html', 'shotgun-roulette.html');
+  await tab.goto(sr); await tab.waitForFunction(() => typeof window.__boredSnapshot === 'function');
+  const chair = await tab.evaluate(() => { const shown = !document.querySelector('#pchair').hidden; document.querySelector('#pchair').click(); return { shown, note: document.querySelector('#pnote').textContent, noteShown: !document.querySelector('#pnote').hidden }; });
+  assert.deepEqual(chair, { shown: true, note: 'P. — you still owe me a rematch. — G.', noteShown: true });
+  await tab.evaluate(() => localStorage.removeItem('bored.poke-idle.roulette.v1')); await tab.reload(); await tab.waitForFunction(() => typeof window.__boredSnapshot === 'function');
+  assert.equal(await tab.evaluate(() => document.querySelector('#pchair').hidden), true, 'no flag, no chair');
   assert.deepEqual(errors, []);
 });
