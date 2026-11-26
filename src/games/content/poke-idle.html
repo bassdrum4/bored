@@ -4295,14 +4295,41 @@ syncBoot();
 // Story Mode never moves the Classic board: while it's open the snapshot reports the Classic save from storage, and
 // Story's own progress rides along in story ({ year, chapter, regionsLiberated, lifeDex }) for the Story board to come.
 window.__boredSnapshot = () => {
-  if (slot === STORY_KEY) return classicSnapshot(readSlot(KEY), S);
-  if (slot === REPLAY_KEY) return classicSnapshot(readSlot(KEY), readSlot(STORY_KEY));
+  if (slot === STORY_KEY) return { ...classicSnapshot(readSlot(KEY), S), admin: adminSnapshot() };
+  if (slot === REPLAY_KEY) return { ...classicSnapshot(readSlot(KEY), readSlot(STORY_KEY)), admin: adminSnapshot() };
   const day = bossDay().date, boss = { date: day, won: !!(S && S.daily && S.daily.date === day && S.daily.won) };
-  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, lifeDex: 0, badges: 0, tower: 0, prestige: 0, ranked: 0, boss: { date: day, won: false }, finished: false };
+  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, lifeDex: 0, badges: 0, tower: 0, prestige: 0, ranked: 0, boss: { date: day, won: false }, finished: false, admin: adminSnapshot() };
   if (S) recordLife();
   const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0, prestige = S ? S.prestige || 0 : 0, life = S ? lifeDex() : 0;
-  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S, story: storyProgress(readSlot(STORY_KEY)) };
+  return { slug: 'poke-idle', caught, shinies, score: S ? boardScore() : 0, lifeDex: life, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, prestige, ranked: prestige * 2051 + life, boss, finished: !!S, story: storyProgress(readSlot(STORY_KEY)), admin: adminSnapshot() };
 };
+// For Bored's admin page only (the hub must keep it from public reads): both real saves, Classic and Story, as they
+// stand, whichever one is open. Small on purpose: counts, and the party (up to six), never the Box. The test account's
+// saves are never read, and a save marked as a test is left out. A save that's missing or broken is null. The bond
+// counts are here for the admin; the game itself still never shows them.
+function adminSnapshot() {
+  const real = k => k === slot && S ? S : readSlot(k);
+  return { v: 1, classic: adminSave(real(KEY), false), story: adminSave(real(STORY_KEY), true) };
+}
+function adminSave(st, story) {
+  if (!st || st.test || !st.box || !Array.isArray(st.party) || (st.mode === "story") !== story || (story && !st.story)) return null;
+  const keep = S;
+  try {
+    S = st;
+    const box = Object.values(S.box), mega = n => { const f = megaOn(n); return f ? f.name : null; };
+    const form = n => { const f = altOf(n); return f ? f.key || f.vid || f.name || null : null; };
+    const party = S.party.filter(n => S.box[n]).slice(0, 6).map(n => ({ num: +n, lvl: story ? realLevel(n) : level(n), ...(story ? { battleLvl: battleLevel(n) } : {}), shiny: !!S.box[n].shiny, form: form(n), mega: mega(n) }));
+    if (!story) {
+      const life = new Set([...Object.keys(S.lifeDex || {}), ...Object.keys(S.box)]).size;
+      return { prestige: S.prestige || 0, dex: life, shinies: box.filter(b => b.shiny).length, badges: Object.keys(S.badges || {}).length, champs: Object.keys(S.champs || {}).length,
+        region: REGIONS[frontier()].name, boxCount: box.length, party };
+    }
+    const p = storyProgress(S), cleared = S.story.cleared || {};
+    return { year: p.year, chapter: p.chapter, liberated: p.regionsLiberated, lifeDex: p.lifeDex, boxCount: box.length, party,
+      bonded: box.filter(b => b.bond).length, unbonded: box.filter(b => !b.bond).length, picks: { ...(S.story.picks || {}) },
+      cleared: [1, 2, 3].filter(y => cleared[y] || (y === 1 && S.story.epilogue)) };
+  } catch { return null; } finally { S = keep; }
+}
 function classicSnapshot(c, st) {
   const day = bossDay().date, boss = { date: day, won: !!(c && c.daily && c.daily.date === day && c.daily.won) };
   const keys = o => Object.keys(o || {}), box = c ? c.box : {};
