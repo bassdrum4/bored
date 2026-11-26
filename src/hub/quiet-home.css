@@ -79,7 +79,10 @@
   #library .section-links { gap: 5px; }
 }
 @media (max-width: 380px) {
+  /* The wordmark, the tools and the account name cannot share one line this narrow: the tools
+     take their own row rather than squeezing the name onto four lines. */
+  .masthead-top { flex-wrap: wrap; }
   .masthead-top h1 { font-size: 34px; }
-  #profile-label { max-width: 64px; }
+  #profile-label { max-width: 140px; }
   #account-buddy { display: none; }
 }
