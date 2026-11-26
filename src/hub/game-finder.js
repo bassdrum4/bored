@@ -37,7 +37,7 @@ const GROUPS = Object.fromEntries(Object.entries({
   build: 'ashcrown transit-chaos signal-tower sand fluid eco corner poke-idle poke-gacha trackbound ticket-to-ride',
   chaos: 'getaway-shootout rooftop-snipers basket-random ballistic-chickens gun-mayhem tank2 tank quickdraw sumo downhill-mayhem lava volletball commanders shotgun-roulette',
   reflex: 'trackbound quickdraw aim-lab circuit brick-run void-runner pac-man qbert frogger snake space-invaders asteroids gun-mayhem getaway-shootout rooftop-snipers basket-random downhill-mayhem wallbound',
-  strategy: 'ashcrown risk chess scrabble ticket-to-ride corner transit-chaos signal-tower prism-duel commanders poker tank2 connect-four poke-idle poke-gacha deep',
+  strategy: 'battleship ashcrown risk chess scrabble ticket-to-ride corner transit-chaos signal-tower prism-duel commanders poker tank2 connect-four poke-idle poke-gacha deep',
   physics: 'getaway-shootout rooftop-snipers basket-random ballistic-chickens wallbound tank2 sumo minigolf air-hockey downhill-mayhem circuit trackbound gun-mayhem',
   peace: 'sand fluid eco mahjong solitaire photo-puzzle wordle memory sudoku 2048 minigolf clicker poke-idle',
   immersive: 'f-14 ashcrown risk poke-idle poke-gacha signal-tower transit-chaos ticket-to-ride eco deep imposter shadow-net',
