@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 992,
+  "count": 993,
   "newest": "2026-11-26",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ee08a023","date":"2026-11-26","author":"Codebuff","subject":"Let the announcement count be read on its red badge"},
   {"sha":"49ec904a","date":"2026-11-26","author":"Codebuff","subject":"Let the header take two rows on the narrowest phones"},
   {"sha":"97353176","date":"2026-11-26","author":"Codebuff","subject":"Stop the new Feedback and Settings from crowding the phone header and tab bar"},
   {"sha":"d9246668","date":"2026-11-26","author":"Codebuff","subject":"Paint Bo's shapes directly so his face cannot come back as a black square"},
