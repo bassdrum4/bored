@@ -436,7 +436,7 @@ function huntTick(){
     if(!state.completedMissions.includes(7)) return;
     state.hunt = { left:SWEEP_STEPS };
     print('', 'c-default');
-    print('COUNTER-INTEL: connection above the noise floor.', 'c-error');
+    print('COUNTER-INTEL: connection above the noise floor.', 'c-warning');
     print(`VEGA: "They are sweeping. ${SWEEP_STEPS} commands, then they burn a file and cut you."`, 'c-warning');
     print('"purge" trades a file for trace; "disconnect" ends the sweep.', 'c-info');
     return;
@@ -448,7 +448,7 @@ function huntTick(){
   }
   state.hunt.left--;
   if(state.hunt.left > 0){
-    print(`COUNTER-INTEL: sweep in ${state.hunt.left} command${state.hunt.left === 1 ? '' : 's'}.`, 'c-error');
+    print(`COUNTER-INTEL: sweep in ${state.hunt.left} command${state.hunt.left === 1 ? '' : 's'}.`, 'c-warning');
     return;
   }
   state.hunt = null;
@@ -680,21 +680,88 @@ function processCmd(raw){
 
   print(getPrompt()+input, 'c-muted');
 
-  // A terminal takes a line of them: ";" always runs the next command, "&&"
-  // only when the last one printed no error. A guess or a shift is not a
-  // script, so chaining only happens in normal command mode.
-  if(state.mode==='normal' && !state.gameEnded && /[;&]/.test(input)){
-    let runNext = true;
-    for(const segment of input.split(/(&&|;)/)){
-      const piece = segment.trim();
-      if(piece==='&&' || piece===';'){ if(piece===';') runNext = true; continue; }
-      if(!piece || !runNext) continue;
-      runNext = execCmd(piece);
-    }
+  // A terminal takes a line of them the way Windows does: "&&" runs the next
+  // only when this one worked, "||" only when it did not, "&" and ";" always.
+  // A guess or a shift is not a script, so chaining only runs in command mode.
+  if(state.mode==='normal' && !state.gameEnded && /[&;]|\|\|/.test(input)){
+    runChain(splitChain(input));
     return;
   }
 
   execCmd(input);
+}
+
+// Split a line into commands, each with the operator joining it to the last.
+// Inside quotes a separator is text, and "^" takes the next character
+// literally, as cmd does.
+function splitChain(input){
+  const out = [];
+  let buf = '', sep = null, quote = null;
+  const cut = () => { out.push({ sep, text: buf }); buf = ''; };
+  for(let i = 0; i < input.length; i++){
+    const ch = input[i];
+    if(quote){
+      buf += ch;
+      if(ch === quote) quote = null;
+      continue;
+    }
+    if(ch === '"' || ch === "'"){ quote = ch; buf += ch; continue; }
+    if(ch === '^' && i + 1 < input.length){ buf += input[++i]; continue; }
+    if(ch === '&' && input[i + 1] === '&'){ cut(); sep = '&&'; i++; continue; }
+    if(ch === '|' && input[i + 1] === '|'){ cut(); sep = '||'; i++; continue; }
+    if(ch === '&' || ch === ';'){ cut(); sep = ch; continue; }
+    buf += ch;
+  }
+  out.push({ sep, text: buf });
+  return out;
+}
+
+// Split one command into words, keeping quoted runs together and dropping the
+// quotes, so "cd \"My Documents\"" is one argument.
+function splitArgs(input){
+  const out = [];
+  let buf = '', quote = null, has = false;
+  for(let i = 0; i < input.length; i++){
+    const ch = input[i];
+    if(quote){
+      if(ch === quote) quote = null; else buf += ch;
+      has = true;
+      continue;
+    }
+    if(ch === '"' || ch === "'"){ quote = ch; has = true; continue; }
+    if(ch === ' ' || ch === '\t'){
+      if(has){ out.push(buf); buf = ''; has = false; }
+      continue;
+    }
+    buf += ch;
+    has = true;
+  }
+  if(has) out.push(buf);
+  return out;
+}
+
+// Run the parts by cmd's rules. A command behind a failed "&&" is skipped
+// without changing the result, so "a && b || c" still reaches c when a fails;
+// a dangling "&&" or "||" is the syntax error cmd reports.
+function runChain(parts){
+  let ok = true, ran = false;
+  for(const part of parts){
+    const piece = part.text.trim();
+    if(!piece){
+      if(part.sep === '&&' || part.sep === '||'){
+        print('The syntax of the command is incorrect.', 'c-error');
+        return;
+      }
+      continue;
+    }
+    const go = !ran || part.sep === null || part.sep === '&' || part.sep === ';'
+      || (part.sep === '&&' && ok) || (part.sep === '||' && !ok);
+    if(!go) continue;
+    ok = execCmd(piece);
+    ran = true;
+    // An interactive prompt is not something the rest of the line can answer.
+    if(state.mode !== 'normal' || state.gameEnded) return;
+  }
 }
 
 // One command, no echo. Returns false when it printed an error, which is what
@@ -711,7 +778,8 @@ function execCmd(input){
   if(state.mode==='crack') { handleCrackInput(input); afterCommand(); return !printedError; }
   if(state.mode==='decrypt') { handleDecryptInput(input); afterCommand(); return !printedError; }
 
-  const parts = input.split(/\s+/);
+  const parts = splitArgs(input);
+  if(!parts.length) return true;
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
 
@@ -737,7 +805,7 @@ function execCmd(input){
     case 'purge': cmdPurge(); break;
     case 'status': cmdStatus(); break;
     case 'missions': cmdMissions(); break;
-    case 'trace': print(`Trace level: ${state.trace}/100`, state.trace>60?'c-error':'c-default'); break;
+    case 'trace': print(`Trace level: ${state.trace}/100`, state.trace>60?'c-warning':'c-default'); break;
     case 'shop': cmdShop(); break;
     case 'buy': cmdBuy(args[0]); break;
     case 'whoami': print('ghost @ SHADOW.NET\nClearance: OPERATIVE\nStatus: ACTIVE','c-info'); break;
@@ -758,6 +826,7 @@ function execCmd(input){
 function cmdHelp(){
   print('Available Commands:', 'c-highlight');
   print('═══════════════════', 'c-muted');
+  print('  Chain with && (if it worked), || (if it failed), & or ; (always).', 'c-muted');
   print('');
   print('    tutorial        Optional walkthrough of the first mission');
   print('');
@@ -1006,7 +1075,7 @@ function catFile(arg){
     print(getContent(node), 'c-default');
     if(node.alarm){
       const paid = addTrace(12);
-      print(`[TRIPWIRE] Reading it reported you. Trace +${paid}.`, 'c-error');
+      print(`[TRIPWIRE] Reading it reported you. Trace +${paid}.`, 'c-warning');
     }
     if(node.burnOnRead){
       burnFile(srv, path);
@@ -1276,7 +1345,7 @@ function cmdDownload(arg){
 
   print(`Downloaded: ${fname}`, 'c-success');
   if(classified) print(`[CLASSIFIED FILE - Trace increased significantly]`, 'c-warning');
-  if(alarm) print('[TRIPWIRE] That file bills every copy made. It cost you trace.', 'c-error');
+  if(alarm) print('[TRIPWIRE] That file bills every copy made. It cost you trace.', 'c-warning');
   if(overwrote) print(`[Overwrote the local copy of ${fname}]`, 'c-muted');
   if(node.decoy){
     state.ledgerDecoy = true;
@@ -1325,7 +1394,7 @@ function cmdStatus(){
   print(line('     OPERATIVE STATUS'), 'c-accent');
   print('╠' + '═'.repeat(width) + '╣', 'c-accent');
   print(row('Credits:', state.credits + 'cr'), 'c-default');
-  print(row('Trace:', state.trace + '/100'), state.trace>60?'c-error':'c-default');
+  print(row('Trace:', state.trace + '/100'), state.trace>60?'c-warning':'c-default');
   print(row('Server:', state.connected || 'localhost'), 'c-default');
   print(row('Files:', state.downloadCount), 'c-default');
   print(row('Missions:', state.completedMissions.length + '/' + MISSIONS.length), 'c-default');
