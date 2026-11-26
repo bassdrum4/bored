@@ -542,14 +542,15 @@ function processCmd(raw){
     return;
   }
 
-  if(state.mode==='crack') { handleCrackInput(input); return; }
-  if(state.mode==='decrypt') { handleDecryptInput(input); return; }
+  if(state.mode==='crack') { handleCrackInput(input); tutorialTick(); return; }
+  if(state.mode==='decrypt') { handleDecryptInput(input); tutorialTick(); return; }
 
   const parts = input.split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
 
   switch(cmd){
+    case 'tutorial': cmdTutorial(args[0]); break;
     case 'help': cmdHelp(); break;
     case 'ls': case 'dir': cmdLs(); break;
     case 'cd': cmdCd(args[0]||''); break;
@@ -576,6 +577,7 @@ function processCmd(raw){
   }
   checkMissions();
   updateUI();
+  tutorialTick();
 }
 
 // --- COMMANDS ---
@@ -583,6 +585,8 @@ function processCmd(raw){
 function cmdHelp(){
   print('Available Commands:', 'c-highlight');
   print('═══════════════════', 'c-muted');
+  print('');
+  print('    tutorial        Optional walkthrough of the first mission');
   print('');
   print('  Navigation:', 'c-accent');
   print('    ls              List directory contents');
@@ -609,6 +613,95 @@ function cmdHelp(){
   print('    shop            Browse upgrades');
   print('    buy <item>      Purchase upgrade');
   print('    whoami          Display identity');
+}
+
+// --- TUTORIAL (optional) ---
+// The walkthrough only watches: every step ticks off when the real command
+// lands, so it cannot change what a run scores or how much trace it costs.
+// It never starts on its own - "help" lists it first, and "tutorial" runs it.
+const TUTORIAL = [
+  {title:'Look around', how:'ls', say:'You are ghost, on your own machine. ls lists the folder you are in; cd moves; cat reads a file.',
+    done:()=>tutorial.did.ls},
+  {title:'Read the briefing', how:'cat readme.txt', say:'The readme names your handler and the channel you are using. ghost is the name; VEGA is the voice.',
+    done:()=>tutorial.did['cat:readme.txt']},
+  {title:'Find a way in', how:'scan', say:'Nothing is on the network map until you scan for it. Scan is the cheapest thing you can do out there.',
+    done:()=>SERVERS['nexus-corp.net'].discovered},
+  {title:'Open a session', how:'connect nexus-corp.net', say:'An uncracked host answers the network and shows nothing else. The lock comes first.',
+    done:()=>state.connected==='nexus-corp.net'},
+  {title:'Break the lock', how:'crack', say:'Pick a word from the list. A wrong guess says how many letters already sit in the right place - that number is the whole puzzle. Four bad guesses drop the session; connect again and retry.',
+    done:()=>SERVERS['nexus-corp.net'].cracked},
+  {title:'Walk the host', how:'cd /home/jdoe/documents', say:'Remote sessions start at /. ls maps a folder and cd moves into it. The brief is three levels in.',
+    done:()=>state.currentDir==='/home/jdoe/documents'},
+  {title:'Read the evidence', how:'cat project_helios_brief.txt', say:'Read it before you take it. It is what the job is actually about.',
+    done:()=>tutorial.did['cat:project_helios_brief.txt']},
+  {title:'Take a copy', how:'download project_helios_brief.txt', say:'download copies a file to /home/ghost/downloads and pays credits. Classified files cost more trace.',
+    done:()=>state.downloaded.includes('project_helios_brief.txt')},
+  {title:'Leave clean', how:'disconnect', say:'Get out before trace reaches 100. Disconnecting is free, and the next job starts from home.',
+    done:()=>!state.connected && SERVERS['nexus-corp.net'].cracked}
+];
+
+const tutorial = {on:false, step:0, did:{}};
+
+function tutorialDid(name){
+  tutorial.did[name] = true;
+}
+
+function printTutorialStep(){
+  const step = TUTORIAL[tutorial.step];
+  if(!step) return;
+  print('');
+  print(`[tutorial ${tutorial.step+1}/${TUTORIAL.length}] ${step.title}`, 'c-accent');
+  print('  > ' + step.how, 'c-info');
+  print('  ' + step.say, 'c-default');
+}
+
+function tutorialTick(){
+  if(!tutorial.on) return;
+  let advanced = false;
+  while(TUTORIAL[tutorial.step] && TUTORIAL[tutorial.step].done()){
+    print('  ok: ' + TUTORIAL[tutorial.step].title, 'c-success');
+    tutorial.step++;
+    advanced = true;
+    if(tutorial.step >= TUTORIAL.length){
+      tutorial.on = false;
+      print('');
+      print('Tutorial done. That is the loop: scan, connect, crack, read, take, disconnect.', 'c-success');
+      print('Encrypted files later need "decrypt <file>"; that interface walks you through the shift.', 'c-muted');
+      print('"missions" has every objective; "tutorial" can be run again at any time.', 'c-muted');
+      return;
+    }
+  }
+  if(advanced) printTutorialStep();
+}
+
+function cmdTutorial(arg){
+  const sub = (arg || '').toLowerCase();
+  if(sub==='exit' || sub==='stop'){
+    if(!tutorial.on){ print('Tutorial is not running. Type "tutorial" to start it.','c-muted'); return; }
+    tutorial.on = false;
+    print('Tutorial off. Your run is exactly where you left it.','c-muted');
+    return;
+  }
+  if(sub==='skip'){
+    if(!tutorial.on){ print('Tutorial is not running. Type "tutorial" to start it.','c-muted'); return; }
+    print('  (skipped)', 'c-muted');
+    tutorial.step++;
+    if(tutorial.step >= TUTORIAL.length){
+      tutorial.on = false;
+      print('Tutorial done. That is the loop: scan, connect, crack, read, take, disconnect.','c-success');
+      return;
+    }
+    printTutorialStep();
+    return;
+  }
+  if(sub){ print('Usage: tutorial | tutorial skip | tutorial exit','c-error'); return; }
+  tutorial.on = true;
+  tutorial.step = 0;
+  tutorial.did = {};
+  print('TUTORIAL - first mission (optional)', 'c-accent');
+  print('The steps are the real commands, in order; each one ticks off when you run it.', 'c-muted');
+  print('"tutorial skip" passes a step, "tutorial exit" stops. The tutorial itself adds no trace and no credits.', 'c-muted');
+  printTutorialStep();
 }
 
 // A connection is not access: until the password is broken the remote machine
@@ -639,6 +732,7 @@ function cmdLs(){
     }
   });
   printHTML(output_str);
+  tutorialDid('ls');
 }
 
 function cmdCd(arg){
@@ -678,6 +772,7 @@ function cmdCat(arg){
     print(`Use "decrypt ${arg}" to attempt decryption.`, 'c-info');
   } else {
     print(getContent(node), 'c-default');
+    tutorialDid('cat:' + path.split('/').pop());
   }
 }
 
@@ -727,6 +822,7 @@ function cmdScan(){
     }
     checkMissions();
     updateUI();
+    tutorialTick();
   }, 800);
 }
 
@@ -1274,6 +1370,7 @@ async function bootSequence(){
     {t:'',c:'c-default',d:80},
     {t:'Welcome, operator.',c:'c-default',d:300},
     {t:'Type "help" for available commands.',c:'c-muted',d:100},
+    {t:'Type "tutorial" for a guided first run (optional).',c:'c-muted',d:100},
     {t:'Type "missions" to view your objectives.',c:'c-muted',d:100},
     {t:'',c:'c-default',d:80},
     {t:'VEGA says: "We\'ve got a job. Nexus Corp is hiding',c:'c-info',d:200},
@@ -1329,7 +1426,7 @@ function tabComplete(){
   const parts = val.split(/\s+/);
 
   if(parts.length<=1){
-    const cmds = ['help','ls','cd','cat','clear','scan','connect','disconnect','crack','decrypt','download','analyze','status','missions','trace','shop','buy','whoami','map','exit'];
+    const cmds = ['tutorial','help','ls','cd','cat','clear','scan','connect','disconnect','crack','decrypt','download','analyze','status','missions','trace','shop','buy','whoami','map','exit'];
     const match = cmds.find(c=>c.startsWith(parts[0]));
     if(match) inputEl.value = match+' ';
   } else if(parts.length===2){
