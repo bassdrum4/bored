@@ -749,6 +749,8 @@ function routePool(r, k) {
 // and catchable. The whole party gets TRAIN_XP times the XP there, so train a team where it hits hardest: a Rock team
 // in the Flying or Bug area. Money is a normal route's.
 const TRAIN_R = 9, TRAIN_XP = 3, TRAIN_TYPES = Object.keys(TC);
+// Story Year 2's Hunt has a list of its own (another place that isn't a region), next to the regions.
+const HUNT_R = 10;
 const trainPool = k => MON.filter(m => m.types.includes(TRAIN_TYPES[k]) && !legendary(m) && !tripOnly(m)).concat(VARIANTS.filter(v => v.types.includes(TRAIN_TYPES[k]) && !legendary(v)));
 // The gym's leader: Year 2 of Story has its own (Y2_GYMS).
 const gymName = (r, k) => storyYear() === 2 ? Y2_GYMS[r][k][0] : REGIONS[r].gyms[k][0];
@@ -2134,8 +2136,10 @@ function renderTop() {
   $("#money").textContent = fmt(S.money);
 }
 function renderLocs() {
+  if (viewR === HUNT_R && storyYear() !== 2) viewR = 0;
   $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("")
-    + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
+    + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "")
+    + (storyYear() === 2 ? `<button class="lbl${viewR === HUNT_R ? " on" : ""}" data-r="${HUNT_R}" type="button">The Hunt</button>` : "");
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Sssssssnakes sits at the very top of each of those regions' lists.
   if (RIVAL_AT[r] && !isStory()) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
@@ -2149,6 +2153,7 @@ function renderLocs() {
   // Today's boss, the same for every player, under the Lab in every list.
   { const m = dailyBoss(); items.push({ kind: "daily", r: frontier(), types: m.types, note: dailyWon() ? "beaten today" : `${m.name} · Lv ${levelCap()}`, done: dailyWon() }); }
   if (r === TRAIN_R) TRAIN_TYPES.forEach((t, k) => items.push({ kind: "route", r, k, train: t, note: `Lv ${levelCap()} · ×${TRAIN_XP} XP` }));
+  else if (r === HUNT_R) items.push(...chapterRows(HUNT_R));
   else {
     for (let k = 0; k < 4; k++) {
       items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
@@ -4238,7 +4243,7 @@ const chaptersDone = () => chaptersNow().filter(c => chDone(c.id)).length;
 const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a)) || null;
 const chapterOpen = c => isStory() && (c.year || 1) === storyYear() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open() || !!(S.test && S.debug && S.debug.dex === "ignore"));
 function chapterRows(r) {
-  return CHAPTERS.filter(c => c.r === r && chapterListed(c)).map(c => {
+  return CHAPTERS.filter(c => (c.hunt ? r === HUNT_R : c.r === r) && chapterListed(c)).map(c => {
     const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
     if (c.hide && !chDone(c.id) && !chapterOpen(c)) return { kind: "chapter", r, x: c.id, done: false, hidden: true, note: c.note ? c.note() : "the Hunt" };
     return { kind: "chapter", r, x: c.id, done: chDone(c.id),
@@ -4494,7 +4499,7 @@ function renderStory() {
   const clues = Object.keys(CLUES).filter(k => st.clues[k]);
   const map = yearMap(), next = CHAPTERS.length ? storyNext().text : "";
   $("#t-story").innerHTML = (next ? `<p class="next"><b>${esc(next)}</b></p>` : "") + `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
-    ${map.length ? `<h2>Year ${st.year}: ${esc(YEARS[st.year] || "")}</h2><ul class="yearmap">${map.map(x => `<li class="${x.grey ? "muted" : ""}"><span class="mk">${x.mark}</span> ${esc(x.name)}${x.optional ? " (optional)" : ""}${x.note ? ` <span class="small">· ${esc(x.note)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+    ${map.length ? `<h2>Year ${st.year}: ${esc(YEARS[st.year] || "")}</h2>${[map.filter(x => !CHAPTER[x.id].hunt), map.filter(x => CHAPTER[x.id].hunt)].map((part, i) => !part.length ? "" : `${i ? '<h3 class="small">The Hunt</h3>' : ""}<ul class="yearmap">${part.map(x => `<li class="${x.grey ? "muted" : ""}"><span class="mk">${x.mark}</span> ${esc(x.name)}${x.optional ? " (optional)" : ""}${x.note ? ` <span class="small">· ${esc(x.note)}</span>` : ""}</li>`).join("")}</ul>`).join("")}` : ""}
     <h2>Story so far</h2>${order.length ? order.map(g => `<div class="st-group"><h4>Year ${g.year}: ${esc(YEARS[g.year] || "")} · ${g.r < 0 ? "Prologue" : esc(REGIONS[g.r].name)}</h4><div class="st-scenes">${g.ids.map(id => `<button class="lbl" type="button" data-reread="${id}">${esc(SCENES[id].title)}</button>`).join("")}</div></div>`).join("") : '<p class="small muted">Nothing yet.</p>'}
     ${S.test ? testToolsHtml() : ""}
     <h2>Clues</h2>${clues.length ? `<div class="clues">${clues.map(k => `<div class="clue"><b>${esc(CLUES[k].title)}</b>${esc(CLUES[k].text)}</div>`).join("")}</div>` : '<p class="small muted">No clues yet. Keep your eyes open.</p>'}`;
