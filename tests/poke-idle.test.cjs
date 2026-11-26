@@ -993,7 +993,7 @@ test('Year 2, the other half: guards, the bound legends you left, Rayquaza, the 
     for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
     S.balls.master = 50; save(); viewR = 0; enter('battle'); skip();
     const done = [], fights = {}, dealer = {};
-    const chapters = chaptersNow().filter(c => c.type !== 'crown');
+    const chapters = chaptersNow().filter(c => c.type !== 'crown' && !c.hunt);
     for (const c of chapters) {
       skip(); if (!chapterOpen(c)) continue;
       startLoc({ kind: 'chapter', r: c.r, x: c.id });
@@ -1048,5 +1048,68 @@ test('Year 2, the other half: guards, the bound legends you left, Rayquaza, the 
   assert.deepEqual(chair, { shown: true, note: 'P. — you still owe me a rematch. — G.', noteShown: true });
   await tab.evaluate(() => localStorage.removeItem('bored.poke-idle.roulette.v1')); await tab.reload(); await tab.waitForFunction(() => typeof window.__boredSnapshot === 'function');
   assert.equal(await tab.evaluate(() => document.querySelector('#pchair').hidden), true, 'no flag, no chair');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2, the Hunt: rows open with the Champions and stay ??? until then, every catch is from its place, Meltan and Kubfu join at the cap, Kubfu waits for a tower, and Giant Chasm waits for Unova', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const skip = () => { let n = 0; while (sceneNow && n++ < 30) endScene(); };
+    // Each foe in turn (the last one is the catch), then the chapter.
+    const win = () => { const here = B; for (let n = 0; n < 12 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    storyJump(to('y2-begin') + 1, { 4: '643' }); skip();
+    const mine = [1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 892, 1024];
+    for (const n of mine) delete S.box[n];
+    S.party = S.party.filter(n => S.box[n]); S.balls.master = 50; S.won = {}; delete S.stones[10062]; delete S.stones[10063];
+    // One Champion: the Hunt is still ???.
+    S.champs = { 0: 1 }; viewR = 1; enter('battle'); skip();
+    const one = { map: yearMap().filter(x => CHAPTER[x.id].hunt).map(x => x.name), next: storyNext().text, row: chapterRows(1).filter(x => CHAPTER[x.x].hunt).map(x => [locName(x), x.note]),
+      list: [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).filter(t => /Kitakami|Ogerpon|Scout/.test(t)) };
+    // Two: Kitakami opens (in Johto's list); the others don't.
+    S.champs[1] = 1; renderLocs();
+    const two = { open: chaptersNow().filter(c => c.hunt && chapterOpen(c)).map(c => c.id), ogerpon: chapterRows(1).find(x => x.x === 'y2-kitakami').note };
+    // All nine: play the Hunt. Giant Chasm waits for Unova's other half.
+    for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
+    const capNow = levelCap(), chasmBefore = chapterOpen(CHAPTER['y2-chasm']);
+    const done = [], kubfu = {};
+    for (const c of chaptersNow().filter(c => c.hunt && c.id !== 'y2-chasm')) {
+      skip(); if (!chapterOpen(c)) continue;
+      if (c.id === 'y2-towers-climb') Object.assign(kubfu, { lv: realLevel(891), evo: evoOptions(891).length, urshifu: !!S.box[892] });
+      startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+      if (!B || B.kind !== 'story') continue;
+      win(); skip(); if (chDone(c.id)) done.push(c.id);
+    }
+    S.story.ch['y2-unova-bound'] = 1;
+    startLoc({ kind: 'chapter', r: 7, x: 'y2-chasm' }); skip(); if (chDone('y2-chasm')) done.push('y2-chasm');
+    checkAch(true);
+    const from = Object.fromEntries(mine.filter(n => S.box[n]).map(n => [n, S.box[n].from]));
+    const sig = id => (MAIL.find(m => m.id === id).body.match(/— Ss*nakes/) || [''])[0];
+    return { one, two, capNow, chasmBefore, done, from, kubfu, gifts: [realLevel(808), S.box[892] ? realLevel(892) : 0], won: Object.keys(S.won).sort(), stones: [S.stones[10062], S.stones[10063]], masks: S.story.masks,
+      under: chapterRows(6).find(x => x.x === 'y2-underdepths').note, terapagos: !!S.box[1024],
+      mail: inbox().map(m => m.id), sigs: [sig('story-y2-alone'), sig('story-y2-stupid')], chasm: MAIL.find(m => m.id === 'story-y2-chasm').body,
+      ach: ['st_masks', 'st_deoxys', 'st_keldeo', 'st_watching', 'st_lost', 'st_tanks'].map(id => !!S.ach[id]) };
+  });
+  assert.ok(got.one.map.every(n => n === '???'), 'locked Hunt rows are ??? in the Year map: ' + got.one.map);
+  assert.ok(!/Kitakami|Ogerpon|Scout/.test(got.one.next), 'Next up doesn’t name them either');
+  assert.ok(got.one.row.every(([name]) => name === '???') && got.one.row.every(([, note]) => note === 'after 2 Champions'), JSON.stringify(got.one.row));
+  assert.deepEqual(got.one.list, [], 'the list shows ??? too');
+  assert.deepEqual(got.two.open, ['y2-kitakami-1', 'y2-kitakami-2', 'y2-kitakami-3'], 'the second Champion opens the scouts');
+  assert.equal(got.two.ogerpon, 'Masks returned: 0/3');
+  assert.equal(got.chasmBefore, false, 'Giant Chasm waits for Unova’s other half');
+  assert.deepEqual(got.done, ['y2-kitakami-1', 'y2-kitakami-2', 'y2-kitakami-3', 'y2-kitakami', 'y2-meteor', 'y2-latias', 'y2-latios', 'y2-tornadus', 'y2-thundurus', 'y2-landorus', 'y2-icirrus', 'y2-towers', 'y2-towers-climb', 'y2-underdepths', 'y2-chasm']);
+  assert.deepEqual(got.from, { 1017: 8, 386: 2, 380: 2, 381: 2, 641: 4, 642: 4, 645: 4, 647: 4, 808: 7, 809: 7, 891: 7, 892: 7 }, 'A17: Kitakami → Paldea, Meteor Falls and Southern Island → Hoenn, Abundant Shrine and Icirrus → Unova, the towers and the Mystery Box → Galar');
+  assert.ok(got.kubfu.lv >= 30 && got.kubfu.evo === 0 && !got.kubfu.urshifu, `Kubfu arrives at the cap (Lv ${got.kubfu.lv}) and waits for a tower`);
+  assert.deepEqual(got.gifts, [got.capNow, got.capNow], 'Meltan and Kubfu (now Urshifu) at the cap');
+  assert.deepEqual(got.won, ['abundant', 'chasm', 'icirrus', 'kitakami', 'meteor', 'southern', 'towers'], 'the form unlocks');
+  assert.deepEqual(got.stones, [1, 1], 'Latiasite and Latiosite');
+  assert.equal(got.masks, 3);
+  assert.equal(got.under, 'Terapagos: lost. For now.');
+  assert.equal(got.terapagos, false, 'no Terapagos');
+  for (const id of ['story-y2-kitakami', 'story-y2-alone', 'story-y2-stupid', 'story-y2-promise', 'story-y2-chasm']) assert.ok(got.mail.includes(id), id);
+  assert.deepEqual(got.sigs, ['— Ssssssssnakes', '— Sssssssnakes'], 'one s too many, then his usual');
+  assert.equal(got.chasm, "<p>If the tanks are full, they'll run it. Soon. I don't know what it will take from you. But whatever happens next, the ones who've fought with you will hold on.</p><p>Prof Penguin</p>", 'bond hint 2, word for word');
+  assert.deepEqual(got.ach, [true, true, true, true, true, true]);
   assert.deepEqual(errors, []);
 });
