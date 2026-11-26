@@ -1064,12 +1064,13 @@ test('Year 2, the Hunt: rows open with the Champions and stay ??? until then, ev
     for (const n of mine) delete S.box[n];
     S.party = S.party.filter(n => S.box[n]); S.balls.master = 50; S.won = {}; delete S.stones[10062]; delete S.stones[10063];
     // One Champion: the Hunt is still ???.
-    S.champs = { 0: 1 }; viewR = 1; enter('battle'); skip();
-    const one = { map: yearMap().filter(x => CHAPTER[x.id].hunt).map(x => x.name), next: storyNext().text, row: chapterRows(1).filter(x => CHAPTER[x.x].hunt).map(x => [locName(x), x.note]),
+    S.champs = { 0: 1 }; viewR = HUNT_R; enter('battle'); skip();
+    const tabs = [...document.querySelectorAll('#regions [data-r]')].map(b => b.textContent);
+    const one = { tabs, regionRows: [0, 1, 2, 3, 4, 5, 6, 7, 8].some(r => chapterRows(r).some(x => CHAPTER[x.x].hunt)), mapHead: (openTab('story'), $('#t-story h3') && $('#t-story h3').textContent), map: yearMap().filter(x => CHAPTER[x.id].hunt).map(x => x.name), next: storyNext().text, row: chapterRows(HUNT_R).map(x => [locName(x), x.note]),
       list: [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).filter(t => /Kitakami|Ogerpon|Scout/.test(t)) };
     // Two: Kitakami opens (in Johto's list); the others don't.
     S.champs[1] = 1; renderLocs();
-    const two = { open: chaptersNow().filter(c => c.hunt && chapterOpen(c)).map(c => c.id), ogerpon: chapterRows(1).find(x => x.x === 'y2-kitakami').note };
+    const two = { open: chaptersNow().filter(c => c.hunt && chapterOpen(c)).map(c => c.id), ogerpon: chapterRows(HUNT_R).find(x => x.x === 'y2-kitakami').note };
     // All nine: play the Hunt. Giant Chasm waits for Unova's other half.
     for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
     const capNow = levelCap(), chasmBefore = chapterOpen(CHAPTER['y2-chasm']);
@@ -1087,13 +1088,15 @@ test('Year 2, the Hunt: rows open with the Champions and stay ??? until then, ev
     const from = Object.fromEntries(mine.filter(n => S.box[n]).map(n => [n, S.box[n].from]));
     const sig = id => (MAIL.find(m => m.id === id).body.match(/— Ss*nakes/) || [''])[0];
     return { one, two, capNow, chasmBefore, done, from, kubfu, gifts: [realLevel(808), S.box[892] ? realLevel(892) : 0], won: Object.keys(S.won).sort(), stones: [S.stones[10062], S.stones[10063]], masks: S.story.masks,
-      under: chapterRows(6).find(x => x.x === 'y2-underdepths').note, terapagos: !!S.box[1024],
+      under: chapterRows(HUNT_R).find(x => x.x === 'y2-underdepths').note, terapagos: !!S.box[1024],
       mail: inbox().map(m => m.id), sigs: [sig('story-y2-alone'), sig('story-y2-stupid')], chasm: MAIL.find(m => m.id === 'story-y2-chasm').body,
       ach: ['st_masks', 'st_deoxys', 'st_keldeo', 'st_watching', 'st_lost', 'st_tanks'].map(id => !!S.ach[id]) };
   });
+  assert.ok(got.one.tabs.includes('The Hunt') && !got.one.regionRows, 'the Hunt has its own list, not the regions\u2019');
+  assert.equal(got.one.mapHead, 'The Hunt', 'and its own section in the Year map');
   assert.ok(got.one.map.every(n => n === '???'), 'locked Hunt rows are ??? in the Year map: ' + got.one.map);
   assert.ok(!/Kitakami|Ogerpon|Scout/.test(got.one.next), 'Next up doesn’t name them either');
-  assert.ok(got.one.row.every(([name]) => name === '???') && got.one.row.every(([, note]) => note === 'after 2 Champions'), JSON.stringify(got.one.row));
+  assert.ok(got.one.row.every(([name]) => name === '???') && got.one.row.every(([, note]) => /^after \d Champions$/.test(note)) && got.one.row[0][1] === 'after 2 Champions' && got.one.row.at(-1)[1] === 'after 8 Champions', JSON.stringify(got.one.row));
   assert.deepEqual(got.one.list, [], 'the list shows ??? too');
   assert.deepEqual(got.two.open, ['y2-kitakami-1', 'y2-kitakami-2', 'y2-kitakami-3'], 'the second Champion opens the scouts');
   assert.equal(got.two.ogerpon, 'Masks returned: 0/3');
