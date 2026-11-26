@@ -532,7 +532,7 @@ test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the
   assert.deepEqual(errors, []);
 });
 
-test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay Mode changes nothing that counts', async t => {
+test('Story Year 1 end: Begin Year 2 opens (YEAR2_READY), Red stays, and Replay Mode changes nothing that counts', async t => {
   const { tab, errors } = await openIdle(t, '2026-11-24');
   await tab.evaluate(`(${storyAllChamps})()`);
   const got = await tab.evaluate(() => {
@@ -569,7 +569,7 @@ test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay M
     return { y2, year2, red, ach, menu, inReplay, replayPick, prizeBefore: prizeBefore || null, hook, mainMoney, after: { slot, gone: localStorage.getItem(REPLAY_KEY), same: core() === main, shiny: localStorage.getItem(SHINY_KEY) === shinyBefore },
       classicAch: (slot = KEY, S = readSlot(KEY), achs().some(a => a.group === 'Story')), wiki: wikiSections().some(x => x.id === 'story'), classicMail: inbox().some(m => m.id === 'update-story-mode') };
   });
-  assert.deepEqual(got.year2, { text: 'Year 2: The Huntcoming soon', open: false }, 'Year 2 shows, but YEAR2_READY is false');
+  assert.deepEqual(got.year2, { text: 'Year 2: The Huntbegin', open: true }, 'Begin Year 2 is open now that Year 2 has shipped');
   assert.equal(got.red.open, true, 'Red can still be fought');
   assert.ok(['st_start', 'st_mewtwo', 'st_r1', 'st_started', 'st_red', 'st_y1'].every(id => got.ach.find(([k, h]) => k === id && h === 1)), 'the Year 1 story achievements are earned');
   assert.ok(got.menu.includes('replay'));
@@ -588,7 +588,7 @@ test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay M
   assert.equal(got.classicAch, false, 'no Story achievements in Classic');
   assert.ok(got.y2.text.includes('Every Pokémon goes back to Lv 5') && got.y2.text.includes('your whole Box') && got.y2.text.includes('Begin Year 2.'), 'the Year 2 confirm screen');
   assert.ok(!/bond/i.test(got.y2.text), 'bond flags are kept but never listed');
-  assert.deepEqual([got.y2.disabled, got.y2.no, got.y2.closed], [true, 'Not yet.', true], 'Begin Year 2. stays disabled while YEAR2_READY is false');
+  assert.deepEqual([got.y2.disabled, got.y2.no, got.y2.closed], [false, 'Not yet.', true], 'Begin Year 2. is enabled, and Not yet. closes it');
   assert.ok(got.wiki && got.classicMail);
   assert.deepEqual(errors, []);
 });
@@ -943,7 +943,7 @@ test('Year 2 begins (test save): the reset keeps the A10 list, the new League ha
       // Back in Classic: the teams are the ones from before, and nothing of Year 2 shows.
       back: (useSlot(KEY), { gym: gymTeam(0, 1).map(m => m.num), champ: champTeam(5).map(m => m.num), name: gymName(0, 1), year: storyYear(), place: locName({ kind: 'gym', r: 0, k: 1 }) }) }); }, 50));
   });
-  assert.equal(got.ready, false, 'Year 2 stays off for players until all of it ships');
+  assert.equal(got.ready, true, 'Year 2 has shipped');
   assert.ok(got.row && got.go, 'the test account can begin Year 2');
   assert.equal(got.interlude, 'y2-interlude');
   const a = got.after;
@@ -1111,5 +1111,122 @@ test('Year 2, the Hunt: rows open with the Champions and stay ??? until then, ev
   assert.deepEqual(got.sigs, ['— Ssssssssnakes', '— Sssssssnakes'], 'one s too many, then his usual');
   assert.equal(got.chasm, "<p>If the tanks are full, they'll run it. Soon. I don't know what it will take from you. But whatever happens next, the ones who've fought with you will hold on.</p><p>Prof Penguin</p>", 'bond hint 2, word for word');
   assert.deepEqual(got.ach, [true, true, true, true, true, true]);
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Champion and chapter, the Crown Shrine and its prizes, the Year 3 screens (off), and Replay Year 2', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const skip = () => { let n = 0; while (sceneNow && n++ < 40) endScene(); };
+    const win = () => { const here = B; for (let n = 0; n < 12 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    // A real Story save at the end of Year 1 (built with the test account's jump, then made a real save).
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'year1-end'), { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' }); skip(); overlay('#scene', false);
+    for (const n of [250, 382, 484, 644, 717, 792, 889, 1008, 384, 646, 890, 487, 1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 892, 1024, 898]) delete S.box[n];
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug;
+    real.party = [248, 445, 149, 376, 373, 635]; real.balls.master = 0;
+    localStorage.setItem(STORY_KEY, JSON.stringify(real)); useSlot(STORY_KEY); enter('battle'); skip();
+    const gate = { ready: YEAR2_READY, test: !!S.test, row: unlocked({ kind: 'year2' }) };
+    startLoc({ kind: 'year2', r: 0 }); $('#scene [data-y2="go"]').click(); skip();
+    const begun = { year: S.story.year, cap: levelCap(), lv5: realLevel(248) };
+    S.balls.master = 80; S.story.lifeDex = { ...S.story.lifeDex }; for (let i = 0; i < 400; i++) S.lifeDex[3000 + i] = 1;
+    const log = { gyms: 0, champs: 0, chapters: [] };
+    for (let r = 0; r < 9; r++) {
+      viewR = r;
+      for (let k = 0; k < 4; k++) { S.kills[r + '-' + k] = KILLS_FOR_GYM; startLoc({ kind: 'gym', r, k }); skip(); if (B && B.kind === 'gym') { win(); skip(); if (badge(r, k)) log.gyms++; } }
+      startLoc({ kind: 'champ', r }); skip(); if (B && B.kind === 'champ') { win(); skip(); if (S.champs[r]) log.champs++; }
+      for (let pass = 0; pass < 3; pass++) for (const c of chaptersNow()) {
+        if (c.type === 'crown' || chDone(c.id) || !chapterOpen(c)) continue;
+        startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+        if (B && B.kind === 'story') { win(); skip(); }
+        if (chDone(c.id)) log.chapters.push(c.id);
+      }
+    }
+    // The Riders for the checklist, from Galar's dungeon.
+    for (const n of [896, 897]) S.box[n] = { xp: 1e6, shiny: false, from: 7 };
+    const crownOpen = chapterOpen(CHAPTER['y2-crown']);
+    startLoc({ kind: 'chapter', r: 7, x: 'y2-crown' }); skip();
+    const crownFight = B && B.queue.map(f => f.name);
+    win(); const scenes = []; let n = 0; while (sceneNow && n++ < 40) { scenes.push(sceneNow.id); endScene(); }
+    checkAch(true);
+    const cal = S.box[898];
+    const after = { done: chDone('y2-crown'), cleared: S.story.cleared, calyrex: cal && { bond: cal.bond, from: cal.from, lv: realLevel(898), cap: levelCap() }, won: [S.won.crown, S.won.weald], ach: [!!S.ach.st_bridges, !!S.ach.st_king], scenes,
+      riders: (QFORMES[898] || []).every(f => S.won[f.quest]), next: storyNext().text };
+    // Begin Year 3: a row that says coming soon; its screens exist but stay off.
+    viewR = 7; renderLocs();
+    const y3row = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).find(t => t.startsWith('Year 3'));
+    startLoc({ kind: 'year3', r: 7 }); const y3toast = $('#toast').textContent;
+    S.test = 1; startLoc({ kind: 'year3', r: 7 });
+    const confirm = { text: $('#scene').textContent, go: $('#scene [data-y3="go"]').disabled };
+    $('#scene [data-y3="pick"]').click();
+    const box = Object.keys(S.box).length, rows = () => [...document.querySelectorAll('#po-list .po-row')];
+    const pick = { all: rows().length, first: rows()[0].textContent };
+    const q = $('#po-q'); q.value = 'calyrex'; q.dispatchEvent(new Event('input', { bubbles: true }));
+    pick.found = rows().map(r => r.textContent);
+    q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true }));
+    const rsel = $('#po-r'); rsel.value = '7'; rsel.dispatchEvent(new Event('change', { bubbles: true })); pick.galar = rows().every(r => r.textContent.includes('Comes back when Galar is freed.'));
+    rsel.value = 'all'; rsel.dispatchEvent(new Event('change', { bubbles: true }));
+    const ssel = $('#po-sort'); ssel.value = 'level'; ssel.dispatchEvent(new Event('change', { bubbles: true })); pick.top = rows()[0].textContent;
+    document.querySelector('#po-list [data-po="898"]').click();
+    pick.chosen = $('.po-chosen').textContent; pick.stay = $('#scene [data-y3="stay"]').disabled; pick.stayText = $('#scene [data-y3="stay"]').textContent;
+    pick.noBond = !/bond|♥|fought beside|half/i.test($('#scene').textContent);
+    overlay('#scene', false); pickOne = null; delete S.test; save();
+    // Replay Year 2 from the title screen: Year 2's caps and rules, and nothing that counts.
+    showTitle(); const menu = [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go);
+    go('replay2');
+    const replay = { slot, year: storyYear(), replay: S.replay, cap: levelCap(), max: leagueMax(), picks: S.story.picks[1], open: chaptersNow().filter(c => !chDone(c.id)).length };
+    go('endreplay');
+    return { gate, begun, log, crownOpen, crownFight, after, y3row, y3toast, confirm, box, pick, menu, replay, main: { year: storyYear(), slot } };
+  });
+  assert.deepEqual(got.gate, { ready: true, test: false, row: true }, 'Begin Year 2 is open on a real save');
+  assert.deepEqual([got.begun.year, got.begun.lv5], [2, 5]);
+  assert.deepEqual([got.log.gyms, got.log.champs], [36, 9], 'all 36 Year 2 gyms and nine Champions');
+  assert.equal(got.log.chapters.length, 37, 'every Year 2 chapter before the finale: ' + got.log.chapters.join(', '));
+  assert.ok(got.crownOpen, 'the Crown Shrine opens with its checklist met');
+  assert.deepEqual(got.crownFight, ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme']);
+  assert.ok(got.after.done);
+  assert.deepEqual(got.after.cleared, { 1: 1, 2: 1 });
+  assert.deepEqual(got.after.calyrex, { bond: 1, from: 7, lv: got.after.calyrex.cap, cap: got.after.calyrex.cap }, 'Calyrex joins bonded, at the cap, from Galar');
+  assert.deepEqual(got.after.won, [1, 1], 'both Riders and the Crowned forms');
+  assert.ok(got.after.riders);
+  assert.deepEqual(got.after.ach, [true, true]);
+  assert.deepEqual(got.after.scenes.slice(-2), ['y2-crown-after', 'y2-engine'], 'the badge in the snow, the base maps, and the Engine runs');
+  assert.equal(got.after.next, 'Year 2 is done. Year 3 is coming.');
+  assert.equal(got.y3row, 'Year 3: The Thawcoming soon');
+  assert.match(got.y3toast, /isn't here yet/);
+  assert.ok(got.confirm.text.includes("Your Box will freeze. You'll keep one Pokémon. Everything else comes back as you free each region.") && got.confirm.go, 'Begin Year 3. is disabled');
+  assert.equal(got.pick.all, got.box, 'the pick-one screen lists the whole Box');
+  assert.match(got.pick.first, /^.+ Lv \d+ Comes back when \w+ is freed\.$/, 'name, level and where it comes back: ' + got.pick.first);
+  assert.deepEqual(got.pick.found.length, 1);
+  assert.ok(got.pick.galar, 'filter by where it comes back');
+  assert.match(got.pick.top, /Lv 100/, 'sort by level');
+  assert.match(got.pick.chosen, /Calyrex: Stays with you at Lv \d+\. It fights at your level cap until the cap catches up\./);
+  assert.deepEqual([got.pick.stay, got.pick.stayText], [true, 'This one stays with me.'], 'disabled until Year 3 ships');
+  assert.ok(got.pick.noBond, 'no bond status or return levels');
+  assert.ok(got.menu.includes('replay2'), 'Replay Year 2 on the title screen');
+  assert.deepEqual([got.replay.slot, got.replay.year, got.replay.replay, got.replay.max, got.replay.picks], ['bored.poke-idle.story.replay', 2, 1, { 3: 2, 4: 3 }, 249], 'Replay Year 2: its own slot, Year 2’s rules, your Year 1 picks');
+  assert.ok(got.replay.cap <= 20 && got.replay.open > 30, 'from the start of Year 2, at its caps');
+  assert.deepEqual(got.main, { year: 2, slot: 'bored.poke-idle.story' });
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2 finale, the Crown Shrine: a League-legal team built on Sssssssnakes’ needs most of the clock, and the Hall of Fame stays harder', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'y2-begin') + 1); while (sceneNow) endScene();
+    for (let r = 0; r < 9; r++) S.champs[r] = 1;
+    viewR = 7; enter('battle'); S.debug.league = 0; startLoc({ kind: 'story', r: 7, x: 'y2-crown' });
+    const cap = areaCap(), typed = (m, f) => refHit(m, cap, f) * bestEff(m, f);
+    const pool = refPool(...refArea(7, 3), cap, 2);
+    const counter = refPick(pool, B.queue.map(f => ({ f, hp: 1 })), typed, 6, leagueRule);
+    const any = refPick(pool, B.queue.map(f => ({ f, hp: 1 })), (m, f) => refHit(m, cap, f), 6, leagueRule);
+    const need = team => B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) * B.tune * clockRate(f) / (team.reduce((d, m) => d + typed(m, f), 0) * bossBoost()), 0) / (B.bossTime * refDef(team));
+    return { counter: need(counter), any: need(any), legal: [!leagueBreaksList(counter), !leagueBreaksList(any)], team: counter.map(m => m.name), crown: CROWN_USE, hof: HOF_USE, cap, L: B.L };
+  });
+  assert.deepEqual(got.legal, [true, true]);
+  assert.ok(got.counter < 1 && got.counter >= 0.8, `a team built on his needs 80-100% of the clock (${got.counter.toFixed(3)}: ${got.team.join(', ')}; any strong League team: ${got.any.toFixed(3)})`);
+  console.log(`# crown: counter ${got.counter.toFixed(3)}, generic ${got.any.toFixed(3)}, L ${got.L}, team ${got.team.join(', ')}`);
+  assert.ok(got.crown < got.hof, 'the Hall of Fame stays the hardest fight');
   assert.deepEqual(errors, []);
 });
