@@ -34,13 +34,13 @@ scene.add(sun, fill, new T.HemisphereLight(0xdcefff, 0x233b4a, 1.2));
 const sky = new T.Mesh(new T.SphereGeometry(700, 32, 20), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, uniforms: {}, vertexShader: `varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`, fragmentShader: `varying vec3 p;void main(){vec3 d=normalize(p);float h=max(d.y,0.);vec3 c=mix(vec3(.72,.79,.77),vec3(.19,.37,.52),pow(h,.45));vec2 uv=d.xz/(h+.22);float cl=sin(uv.x*4.+sin(uv.y*3.))*cos(uv.y*3.1+sin(uv.x*2.3));cl+=.42*sin(uv.x*9.2+uv.y*4.6)+.18*cos(uv.y*22.-uv.x*9.);c=mix(c,vec3(.87,.88,.83),smoothstep(.48,1.05,cl)*smoothstep(.03,.3,h)*.65);float s=pow(max(dot(d,normalize(vec3(-.8,.35,-.4))),0.),100.);c+=vec3(1.,.7,.35)*s;gl_FragColor=vec4(c,1.);}` }));
 scene.add(sky);
 
-const sea = new T.Mesh(new T.PlaneGeometry(4000, 4000, 100, 100), new T.ShaderMaterial({ uniforms: { time: { value: 0 } }, vertexShader: `uniform float time;varying vec3 w;void main(){vec3 p=position;p.z=.45*sin(p.x*.18+time*1.2)+.24*cos(p.y*.32-time*.9)+.12*sin((p.x+p.y)*.7+time);w=(modelMatrix*vec4(p,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}`, fragmentShader: `uniform float time;varying vec3 w;void main(){float d=length(cameraPosition.xz-w.xz);float near=1.-smoothstep(35.,260.,d);float a=sin(w.x*.18+time*1.2), b=cos(w.z*.32-time*.9);float s1=sin(dot(w.xz,vec2(1.7,-1.1))+time*1.7);float s2=sin(dot(w.xz,vec2(-3.3,2.6))-time*2.3);float s3=sin(dot(w.xz,vec2(2.9,3.4))+time*2.1);float s4=sin(dot(w.xz,vec2(-5.2,-4.1))+time*3.1);vec3 n=normalize(vec3(-.081*cos(w.x*.18+time*1.2)-.026*s1*near-.012*s2*near-.006*s4*near,1.,.077*sin(w.z*.32-time*.9)+.024*s3*near+.010*s4*near));vec3 v=normalize(cameraPosition-w);float f=pow(1.-max(dot(n,v),0.),3.);float spec=pow(max(dot(reflect(-normalize(vec3(-.8,.55,-.4)),n),v),0.),26.);vec3 c=mix(vec3(.018,.18,.24),vec3(.47,.62,.65),f)+vec3(.8,.66,.41)*spec*.5;float foam=smoothstep(.95,1.,a*.65+b*.35)*.1;c+=foam+s1*.007*near;c=mix(c,vec3(.6,.68,.71),clamp((1.-exp(-d*.004))*.8+smoothstep(50.,300.,d)*.55,0.,.95));gl_FragColor=vec4(c,1.);}` }));
+const sea = new T.Mesh(new T.PlaneGeometry(1600, 1600, 220, 220), new T.ShaderMaterial({ uniforms: { time: { value: 0 } }, vertexShader: `uniform float time;varying vec3 w;void main(){vec3 p=position;p.z=.45*sin(p.x*.18+time*1.2)+.24*cos(p.y*.32-time*.9)+.12*sin((p.x+p.y)*.7+time);w=(modelMatrix*vec4(p,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}`, fragmentShader: `uniform float time;varying vec3 w;void main(){float d=length(cameraPosition.xz-w.xz);float near=1.-smoothstep(35.,260.,d);float a=sin(w.x*.18+time*1.2), b=cos(w.z*.32+time*.9), c0=sin((w.x-w.z)*.7+time);float s1=sin(dot(w.xz,vec2(1.7,-1.1))+time*1.7);float s2=sin(dot(w.xz,vec2(-3.3,2.6))-time*2.3);float s3=sin(dot(w.xz,vec2(2.9,3.4))+time*2.1);float s4=sin(dot(w.xz,vec2(-5.2,-4.1))+time*3.1);vec3 n=normalize(vec3(-.081*cos(w.x*.18+time*1.2)-.084*c0-.016*s1*near-.008*s2*near-.005*s4*near,1.,.077*sin(w.z*.32+time*.9)+.084*c0+.015*s3*near+.007*s4*near));vec3 v=normalize(cameraPosition-w);float f=pow(1.-max(dot(n,v),0.),3.);float spec=pow(max(dot(reflect(-normalize(vec3(-.8,.55,-.4)),n),v),0.),26.);vec3 c=mix(vec3(.018,.18,.24),vec3(.47,.62,.65),f)+vec3(.8,.66,.41)*spec*.5;float foam=smoothstep(.95,1.,a*.65+b*.35)*.1;c+=foam+s1*.003*near;c=mix(c,vec3(.6,.68,.71),clamp((1.-exp(-d*.004))*.8+smoothstep(50.,300.,d)*.55,0.,.95));gl_FragColor=vec4(c,1.);}` }));
 sea.rotation.x = -Math.PI / 2;
 scene.add(sea);
 // Flat ocean out to the horizon so the detailed swell never ends inside the frame.
 const farSea = new T.Mesh(new T.PlaneGeometry(9000, 9000), new T.MeshBasicMaterial({ color: 0x31596a }));
 farSea.rotation.x = -Math.PI / 2;
-farSea.position.y = -.8;
+farSea.position.y = -1.25;
 scene.add(farSea);
 
 /* ------------------------------------------------------------------ fleet */
@@ -90,6 +90,15 @@ player.userData.shipType = 'battleship';
 player.position.set(0, 0, 43);
 scene.add(player);
 
+// The enemy battery sits beyond its grid; it only appears when it fires back.
+const battery = makeShip(30);
+battery.userData.shipType = 'battleship';
+battery.userData.length = 30;
+battery.position.set(13, 0, -104);
+battery.rotation.y = Math.PI;
+battery.visible = false;
+scene.add(battery);
+
 const grid = new T.Group(); scene.add(grid);
 const cell = 6.5, originX = -29.25, originZ = -65;
 let verts = [];
@@ -108,9 +117,18 @@ const camPos = baseCam.clone(), look = baseLook.clone();
 
 let ships = [], occupied = new Map(), busy = false, cinematic = true, soundOn = false, shot = null, finish = null;
 let ownModels = [], ownKey = '', clock = new T.Clock(), elapsed = 0, ac = null, shake = 0;
-const particles = [], billows = [], rings = [], flashes = [];
+const particles = [], billows = [], rings = [], flashes = [], scorches = [];
 
 function pos(i) { return new T.Vector3(originX + (i % 10) * cell, .7, originZ + Math.floor(i / 10) * cell) }
+
+// My own fleet sits on its own grid, nearer the camera. Same swell runs under both.
+const OWN_Z = 83;
+function ownPos(i) { return new T.Vector3(originX + (i % 10) * cell, 0, OWN_Z + Math.floor(i / 10) * cell) }
+const waveAt = (x, z) => .45 * Math.sin(x * .18 + elapsed * 1.2) + .24 * Math.cos(z * .32 + elapsed * .9) + .12 * Math.sin((x - z) * .7 + elapsed);
+function floatShip(g, amp = 1) {
+  g.position.y = waveAt(g.position.x, g.position.z) * amp;
+  return g.position.y;
+}
 
 function setFleet(fleet) {
   const key = JSON.stringify(fleet);
@@ -125,14 +143,17 @@ function setFleet(fleet) {
     g.userData.length = cells.length * cell * .87;
     styleFallback(g, TYPES[index]);
     applyModel(g);
-    g.position.set(((cells[0] % 10 + cells.at(-1) % 10) / 2 - 4.5) * cell, 0, 83 + (Math.floor(cells[0] / 10) + Math.floor(cells.at(-1) / 10)) / 2 * cell);
+    g.position.set(((cells[0] % 10 + cells.at(-1) % 10) / 2 - 4.5) * cell, 0, OWN_Z + (Math.floor(cells[0] / 10) + Math.floor(cells.at(-1) / 10)) / 2 * cell);
     g.rotation.y = cells[1] - cells[0] === 1 ? Math.PI / 2 : 0;
+    g.userData.cells = cells.slice();
     scene.add(g);
     ownModels.push(g);
   });
 }
 
 const TYPES = ['carrier', 'battleship', 'cruiser', 'submarine', 'destroyer'];
+// Waterline per class, as a fraction of the model's total height (masts included).
+const DRAFT = { carrier: .105, battleship: .075, cruiser: .13, submarine: .18, destroyer: .125 };
 const NAMES = ['CARRIER', 'BATTLESHIP', 'CRUISER', 'SUBMARINE', 'DESTROYER'];
 
 /* --------------------------------------------------------------- effects */
@@ -289,10 +310,20 @@ function layBearing(a, b) {
 }
 
 /* ----------------------------------------------------------- the shell */
-const projectile = new T.Mesh(new T.CapsuleGeometry(.13, 1.3, 3, 8), new T.MeshBasicMaterial({ color: 0xe8be86 }));
+// A real ogive: flat base, a copper driving band, a pointed cap.
+const shellProfile = [[.001, -1], [.104, -1], [.138, -.95], [.146, -.87], [.146, -.3], [.142, .05], [.132, .32], [.115, .52], [.088, .70], [.052, .86], [.001, 1.0]]
+  .map(([r, y]) => new T.Vector2(r, y));
+const projectile = new T.Mesh(new T.LatheGeometry(shellProfile, 18), new T.MeshStandardMaterial({ color: 0x59645f, metalness: .75, roughness: .44, emissive: 0x160c05 }));
+const shellBand = new T.Mesh(new T.CylinderGeometry(.156, .156, .1, 18), new T.MeshStandardMaterial({ color: 0x8a5a30, metalness: .8, roughness: .45 }));
+shellBand.position.y = -.6;
+const shellTracer = new T.Sprite(new T.SpriteMaterial({ map: puffTexture, color: 0xffbf7a, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .5 }));
+shellTracer.position.y = -.95;
+shellTracer.scale.setScalar(.38);
+projectile.add(shellBand, shellTracer);
+projectile.scale.setScalar(1.15);
 projectile.visible = false;
 scene.add(projectile);
-const trailGlow = new T.SpriteMaterial({ map: puffTexture, color: 0xffcf8d, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .55 });
+const trailGlow = new T.SpriteMaterial({ map: puffTexture, color: 0xffd7a2, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .26 });
 let trailTimer = 0;
 
 function bezier(a, c, b, u) {
@@ -307,17 +338,18 @@ function tangent(a, c, b, u) {
   ).normalize();
 }
 
-function muzzlePoint(target) {
-  player.updateMatrixWorld(true);
-  const turrets = player.userData.turrets || [];
+function muzzleFrom(g, target) {
+  g.updateMatrixWorld(true);
+  const turrets = g.userData.turrets || [];
   if (turrets.length) {
     const p = new T.Vector3();
     turrets[0].getWorldPosition(p);
     const flat = target.clone().sub(p); flat.y = 0; flat.normalize();
-    p.addScaledVector(flat, 2.4); p.y += .7;
-    if (p.distanceTo(player.position) < 20 && p.y > 0) return p;
+    p.addScaledVector(flat, 2.6); p.y += .8;
+    if (p.distanceTo(g.position) < (g.userData.length || 24) && p.y > 0) return p;
   }
-  return player.position.clone().add(new T.Vector3(0, 3.2, -8));
+  const fwd = new T.Vector3(0, 0, -1).applyQuaternion(g.quaternion); fwd.y = 0; fwd.normalize();
+  return g.position.clone().addScaledVector(fwd, (g.userData.length || 24) * .3).add(new T.Vector3(0, 5.2, 0));
 }
 
 /* --------------------------------------------------------------- caption */
@@ -333,28 +365,35 @@ function caption(text, tone) {
 const T_AIM = 1.05, T_FIRE = 1.3, T_HIT = 3.55, T_END = 5.0;
 let lastFrame = 0;
 
-function fire(i, hit, sunk) {
+function startShot(kind, cell, hit, sunk) {
   return new Promise(resolve => {
     if (shot) window.ironTide.skip();
     if (!cinematic || !host) { resolve(); return }
-    player.updateMatrixWorld(true);
-    const target = pos(i); target.y = 1.1;
-    const start = muzzlePoint(target);
+    const gun = kind === 'in' ? battery : player;
+    gun.updateMatrixWorld(true);
+    const target = kind === 'in' ? ownPos(cell) : pos(cell);
+    const deck = waveAt(target.x, target.z);
+    target.y = deck + (kind === 'in' ? (hit ? 1.7 : .16) : .45);
+    const start = muzzleFrom(gun, target);
     const dist = start.distanceTo(target);
     const ctrl = start.clone().lerp(target, .5);
-    ctrl.y = Math.max(start.y, target.y) + dist * .33;
+    ctrl.y = Math.max(start.y, target.y) + dist * (kind === 'in' ? .26 : .33);
     const dir = target.clone().sub(start).normalize();
     const yaw = Math.atan2(-dir.x, -dir.z);
     finish = resolve;
-    shot = { i, hit, sunk, target, start, ctrl, dir, yaw, t: 0, impacted: false, fired: false };
-    reticle.position.copy(target); reticle.position.y = 1;
-    reticle.visible = true; retPulse.material.opacity = 0;
-    bearingLine.visible = true; layBearing(start, target);
-    caption(cellName(i) + ' · firing', 'fire');
+    shot = { kind, cell, hit, sunk, gun, target, start, ctrl, dir, yaw, t: 0, impacted: false, fired: false, cut: false, rate: kind === 'in' ? 1.2 : 1 };
+    if (kind === 'in') { battery.visible = true; grid.visible = false }
+    reticle.position.copy(target);
+    reticle.visible = kind === 'out'; retPulse.material.opacity = 0;
+    bearingLine.visible = kind === 'out';
+    if (kind === 'out') layBearing(start, target);
+    caption(cellName(cell) + (kind === 'in' ? ' · incoming' : ' · firing'), 'fire');
     projectile.visible = false;
     trailTimer = 0;
   });
 }
+const fire = (i, hit, sunk) => startShot('out', i, hit, sunk);
+const incoming = (i, hit, sunk) => startShot('in', i, hit, sunk);
 
 function impact(s) {
   if (s.impacted) return;
@@ -363,14 +402,32 @@ function impact(s) {
   reticle.visible = false;
   bearingLine.visible = false;
   if (s.hit) explode(s.target); else splash(s.target);
-  ring(s.target, s.hit ? 0xffc07a : 0xd6f2f8, 3, 30, 1.2);
+  ring(s.target, s.hit ? 0xffc07a : 0xd6f2f8, s.kind === 'in' ? 2 : 3, s.kind === 'in' ? 18 : 30, 1.1);
+  sound(s.hit);
+  if (s.kind === 'in') {
+    if (s.hit) {
+      const sc = new T.Mesh(new T.CircleGeometry(1.5, 20), new T.MeshBasicMaterial({ color: 0x101619, transparent: true, opacity: .6, depthWrite: false }));
+      sc.rotation.x = -Math.PI / 2;
+      sc.position.copy(s.target).setY(s.target.y - .5);
+      scene.add(sc); scorches.push(sc);
+    }
+    if (s.sunk) {
+      caption(cellName(s.cell) + ' · ' + NAMES[s.sunk.index].toLowerCase() + ' lost', 'sunk');
+      const m = ownModels.find(g => g.userData.cells && g.userData.cells.includes(s.cell));
+      if (m && m.userData.sinkStart == null) {
+        m.userData.baseY = m.position.y;
+        m.userData.sinkStart = elapsed;
+        m.userData.sinkRoll = Math.random() < .5 ? -1 : 1;
+      }
+    } else caption(cellName(s.cell) + (s.hit ? ' · hit' : ' · miss'), s.hit ? 'hit' : 'miss');
+    return;
+  }
   const mark = new T.Mesh(new T.RingGeometry(1.2, 1.7, 32), new T.MeshBasicMaterial({ color: s.hit ? 0xf18a52 : 0xd4eff7, transparent: true, opacity: .75, side: T.DoubleSide, depthWrite: false }));
   mark.rotation.x = -Math.PI / 2;
   mark.position.copy(s.target); mark.position.y = 1;
   marks.add(mark);
-  sound(s.hit);
   if (s.sunk) {
-    caption(cellName(s.i) + ' · ' + NAMES[s.sunk.index].toLowerCase() + ' sunk', 'sunk');
+    caption(cellName(s.cell) + ' · ' + NAMES[s.sunk.index].toLowerCase() + ' sunk', 'sunk');
     const g = makeShip(s.sunk.cells.length * cell * .87);
     g.userData.shipType = TYPES[s.sunk.index];
     g.userData.length = s.sunk.cells.length * cell * .87;
@@ -382,8 +439,8 @@ function impact(s) {
     scene.add(g);
     g.userData.sinkStart = elapsed;
     ships.push({ model: g, sunk: true });
-  } else if (s.hit) caption(cellName(s.i) + ' · hit', 'hit');
-  else caption(cellName(s.i) + ' · miss', 'miss');
+  } else if (s.hit) caption(cellName(s.cell) + ' · hit', 'hit');
+  else caption(cellName(s.cell) + ' · miss', 'miss');
 }
 
 function finishShot() {
@@ -391,6 +448,8 @@ function finishShot() {
   projectile.visible = false;
   reticle.visible = false;
   bearingLine.visible = false;
+  battery.visible = false;
+  grid.visible = true;
   if (finish) { finish(); finish = null }
 }
 
@@ -399,6 +458,8 @@ function skip() {
   projectile.visible = false;
   reticle.visible = false;
   bearingLine.visible = false;
+  battery.visible = false;
+  grid.visible = true;
   if (shot) shot = null;
   if (finish) { finish(); finish = null }
   document.body.dataset.shot = '';
@@ -406,9 +467,13 @@ function skip() {
 
 function setup() {
   marks.clear();
+  for (const s of scorches) { scene.remove(s); s.geometry.dispose(); s.material.dispose() }
+  scorches.length = 0;
   projectile.visible = false;
   reticle.visible = false;
   bearingLine.visible = false;
+  battery.visible = false;
+  grid.visible = true;
   camera.position.copy(baseCam);
   camPos.copy(baseCam); look.copy(baseLook); camera.up.copy(UP);
   camera.fov = 44; camera.updateProjectionMatrix();
@@ -446,11 +511,24 @@ function update(now = 0) {
   sea.material.uniforms.time.value = elapsed;
   updateFx(dt);
 
-  player.position.y = .23 * Math.sin(elapsed * 1.5);
-  player.rotation.z = .025 * Math.sin(elapsed * .9);
+  // Ships ride the same swell the shader draws, so they sit in the water instead of on it.
+  floatShip(player, .94);
+  player.rotation.x = (waveAt(player.position.x, player.position.z - 10) - waveAt(player.position.x, player.position.z + 10)) * .03;
+  player.rotation.z = (waveAt(player.position.x - 8, player.position.z) - waveAt(player.position.x + 8, player.position.z)) * .018;
   for (const g of ownModels) {
-    g.position.y = .22 * Math.sin(elapsed * 1.35 + g.position.x * .12);
-    g.rotation.z = .028 * Math.sin(elapsed * .85 + g.position.z * .04);
+    if (g.userData.sinkStart != null) {
+      const st = elapsed - g.userData.sinkStart;
+      g.position.y = (g.userData.baseY || 0) - Math.min(16, st * 1.15);
+      g.rotation.z = Math.min(.65, st * .055) * (g.userData.sinkRoll || 1);
+      if (st > 22) g.visible = false;
+      continue;
+    }
+    g.position.y = waveAt(g.position.x, g.position.z) * .9;
+    g.rotation.z = .03 * Math.sin(elapsed * .85 + g.position.z * .04);
+  }
+  if (battery.visible) {
+    floatShip(battery, .94);
+    battery.rotation.x = -(waveAt(battery.position.x, battery.position.z - 10) - waveAt(battery.position.x, battery.position.z + 10)) * .03;
   }
   for (const s of ships) {
     if (!s.sunk) continue;
@@ -463,8 +541,8 @@ function update(now = 0) {
 
   let desired = baseCam.clone(), focus = baseLook.clone(), lambda = 3.4, fovGoal = 44, bank = 0;
   if (shot) {
-    const s = shot; s.t += dt; const t = s.t;
-    for (const turret of (player.userData.turrets || [])) {
+    const s = shot; s.t += dt * (s.rate || 1); const t = s.t;
+    for (const turret of (s.gun.userData.turrets || [])) {
       turret.rotation.y = turn(turret.rotation.y, s.yaw, 1 - Math.exp(-dt * 5.5));
       if (turret.userData.barrels) for (const b of turret.userData.barrels) b.rotation.x = damp(b.rotation.x, Math.PI / 2 - .2, 4, dt);
     }
@@ -474,14 +552,24 @@ function update(now = 0) {
       const k = smooth(clamp(t / T_AIM, 0, 1));
       // Narrow portrait screens see a much thinner slice of the world, so pull back.
       const fit = clamp(1.45 / camera.aspect, 1, 2);
-      const lift = 1 + (fit - 1) * .5;
-      desired.copy(player.position).add(new T.Vector3(29 * fit, 14 * lift, 25 * fit).lerp(new T.Vector3(21 * fit, 9 * lift, 15 * fit), k));
-      focus.copy(player.position).add(new T.Vector3(0, 5, -8)).lerp(s.target, .18 * k);
-      lambda = 5.5; fovGoal = 42;
-      reticle.visible = true;
-      const pulse = .5 + .5 * Math.sin(elapsed * 6);
-      retPulse.material.opacity = .18 + pulse * .35;
-      retPulse.scale.setScalar(1 + pulse * .25);
+      if (s.kind === 'in') {
+        // Low over the water off the enemy's bow while its guns come to bear on us.
+        const b = s.gun.position;
+        // Port broadside: the sun is north-west, so this is the lit side of the enemy ship.
+        desired.copy(b).add(new T.Vector3(-56 * fit, 17 * fit, 5 * fit).lerp(new T.Vector3(-42 * fit, 13 * fit, 4 * fit), k));
+        focus.copy(b).add(new T.Vector3(0, 7, 1));
+        lambda = 4.6; fovGoal = 44;
+        if (!s.aimCut) { s.aimCut = true; camPos.copy(desired); look.copy(focus) }
+      } else {
+        const lift = 1 + (fit - 1) * .5;
+        desired.copy(player.position).add(new T.Vector3(29 * fit, 14 * lift, 25 * fit).lerp(new T.Vector3(21 * fit, 9 * lift, 15 * fit), k));
+        focus.copy(player.position).add(new T.Vector3(0, 5, -8)).lerp(s.target, .18 * k);
+        lambda = 5.5; fovGoal = 42;
+        reticle.visible = true;
+        const pulse = .5 + .5 * Math.sin(elapsed * 6);
+        retPulse.material.opacity = .18 + pulse * .35;
+        retPulse.scale.setScalar(1 + pulse * .25);
+      }
     } else if (t < T_HIT) {
       /* --- chase cam behind the shell ------------------------------------- */
       const u = clamp((t - T_FIRE) / (T_HIT - T_FIRE), 0, 1);
@@ -489,7 +577,7 @@ function update(now = 0) {
         s.fired = true;
         muzzleFlash(s.start);
         sound(false, 'fire');
-        for (const turret of (player.userData.turrets || [])) {
+        for (const turret of (s.gun.userData.turrets || [])) {
           if (turret.userData.restZ != null) turret.position.z = turret.userData.restZ + 1.1;
         }
       }
@@ -504,16 +592,18 @@ function update(now = 0) {
       if (trailTimer > .028) {
         trailTimer = 0;
         const sprite = new T.Sprite(trailGlow.clone());
-        sprite.position.copy(p);
+        sprite.position.copy(p).addScaledVector(tan, -.75);
         scene.add(sprite);
-        flashes.push({ sprite, t: 0, life: .26, size: 1.05, alpha: .5 });
-        if (Math.random() < .5) puff(p, { color: 0xd9d6c4, size: .8, life: .55, rise: 0, spread: .5, gravity: 1, grow: 2.2, opacity: .3 });
+        flashes.push({ sprite, t: 0, life: .16, size: .42, alpha: .3 });
+        if (Math.random() < .4) puff(p.clone().addScaledVector(tan, -.95), { color: 0xd9d6c4, size: .38, life: .6, rise: 0, spread: .5, gravity: 1.1, grow: 2.6, opacity: .13 });
       }
 
-      desired.copy(p).addScaledVector(tan, -8 * clamp(1.3 / camera.aspect, 1, 1.5)).addScaledVector(UP, 6 - u * 2.5).addScaledVector(side, 1.4);
+      desired.copy(p).addScaledVector(tan, -6 * clamp(1.3 / camera.aspect, 1, 1.5)).addScaledVector(UP, 4.4 - u * 1.4).addScaledVector(side, 5);
       focus.copy(p).lerp(s.target, .42 + u * .25);
       lambda = 9; fovGoal = 55; bank = .1;
       reticle.visible = false;
+      // Hard cut from the enemy's bow to the chase position, hidden by the muzzle flash.
+      if (s.kind === 'in' && !s.cut) { s.cut = true; camPos.copy(desired); look.copy(focus); }
     } else if (t < T_END) {
       /* --- reveal: orbit the impact point -------------------------------- */
       if (!s.impacted) impact(s);
@@ -609,7 +699,11 @@ function applyModel(g) {
   }
   const scale = g.userData.length / size.z;
   wrapper.scale.setScalar(scale);
-  wrapper.position.set(-center.x * scale, a.zero ? 0 : -(bounds.min.y + size.y * .20) * scale, -center.z * scale);
+  wrapper.updateMatrixWorld(true);
+  bounds.setFromObject(wrapper); bounds.getSize(size); bounds.getCenter(center);
+  // 20% of the whole bbox includes the mast, which buries the hull; use a per-class waterline.
+  const draft = size.y * (DRAFT[g.userData.shipType] ?? .06);
+  wrapper.position.set(-center.x, a.zero ? 0 : -(bounds.min.y + draft), -center.z);
   const turrets = [];
   wrapper.traverse(o => { if (/^(turret|main_gun)[_ -]?\d+$/i.test(o.name)) turrets.push(o) });
   g.clear();
@@ -621,6 +715,7 @@ function applyModel(g) {
 
 function applyAll(type) {
   if (player.userData.shipType === type) applyModel(player);
+  if (battery.userData.shipType === type) applyModel(battery);
   for (const s of ships) if (s.model.userData.shipType === type) applyModel(s.model);
   for (const g of ownModels) if (g.userData.shipType === type) applyModel(g);
 }
@@ -722,12 +817,14 @@ window.ironTide = {
     if (v) { try { ac ??= new AudioContext(); ac.resume() } catch { } }
   },
   fire,
+  incoming,
   aim(i) {
     const target = pos(i); reticle.position.copy(target); reticle.visible = true;
     bearingLine.visible = true; layBearing(player.position, target);
   },
   status() {
-    return { loaded: [...loaded], errors: [...errors], player: !!player.userData.assetApplied, own: ownModels.map(x => !!x.userData.assetApplied) };
+    const bs = new T.Box3().setFromObject(battery).getSize(new T.Vector3());
+    return { loaded: [...loaded], errors: [...errors], player: !!player.userData.assetApplied, own: ownModels.map(x => !!x.userData.assetApplied), cam: camera.position.toArray().map(n => +n.toFixed(1)), look: look.toArray().map(n => +n.toFixed(1)), battery: { pos: battery.position.toArray().map(n => +n.toFixed(1)), vis: battery.visible, size: bs.toArray().map(n => +n.toFixed(1)) }, shot: shot ? { kind: shot.kind, t: +shot.t.toFixed(2) } : null };
   }
 };
 window.dispatchEvent(new Event('iron-tide-ready'));
