@@ -78,7 +78,7 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
     <span class="ver">v2.4.1</span>
     <div class="conn" id="conn-status"><span class="dot"></span><span id="conn-text">LOCAL</span></div>
   </div>
-  <div id="mobile-hud"><span>TRACE <strong id="m-trace">0%</strong></span><span id="m-mission">Mission 1</span></div>
+  <div id="mobile-hud"><span>TRACE <strong id="m-trace">0%</strong></span><span id="m-mission"></span></div>
   <div id="main">
     <div id="terminal-wrap">
       <div id="terminal-output"></div>
@@ -141,7 +141,15 @@ const SERVERS = {
   'meridian.archive.net':{ip:'203.0.113.44',security:4,cracked:false,discovered:false,desc:'Meridian Holdings archive',pwdLen:8,maxAttempts:3}
 };
 
-// File system: objects = dirs, strings = plain files, {content,encrypted,shift,classified} = encrypted files
+// The exit thresholds live in one place: the mission text, the archive's own
+// counter-intel notes and the disconnect warning all read from here.
+const EXIT_TRACE = { blueprint:75, ledger:60 };
+// Above its noise floor the Meridian archive starts a sweep: this many
+// commands, then it burns one file and cuts the session.
+const SWEEP_TRACE = 80;
+const SWEEP_STEPS = 3;
+
+// File system: objects = dirs, strings = plain files, {content,encrypted,shift|cipher+key,classified} = encrypted files
 const FS = {
   localhost:{
     home:{ghost:{
@@ -210,20 +218,26 @@ const FS = {
     home:{vega:{
       'readme.txt':'If you are reading this, the channel is gone.\n\nI kept one door open behind me. Nothing in here\nwas meant for you until Meridian moved.\n\nDo not trust the name on the file.\n\n- VEGA',
       private:{
-        'vega_identity.dat':{content:'OPERATIVE DOSSIER - VEGA\n========================\n\nReal name: Elena Park\nNexus Corp: Head of Vault Security, 2019-2023\nHELIOS: wrote the key rotation, then kept a copy\n\nWhy I turned:\nMeridian paid Webb to sell HELIOS to four states.\nI signed the audit that hid it. Then I let it leak.\n\nWhat is left:\nMeridian keeps one ledger - every payment, every\nwitness, every price. With it we can pull the whole\nthing down. Without it, eleven people stay bought.\n\nArchive: meridian.archive.net (203.0.113.44)\nThe operator who built that cipher added four to the\nvault shift. Same hand. Same habit.\n\n- E.P.',encrypted:true,shift:9,classified:true}
+        'vega_identity.dat':{content:'OPERATIVE DOSSIER - VEGA\n========================\n\nReal name: Elena Park\nNexus Corp: Head of Vault Security, 2019-2023\nHELIOS: wrote the key rotation, then kept a copy\n\nWhy I turned:\nMeridian paid Webb to sell HELIOS to four states.\nI signed the audit that hid it. Then I let it leak.\n\nWhat is left:\nMeridian keeps one ledger - every payment, every\nwitness, every price. With it we can pull the whole\nthing down. Without it, eleven people stay bought.\n\nArchive: meridian.archive.net (203.0.113.44)\nThe cipher changed after the audit. It is keyed to the\nhouse name now - one word, eight letters, their own\nletterhead. Same operator who built the vault cipher:\nnever a key anyone has to remember.\n\n- E.P.',encrypted:true,shift:9,classified:true}
+      },
+      public:{
+        'meridian_access.txt':'MERIDIAN ARCHIVE - OLD INTEL\n============================\n\nCipher: Caesar, shift 17 (vault shift + 4).\nWritten before the rewrite. They rotate keys now.\n\n- E.P.\n[stale note, kept because the channel was already down]',
+        'dead_drop.txt':{content:'DEAD DROP - ONE READ\n====================\n\nIf you are reading this, burn it. This is the last\nthing on the relay that points at me.\n\nTake the dossier in private/ and leave.\n\n- VEGA',burnOnRead:true}
       }
     }},
     etc:{'shadow':'Password hint for VEGA relay:\n"It is one of the seven-letter words the\ncracker deals you. It answers with how many\nletters land in the right place — read that."\nLength: 7 characters'}
   },
   'meridian.archive.net':{
     data:{ledger:{
-      'meridian_ledger.dat':{content:'MERIDIAN HOLDINGS - SETTLEMENT LEDGER\n=====================================\nACCOUNT: 88-114-CAYMAN\nCLEARING: ATLAS FUND / PHOENIX CAPITAL\n\nPAYMENTS\n  Harlow, P. (CEO, Nexus)     $45,000,000\n  Webb, M. (CTO, Nexus)       $28,000,000\n  Rodriguez, J. (CFO, Nexus)  $22,000,000\n  Park, E. (Vault Security)   $ 6,000,000 [RETURNED]\n  Four state buyers          $2,610,000,000\n\nSILENCE\n  11 witnesses - settled\n  2 witnesses - open (VEGA, GHOST)\n\nNOTE: HELIOS is a product. The list is the business.\nLosing the list costs more than losing HELIOS.\n\nEVIDENCE OF MONEY LAUNDERING AND WITNESS TAMPERING\n====================================================',encrypted:true,shift:17,classified:true,missionCritical:true}
+      'meridian_ledger.dat':{content:'MERIDIAN HOLDINGS - SETTLEMENT LEDGER\n=====================================\nACCOUNT: 88-114-CAYMAN\nCLEARING: ATLAS FUND / PHOENIX CAPITAL\n\nPAYMENTS\n  Harlow, P. (CEO, Nexus)     $45,000,000\n  Webb, M. (CTO, Nexus)       $28,000,000\n  Rodriguez, J. (CFO, Nexus)  $22,000,000\n  Park, E. (Vault Security)   $ 6,000,000 [RETURNED]\n  Four state buyers          $2,610,000,000\n\nSILENCE\n  11 witnesses - settled\n  2 witnesses - open (VEGA, GHOST)\n\nNOTE: HELIOS is a product. The list is the business.\nLosing the list costs more than losing HELIOS.\n\nEVIDENCE OF MONEY LAUNDERING AND WITNESS TAMPERING\n====================================================',encrypted:true,cipher:'vigenere',key:'MERIDIAN',classified:true,missionCritical:true}
     }},
     home:{ops:{
-      'watchlist.txt':'COUNTER-INTEL TASKING - 15 JAN\n\n1. Purge settlement archive if any trace > 60.\n2. Operator \'ghost\' - priority one.\n3. VEGA (Park, E.) - locate, do not engage.\n4. Burn contacts list on confirmation.\n\nDo not escalate above the archive. Ever.',
-      'contacts.txt':'meridian.archive.net  - 203.0.113.44\nops@meridian-holdings.example\n\nNo names in mail. No names on paper.'
+      'watchlist.txt':'COUNTER-INTEL TASKING - 15 JAN\n\n1. Sweep the archive above trace '+SWEEP_TRACE+'.\n2. Operator \'ghost\' - priority one.\n3. VEGA (Park, E.) - locate, do not engage.\n4. Burn contacts on confirmation; the ledger stays.\n\nDo not escalate above the archive. Ever.',
+      'contacts.txt':'meridian.archive.net  - 203.0.113.44\nops@meridian-holdings.example\n\nNo names in mail. No names on paper.',
+      'tripwire.log':{content:'TRIPWIRE LOG\n============\n\nEvery read of this file is reported to counter-intel.\nIt exists to catch operators who read everything they\ncan open.\n\n[You are the read it was waiting for.]',alarm:true},
+      'purge_readme.txt':'PURGE STATION\n=============\n\nTyping "purge" while connected here trades one archive\nfile for forty points of trace. It cannot take the\nledger, and it runs out of files.'
     }},
-    etc:{security:{'counter_intel.txt':'COUNTER-INTEL POSTURE\n=====================\n\n1. Archive cipher: Caesar, set four past the vault.\n2. Passphrase: eight characters, three attempts.\n3. Noise threshold: trace 60. Above it, wipe.\n4. The ledger is the only copy.\n\nIf this file is being read by an outsider,\nsomeone has already failed.'}}
+    etc:{security:{'counter_intel.txt':'COUNTER-INTEL POSTURE\n=====================\n\n1. Archive cipher: Vigenere, keyed to the house name.\n   One word, eight letters, our own letterhead.\n2. Passphrase: eight characters, three attempts.\n3. Noise floor: trace '+SWEEP_TRACE+'. Above it a sweep burns\n   one file, then cuts the session.\n4. A clean exit under trace '+EXIT_TRACE.ledger+' is an exit we never log.\n5. Purge station: "purge" trades a file for -40 trace.\n\nIf this file is being read by an outsider,\nsomeone has already failed.'}}
   }
 };
 
@@ -234,7 +248,7 @@ const MISSIONS = [
   {id:4,name:'Relay Access',desc:'Find and infiltrate the Nexus Corp relay server.',obj:'Discover the relay server and crack its password',check:()=>SERVERS['relay.nexus-corp.net'].cracked,reward:300},
   {id:5,name:'The Key',desc:'Obtain and decrypt the vault encryption key from the relay.',obj:'Download and decrypt "vault_key.dat" from the relay',check:()=>state.decrypted.some(f=>f.includes('vault_key.dat')),reward:400},
   {id:6,name:'The Vault',desc:'Access the vault and steal the HELIOS blueprint.',obj:'Crack the vault, decrypt and download "helios_blueprint.txt"',check:()=>state.downloaded.includes('helios_blueprint.txt')&&state.decrypted.some(f=>f.includes('helios_blueprint.txt')),reward:500},
-  {id:7,name:'Exfiltration',desc:'Disconnect safely before being traced.',obj:'Disconnect with trace below 75 after getting the blueprint (wipes are in the shop)',check:()=>!state.connected&&state.trace<75&&state.downloaded.includes('helios_blueprint.txt'),reward:500},
+  {id:7,name:'Exfiltration',desc:'Disconnect safely before being traced.',obj:`Disconnect with trace below ${EXIT_TRACE.blueprint} after getting the blueprint (wipes are in the shop)`,check:()=>!state.connected&&state.trace<EXIT_TRACE.blueprint&&state.downloaded.includes('helios_blueprint.txt'),reward:500},
 
   // Act two. The leak ends the Nexus contract, not the story: the money behind
   // HELIOS is still solvent, and it starts closing its own people.
@@ -255,22 +269,26 @@ const MISSIONS = [
       'whether you still want the rest of the job."'
     ],
     check:()=>state.downloaded.includes('vega_identity.dat')&&state.decrypted.some(f=>f.includes('vega_identity.dat')),reward:600},
-  {id:10,name:'Meridian',desc:'The buyer was never a state. It is Meridian Holdings, and it keeps a list of everyone it paid for silence.',obj:'Crack meridian.archive.net, download "meridian_ledger.dat", then disconnect with trace below 60',
+  {id:10,name:'Meridian',desc:'The buyer was never a state. It is Meridian Holdings, and it keeps a list of everyone it paid for silence.',obj:`Crack meridian.archive.net, decrypt the ledger with its keyword, download "meridian_ledger.dat", then disconnect with trace below ${EXIT_TRACE.ledger}`,
     intro:[
       'VEGA: "Meridian does not sell weapons. It sells silence."',
       'VEGA: "Their archive holds the only copy of the ledger. Take it',
-      'and no one can bury this. Their counter-intel hears noise -',
-      'keep your trace under 60 before you disconnect."'
+      'and no one can bury this. They sweep above '+SWEEP_TRACE+', but the',
+      'archive has a purge station - it charges in files, not credits."',
+      'VEGA: "Leave below trace '+EXIT_TRACE.ledger+' or the exit is logged."'
     ],
-    check:()=>!state.connected&&state.trace<60&&state.downloaded.includes('meridian_ledger.dat'),reward:800}
+    check:()=>!state.connected&&state.trace<EXIT_TRACE.ledger&&state.downloaded.includes('meridian_ledger.dat'),reward:800}
 ];
 
+// Nothing here is a straight upgrade: every item that buys you something pays
+// for it somewhere else, so the shop is a build rather than a shopping list.
 const SHOP = [
-  {id:'trace_wipe',name:'Trace Wipe',desc:'Reduce trace by 25',price:200,consumable:true},
-  {id:'heavy_wipe',name:'Heavy Trace Wipe',desc:'Reduce trace by 50',price:400,consumable:true},
-  {id:'cracker_v2',name:'Cracker v2',desc:'Eliminate 3 wrong words when cracking',price:300,consumable:false},
-  {id:'decryptor',name:'Decryptor v2',desc:'Reveal 3 letter hints when decrypting',price:250,consumable:false},
-  {id:'stealth',name:'Stealth Module',desc:'Reduce all trace gains by 50%',price:500,consumable:false}
+  {id:'trace_wipe',name:'Trace Wipe',desc:'Reduce trace by 25. Cheap, and the archive counts it.',price:200,consumable:true},
+  {id:'heavy_wipe',name:'Heavy Trace Wipe',desc:'Reduce trace by 50.',price:400,consumable:true},
+  {id:'cracker_v2',name:'Cracker v2',desc:'Eliminate 3 wrong words. Noisy brute force: +5 trace on every crack.',price:300,consumable:false},
+  {id:'decryptor',name:'Decryptor v2',desc:'Reveal 3 plaintext letters. Noisy probe: +2 trace on every decrypt.',price:250,consumable:false},
+  {id:'stealth',name:'Stealth Module',desc:'Halve every trace gain. Scrubs your cut too: downloads pay half credits.',price:500,consumable:false},
+  {id:'proxy',name:'Proxy Chain',desc:'Classified downloads cost 4 trace instead of 8. +2 trace on every connect.',price:350,consumable:false}
 ];
 
 // --- GAME STATE ---
@@ -295,7 +313,10 @@ const state = {
   decryptorBought: false,
   discoveredServers: new Set(['localhost']),
   crackedServers: new Set(['localhost']),
-  downloadCount: 0
+  downloadCount: 0,
+  proxyBought: false,
+  burned: [],            // "server:path" files a sweep or the purge station took
+  hunt: null             // {left} while the Meridian archive is sweeping
 };
 
 // --- TERMINAL ENGINE ---
@@ -333,7 +354,7 @@ function clearTerm(){
 
 function getPrompt(){
   if(state.mode==='crack') return 'password> ';
-  if(state.mode==='decrypt') return 'shift> ';
+  if(state.mode==='decrypt') return state.decryptState && state.decryptState.cipher==='vigenere' ? 'key> ' : 'shift> ';
   const srv = state.connected || 'localhost';
   let dir = state.currentDir;
   if(srv==='localhost' && dir==='/home/ghost') dir='~';
@@ -356,14 +377,82 @@ function caesarEnc(text, shift){
   }).join('');
 }
 
+// Act two uses a keyword cipher: same letters, a different thing to find. The
+// key index only advances on letters, so encryption and decryption stay in step.
+function vigenereShift(text, key, dir){
+  const k = String(key || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if(!k) return text;
+  let j = 0;
+  return text.split('').map(c=>{
+    const base = c>='A'&&c<='Z' ? 65 : c>='a'&&c<='z' ? 97 : 0;
+    if(!base) return c;
+    const shift = (k.charCodeAt(j % k.length) - 65) * dir;
+    j++;
+    return String.fromCharCode((((c.charCodeAt(0) - base + shift) % 26) + 26) % 26 + base);
+  }).join('');
+}
+function vigenereEnc(text, key){ return vigenereShift(text, key, 1); }
+function vigenereDec(text, key){ return vigenereShift(text, key, -1); }
+
+// Encrypted nodes store their plaintext and a recipe; the ciphertext is only
+// ever derived, so swapping a file's cipher is one property on the node.
+function encryptedText(node){
+  return node.cipher === 'vigenere' ? vigenereEnc(getContent(node), node.key) : caesarEnc(getContent(node), node.shift);
+}
+
+// Returns what was actually applied, so the interface can print the real
+// charge instead of the list price (stealth and the ceiling both change it).
 function addTrace(amount){
   if(state.stealthBought) amount = Math.ceil(amount/2);
+  const before = state.trace;
   state.trace = Math.min(100, state.trace + amount);
+  const applied = state.trace - before;
   updateUI();
   tutorialTraceWarn();
   if(state.trace >= 100 && !state.gameEnded){
     gameOver();
   }
+  return applied;
+}
+
+// Above its noise floor the archive sweeps: a command clock you can beat by
+// purging (files for trace) or leaving. It burns intel, never the ledger.
+function huntTick(){
+  if(state.gameEnded) return;
+  if(!state.hunt){
+    if(state.connected !== 'meridian.archive.net' || state.trace < SWEEP_TRACE) return;
+    if(!state.completedMissions.includes(7)) return;
+    state.hunt = { left:SWEEP_STEPS };
+    print('', 'c-default');
+    print('COUNTER-INTEL: connection above the noise floor.', 'c-error');
+    print(`VEGA: "They are sweeping. ${SWEEP_STEPS} commands, then they burn a file and cut you."`, 'c-warning');
+    print('"purge" trades a file for trace; "disconnect" ends the sweep.', 'c-info');
+    return;
+  }
+  if(state.connected !== 'meridian.archive.net' || state.trace < SWEEP_TRACE){
+    state.hunt = null;
+    print('VEGA: "Sweep called off. They lost the thread."', 'c-muted');
+    return;
+  }
+  state.hunt.left--;
+  if(state.hunt.left > 0){
+    print(`COUNTER-INTEL: sweep in ${state.hunt.left} command${state.hunt.left === 1 ? '' : 's'}.`, 'c-error');
+    return;
+  }
+  state.hunt = null;
+  const burned = burnArchiveFile();
+  addTrace(5);
+  print('COUNTER-INTEL: sweep complete. Session cut.', 'c-error');
+  if(burned) print(`They purged ${burned} from the archive.`, 'c-warning');
+  else print('There was nothing left on the archive to burn.', 'c-muted');
+  state.connected = null;
+  state.currentDir = '/home/ghost';
+  updateUI();
+}
+
+function afterCommand(){
+  tutorialTick();
+  huntTick();
 }
 
 function addCredits(n){
@@ -398,7 +487,33 @@ function normalizePath(p){
   return '/'+res.join('/');
 }
 
+function isBurned(server, path){
+  return state.burned.indexOf(server + ':' + normalizePath(path)) !== -1;
+}
+
+function burnFile(server, path){
+  const id = server + ':' + normalizePath(path);
+  if(state.burned.indexOf(id) !== -1) return false;
+  state.burned.push(id);
+  return true;
+}
+
+// What a sweep or the purge station can take: intel, never the ledger.
+function burnArchiveFile(){
+  const candidates = ['/home/ops/contacts.txt', '/home/ops/watchlist.txt', '/etc/security/counter_intel.txt'];
+  for(const path of candidates){
+    if(getNode('meridian.archive.net', path)){
+      burnFile('meridian.archive.net', path);
+      return path;
+    }
+  }
+  return null;
+}
+
+// A burned file is gone for the run: every read path comes through here, so a
+// note that was taken cannot be reprinted from the terminal later.
 function getNode(server, path){
+  if(isBurned(server, path)) return null;
   const fs = FS[server];
   if(!fs) return null;
   const parts = path.split('/').filter(Boolean);
@@ -544,8 +659,8 @@ function processCmd(raw){
     return;
   }
 
-  if(state.mode==='crack') { handleCrackInput(input); tutorialTick(); return; }
-  if(state.mode==='decrypt') { handleDecryptInput(input); tutorialTick(); return; }
+  if(state.mode==='crack') { handleCrackInput(input); afterCommand(); return; }
+  if(state.mode==='decrypt') { handleDecryptInput(input); afterCommand(); return; }
 
   const parts = input.split(/\s+/);
   const cmd = parts[0].toLowerCase();
@@ -565,6 +680,7 @@ function processCmd(raw){
     case 'decrypt': cmdDecrypt(args[0]); break;
     case 'download': cmdDownload(args[0]); break;
     case 'analyze': cmdAnalyze(); break;
+    case 'purge': cmdPurge(); break;
     case 'status': cmdStatus(); break;
     case 'missions': cmdMissions(); break;
     case 'trace': print(`Trace level: ${state.trace}/100`, state.trace>60?'c-error':'c-default'); break;
@@ -579,7 +695,7 @@ function processCmd(raw){
   }
   checkMissions();
   updateUI();
-  tutorialTick();
+  afterCommand();
 }
 
 // --- COMMANDS ---
@@ -607,6 +723,7 @@ function cmdHelp(){
   print('    decrypt <file>  Decrypt encrypted file');
   print('    download <file> Download file to local');
   print('    analyze         Analyze system vulnerabilities');
+  print('    purge           Trade an archive file for -40 trace (Meridian)');
   print('');
   print('  Game:', 'c-accent');
   print('    status          Show operative status');
@@ -643,7 +760,7 @@ const TUTORIAL = [
 
   // The rest of the toolbox: the commands the first breach never needs and the
   // later missions cannot do without.
-  {id:'cipher', title:'Open a file', how:'decrypt practice.dat', say:'VEGA left a training file at home. decrypt opens the shift interface: try <n> previews for free, submit <n> spends an attempt, hint costs 3 trace. Read the preview, never the ciphertext.',
+  {id:'cipher', title:'Open a file', how:'decrypt practice.dat', say:'VEGA left a training file at home. decrypt opens the shift interface: try <n> previews for free, submit <n> spends an attempt, hint costs 3 trace. Read the preview, never the ciphertext; later files take a keyword instead, and the interface says which.',
     done:()=>tutorial.did.decrypt},
   {id:'rescan', title:'Scan again', how:'scan', say:'Cracking a host opens the network behind it. A scan costs 3 trace, so scan when a job points you somewhere new.',
     done:()=>SERVERS['relay.nexus-corp.net'].discovered},
@@ -768,7 +885,7 @@ function cmdLs(){
   const srv = state.connected || 'localhost';
   const node = getNode(srv, state.currentDir);
   if(!node || isFile(node)){ print('Not a directory.','c-error'); return; }
-  const entries = Object.keys(node);
+  const entries = Object.keys(node).filter(e=>!isBurned(srv, state.currentDir + '/' + e));
   if(entries.length===0){ print('(empty directory)','c-muted'); return; }
   let output_str = '';
   entries.forEach(e=>{
@@ -813,13 +930,21 @@ function cmdCat(arg){
   const dec = isDecrypted(srv, path);
 
   if(enc && !dec){
-    print(`[ENCRYPTED - Caesar cipher detected]`, 'c-warning');
+    print(`[ENCRYPTED - ${node.cipher==='vigenere' ? 'Vigenere keyword required' : 'Caesar cipher detected'}]`, 'c-warning');
     print('', 'c-default');
     print(caesarEnc(getContent(node), node.shift), 'c-muted');
     print('', 'c-default');
     print(`Use "decrypt ${arg}" to attempt decryption.`, 'c-info');
   } else {
     print(getContent(node), 'c-default');
+    if(node.alarm){
+      const paid = addTrace(12);
+      print(`[TRIPWIRE] Reading it reported you. Trace +${paid}.`, 'c-error');
+    }
+    if(node.burnOnRead){
+      burnFile(srv, path);
+      print('[The file removed itself from the host.]', 'c-warning');
+    }
     tutorialDid('cat:' + path.split('/').pop());
   }
 }
@@ -884,14 +1009,14 @@ function cmdConnect(arg){
   if(srv.cracked){
     state.connected = arg;
     state.currentDir = '/';
-    addTrace(2);
+    addTrace(2 + (state.proxyBought ? 2 : 0));
     print(`Connected to ${arg} (${srv.ip})`, 'c-success');
     print('Type "ls" to explore.', 'c-muted');
     updateUI();
   } else {
     state.connected = arg;
     state.currentDir = '/';
-    addTrace(5);
+    addTrace(5 + (state.proxyBought ? 2 : 0));
     print(`Connecting to ${arg} (${srv.ip})...`, 'c-info');
     print(`Access denied. Authentication required.`, 'c-warning');
     print(`Type "crack" to attempt password breach.`, 'c-info');
@@ -903,9 +1028,13 @@ function cmdConnect(arg){
 function cmdDisconnect(){
   if(!state.connected){ print('Not connected to any remote server.','c-error'); return; }
   print(`Disconnected from ${state.connected}.`, 'c-info');
-  if(state.trace >= 75 && state.downloaded.includes('helios_blueprint.txt')){
+  if(state.trace >= EXIT_TRACE.blueprint && state.downloaded.includes('helios_blueprint.txt')){
     print('VEGA: "You are too hot to walk away clean. Wipe some trace first."', 'c-warning');
     print('A "trace_wipe" (200cr) from the shop clears this up; the mission checks again after.', 'c-info');
+  }
+  if(state.trace >= EXIT_TRACE.ledger && state.downloaded.includes('meridian_ledger.dat')){
+    print('VEGA: "That exit just went in their log. Get under ' + EXIT_TRACE.ledger + ' and leave again."', 'c-warning');
+    print('The archive\'s own purge station ("purge") trades a file for -40; the shop wipes work too.', 'c-info');
   }
   state.connected = null;
   state.currentDir = '/home/ghost';
@@ -956,11 +1085,20 @@ function cmdDownload(arg){
   state.downloaded.push(fname);
   state.downloadCount++;
   const classified = typeof node==='object' && node.classified;
-  addTrace(classified ? 8 : 2);
-  addCredits(classified ? 100 : 30);
+  const alarm = typeof node==='object' && node.alarm;
+  // The proxy cuts the heavy classified carry; stealth halves the charge but
+  // halves the buyer's payment too - it scrubs your cut with your trail.
+  let cost = classified ? 8 : 2;
+  if(classified && state.proxyBought) cost = 4;
+  if(alarm) cost += 20;
+  let pay = classified ? 100 : 30;
+  if(state.stealthBought) pay = Math.floor(pay / 2);
+  addTrace(cost);
+  addCredits(pay);
 
   print(`Downloaded: ${fname}`, 'c-success');
   if(classified) print(`[CLASSIFIED FILE - Trace increased significantly]`, 'c-warning');
+  if(alarm) print('[TRIPWIRE] That file bills every copy made. It cost you trace.', 'c-error');
   print(`Saved to /home/ghost/downloads/`, 'c-muted');
 
   checkMissions();
@@ -971,9 +1109,10 @@ function cmdAnalyze(){
   if(!state.connected){ print('Connect to a remote server first.','c-error'); return; }
   const srv = SERVERS[state.connected];
   if(srv.cracked){ print('Server already accessed.','c-muted'); return; }
-  addTrace(5);
+  const cost = addTrace(5);
+  const maxSecurity = Math.max(...Object.keys(SERVERS).map(k=>SERVERS[k].security));
   print(`Analyzing ${state.connected}...`, 'c-info');
-  print(`Security level: ${srv.security}/3`, 'c-default');
+  print(`Security level: ${srv.security}/${maxSecurity}`, 'c-default');
   print(`Password length: ${srv.pwdLen} characters`, 'c-default');
   print(`Max attempts: ${srv.maxAttempts}`, 'c-default');
 
@@ -986,9 +1125,9 @@ function cmdAnalyze(){
   } else if(state.connected==='drop.vega.net'){
     print(`Hint: VEGA's relay uses the same lock as the last node — read /etc/shadow here.`, 'c-accent');
   } else if(state.connected==='meridian.archive.net'){
-    print(`Hint: Meridian set the archive cipher four past the vault. Preview before submitting.`, 'c-accent');
+    print(`Hint: Meridian keyed the archive to the house name - one word, eight letters. "try" takes a keyword here.`, 'c-accent');
   }
-  print(`[Trace +5]`, 'c-warning');
+  print(`[Trace +${cost}]`, 'c-warning');
   tutorialDid('analyze');
 }
 
@@ -1050,6 +1189,7 @@ function cmdBuy(arg){
     if(item.id==='stealth') state.stealthBought=true;
     if(item.id==='cracker_v2') state.crackerV2Bought=true;
     if(item.id==='decryptor') state.decryptorBought=true;
+    if(item.id==='proxy') state.proxyBought=true;
     print(`Purchased: ${item.name}`, 'c-success');
   }
   updateUI();
@@ -1071,11 +1211,32 @@ function cmdMap(){
   tutorialDid('map');
 }
 
+// The third way down from a hot archive: Meridian's own station, paid in files
+// rather than credits. It cannot touch the ledger, and it runs out of files.
+function cmdPurge(){
+  if(!state.connected){ print('Connect to meridian.archive.net first.','c-error'); return; }
+  if(state.connected !== 'meridian.archive.net'){ print('Only the Meridian archive has a purge station.','c-error'); return; }
+  if(accessDenied()) return;
+  if(state.trace <= 0){ print('Trace is already at zero.','c-muted'); return; }
+  const burned = burnArchiveFile();
+  if(!burned){ print('The station has nothing left to trade.','c-error'); return; }
+  const cut = Math.min(40, state.trace);
+  state.trace -= cut;
+  updateUI();
+  print(`Purged ${burned}. The archive will not miss it for a while.`, 'c-success');
+  print(`[Trace -${cut}]`, 'c-accent');
+}
+
 // --- MINI-GAME: PASSWORD CRACK ---
 
 function startCrackGame(server){
   const srv = SERVERS[server];
   const wordLen = srv.pwdLen;
+  if(state.crackerV2Bought){
+    const noisy = addTrace(5);
+    if(state.gameEnded) return;
+    print(`[Cracker v2 - noisy brute force: trace +${noisy}]`, 'c-warning');
+  }
   let words = [...CRACK_WORDS[wordLen]];
   const password = words[Math.floor(Math.random()*words.length)];
 
@@ -1186,11 +1347,46 @@ function handleCrackInput(input){
 
 // --- MINI-GAME: DECRYPTION ---
 
+function finishDecrypt(ds){
+  const fid = getFileId(ds.server, ds.path);
+  state.decrypted.push(fid);
+  addTrace(5);
+  addCredits(50);
+  state.mode='normal';
+  state.decryptState=null;
+  print(`\n★ DECRYPTION SUCCESSFUL ★`, 'c-success');
+  print(`File "${ds.filename}" has been decrypted!`, 'c-success');
+  print(`Use "cat ${ds.filename}" to read it.`, 'c-info');
+  print(`[+50cr]`, 'c-accent');
+  tutorialDid('decrypt');
+  checkMissions();
+  updateUI();
+}
+
+function failDecryptAttempt(ds){
+  ds.attemptsLeft--;
+  print(`Incorrect ${ds.cipher==='vigenere' ? 'keyword' : 'shift'}. Attempts remaining: ${ds.attemptsLeft}`, 'c-error');
+  if(ds.attemptsLeft<=0){
+    state.mode='normal';
+    state.decryptState=null;
+    addTrace(8);
+    print(`Decryption failed. File remains encrypted.`, 'c-error');
+    print(`[Trace +8]`, 'c-warning');
+    updateUI();
+  }
+}
+
 function startDecryptGame(filename, path, node){
-  const encText = caesarEnc(node.content, node.shift);
+  const cipher = node.cipher === 'vigenere' ? 'vigenere' : 'caesar';
+  if(state.decryptorBought){
+    const noisy = addTrace(2);
+    if(state.gameEnded) return;
+    print(`[Decryptor v2 - noisy probe: trace +${noisy}]`, 'c-warning');
+  }
+  const encText = encryptedText(node);
   state.mode = 'decrypt';
   state.decryptState = {
-    filename, path, shift: node.shift, attemptsLeft:3,
+    filename, path, cipher, shift: node.shift, key: node.key, attemptsLeft:3,
     content: node.content, encText, server: state.connected||'localhost'
   };
   updatePrompt();
@@ -1200,7 +1396,7 @@ function startDecryptGame(filename, path, node){
   print('║       DECRYPTION INTERFACE           ║', 'c-warning');
   print('╚══════════════════════════════════════╝', 'c-warning');
   print(`\nFile: ${filename}`, 'c-info');
-  print(`Cipher: Caesar (shift unknown)`, 'c-info');
+  print(`Cipher: ${cipher==='vigenere' ? 'Vigenere (keyword unknown)' : 'Caesar (shift unknown)'}`, 'c-info');
   print(`Attempts: ${3}/3\n`, 'c-default');
   print('Encrypted preview:', 'c-muted');
   print('─'.repeat(40), 'c-muted');
@@ -1222,8 +1418,13 @@ function startDecryptGame(filename, path, node){
   }
 
   print('\nCommands:', 'c-default');
-  print('  try <shift>     Preview with shift (no penalty)', 'c-info');
-  print('  submit <shift>  Submit answer (-1 attempt if wrong)', 'c-info');
+  if(cipher==='vigenere'){
+    print('  try <key>       Preview with a keyword (no penalty)', 'c-info');
+    print('  submit <key>    Submit answer (-1 attempt if wrong)', 'c-info');
+  } else {
+    print('  try <shift>     Preview with shift (no penalty)', 'c-info');
+    print('  submit <shift>  Submit answer (-1 attempt if wrong)', 'c-info');
+  }
   print('  hint            Get a hint (+3 trace)', 'c-info');
   print('  exit            Abort decryption\n', 'c-muted');
 }
@@ -1244,6 +1445,19 @@ function handleDecryptInput(input){
 
   if(cmd==='hint'){
     addTrace(3);
+    if(ds.cipher==='vigenere'){
+      const key = String(ds.key || '').toUpperCase();
+      const khints = [
+        'The key is one word, not a number.',
+        `The key starts with "${key[0] || '?'}".`,
+        `The key is ${key.length} letters long.`,
+        'The key is the name on the account that pays for this archive.',
+        'counter_intel.txt names the cipher and where the key comes from.'
+      ];
+      print(`Hint: ${khints[Math.floor(Math.random()*khints.length)]}`, 'c-accent');
+      print(`[Trace +3]`, 'c-warning');
+      return;
+    }
     // Give a useful hint about the shift
     const s = ds.shift;
     const hints = [
@@ -1261,6 +1475,17 @@ function handleDecryptInput(input){
   }
 
   if(cmd==='try'){
+    if(ds.cipher==='vigenere'){
+      const key = String(parts[1] || '').toUpperCase().replace(/[^A-Z]/g, '');
+      if(key.length < 2){ print('Usage: try <keyword>','c-error'); return; }
+      const shown = vigenereDec(ds.encText, key).substring(0,150);
+      print(`\nKeyword ${key} preview:`, 'c-info');
+      print('─'.repeat(40), 'c-muted');
+      print(shown + (shown.length>=150?'...':''), 'c-default');
+      print('─'.repeat(40), 'c-muted');
+      print('(This is a preview. Use "submit" if it reads clean.)\n', 'c-muted');
+      return;
+    }
     const shift = parseInt(parts[1]);
     if(isNaN(shift)||shift<0||shift>25){
       print('Invalid shift. Use a number 0-25.','c-error');
@@ -1279,42 +1504,24 @@ function handleDecryptInput(input){
   }
 
   if(cmd==='submit'){
+    if(ds.cipher==='vigenere'){
+      const key = String(parts[1] || '').toUpperCase().replace(/[^A-Z]/g, '');
+      if(key.length < 2){ print('Usage: submit <keyword>','c-error'); return; }
+      if(key === String(ds.key || '').toUpperCase()) finishDecrypt(ds);
+      else failDecryptAttempt(ds);
+      return;
+    }
     const shift = parseInt(parts[1]);
     if(isNaN(shift)||shift<0||shift>25){
       print('Invalid shift. Use a number 0-25.','c-error');
       return;
     }
-    if(shift===ds.shift){
-      // Correct!
-      const fid = getFileId(ds.server, ds.path);
-      state.decrypted.push(fid);
-      addTrace(5);
-      addCredits(50);
-      state.mode='normal';
-      state.decryptState=null;
-      print(`\n★ DECRYPTION SUCCESSFUL ★`, 'c-success');
-      print(`File "${ds.filename}" has been decrypted!`, 'c-success');
-      print(`Use "cat ${ds.filename}" to read it.`, 'c-info');
-      print(`[+50cr]`, 'c-accent');
-      tutorialDid('decrypt');
-      checkMissions();
-      updateUI();
-    } else {
-      ds.attemptsLeft--;
-      print(`Incorrect shift. Attempts remaining: ${ds.attemptsLeft}`, 'c-error');
-      if(ds.attemptsLeft<=0){
-        state.mode='normal';
-        state.decryptState=null;
-        addTrace(8);
-        print(`Decryption failed. File remains encrypted.`, 'c-error');
-        print(`[Trace +8]`, 'c-warning');
-        updateUI();
-      }
-    }
+    if(shift===ds.shift) finishDecrypt(ds);
+    else failDecryptAttempt(ds);
     return;
   }
 
-  print('Unknown command. Use: try <shift>, submit <shift>, hint, or exit.','c-error');
+  print('Unknown command. Use: try <shift|key>, submit <shift|key>, hint, or exit.','c-error');
 }
 
 // --- GAME END STATES ---
@@ -1390,6 +1597,9 @@ function restartGame(){
   state.discoveredServers=new Set(['localhost']);
   state.crackedServers=new Set(['localhost']);
   state.downloadCount=0;
+  state.proxyBought=false;
+  state.burned=[];
+  state.hunt=null;
   tutorial.on=false;
   tutorial.step=0;
   tutorial.did={};
@@ -1489,7 +1699,7 @@ function tabComplete(){
   const parts = val.split(/\s+/);
 
   if(parts.length<=1){
-    const cmds = ['tutorial','help','ls','cd','cat','clear','scan','connect','disconnect','crack','decrypt','download','analyze','status','missions','trace','shop','buy','whoami','map','exit'];
+    const cmds = ['tutorial','help','ls','cd','cat','clear','scan','connect','disconnect','crack','decrypt','download','analyze','purge','status','missions','trace','shop','buy','whoami','map','exit'];
     const match = cmds.find(c=>c.startsWith(parts[0]));
     if(match) inputEl.value = match+' ';
   } else if(parts.length===2){
@@ -1560,7 +1770,8 @@ function savedRun(){
       decrypted:state.decrypted.slice(), missionIdx:state.missionIdx,
       completedMissions:state.completedMissions.slice(),
       stealthBought:state.stealthBought, crackerV2Bought:state.crackerV2Bought,
-      decryptorBought:state.decryptorBought, downloadCount:state.downloadCount,
+      decryptorBought:state.decryptorBought, proxyBought:state.proxyBought,
+      downloadCount:state.downloadCount, burned:state.burned.slice(),
       discovered:Array.from(state.discoveredServers), cracked:Array.from(state.crackedServers),
       servers:Object.keys(SERVERS).reduce(function (out, name) {
         out[name] = { discovered:!!SERVERS[name].discovered, cracked:!!SERVERS[name].cracked };
@@ -1590,7 +1801,10 @@ function restoreRun(saved){
   state.stealthBought = !!run.stealthBought;
   state.crackerV2Bought = !!run.crackerV2Bought;
   state.decryptorBought = !!run.decryptorBought;
+  state.proxyBought = !!run.proxyBought;
   state.downloadCount = Math.max(0, run.downloadCount | 0);
+  state.burned = Array.isArray(run.burned) ? run.burned.slice() : [];
+  state.hunt = null;
   state.discoveredServers = new Set(run.discovered.concat(['localhost']));
   state.crackedServers = new Set((run.cracked || []).concat(['localhost']));
   Object.keys(run.servers || {}).forEach(function (name) {
