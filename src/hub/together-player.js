@@ -5,6 +5,7 @@ import { hasIdentity, getSession } from './backend.js';
 // players the same seed and compare one self-reported run, so there is no board
 // for the server to referee — the same trust the single-player boards already use.
 export const TOGETHER_ADAPTERS = Object.freeze({
+  battleship: { rulesVersion: 1, action: "move", mode: "turns" },
   'connect-four': { rulesVersion: 1, action: 'move', mode: 'turns' },
   '8ball': { rulesVersion: 1, action: 'pool_move', mode: 'turns', engine: 'pool-engine.js' },
   // Tanks stores its seed and the shots fired; both clients replay them through
