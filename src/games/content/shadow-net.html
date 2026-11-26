@@ -691,6 +691,16 @@ function processCmd(raw){
   execCmd(input);
 }
 
+// A command that finishes later (a network scan) parks its promise here, so a
+// chained line can wait for it the way a shell waits for a child process.
+let commandPending = null;
+
+function slowCommand(promise){
+  commandPending = promise;
+  promise.then(()=>{ if(commandPending === promise) commandPending = null; });
+  return promise;
+}
+
 // Split a line into commands, each with the operator joining it to the last.
 // Inside quotes a separator is text, and "^" takes the next character
 // literally, as cmd does.
@@ -743,9 +753,9 @@ function splitArgs(input){
 // Run the parts by cmd's rules. A command behind a failed "&&" is skipped
 // without changing the result, so "a && b || c" still reaches c when a fails;
 // a dangling "&&" or "||" is the syntax error cmd reports.
-function runChain(parts){
-  let ok = true, ran = false;
-  for(const part of parts){
+function runChain(parts, start = 0, ok = true, ran = false){
+  for(let i = start; i < parts.length; i++){
+    const part = parts[i];
     const piece = part.text.trim();
     if(!piece){
       if(part.sep === '&&' || part.sep === '||'){
@@ -761,6 +771,16 @@ function runChain(parts){
     ran = true;
     // An interactive prompt is not something the rest of the line can answer.
     if(state.mode !== 'normal' || state.gameEnded) return;
+    // A command still running owns the terminal until it returns, so the rest
+    // of the line starts after it instead of racing it.
+    const work = commandPending;
+    if(work){
+      work.then(()=>{
+        if(state.mode !== 'normal' || state.gameEnded) return;
+        runChain(parts, i + 1, ok, true);
+      });
+      return;
+    }
   }
 }
 
@@ -1196,7 +1216,7 @@ function cmdScan(){
   if(state.connected){ print('Disconnect before scanning.','c-error'); return; }
   addTrace(3);
   print('Scanning network...', 'c-info');
-  setTimeout(()=>{
+  slowCommand(new Promise(resolve => setTimeout(()=>{
     let found = [];
     // Always discover nexus-corp on first scan
     if(!SERVERS['nexus-corp.net'].discovered){
@@ -1239,7 +1259,8 @@ function cmdScan(){
     checkMissions();
     updateUI();
     tutorialTick();
-  }, 800);
+    resolve();
+  }, 800)));
 }
 
 function cmdConnect(arg){
