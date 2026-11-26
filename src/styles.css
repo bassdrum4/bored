@@ -583,7 +583,7 @@ body.playing .bt-notice,.together-open .bt-notice{display:none}
 /* Fixed, high-contrast message above the hub, but below the full-screen player.
    The notice remains at the same viewport position until explicitly dismissed. */
 #announcement-toggle{display:inline-flex;align-items:center;gap:8px}
-#announcement-count{min-width:18px;text-align:center;color:var(--red);border-color:var(--red)}
+#announcement-count{min-width:18px;text-align:center;color:var(--paper);border-color:var(--red)}
 #announcement-banner{
   position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;
   transform:translateX(-50%);z-index:45;
