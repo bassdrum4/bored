@@ -2551,6 +2551,7 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "story-y2-end", chapter: true, date: "End of Year 2", from: "Prof Penguin", title: "Warming up", body: `<p>It's warming up. We have a little time. Not much.</p><p>Prof Penguin</p>` },
   { id: "update-story-year2", story: true, date: "Nov 26, 2026", from: "Prof Penguin", title: "Story Mode, Year 2: The Hunt",
     body: `<ul><li>Once you've cleared Year 1, <b>Begin Year 2</b> is at the top of your lists. It tells you exactly what resets and what stays before anything happens.</li>
       <li>A new League: strangers in every gym, the Champions with new Ice types, and League rules that allow two Tier 3s and three Tier 4s.</li>
@@ -3867,8 +3868,8 @@ const SCENES = {
     ["", "Calyrex joins you, with both of its Rider forms. The Rusted Sword and Rusted Shield are yours: your Zacian and Zamazenta can take their Crowned forms."],
     ["", "Then Sssssssnakes takes off the Team Thaw badge, holds it for a second, and drops it in the snow. He hands you a thick folder."],
     ["Sssssssnakes", "Base maps. Every lab, every site, every vault. Next year we hit them."]] },
-  "y2-engine": { year: 2, r: 7, title: "The Engine runs", lines: [
-    ["", "That's when the Engine runs, on years of stored ice."]] },
+  "y2-engine": { year: 2, r: 7, title: "The Engine starts", lines: [
+    ["", "That's when the Engine starts. Far away, something enormous begins to hum, and the tanks start to drain."]] },
   "silver-after": { year: 1, r: 1, title: "Red", lines: [
     ["", "When it's over, he presses something into your hand: the Shiny Charm. Then he turns back to the snow, as if you were never there."],
     ["", "You write down the fight, and the way Red's Pokémon stood with him in the snow without a single command. Penguin replies:"],
@@ -3886,7 +3887,7 @@ const CLUES = {
 // tried again at once if it gets away. Paldea's admins come all three in a row (the finale), then its pick. Each
 // legend chapter has a prize: a Mega pseudo stone where one exists, a Master Ball where none does. Red waits on Mt.
 // Silver (Johto) once the year is over.
-const CROWN_USE = 1.30, CROWN_PAY = 150, CROWN_TEAM = () => [...[497, 24, 844, 350].map(mon), ZYGARDE_50];
+const CROWN_USE = 1.35, CROWN_PAY = 150, CROWN_TEAM = () => [...[497, 24, 844, 350].map(mon), ZYGARDE_50];
 const CHIEF_USE = 0.95, ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_SLUSH_USE = 1.17, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
 const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
 // Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
@@ -4012,7 +4013,7 @@ const CHAPTERS = [
     pre: "y2-chasm", unlock: "chasm", letter: "story-y2-chasm", doneNote: "Black and White Kyurem" },
   // The Crown Shrine finale (D4) shows from the first day of the year, greyed, with its checklist.
   { id: "y2-crown", year: 2, r: 7, type: "crown", finale: true, name: "Crown Shrine", at: "the Crown Shrine", after: ["champ"], open: () => crownReady(), note: () => crownNote(),
-    pre: "y2-crown", post: "y2-crown-after", after2: "y2-engine", doneNote: "Calyrex" }
+    pre: "y2-crown", post: "y2-crown-after", after2: "y2-engine", letter: "story-y2-end", doneNote: "Calyrex" }
 ].map(c => ({ year: 1, ...c }));
 // The chapters of the year this save is in. Red stays on Johto's list after Year 1, for rematches (no second Shiny Charm).
 const chaptersNow = () => CHAPTERS.filter(c => (c.year || 1) === storyYear());

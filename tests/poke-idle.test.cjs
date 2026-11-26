@@ -1154,7 +1154,8 @@ test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Cham
     checkAch(true);
     const cal = S.box[898];
     const after = { done: chDone('y2-crown'), cleared: S.story.cleared, calyrex: cal && { bond: cal.bond, from: cal.from, lv: realLevel(898), cap: levelCap() }, won: [S.won.crown, S.won.weald], ach: [!!S.ach.st_bridges, !!S.ach.st_king], scenes,
-      riders: (QFORMES[898] || []).every(f => S.won[f.quest]), next: storyNext().text };
+      riders: (QFORMES[898] || []).every(f => S.won[f.quest]), next: storyNext().text,
+      engine: SCENES['y2-engine'].lines[0][1], endText: ['y2-crown', 'y2-crown-after', 'y2-engine'].flatMap(id => SCENES[id].lines.map(l => l[1])).join(' '), letter: S.mail.got['story-y2-end'] && MAIL.find(m => m.id === 'story-y2-end').body };
     // Begin Year 3: a row that says coming soon; its screens exist but stay off.
     viewR = 7; renderLocs();
     const y3row = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).find(t => t.startsWith('Year 3'));
@@ -1193,7 +1194,10 @@ test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Cham
   assert.deepEqual(got.after.won, [1, 1], 'both Riders and the Crowned forms');
   assert.ok(got.after.riders);
   assert.deepEqual(got.after.ach, [true, true]);
-  assert.deepEqual(got.after.scenes.slice(-2), ['y2-crown-after', 'y2-engine'], 'the badge in the snow, the base maps, and the Engine runs');
+  assert.deepEqual(got.after.scenes.slice(-2), ['y2-crown-after', 'y2-engine'], 'the badge in the snow, the base maps, and the Engine starts');
+  assert.equal(got.after.engine, "That's when the Engine starts. Far away, something enormous begins to hum, and the tanks start to drain.");
+  assert.ok(!/freez/i.test(got.after.endText), 'nothing at the Crown Shrine says the Box freezes');
+  assert.equal(got.after.letter, "<p>It's warming up. We have a little time. Not much.</p><p>Prof Penguin</p>");
   assert.equal(got.after.next, 'Year 2 is done. Year 3 is coming.');
   assert.equal(got.y3row, 'Year 3: The Thawcoming soon');
   assert.match(got.y3toast, /isn't here yet/);
@@ -1228,8 +1232,9 @@ test('Year 2 finale, the Crown Shrine: a League-legal team built on Sssssssnakes
     return { counter: need(counter), any: need(any), legal: [!leagueBreaksList(counter), !leagueBreaksList(any)], team: counter.map(m => m.name), crown: CROWN_USE, hof: HOF_USE, cap, L: B.L };
   });
   assert.deepEqual(got.legal, [true, true]);
-  assert.ok(got.counter < 1 && got.counter >= 0.8, `a team built on his needs 80-100% of the clock (${got.counter.toFixed(3)}: ${got.team.join(', ')}; any strong League team: ${got.any.toFixed(3)})`);
+  assert.ok(got.counter < 0.95 && got.counter >= 0.85, `a team built on his needs about 88% of the clock (${got.counter.toFixed(3)}: ${got.team.join(', ')}; any strong League team: ${got.any.toFixed(3)})`);
   console.log(`# crown: counter ${got.counter.toFixed(3)}, generic ${got.any.toFixed(3)}, L ${got.L}, team ${got.team.join(', ')}`);
+  assert.ok(got.any > 1, `a generic League team still loses (${got.any.toFixed(3)})`);
   assert.ok(got.crown < got.hof, 'the Hall of Fame stays the hardest fight');
   assert.deepEqual(errors, []);
 });
