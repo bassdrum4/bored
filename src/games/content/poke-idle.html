@@ -212,16 +212,45 @@
   .tip { position: relative; margin-top: 8px; padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink); display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55 }
   .tip .who { position: absolute; top: -9px; left: 12px; padding: 0 6px; background: var(--paper); font-size: 12px; font-weight: 700; line-height: 16px }
   .tip p { max-width: 68ch }
-  /* Story scenes use Prof Penguin's text box, over whichever screen is open. */
-  .scene { margin: 0 0 12px }
+  /* Prof Penguin's text box, the one look for the tip slot under the tabs and the scene overlay: a portrait, the
+     speaker's name, the line typed out, thumb-sized buttons. Frost blue with a doubled rule, for the Long Freeze. */
+  :root { --frost: #e9f1f4; --frost-line: #93b4c3; --veil: rgba(20, 32, 40, .45) }
+  @media (prefers-color-scheme: dark) { :root { --frost: #1c2427; --frost-line: #4b6b79; --veil: rgba(0, 0, 0, .55) } }
+  .dlg { position: relative; box-sizing: border-box; display: grid; grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-areas: "face who" "face text" "extra extra" "row row"; column-gap: 12px; row-gap: 4px; padding: 12px 14px;
+    background: var(--frost); color: var(--ink); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--frost), inset 0 0 0 4px var(--frost-line) }
+  .dlg-face { grid-area: face; width: 48px; height: 48px; box-sizing: border-box; border: 1px solid var(--frost-line); border-radius: 4px; background: var(--surface); display: grid; place-items: center; overflow: hidden; font: 700 13px/1 var(--mono); color: var(--dim) }
+  .dlg-face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated }
+  .dlg.narr { grid-template-areas: "who who" "text text" "extra extra" "row row" }
+  .dlg .who { grid-area: who; font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase }
+  .dlg-text { grid-area: text; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; max-width: 62ch }
+  .dlg-text p + p { margin-top: 6px }
+  .dlg-text .tw-rest { visibility: hidden }
+  .dlg > table, .dlg > .picks { grid-area: extra; margin-top: 6px }
+  .dlg .row { grid-area: row; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; flex-wrap: wrap }
+  .dlg .row button.lbl { min-height: 40px; min-width: 76px; padding: 0 14px; font-size: 14px; background: var(--surface); border-radius: 4px }
+  .dlg .row .skip { margin-right: auto; min-height: 40px; padding: 0 6px 0 0; font: inherit; font-size: 13px; border: 0; background: none; color: var(--dim); cursor: pointer; text-decoration: underline 1px; text-underline-offset: 3px }
+  .dlg .row .skip:hover { color: var(--ink) }
+  .dlg .count { font: 12px var(--mono); color: var(--dim) }
+  /* The tip slot keeps one height whether Prof Penguin is talking or not (two lines, then "Next ›"), so nothing below
+     it ever moves. With nothing to say it waits, faint. Shown and hidden by opacity only. */
+  #tip { margin-top: 8px; grid-template-rows: 16px 44px 40px; grid-template-areas: "face who" "face text" "row row" }
+  #tip .dlg-text { font-size: 15px }
+  #tip .row { margin-top: 0 }
+  #tip.idle { opacity: .4 } #tip.idle .row { visibility: hidden }
+  /* Scenes and the league notice open over the bottom of the screen on a veil that dims the page and takes its taps:
+     opening and closing them moves nothing, and a fast "Next" can't land on a battle button. A scene line keeps one
+     height, so Next stays under your thumb from line to line. The game keeps running behind it. */
+  #veil { position: fixed; inset: 0; z-index: 30; background: var(--veil); touch-action: none }
+  #veil[hidden] { display: none }
+  .scene, #league { position: fixed; z-index: 31; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(640px, calc(100vw - 24px)); max-height: 80vh; overflow-y: auto; margin: 0 }
+  .scene:not(.free) { grid-template-rows: 16px 70px auto; overflow: hidden }
+  .scene[hidden], #league[hidden] { display: none }
   .replaybar { margin: 0 0 10px; padding: 6px 10px; border: 1px solid var(--ink); border-radius: 4px; font-size: 13px; font-weight: 700; text-align: center }
-  .scene .count { margin-left: auto }
   .y2 { border-collapse: collapse } .y2 th, .y2 td { border: 1px solid var(--ink); padding: 4px 8px; text-align: left; vertical-align: top }
   .modes { display: grid; gap: 8px }
   .modes button { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
   .modes button span { font-size: 12px; color: var(--dim) }
-  .face { float: left; width: 40px; height: 40px; margin: 0 10px 4px 0; border: 1px solid var(--ink); border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 700; text-align: center; overflow: hidden; background: var(--paper) }
-  .face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated }
   .picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
   .picks button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
   .picks button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px }
@@ -347,7 +376,9 @@
 <main>
   <div class="tip syncask" id="syncask" role="alertdialog" aria-labelledby="syncask-h" hidden></div>
   <p class="replaybar" id="replaybar" hidden></p>
-  <div class="tip scene" id="scene" role="dialog" aria-live="polite" hidden></div>
+  <div id="veil" hidden></div>
+  <div class="dlg scene" id="scene" role="dialog" aria-modal="true" aria-live="polite" hidden></div>
+  <div class="dlg" id="league" role="alertdialog" aria-modal="true" hidden></div>
   <section id="title" hidden>
     <div class="head"><h1 id="sign">Poké Idle</h1><b class="ptag" id="t-prest" hidden></b><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
     <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
@@ -385,8 +416,7 @@
       <button data-tab="ach" type="button">Achievements</button>
       <button data-tab="story" type="button" hidden>Story</button>
     </div>
-    <div class="tip" id="tip" role="status" hidden></div>
-    <div class="tip" id="league" role="alertdialog" hidden></div>
+    <div class="dlg idle" id="tip" role="status"></div>
     <div class="credits" id="credits" role="dialog" aria-modal="true" aria-labelledby="credits-h" hidden></div>
 
     <section id="t-battle" class="cols">
@@ -1958,16 +1988,67 @@ const TIPS = [
   { id: "tier3", when: () => REGIONS.some((_, r) => badge(r, 1) && dungeonPhase(r) === 3), tab: "battle", text: () => { const r = REGIONS.findIndex((_, r) => badge(r, 1) && dungeonPhase(r) === 3);
     return `You have every Tier 4 legendary from the ${REGIONS[r].name} dungeon, so its Tier 3s come out now: ${dungeonBosses(r).filter(m => tierOf(m) === 3).map(m => m.name).join(", ")}. They're set against Tier 4 legendaries, so bring yours, with types that hit hard. They're harder to catch too: about ${pct(Math.pow(TIER_RATE[3] * 5 / 255, .75))} an Ultra Ball.`; } }
 ];
-let tipNow = null;
+// ── Prof Penguin's text box, shared by the tip slot and the scene overlay. A portrait (Prof Penguin's own; anyone else
+// gets a frame with their initials until their art is drawn), the speaker's name, and the line typed out: a tap
+// finishes it, the next tap moves on. A line too long for the box is split into pages at the ends of sentences.
+const PORTRAIT = { "Prof Penguin": "prof-penguin.png" };
+function dlgFace(who) {
+  const ini = esc((who || "").split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase());
+  return `<span class="dlg-face" aria-hidden="true">${PORTRAIT[who] ? `<img src="${SPRITE_DIR + PORTRAIT[who]}" alt="" onerror="this.replaceWith('${ini}')">` : ini}</span>`;
+}
+// Narration (no speaker) has no portrait or name and uses the whole width.
+const dlgHtml = o => `${(o.face === undefined ? o.who : o.face) ? dlgFace(o.face === undefined ? o.who : o.face) : ""}<span class="who">${esc(o.who || "")}</span><div class="dlg-text">${o.text || ""}</div>${o.extra || ""}<div class="row">${o.row || ""}</div>`;
+// The pages of a line: as many whole sentences as fit the box at a time. A sentence too long for the box on its own
+// breaks between words.
+function dlgPages(el, text) {
+  if (!el.clientHeight) return [text];
+  const fits = t => { el.textContent = t; return el.scrollHeight <= el.clientHeight + 1; };
+  const fill = (parts, join) => { const out = []; let cur = ""; for (const p of parts) { const next = cur ? cur + join + p : p; if (!cur || fits(next)) cur = next; else { out.push(cur); cur = p; } } if (cur) out.push(cur); return out; };
+  const pages = fill(text.split(/(?<=[.!?…]["'”’)]?)\s+/), " ").flatMap(p => fits(p) ? [p] : fill(p.split(/\s+/), " "));
+  el.textContent = "";
+  return pages;
+}
+// The typewriter. The rest of the line is laid out already, just not shown, so the words never jump to a new line as
+// they appear. Reduced motion shows the line at once.
+const TYPE_MS = 18;
+const typer = { el: null, text: "", i: 0, t: 0, shown: null, rest: null };
+function typeInto(el, text) {
+  typeStop();
+  Object.assign(typer, { el, text, i: 0, shown: document.createTextNode(""), rest: document.createElement("span") });
+  typer.rest.className = "tw-rest"; el.textContent = ""; el.scrollTop = 0; el.append(typer.shown, typer.rest);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) typer.i = text.length;
+  typeDraw();
+  if (typer.i < text.length) typer.t = setInterval(() => { typer.i++; typeDraw(); if (typer.i >= typer.text.length) typeStop(); }, TYPE_MS);
+}
+function typeDraw() { typer.shown.data = typer.text.slice(0, typer.i); typer.rest.textContent = typer.text.slice(typer.i); }
+function typeStop() { clearInterval(typer.t); typer.t = 0; }
+// Finishes the line being typed; true if there was one, so that tap does nothing else.
+function typeFinish() { if (!typer.t) return false; typer.i = typer.text.length; typeDraw(); typeStop(); return true; }
+
+let tipNow = null, tipPages = [], tipPg = 0;
 function tutor() {
   if (!S || !S.tut || S.tut.off || screen !== "game" || tipNow || sceneNow) return;
   const t = TIPS.find(x => !S.tut.seen[x.id] && x.when());
   if (!t) return;
   tipNow = t;
-  $("#tip").innerHTML = `<span class="who">Prof Penguin</span><p>${esc(t.text())}</p><div class="row"><button class="skip" type="button" data-tip="off">Skip the tips</button>${t.tab && t.tab !== tab ? '<button class="lbl" type="button" data-tip="show">Show me</button>' : ""}<button class="lbl" type="button" data-tip="ok">Got it</button></div>`;
-  $("#tip").hidden = false;
+  const el = $("#tip");
+  el.innerHTML = dlgHtml({ who: "Prof Penguin" }); el.classList.remove("idle");
+  tipPages = dlgPages($("#tip .dlg-text"), t.text()); tipPg = 0;
+  tipPage();
 }
-function hideTip() { tipNow = null; $("#tip").hidden = true; }
+function tipPage() {
+  const t = tipNow, more = tipPg < tipPages.length - 1;
+  $("#tip .row").innerHTML = `<button class="skip" type="button" data-tip="off">Skip the tips</button>${!more && t.tab && t.tab !== tab ? '<button class="lbl" type="button" data-tip="show">Show me</button>' : ""}<button class="lbl" type="button" data-tip="${more ? "more" : "ok"}">${more ? "Next ›" : "Got it"}</button>`;
+  typeInto($("#tip .dlg-text"), tipPages[tipPg]);
+}
+// No tip: the slot stays where it is, Prof Penguin's frame faint and quiet.
+function hideTip() {
+  tipNow = null; if (typer.el && $("#tip").contains(typer.el)) typeStop();
+  const el = $("#tip"); el.classList.add("idle"); el.innerHTML = dlgHtml({ who: "Prof Penguin", text: "…" });
+}
+hideTip();
+// A scene or the league notice: shown over the page, with the veil behind it.
+function overlay(id, on) { $(id).hidden = !on; $("#veil").hidden = $("#scene").hidden && $("#league").hidden; }
 
 // ── Rendering
 let tab = "battle", dexR = 0, viewR = 0, detail = null;
@@ -2380,6 +2461,10 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "update-2026-11-26a", date: "Nov 26, 2026", from: "Prof Penguin", title: "My text box got a makeover",
+    body: `<ul><li>My text box got a makeover, and the screen no longer jumps when I talk. The box under the tabs keeps its place even when I have nothing to say, so your next tap lands where you aimed it. A long tip comes in pages: tap Next ›.</li>
+      <li>Words type out as I say them. Tap once to see the whole line, and again to move on. The buttons are bigger, for thumbs.</li>
+      <li>Story scenes and the League rules open over the bottom of the screen instead, and the page behind them stays put until you close them. Your party keeps fighting while you read.</li></ul>` },
   { id: "update-story-mode", story: true, date: "Nov 25, 2026", from: "Prof Penguin", title: "Story Mode, Year 1",
     body: `<ul><li><b>New game</b> now asks: Classic or <b>Story</b>. Each has its own save, and you switch between them on the title screen. Your Classic save stays as it is.</li>
       <li>Year 1 is <b>The Long Freeze</b>. Snow in Kanto three weeks early, legends waking up, and a cheerful outfit called Team Thaw that always seems to get there first.</li>
@@ -2946,6 +3031,7 @@ $("#foe").addEventListener("pointerdown", e => {
 // Space or Enter taps the foe from anywhere on the battle screen, except while typing or with a button picked by keyboard.
 document.addEventListener("keydown", e => {
   if (screen !== "game" || tab !== "battle" || (e.key !== " " && e.key !== "Enter") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!$("#veil").hidden) return;
   const t = e.target; if (t !== $("#foe") && t.closest && t.closest("textarea, input, select, button, a, [contenteditable]")) return;
   e.preventDefault(); if (!e.repeat) tap(e);
 });
@@ -3006,7 +3092,10 @@ $("#t-party").addEventListener("change", e => {
   S.box[detail].forme = sel.value; save(); renderAll();
 });
 $("#tip").onclick = e => {
-  const b = e.target.closest("[data-tip]"), t = tipNow; if (!b || !t) return;
+  const b = e.target.closest("[data-tip]"), t = tipNow; if (!t) return;
+  if ((!b || b.dataset.tip !== "off") && typeFinish()) return;
+  if (!b) return;
+  if (b.dataset.tip === "more") { tipPg++; tipPage(); return; }
   S.tut.seen[t.id] = 1; hideTip();
   if (b.dataset.tip === "off") { S.tut.off = 1; toast("Tips are off. Settings can bring them back."); }
   if (b.dataset.tip === "show") openTab(t.tab);
@@ -3233,10 +3322,11 @@ const YEAR2_RESETS = ["Every Pokémon goes back to Lv 5 (❄ catch-up XP helps t
 const YEAR2_STAYS = ["your whole Box", "your dex", "key items, Mega Stones and form unlocks", "achievements, Mail and saved teams"];
 function year2Confirm() {
   hideTip();
-  $("#scene").innerHTML = `<span class="who">Year 2: ${esc(YEARS[2])}</span><p>Begin Year 2? This can't be undone.</p>
-    <table class="small y2"><tr><th>Resets</th><th>Stays</th></tr>${YEAR2_RESETS.map((r, i) => `<tr><td>${esc(r)}</td><td>${esc(YEAR2_STAYS[i] || "")}</td></tr>`).join("")}</table>
-    <div class="row"><button class="skip" type="button" data-y2="no">Not yet.</button><button class="lbl danger" type="button" data-y2="go"${YEAR2_READY ? "" : " disabled"}>Begin Year 2.</button></div>`;
-  $("#scene").hidden = false;
+  $("#scene").classList.add("free"); $("#scene").classList.remove("narr");
+  $("#scene").innerHTML = dlgHtml({ who: `Year 2: ${YEARS[2]}`, face: "Prof Penguin", text: "<p>Begin Year 2? This can't be undone.</p>",
+    extra: `<table class="small y2"><tr><th>Resets</th><th>Stays</th></tr>${YEAR2_RESETS.map((r, i) => `<tr><td>${esc(r)}</td><td>${esc(YEAR2_STAYS[i] || "")}</td></tr>`).join("")}</table>`,
+    row: `<button class="skip" type="button" data-y2="no">Not yet.</button><button class="lbl danger" type="button" data-y2="go"${YEAR2_READY ? "" : " disabled"}>Begin Year 2.</button>` });
+  overlay("#scene", true);
 }
 function beginYear2() { if (!YEAR2_READY) return; /* Year 2 builds the reset itself. */ }
 function endReplay() { try { localStorage.removeItem(REPLAY_KEY); } catch {} S = null; B = null; useSlot(STORY_KEY); }
@@ -3458,7 +3548,6 @@ const CLUES = {
 // legend chapter has a prize: a Mega pseudo stone where one exists, a Master Ball where none does. Red waits on Mt.
 // Silver (Johto) once the year is over.
 const CHIEF_USE = 0.95, ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_SLUSH_USE = 1.17, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
-const ADMIN_PIC = { Rime: "thaw-rime.png", Hail: "thaw-hail.png", Slush: "thaw-slush.png", Sssssssnakes: "sssssssnakes.png", "Team Thaw grunt": "thaw-grunt.png", "Prof Penguin": "prof-penguin.png" };
 const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
 // Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
 // Six each, all from that region's generation (forms included); the finale's are all Generation 9.
@@ -3651,15 +3740,16 @@ function pickScreen(c) {
 }
 function renderPick() {
   const { c, n } = pickNow;
-  $("#scene").innerHTML = `<span class="who">Prof Penguin</span><p>Both of them are awake. Team Thaw will take whichever you leave. Pick one.</p>
-    <div class="picks">${c.mons.map((m, i) => `<button type="button" data-pick="${m}" aria-pressed="${n === m}"><img src="${sprite(m)}" alt="A silhouette"><span>${esc(c.hints[i])}</span></button>`).join("")}</div>
-    <div class="row"><button class="skip" type="button" data-pick="later">Not yet</button><button class="lbl" type="button" data-pick="mine"${n ? "" : " disabled"}>This one's mine.</button></div>`;
-  $("#scene").hidden = false;
+  $("#scene").classList.add("free"); $("#scene").classList.remove("narr");
+  $("#scene").innerHTML = dlgHtml({ who: "Prof Penguin", text: "<p>Both of them are awake. Team Thaw will take whichever you leave. Pick one.</p>",
+    extra: `<div class="picks">${c.mons.map((m, i) => `<button type="button" data-pick="${m}" aria-pressed="${n === m}"><img src="${sprite(m)}" alt="A silhouette"><span>${esc(c.hints[i])}</span></button>`).join("")}</div>`,
+    row: `<button class="skip" type="button" data-pick="later">Not yet</button><button class="lbl" type="button" data-pick="mine"${n ? "" : " disabled"}>This one's mine.</button>` });
+  overlay("#scene", true);
 }
 function pickClick(b) {
   const v = b.dataset.pick, c = pickNow.c;
-  if (v === "later") { pickNow = null; $("#scene").hidden = true; return; }
-  if (v === "mine") { const n = pickNow.n; pickNow = null; $("#scene").hidden = true; S.story.picks[c.r] = n; notePickLine(c, n); save(); checkAch(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
+  if (v === "later") { pickNow = null; overlay("#scene", false); return; }
+  if (v === "mine") { const n = pickNow.n; pickNow = null; overlay("#scene", false); S.story.picks[c.r] = n; notePickLine(c, n); save(); checkAch(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
   pickNow.n = +v; renderPick();
 }
 // ── The League rules, for Story's gyms and Champions: no Tier 0 to 2, at most one Tier 3 and two Tier 4s.
@@ -3677,14 +3767,14 @@ let leagueFor = null;
 function leagueNotice(loc) {
   leagueFor = loc; hideTip();
   const teams = (S.teams || []).map((t, i) => [t, i]).filter(([t]) => !leagueBreaks(t.party.filter(n => S.box[n])));
-  $("#league").innerHTML = `<span class="who">League rules</span><p>Gyms and Champions in Story Mode allow no Tier 0, 1 or 2 Pokémon, at most one Tier 3 and at most two Tier 4s. ${esc(leagueBreaks())}</p>
-    <p class="small muted">Mascot legends and Mega pseudo forms are both Tier 3.</p>
-    <div class="row">${teams.length ? teams.map(([t, i]) => `<button class="lbl" type="button" data-league="${i}">Load ${esc(t.name)}</button>`).join("") : '<span class="small muted">No saved team fits. Save one in Party &amp; Box.</span>'}<button class="skip" type="button" data-league="close">Close</button></div>`;
-  $("#league").hidden = false;
+  $("#league").innerHTML = dlgHtml({ who: "League rules", face: "Prof Penguin", text: `<p>Gyms and Champions in Story Mode allow no Tier 0, 1 or 2 Pokémon, at most one Tier 3 and at most two Tier 4s. ${esc(leagueBreaks())}</p>
+    <p class="small muted">Mascot legends and Mega pseudo forms are both Tier 3.</p>`,
+    row: `<button class="skip" type="button" data-league="close">Close</button>${teams.length ? teams.map(([t, i]) => `<button class="lbl" type="button" data-league="${i}">Load ${esc(t.name)}</button>`).join("") : '<span class="small muted">No saved team fits. Save one in Party &amp; Box.</span>'}` });
+  overlay("#league", true);
 }
 $("#league").onclick = e => {
   const b = e.target.closest("[data-league]"); if (!b) return;
-  $("#league").hidden = true;
+  overlay("#league", false);
   if (b.dataset.league === "close") return;
   loadTeam(+b.dataset.league);
   if (leagueFor && !leagueBreaks()) startLoc(leagueFor);
@@ -3880,14 +3970,22 @@ function playScene(id, then) {
   renderScene();
 }
 function renderScene() {
-  const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], last = sceneNow.i === sc.lines.length - 1;
-  $("#scene").innerHTML = (who ? `<span class="who">${esc(who)}</span>${ADMIN_PIC[who] ? `<span class="face"><img src="${SPRITE_DIR + ADMIN_PIC[who]}" alt="" onerror="this.parentNode.textContent='${esc(who.split(" ").pop().toUpperCase())}'"></span>` : ""}` : "") + `<p>${esc(text)}</p><div class="row"><button class="skip" type="button" data-scene="skip">Skip</button><span class="muted small count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next">${last ? "Close" : "Next"}</button></div>`;
-  $("#scene").hidden = false;
+  const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], el = $("#scene");
+  el.classList.remove("free"); el.classList.toggle("narr", !who);
+  el.innerHTML = dlgHtml({ who, row: `<button class="skip" type="button" data-scene="skip">Skip</button><span class="count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next"></button>` });
+  overlay("#scene", true);
+  sceneNow.pages = dlgPages($("#scene .dlg-text"), text); sceneNow.pg = 0;
+  scenePage();
   $("#scene [data-scene=next]").focus({ preventScroll: true });
+}
+function scenePage() {
+  const s = sceneNow, last = s.i === SCENES[s.id].lines.length - 1 && s.pg === s.pages.length - 1;
+  $("#scene [data-scene=next]").textContent = last ? "Close" : "Next ›";
+  typeInto($("#scene .dlg-text"), s.pages[s.pg]);
 }
 function endScene() {
   const s = sceneNow; if (!s) return;
-  sceneNow = null; $("#scene").hidden = true;
+  sceneNow = null; typeStop(); overlay("#scene", false);
   markSeen(s.id);
   if (tab === "story" && screen === "game") renderStory();
   if (s.then) s.then();
@@ -3896,9 +3994,14 @@ function endScene() {
 function markSeen(id) { if (S && S.story) { if (!S.story.seen[id]) { S.story.seen[id] = 1; save(); } } else if (!preSeen.includes(id)) preSeen.push(id); }
 $("#scene").onclick = e => {
   const p = e.target.closest("[data-pick]"); if (p && pickNow) return pickClick(p);
-  const y = e.target.closest("[data-y2]"); if (y) { $("#scene").hidden = true; if (y.dataset.y2 === "go") beginYear2(); return; }
-  const b = e.target.closest("[data-scene]"); if (!b || !sceneNow) return;
-  if (b.dataset.scene === "skip" || sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
+  const y = e.target.closest("[data-y2]"); if (y) { overlay("#scene", false); if (y.dataset.y2 === "go") beginYear2(); return; }
+  // In a scene, Next or a tap anywhere on the box: finish the line, then the next page, then the next line.
+  if (!sceneNow) return;
+  const b = e.target.closest("[data-scene]");
+  if (b && b.dataset.scene === "skip") return endScene();
+  if (typeFinish()) return;
+  if (sceneNow.pg < sceneNow.pages.length - 1) { sceneNow.pg++; scenePage(); }
+  else if (sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
   else { sceneNow.i++; renderScene(); }
 };
 
