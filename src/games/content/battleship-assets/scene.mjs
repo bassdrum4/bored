@@ -20,13 +20,16 @@ const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-p
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
 renderer.toneMapping = T.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.24;
+renderer.toneMappingExposure = 1.04;
 host.appendChild(renderer.domElement);
 $('error')?.remove();
 
-const sun = new T.DirectionalLight(0xffe0a3, 3.1);
+const sun = new T.DirectionalLight(0xffe0a3, 2.2);
 sun.position.set(-80, 45, -35);
-scene.add(sun, new T.HemisphereLight(0xdcefff, 0x233b4a, 2.0));
+// Fill from the camera side so ships never read as flat silhouettes against the glare.
+const fill = new T.DirectionalLight(0xcfe2ea, .95);
+fill.position.set(70, 34, 95);
+scene.add(sun, fill, new T.HemisphereLight(0xdcefff, 0x233b4a, 1.2));
 
 const sky = new T.Mesh(new T.SphereGeometry(700, 32, 20), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, uniforms: {}, vertexShader: `varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`, fragmentShader: `varying vec3 p;void main(){vec3 d=normalize(p);float h=max(d.y,0.);vec3 c=mix(vec3(.72,.79,.77),vec3(.19,.37,.52),pow(h,.45));vec2 uv=d.xz/(h+.22);float cl=sin(uv.x*4.+sin(uv.y*3.))*cos(uv.y*3.1+sin(uv.x*2.3));cl+=.42*sin(uv.x*9.2+uv.y*4.6)+.18*cos(uv.y*22.-uv.x*9.);c=mix(c,vec3(.87,.88,.83),smoothstep(.48,1.05,cl)*smoothstep(.03,.3,h)*.65);float s=pow(max(dot(d,normalize(vec3(-.8,.35,-.4))),0.),100.);c+=vec3(1.,.7,.35)*s;gl_FragColor=vec4(c,1.);}` }));
 scene.add(sky);
@@ -41,8 +44,8 @@ farSea.position.y = -.8;
 scene.add(farSea);
 
 /* ------------------------------------------------------------------ fleet */
-const mat = (color, metalness = .25, roughness = .55) => new T.MeshStandardMaterial({ color, metalness, roughness });
-const steel = mat(0x64747a), dark = mat(0x26343d), deck = mat(0x97856c), black = mat(0x151f25), red = mat(0x753c35), cream = mat(0xb6b5a1);
+const mat = (color, metalness = .25, roughness = .55) => new T.MeshStandardMaterial({ color, metalness, roughness, envMapIntensity: .28 });
+const steel = mat(0x6a7a80), dark = mat(0x25323a), deck = mat(0x8a7a63), black = mat(0x151f25), red = mat(0x6d3a33), cream = mat(0xa9a897);
 const boxGeo = new T.BoxGeometry(1, 1, 1);
 function box(g, m, x, y, z, w, h, d) { let o = new T.Mesh(boxGeo, m); o.position.set(x, y, z); o.scale.set(w, h, d); g.add(o); return o }
 function cyl(g, m, x, y, z, r1, r2, h) { let o = new T.Mesh(new T.CylinderGeometry(r1, r2, h, 10), m); o.position.set(x, y, z); g.add(o); return o }
@@ -286,7 +289,7 @@ function layBearing(a, b) {
 }
 
 /* ----------------------------------------------------------- the shell */
-const projectile = new T.Mesh(new T.CapsuleGeometry(.16, .9, 3, 8), new T.MeshBasicMaterial({ color: 0xffd89a }));
+const projectile = new T.Mesh(new T.CapsuleGeometry(.13, 1.3, 3, 8), new T.MeshBasicMaterial({ color: 0xe8be86 }));
 projectile.visible = false;
 scene.add(projectile);
 const trailGlow = new T.SpriteMaterial({ map: puffTexture, color: 0xffcf8d, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .55 });
@@ -318,14 +321,12 @@ function muzzlePoint(target) {
 }
 
 /* --------------------------------------------------------------- caption */
-function caption(tag, sub, tone) {
+const cellName = i => String.fromCharCode(65 + Math.floor(i / 10)) + (i % 10 + 1);
+function caption(text, tone) {
   const n = $('cineNotice');
-  if (n) {
-    const a = n.firstElementChild, b = n.lastElementChild;
-    if (a && a !== b) { a.textContent = tag; b.textContent = sub } else n.textContent = tag;
-  }
+  if (n) n.textContent = text;
   document.body.dataset.shot = tone || '';
-  if ($('log')) $('log').textContent = tag + (sub ? ' · ' + sub : '');
+  if ($('log')) $('log').textContent = text;
 }
 
 /* ------------------------------------------------------------ timeline */
@@ -349,7 +350,7 @@ function fire(i, hit, sunk) {
     reticle.position.copy(target); reticle.position.y = 1;
     reticle.visible = true; retPulse.material.opacity = 0;
     bearingLine.visible = true; layBearing(start, target);
-    caption(String.fromCharCode(65 + Math.floor(i / 10)) + (i % 10 + 1), 'MAIN BATTERY · RANGE ' + (dist * .1).toFixed(1) + ' KM', 'aim');
+    caption(cellName(i) + ' · firing', 'fire');
     projectile.visible = false;
     trailTimer = 0;
   });
@@ -369,7 +370,7 @@ function impact(s) {
   marks.add(mark);
   sound(s.hit);
   if (s.sunk) {
-    caption('SUNK', NAMES[s.sunk.index] + ' · LOST WITH ALL HANDS', 'sunk');
+    caption(cellName(s.i) + ' · ' + NAMES[s.sunk.index].toLowerCase() + ' sunk', 'sunk');
     const g = makeShip(s.sunk.cells.length * cell * .87);
     g.userData.shipType = TYPES[s.sunk.index];
     g.userData.length = s.sunk.cells.length * cell * .87;
@@ -381,8 +382,8 @@ function impact(s) {
     scene.add(g);
     g.userData.sinkStart = elapsed;
     ships.push({ model: g, sunk: true });
-  } else if (s.hit) caption('HIT', 'TARGET STRUCK · DAMAGE REPORTED', 'hit');
-  else caption('MISS', 'SPLASH · NO CONTACT', 'miss');
+  } else if (s.hit) caption(cellName(s.i) + ' · hit', 'hit');
+  else caption(cellName(s.i) + ' · miss', 'miss');
 }
 
 function finishShot() {
@@ -471,14 +472,16 @@ function update(now = 0) {
     if (t < T_FIRE) {
       /* --- guns train, camera on the ship --------------------------------- */
       const k = smooth(clamp(t / T_AIM, 0, 1));
-      desired.copy(player.position).add(new T.Vector3(29, 14, 25).lerp(new T.Vector3(21, 9, 15), k));
+      // Narrow portrait screens see a much thinner slice of the world, so pull back.
+      const fit = clamp(1.45 / camera.aspect, 1, 2);
+      const lift = 1 + (fit - 1) * .5;
+      desired.copy(player.position).add(new T.Vector3(29 * fit, 14 * lift, 25 * fit).lerp(new T.Vector3(21 * fit, 9 * lift, 15 * fit), k));
       focus.copy(player.position).add(new T.Vector3(0, 5, -8)).lerp(s.target, .18 * k);
       lambda = 5.5; fovGoal = 42;
       reticle.visible = true;
       const pulse = .5 + .5 * Math.sin(elapsed * 6);
       retPulse.material.opacity = .18 + pulse * .35;
       retPulse.scale.setScalar(1 + pulse * .25);
-      if (!s.fired && t > T_FIRE - .18) caption('SALVO AWAY', 'MAIN BATTERY · SHELL IN FLIGHT', 'fire');
     } else if (t < T_HIT) {
       /* --- chase cam behind the shell ------------------------------------- */
       const u = clamp((t - T_FIRE) / (T_HIT - T_FIRE), 0, 1);
@@ -507,7 +510,7 @@ function update(now = 0) {
         if (Math.random() < .5) puff(p, { color: 0xd9d6c4, size: .8, life: .55, rise: 0, spread: .5, gravity: 1, grow: 2.2, opacity: .3 });
       }
 
-      desired.copy(p).addScaledVector(tan, -8).addScaledVector(UP, 6 - u * 2.5).addScaledVector(side, 1.4);
+      desired.copy(p).addScaledVector(tan, -8 * clamp(1.3 / camera.aspect, 1, 1.5)).addScaledVector(UP, 6 - u * 2.5).addScaledVector(side, 1.4);
       focus.copy(p).lerp(s.target, .42 + u * .25);
       lambda = 9; fovGoal = 55; bank = .1;
       reticle.visible = false;
@@ -516,7 +519,8 @@ function update(now = 0) {
       if (!s.impacted) impact(s);
       const k = clamp((t - T_HIT) / (T_END - T_HIT), 0, 1);
       const a = .55 + k * 1.35;
-      desired.copy(s.target).add(new T.Vector3(Math.cos(a) * (44 - k * 10), 22 + Math.sin(k * Math.PI) * 6, Math.sin(a) * (44 - k * 10)));
+      const orbit = (44 - k * 10) * clamp(1.3 / camera.aspect, 1, 1.6);
+      desired.copy(s.target).add(new T.Vector3(Math.cos(a) * orbit, 22 + Math.sin(k * Math.PI) * 6, Math.sin(a) * orbit));
       focus.copy(s.target).add(new T.Vector3(0, s.hit ? 3.5 : 1.5, 0));
       lambda = 3.2; fovGoal = 50;
       if (s.hit && Math.random() < .5) puff(s.target.clone().add(new T.Vector3((Math.random() - .5) * 6, 1, (Math.random() - .5) * 6)), { color: 0x3a4046, size: 3, life: 2.2, rise: 3 + Math.random() * 4, gravity: -.8, grow: 2.4, opacity: .35 });
@@ -574,6 +578,23 @@ function styleFallback(g, type) {
   }
 }
 
+// The fleet models ship untextured white; pull them down to painted naval grey.
+function paintModel(g) {
+  g.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (!m.color) continue;
+      const hsl = { h: 0, s: 0, l: 0 };
+      m.color.getHSL(hsl);
+      if (hsl.s > .3) m.color.multiplyScalar(.8);
+      else if (hsl.l < .25) m.color.setHex(0x39434a);
+      else m.color.setHex(0x8d979b);
+      if ('metalness' in m) { m.metalness = .08; m.roughness = .82 }
+      m.envMapIntensity = .15;
+    }
+  });
+}
+
 function applyModel(g) {
   const a = assets.get(g.userData.shipType);
   if (!a) return;
@@ -593,6 +614,7 @@ function applyModel(g) {
   wrapper.traverse(o => { if (/^(turret|main_gun)[_ -]?\d+$/i.test(o.name)) turrets.push(o) });
   g.clear();
   g.add(wrapper);
+  paintModel(g);
   g.userData.turrets = turrets;
   g.userData.assetApplied = true;
 }
