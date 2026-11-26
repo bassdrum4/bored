@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 999,
+  "count": 1000,
   "newest": "2026-11-26",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"eba01728","date":"2026-11-26","author":"Codebuff","subject":"Fix Battleship's white fleet, unclear setup and trailer captions"},
   {"sha":"c7ac3083","date":"2026-11-26","author":"Codebuff","subject":"Give Battleship a chase-cam salvo cinematic"},
   {"sha":"5b442596","date":"2026-11-26","author":"bassdrum4","subject":"Make a chained shadow.net line wait for a slow command"},
   {"sha":"547c5022","date":"2026-11-26","author":"bassdrum4","subject":"Chain shadow.net commands like cmd.exe, not like a guess at bash"},
