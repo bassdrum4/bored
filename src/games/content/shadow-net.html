@@ -146,6 +146,7 @@ const FS = {
   localhost:{
     home:{ghost:{
       'readme.txt':'Welcome to SHADOW.NET v2.4.1\n\nYou are a freelance operative.\nYour handler: VEGA\nEncrypted channel: ACTIVE\n\nType "help" for commands.\nType "missions" for objectives.',
+      'practice.dat':{content:'TRAINING FILE - LEFT BY VEGA\n============================\n\nThis one is not protecting anything. It is here so you\ncan learn the lock without spending a run on it.\n\nEvery encrypted file on this network is a Caesar\ncipher: each letter is moved forward by the same number.\nPreview a shift for free with "try <number>"; "submit"\nlocks it in and costs an attempt if you are wrong.\n\nThe shift on this file is 4.',encrypted:true,shift:4},
       downloads:{},
       notes:{
         'targets.txt':'Known targets:\n- nexus-corp.net (10.0.44.12) - Primary\n- relay.nexus-corp.net - Unknown IP\n- vault.nexus-corp.net - Unknown IP\n\nNote: Scan network to discover servers.',
@@ -359,6 +360,7 @@ function addTrace(amount){
   if(state.stealthBought) amount = Math.ceil(amount/2);
   state.trace = Math.min(100, state.trace + amount);
   updateUI();
+  tutorialTraceWarn();
   if(state.trace >= 100 && !state.gameEnded){
     gameOver();
   }
@@ -620,30 +622,87 @@ function cmdHelp(){
 // lands, so it cannot change what a run scores or how much trace it costs.
 // It never starts on its own - "help" lists it first, and "tutorial" runs it.
 const TUTORIAL = [
-  {title:'Look around', how:'ls', say:'You are ghost, on your own machine. ls lists the folder you are in; cd moves; cat reads a file.',
+  {id:'look', title:'Look around', how:'ls', say:'You are ghost, on your own machine. ls lists the folder you are in; cd moves; cat reads a file.',
     done:()=>tutorial.did.ls},
-  {title:'Read the briefing', how:'cat readme.txt', say:'The readme names your handler and the channel you are using. ghost is the name; VEGA is the voice.',
+  {id:'readme', title:'Read the briefing', how:'cat readme.txt', say:'The readme names your handler and the channel you are using. ghost is the name; VEGA is the voice.',
     done:()=>tutorial.did['cat:readme.txt']},
-  {title:'Find a way in', how:'scan', say:'Nothing is on the network map until you scan for it. Scan is the cheapest thing you can do out there.',
+  {id:'scan', title:'Find a way in', how:'scan', say:'Nothing is on the network map until you scan for it. Scan is the cheapest thing you can do out there.',
     done:()=>SERVERS['nexus-corp.net'].discovered},
-  {title:'Open a session', how:'connect nexus-corp.net', say:'An uncracked host answers the network and shows nothing else. The lock comes first.',
+  {id:'session', title:'Open a session', how:'connect nexus-corp.net', say:'An uncracked host answers the network and shows nothing else. The lock comes first.',
     done:()=>state.connected==='nexus-corp.net'},
-  {title:'Break the lock', how:'crack', say:'Pick a word from the list. A wrong guess says how many letters already sit in the right place - that number is the whole puzzle. Four bad guesses drop the session; connect again and retry.',
+  {id:'crack', title:'Break the lock', how:'crack', say:'Pick a word from the list. A wrong guess says how many letters already sit in the right place - that number is the whole puzzle. Four bad guesses drop the session; connect again and retry.',
     done:()=>SERVERS['nexus-corp.net'].cracked},
-  {title:'Walk the host', how:'cd /home/jdoe/documents', say:'Remote sessions start at /. ls maps a folder and cd moves into it. The brief is three levels in.',
+  {id:'walk', title:'Walk the host', how:'cd /home/jdoe/documents', say:'Remote sessions start at /. ls maps a folder and cd moves into it. The brief is three levels in.',
     done:()=>state.currentDir==='/home/jdoe/documents'},
-  {title:'Read the evidence', how:'cat project_helios_brief.txt', say:'Read it before you take it. It is what the job is actually about.',
+  {id:'evidence', title:'Read the evidence', how:'cat project_helios_brief.txt', say:'Read it before you take it. It is what the job is actually about.',
     done:()=>tutorial.did['cat:project_helios_brief.txt']},
-  {title:'Take a copy', how:'download project_helios_brief.txt', say:'download copies a file to /home/ghost/downloads and pays credits. Classified files cost more trace.',
+  {id:'copy', title:'Take a copy', how:'download project_helios_brief.txt', say:'download copies a file to /home/ghost/downloads and pays credits. Classified files cost more trace.',
     done:()=>state.downloaded.includes('project_helios_brief.txt')},
-  {title:'Leave clean', how:'disconnect', say:'Get out before trace reaches 100. Disconnecting is free, and the next job starts from home.',
-    done:()=>!state.connected && SERVERS['nexus-corp.net'].cracked}
+  {id:'leave', title:'Leave clean', how:'disconnect', say:'Get out before trace reaches 100. Disconnecting is free, and the next job starts from home.',
+    done:()=>!state.connected && SERVERS['nexus-corp.net'].cracked},
+
+  // The rest of the toolbox: the commands the first breach never needs and the
+  // later missions cannot do without.
+  {id:'cipher', title:'Open a file', how:'decrypt practice.dat', say:'VEGA left a training file at home. decrypt opens the shift interface: try <n> previews for free, submit <n> spends an attempt, hint costs 3 trace. Read the preview, never the ciphertext.',
+    done:()=>tutorial.did.decrypt},
+  {id:'rescan', title:'Scan again', how:'scan', say:'Cracking a host opens the network behind it. A scan costs 3 trace, so scan when a job points you somewhere new.',
+    done:()=>SERVERS['relay.nexus-corp.net'].discovered},
+  {id:'relay', title:'Take the relay', how:'connect relay.nexus-corp.net', say:'The relay is where the vault key lives. Connect first, then ask the machine what its lock looks like.',
+    done:()=>state.connected==='relay.nexus-corp.net'},
+  {id:'analyze', title:'Ask before you guess', how:'analyze', say:'analyze costs 5 trace and returns the password length, the attempts the host allows, and where its clue lives. Cheaper than a lockout.',
+    done:()=>tutorial.did.analyze},
+  {id:'map', title:'Read the network', how:'map', say:'map draws every host you have found; [???] is one that exists but has not shown itself. The bar in the sidebar is the number trace prints.',
+    done:()=>tutorial.did.map},
+  {id:'shop', title:'Spend the money', how:'shop', say:'Credits buy trace, not access: trace_wipe 200cr is -25, heavy_wipe 400cr is -50, stealth 500cr halves every future gain. buy <id> pays; mission 7 wants you out below 75.',
+    done:()=>tutorial.did.shop}
 ];
 
 const tutorial = {on:false, step:0, did:{}};
 
 function tutorialDid(name){
   tutorial.did[name] = true;
+}
+
+// How many positions two guesses share. The crack already knows the password;
+// these hints only teach the operator to read the board they were dealt.
+function tutorialLiking(a, b){
+  let n = 0;
+  for(let i=0;i<a.length;i++) if(a[i]===b[i]) n++;
+  return n;
+}
+
+function tutorialCrackHint(guess, likeness, cs){
+  const step = TUTORIAL[tutorial.step];
+  if(!tutorial.on || !step || step.id!=='crack') return;
+  const others = cs.words.filter(w=>w!==guess);
+  const left = others.filter(w=>tutorialLiking(guess, w)===likeness);
+  print(`  [tutorial] ${guess} scores ${likeness}, so the password scores exactly ${likeness} against it: ${left.length} of the ${others.length} other words fit.`, 'c-accent');
+  print(left.length===1
+    ? '  [tutorial] One word still fits. That is the password.'
+    : '  [tutorial] Score the next guess the same way and the list halves itself.', 'c-accent');
+}
+
+function tutorialCrackLockout(server){
+  const step = TUTORIAL[tutorial.step];
+  if(!tutorial.on || !step || step.id!=='crack') return;
+  print('  [tutorial] Locked out is not lost: the host still stands and nothing you took is gone.', 'c-accent');
+  print(`  [tutorial] "connect ${server}" then "crack" again; the words reshuffle, the likeness rule does not.`, 'c-accent');
+}
+
+// Once, when the meter first gets dangerous: the prices the shop actually
+// charges, so the warning can be acted on instead of just felt.
+function tutorialTraceWarn(){
+  if(!tutorial.on || tutorial.did.traceWarned || state.trace < 75) return;
+  tutorial.did.traceWarned = true;
+  print(`  [tutorial] Trace ${state.trace}. At 100 the session ends; mission 7 wants you out below 75.`, 'c-accent');
+  print('  [tutorial] buy trace_wipe is -25 for 200cr, buy heavy_wipe is -50 for 400cr. "trace" prints the number.', 'c-accent');
+}
+
+function finishTutorial(){
+  tutorial.on = false;
+  print('');
+  print('Tutorial done. From here it is the same loop against harder locks.', 'c-success');
+  print('"missions" has every objective; "tutorial" can be run again at any time.', 'c-muted');
 }
 
 function printTutorialStep(){
@@ -662,14 +721,7 @@ function tutorialTick(){
     print('  ok: ' + TUTORIAL[tutorial.step].title, 'c-success');
     tutorial.step++;
     advanced = true;
-    if(tutorial.step >= TUTORIAL.length){
-      tutorial.on = false;
-      print('');
-      print('Tutorial done. That is the loop: scan, connect, crack, read, take, disconnect.', 'c-success');
-      print('Encrypted files later need "decrypt <file>"; that interface walks you through the shift.', 'c-muted');
-      print('"missions" has every objective; "tutorial" can be run again at any time.', 'c-muted');
-      return;
-    }
+    if(tutorial.step >= TUTORIAL.length){ finishTutorial(); return; }
   }
   if(advanced) printTutorialStep();
 }
@@ -686,11 +738,7 @@ function cmdTutorial(arg){
     if(!tutorial.on){ print('Tutorial is not running. Type "tutorial" to start it.','c-muted'); return; }
     print('  (skipped)', 'c-muted');
     tutorial.step++;
-    if(tutorial.step >= TUTORIAL.length){
-      tutorial.on = false;
-      print('Tutorial done. That is the loop: scan, connect, crack, read, take, disconnect.','c-success');
-      return;
-    }
+    if(tutorial.step >= TUTORIAL.length){ finishTutorial(); return; }
     printTutorialStep();
     return;
   }
@@ -941,6 +989,7 @@ function cmdAnalyze(){
     print(`Hint: Meridian set the archive cipher four past the vault. Preview before submitting.`, 'c-accent');
   }
   print(`[Trace +5]`, 'c-warning');
+  tutorialDid('analyze');
 }
 
 function cmdStatus(){
@@ -982,6 +1031,7 @@ function cmdShop(){
     print(`    ${item.desc}${owned?' (OWNED)':''}`, 'c-muted');
   });
   print('\nUse "buy <id>" to purchase.', 'c-info');
+  tutorialDid('shop');
 }
 
 function cmdBuy(arg){
@@ -1018,6 +1068,7 @@ function cmdMap(){
   print('');
   print('  Legend: ', 'c-muted');
   printHTML(`  <span style="color:var(--success)">● Accessed</span>  <span style="color:var(--info)">● Discovered</span>  <span style="color:var(--muted)">● Unknown</span>`);
+  tutorialDid('map');
 }
 
 // --- MINI-GAME: PASSWORD CRACK ---
@@ -1115,6 +1166,9 @@ function handleCrackInput(input){
   print(`  Likeness: ${likeness}/${word.length} letters in correct position`, likeness>0?'c-warning':'c-error');
   print(`  Attempts remaining: ${'●'.repeat(cs.attemptsLeft)}${'○'.repeat(cs.maxAttempts-cs.attemptsLeft)} ${cs.attemptsLeft}/${cs.maxAttempts}\n`, cs.attemptsLeft<=1?'c-error':'c-default');
 
+  // Teach the number while there is still a guess left to spend on it.
+  if(cs.attemptsLeft>0) tutorialCrackHint(word, likeness, cs);
+
   if(cs.attemptsLeft<=0){
     // Failed!
     state.mode='normal';
@@ -1122,6 +1176,7 @@ function handleCrackInput(input){
     addTrace(10);
     print(`CRACK FAILED. Lockout triggered.`, 'c-error');
     print(`Trace increased significantly. Disconnected.`, 'c-error');
+    tutorialCrackLockout(cs.server);
     state.connected=null;
     state.currentDir='/home/ghost';
     checkMissions();
@@ -1241,6 +1296,7 @@ function handleDecryptInput(input){
       print(`File "${ds.filename}" has been decrypted!`, 'c-success');
       print(`Use "cat ${ds.filename}" to read it.`, 'c-info');
       print(`[+50cr]`, 'c-accent');
+      tutorialDid('decrypt');
       checkMissions();
       updateUI();
     } else {
@@ -1281,6 +1337,10 @@ function gameOver(){
   print('║                                      ║', 'c-error');
   print('║  Type "restart" to try again.        ║', 'c-error');
   print('╚══════════════════════════════════════╝\n', 'c-error');
+  if(tutorial.on){
+    tutorial.on = false;
+    print('The tutorial stops with the run. Type "tutorial" after you restart.', 'c-muted');
+  }
 }
 
 function gameWin(){
@@ -1330,6 +1390,9 @@ function restartGame(){
   state.discoveredServers=new Set(['localhost']);
   state.crackedServers=new Set(['localhost']);
   state.downloadCount=0;
+  tutorial.on=false;
+  tutorial.step=0;
+  tutorial.did={};
 
   // Reset servers
   Object.keys(SERVERS).forEach(k=>{
