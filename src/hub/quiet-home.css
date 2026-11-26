@@ -15,9 +15,9 @@
 .header-tools .online-presence summary { padding: 8px 4px; }
 .header-icon { position: relative; display: grid; place-items: center; width: 36px; height: 36px; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
 .header-icon .badge { position: absolute; top: 0; right: 0; }
-.header-feedback { border: 0; background: transparent; color: var(--ink); font: inherit; padding: 8px 4px; cursor: pointer; }
-.header-feedback:hover, .header-feedback:focus-visible { text-decoration: underline; }
-.header-feedback:disabled { color: var(--dim); cursor: default; text-decoration: none; }
+.site-nav .nav-button { display: flex; align-items: center; justify-content: center; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink); font: inherit; padding: 10px 0; cursor: pointer; white-space: nowrap; text-align: center; }
+.site-nav .nav-button:hover, .site-nav .nav-button:focus-visible { text-decoration: underline; }
+.site-nav .nav-button:disabled { color: var(--dim); cursor: default; text-decoration: none; }
 #profile-menu { position: relative; min-width: 0; }
 #profile-menu summary { display: flex; align-items: center; gap: 5px; cursor: pointer; list-style: none; min-height: 36px; }
 #profile-menu summary::-webkit-details-marker { display: none; }
@@ -63,6 +63,7 @@
   .masthead-top h1 { font-size: 40px; }
   .header-tools { gap: 4px; font-size: 10px; }
   .site-nav #together-nav { padding: 7px 4px; }
+  .site-nav .nav-button { min-height: 48px; padding: 7px 4px; font: 10.5px/1.3 var(--mono); white-space: normal; }
   #profile-label { max-width: 85px; }
   .header-tools .online-presence { position: static; }
   .header-tools .online-panel { right: 0; top: 100%; }

@@ -311,9 +311,11 @@ html[data-reduce-motion="true"] *::after {
   #daily { grid-template-columns: minmax(0, 1fr); padding: 15px; gap: 0; }
   #daily .daily-visual { display: none; }
   .site-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .site-nav > #leaderboard-nav,
-  .site-nav > #changelog-nav,
-  .site-nav > #settings-nav { display: none; }
+  /* These three are in More on the bottom bar. The ids are spelled with the element so these
+     rules outrank the flex cell rule above, which also matches them. */
+  .site-nav > a#leaderboard-nav,
+  .site-nav > a#changelog-nav,
+  .site-nav > a#settings-nav { display: none; }
   .site-nav > a:not(#together-nav),
   .site-nav > #together-nav { font-size: 10.5px; min-height: 48px; }
   #mobile-more-nav { display: block; min-width: 0; position: relative; }
