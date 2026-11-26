@@ -205,9 +205,9 @@
     "max_value": 2000
   },
   "shadow-net": {
-    "label": "Files downloaded",
+    "label": "Credits kept + trace left + time under 20 minutes",
     "better": "high",
-    "max_value": 999
+    "max_value": 12000
   },
   "shotgun-roulette": {
     "label": "Biggest profit from one won game",

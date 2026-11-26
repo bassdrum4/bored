@@ -343,7 +343,7 @@ const DAILY_ADAPTERS = {
   lava: { expression: '({points:sc?sc[0]:0,cpu:cpuMode===true})' },
   volletball: { expression: '({points:sc[0],cpu:cpuMode===true})' },
   'gun-mayhem': { expression: '({wins:pls[0]?pls[0].wins:0,cpu:mode==="1p"})' },
-  'shadow-net': { expression: '({files:state.downloadCount})' },
+  'shadow-net': { expression: '({files:state.downloadCount,score:shadowScore(),won:shadowWon()})' },
   sand: { closure: true, expression: '({cells:grid.reduce((n,v)=>n+(v!==EMPTY),0),materials:new Set(grid.filter(v=>v!==EMPTY)).size})' },
   eco: { closure: true, expression: '({plants:plants.length,herbs:herbs.length,predators:preds.length,seconds:gTime})' }
 };

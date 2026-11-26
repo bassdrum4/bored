@@ -155,6 +155,7 @@ const FS = {
     home:{ghost:{
       'readme.txt':'Welcome to SHADOW.NET v2.4.1\n\nYou are a freelance operative.\nYour handler: VEGA\nEncrypted channel: ACTIVE\n\nType "help" for commands.\nType "missions" for objectives.',
       'practice.dat':{content:'TRAINING FILE - LEFT BY VEGA\n============================\n\nThis one is not protecting anything. It is here so you\ncan learn the lock without spending a run on it.\n\nEvery encrypted file on this network is a Caesar\ncipher: each letter is moved forward by the same number.\nPreview a shift for free with "try <number>"; "submit"\nlocks it in and costs an attempt if you are wrong.\n\nThe shift on this file is 4.',encrypted:true,shift:4},
+      'practice.key':{content:'TRAINING FILE - KEYWORD CIPHER\n==============================\n\nThis one takes a word instead of a number: each letter\nof the key shifts its own letter of the file, then the\nkey starts again.\n\nPreview a keyword with "try <word>"; lock it in with\n"submit <word>".\n\nThe key on this file is PRACTICE.',encrypted:true,cipher:'vigenere',key:'PRACTICE'},
       downloads:{},
       notes:{
         'targets.txt':'Known targets:\n- nexus-corp.net (10.0.44.12) - Primary\n- relay.nexus-corp.net - Unknown IP\n- vault.nexus-corp.net - Unknown IP\n\nNote: Scan network to discover servers.',
@@ -207,7 +208,10 @@ const FS = {
     data:{
       classified:{
         'helios_blueprint.txt':{content:'========================================\n  PROJECT HELIOS - MASTER BLUEPRINT\n  CLASSIFICATION: UMBRA - TOP SECRET\n========================================\n\nSystem Architecture:\n- Core AI: HELIOS-v4.2\n- Collection: Global mesh network\n- Processing: Distributed quantum cluster\n- Storage: 5 encrypted vaults\n\nSurveillance Capabilities:\n1. Communication intercept (99.97% coverage)\n2. Facial recognition (2.3M cameras, <0.3s ID)\n3. Predictive behavior (91% accuracy target)\n\nDeployment:\n- Phase 1: SE Asia (Q1 2024)\n- Phase 2: Middle East (Q2 2024)\n- Phase 3: Global (Q4 2024)\n\nBuyer Contracts: $2.71 billion total\nLaundered via Meridian, Atlas, Phoenix funds\n\nTHIS DOCUMENT CONSTITUTES EVIDENCE OF\nCRIMINAL ACTIVITY UNDER INTERNATIONAL LAW\n========================================',encrypted:true,shift:13,classified:true,missionCritical:true},
-        'financial_records.txt':{content:'NEXUS CORP - OFF-BOOK RECORDS\n=============================\n\nHELIOS Revenue:\n- Contract A: $890M (5-year)\n- Contract B: $720M (3-year)\n- Contract C: $1.1B (10-year)\nTotal: $2,710,000,000\n\nLaundered through:\n- Meridian Holdings (Cayman)\n- Atlas Fund (Switzerland)\n- Phoenix Capital (Singapore)\n\nKey payments:\n- P. Harlow (CEO): $45M offshore\n- M. Webb (CTO): $28M offshore\n- J. Rodriguez (CFO): $22M offshore\n\nEVIDENCE OF FRAUD AND MONEY LAUNDERING\n=========================================',encrypted:true,shift:5,classified:true}
+        'financial_records.txt':{content:'NEXUS CORP - OFF-BOOK RECORDS\n=============================\n\nHELIOS Revenue:\n- Contract A: $890M (5-year)\n- Contract B: $720M (3-year)\n- Contract C: $1.1B (10-year)\nTotal: $2,710,000,000\n\nLaundered through:\n- Meridian Holdings (Cayman)\n- Atlas Fund (Switzerland)\n- Phoenix Capital (Singapore)\n\nKey payments:\n- P. Harlow (CEO): $45M offshore\n- M. Webb (CTO): $28M offshore\n- J. Rodriguez (CFO): $22M offshore\n\nEVIDENCE OF FRAUD AND MONEY LAUNDERING\n=========================================',encrypted:true,shift:5,classified:true},
+        // What Nexus legal certified for release: a summary, seeded so a
+        // shortcut looks like the ledger. It publishes; it does not burn them.
+        'meridian_ledger.dat':{content:'MERIDIAN HOLDINGS - CERTIFIED SUMMARY\n=====================================\nPREPARED FOR DISCLOSURE - NOT THE SETTLEMENT ORIGINAL\n\nACCOUNT: 88-114-CAYMAN (summary copy)\n\nPAYMENTS (ROUNDED)\n  Harlow, P.            $45,000,000\n  Webb, M.              $28,000,000\n  Rodriguez, J.         $22,000,000\n  Other parties      $2,478,000,000\n\nTOTAL REPORTED: $2,573,000,000\n\nNOTE: Figures are certified for publication. The settlement\noriginal is held by Meridian, not by us.\n\nCERTIFIED BY NEXUS LEGAL - FOR RELEASE',encrypted:true,shift:11,classified:true,decoy:true}
       },
       backups:{'server_backup.tar':'[Archive: 2.4GB - Binary data]'}
     },
@@ -277,7 +281,7 @@ const MISSIONS = [
       'archive has a purge station - it charges in files, not credits."',
       'VEGA: "Leave below trace '+EXIT_TRACE.ledger+' or the exit is logged."'
     ],
-    check:()=>!state.connected&&state.trace<EXIT_TRACE.ledger&&state.downloaded.includes('meridian_ledger.dat'),reward:800}
+    check:()=>!state.connected&&state.trace<EXIT_TRACE.ledger&&(state.ledgerReal||state.ledgerDecoy),reward:800}
 ];
 
 // Nothing here is a straight upgrade: every item that buys you something pays
@@ -316,7 +320,12 @@ const state = {
   downloadCount: 0,
   proxyBought: false,
   burned: [],            // "server:path" files a sweep or the purge station took
-  hunt: null             // {left} while the Meridian archive is sweeping
+  hunt: null,            // {left} while the Meridian archive is sweeping
+  startedAt: Date.now(), // the clock the board scores against
+  taken: [],             // "server:path" so two files may share a name
+  ledgerReal: false,
+  ledgerDecoy: false,
+  decoyEnding: false
 };
 
 // --- TERMINAL ENGINE ---
@@ -325,8 +334,11 @@ const output = document.getElementById('terminal-output');
 const inputEl = document.getElementById('terminal-input');
 const cmdHistory = [];
 let histIdx = -1;
+// Set by print() so a chained "&&" can tell whether the last command failed.
+let printedError = false;
 
 function print(text, cls='c-default'){
+  if(cls === 'c-error') printedError = true;
   const span = document.createElement('span');
   span.className = 'line ' + cls;
   span.textContent = text;
@@ -458,6 +470,21 @@ function afterCommand(){
 function addCredits(n){
   state.credits += n;
   updateUI();
+}
+
+// The shared board ranks one finished contract: credits kept (money not burnt
+// on wipes), trace left in the meter, and time under a twenty-minute par. A
+// decoy finish is not evidence, so it scores nothing at all.
+const SCORE_PAR_SECONDS = 1200;
+function shadowScore(){
+  if(!state.gameEnded || state.decoyEnding) return 0;
+  const seconds = Math.max(0, Math.round((Date.now() - state.startedAt) / 1000));
+  const quiet = Math.max(0, 100 - state.trace);
+  const early = Math.max(0, SCORE_PAR_SECONDS - seconds);
+  return Math.max(0, Math.round(state.credits + quiet * 10 + early * 2));
+}
+function shadowWon(){
+  return state.gameEnded === true && !state.decoyEnding && state.completedMissions.includes(10);
 }
 
 // --- FILE SYSTEM ---
@@ -646,12 +673,34 @@ function checkMissions(){
 // --- COMMAND PROCESSOR ---
 
 function processCmd(raw){
-  const input = raw.trim();
+  const input = String(raw == null ? '' : raw).trim();
   if(!input) return;
   cmdHistory.push(input);
   histIdx = -1;
 
   print(getPrompt()+input, 'c-muted');
+
+  // A terminal takes a line of them: ";" always runs the next command, "&&"
+  // only when the last one printed no error. A guess or a shift is not a
+  // script, so chaining only happens in normal command mode.
+  if(state.mode==='normal' && !state.gameEnded && /[;&]/.test(input)){
+    let runNext = true;
+    for(const segment of input.split(/(&&|;)/)){
+      const piece = segment.trim();
+      if(piece==='&&' || piece===';'){ if(piece===';') runNext = true; continue; }
+      if(!piece || !runNext) continue;
+      runNext = execCmd(piece);
+    }
+    return;
+  }
+
+  execCmd(input);
+}
+
+// One command, no echo. Returns false when it printed an error, which is what
+// "&&" waits on.
+function execCmd(input){
+  printedError = false;
 
   if(state.gameEnded){
     if(input.toLowerCase()==='restart') { restartGame(); return; }
@@ -659,8 +708,8 @@ function processCmd(raw){
     return;
   }
 
-  if(state.mode==='crack') { handleCrackInput(input); afterCommand(); return; }
-  if(state.mode==='decrypt') { handleDecryptInput(input); afterCommand(); return; }
+  if(state.mode==='crack') { handleCrackInput(input); afterCommand(); return !printedError; }
+  if(state.mode==='decrypt') { handleDecryptInput(input); afterCommand(); return !printedError; }
 
   const parts = input.split(/\s+/);
   const cmd = parts[0].toLowerCase();
@@ -671,7 +720,12 @@ function processCmd(raw){
     case 'help': cmdHelp(); break;
     case 'ls': case 'dir': cmdLs(); break;
     case 'cd': cmdCd(args[0]||''); break;
-    case 'cat': case 'read': case 'type': cmdCat(args[0]); break;
+    case 'cat': case 'read': case 'type': cmdCat(args); break;
+    case 'pwd': cmdPwd(); break;
+    case 'grep': cmdGrep(args); break;
+    case 'man': cmdMan(args[0]); break;
+    case 'history': cmdHistoryList(); break;
+    case 'hint': cmdHint(); break;
     case 'clear': case 'cls': clearTerm(); break;
     case 'scan': cmdScan(); break;
     case 'connect': cmdConnect(args[0]); break;
@@ -696,6 +750,7 @@ function processCmd(raw){
   checkMissions();
   updateUI();
   afterCommand();
+  return !printedError;
 }
 
 // --- COMMANDS ---
@@ -710,6 +765,10 @@ function cmdHelp(){
   print('    ls              List directory contents');
   print('    cd <dir>        Change directory');
   print('    cat <file>      Read file contents');
+  print('    pwd             Print the current path');
+  print('    grep <pat> <f>  Search a file');
+  print('    man <command>   Read a command manual');
+  print('    history         Last twenty commands');
   print('    clear           Clear terminal');
   print('');
   print('  Network:', 'c-accent');
@@ -731,6 +790,7 @@ function cmdHelp(){
   print('    trace           Check trace level');
   print('    shop            Browse upgrades');
   print('    buy <item>      Purchase upgrade');
+  print('    hint            One line on the current objective (+3 trace)');
   print('    whoami          Display identity');
 }
 
@@ -760,8 +820,10 @@ const TUTORIAL = [
 
   // The rest of the toolbox: the commands the first breach never needs and the
   // later missions cannot do without.
-  {id:'cipher', title:'Open a file', how:'decrypt practice.dat', say:'VEGA left a training file at home. decrypt opens the shift interface: try <n> previews for free, submit <n> spends an attempt, hint costs 3 trace. Read the preview, never the ciphertext; later files take a keyword instead, and the interface says which.',
-    done:()=>tutorial.did.decrypt},
+  {id:'cipher', title:'Open a file', how:'decrypt practice.dat', say:'VEGA left a training file at home. decrypt opens the shift interface: try <n> previews for free, submit <n> spends an attempt, hint costs 3 trace. Read the preview, never the ciphertext.',
+    done:()=>tutorial.did['decrypt:practice.dat']},
+  {id:'keyword', title:'Try a keyword', how:'decrypt practice.key', say:'The archive later uses a keyword instead of a number. This one is keyed to PRACTICE: preview with "try practice", lock it with "submit practice".',
+    done:()=>tutorial.did['decrypt:practice.key']},
   {id:'rescan', title:'Scan again', how:'scan', say:'Cracking a host opens the network behind it. A scan costs 3 trace, so scan when a job points you somewhere new.',
     done:()=>SERVERS['relay.nexus-corp.net'].discovered},
   {id:'relay', title:'Take the relay', how:'connect relay.nexus-corp.net', say:'The relay is where the vault key lives. Connect first, then ask the machine what its lock looks like.',
@@ -917,9 +979,14 @@ function cmdCd(arg){
   updateUI();
 }
 
-function cmdCat(arg){
-  if(!arg){ print('Usage: cat <filename>','c-error'); return; }
+function cmdCat(args){
+  const list = Array.isArray(args) ? args : (args ? [args] : []);
+  if(!list.length){ print('Usage: cat <file> [more files]','c-error'); return; }
   if(accessDenied()) return;
+  for(const arg of list) catFile(arg);
+}
+
+function catFile(arg){
   const srv = state.connected || 'localhost';
   const path = resolvePath(state.currentDir, arg);
   const node = getNode(srv, path);
@@ -947,6 +1014,113 @@ function cmdCat(arg){
     }
     tutorialDid('cat:' + path.split('/').pop());
   }
+}
+
+// --- terminal tools ---
+
+const CMD_DOCS = {
+  ls:{usage:'ls', what:'List the folder you are in. Directories end in a slash.'},
+  cd:{usage:'cd <dir> | cd', what:'Move to a directory. Bare "cd" returns to your home folder.'},
+  cat:{usage:'cat <file> [more files]', what:'Print files. An encrypted file shows its ciphertext until you decrypt it.'},
+  pwd:{usage:'pwd', what:'Print the path you are in on the host you are on.'},
+  grep:{usage:'grep [-i] <pattern> <file>', what:'Print the lines of a file that contain the pattern. -i ignores case.'},
+  man:{usage:'man <command>', what:'Read the manual entry for a command.'},
+  history:{usage:'history', what:'List the last twenty lines you typed, numbered.'},
+  clear:{usage:'clear', what:'Wipe the terminal. Ctrl+L does the same without typing.'},
+  scan:{usage:'scan', what:'Find hosts on the network. Only works while disconnected.', cost:'+3 trace'},
+  connect:{usage:'connect <host>', what:'Open a session on a host you have found. An uncracked host shows nothing until you crack it.', cost:'+2 trace, +5 if it is still locked'},
+  disconnect:{usage:'disconnect', what:'Close the session and return home.'},
+  crack:{usage:'crack', what:'Start the password interface on the host you are connected to. A wrong word reports how many letters are already in place.', cost:'+10 trace on a lockout'},
+  decrypt:{usage:'decrypt <file>', what:'Open the cipher interface. "try" previews for free; "submit" spends an attempt.', cost:'+5 trace on success, +8 on failure'},
+  download:{usage:'download <file>', what:'Copy a decrypted file into /home/ghost/downloads for credits. Classified files carry more trace.', cost:'+2 trace, +8 for a classified file'},
+  analyze:{usage:'analyze', what:'Read an uncracked host: security, password length, attempts and a hint.', cost:'+5 trace'},
+  purge:{usage:'purge', what:'The Meridian archive only: trade one archive file for 40 points of trace.', cost:'-40 trace, one file'},
+  status:{usage:'status', what:'Credits, trace, host, files and missions at a glance.'},
+  missions:{usage:'missions', what:'List every objective, with the current one marked.'},
+  trace:{usage:'trace', what:'Print the trace meter and what is driving it.'},
+  hint:{usage:'hint', what:'One line about what the current objective actually needs.', cost:'+3 trace'},
+  shop:{usage:'shop', what:'List the upgrades and their trade-offs.'},
+  buy:{usage:'buy <id>', what:'Buy one item from the shop.'},
+  map:{usage:'map', what:'Draw the hosts you have found and the links between them.'},
+  whoami:{usage:'whoami', what:'Print the identity this terminal is running under.'},
+  tutorial:{usage:'tutorial | tutorial skip | tutorial exit', what:'Optional guided walkthrough of the first job.'},
+  help:{usage:'help', what:'List every command by group.'},
+  exit:{usage:'exit', what:'Disconnect from the current host.'}
+};
+
+function cmdPwd(){
+  print(state.connected ? state.connected + ':' + state.currentDir : state.currentDir, 'c-default');
+}
+
+function cmdMan(arg){
+  const name = (arg || '').toLowerCase();
+  if(!name){
+    print('Usage: man <command>', 'c-error');
+    print('Entries: ' + Object.keys(CMD_DOCS).join(' '), 'c-muted');
+    return;
+  }
+  const doc = CMD_DOCS[name];
+  if(!doc){ print(`No manual entry for ${name}.`, 'c-error'); return; }
+  print(name.toUpperCase(), 'c-highlight');
+  print('  usage: ' + doc.usage, 'c-info');
+  print('  ' + doc.what, 'c-default');
+  if(doc.cost) print('  ' + doc.cost, 'c-muted');
+}
+
+function cmdHistoryList(){
+  if(!cmdHistory.length){ print('No commands yet.', 'c-muted'); return; }
+  const start = Math.max(0, cmdHistory.length - 20);
+  cmdHistory.slice(start).forEach((line, i)=>{
+    print(String(start + i + 1).padStart(4) + '  ' + line, 'c-default');
+  });
+}
+
+function cmdGrep(args){
+  const list = args.slice();
+  let ignore = false;
+  while(list[0] === '-i'){ ignore = true; list.shift(); }
+  if(list.length < 2){ print('Usage: grep [-i] <pattern> <file>', 'c-error'); return; }
+  const pattern = list[0];
+  const file = list[1];
+  if(accessDenied()) return;
+  const srv = state.connected || 'localhost';
+  const path = resolvePath(state.currentDir, file);
+  const node = getNode(srv, path);
+  if(!node){ print(`File not found: ${file}`, 'c-error'); return; }
+  if(isDir(node)){ print(`"${file}" is a directory.`, 'c-error'); return; }
+  const enc = typeof node==='object' && node.encrypted && !isDecrypted(srv, path);
+  const lines = String(enc ? encryptedText(node) : getContent(node)).split('\n');
+  const needle = ignore ? pattern.toLowerCase() : pattern;
+  let hits = 0;
+  lines.forEach((line, i)=>{
+    if((ignore ? line.toLowerCase() : line).includes(needle)){
+      hits++;
+      print(String(i + 1).padStart(3) + ': ' + line, 'c-default');
+    }
+  });
+  if(!hits) print('No matches.', 'c-muted');
+}
+
+const HINTS = {
+  1:'"scan" costs 3 trace and finds one host at a time.',
+  2:'"connect nexus-corp.net" then "crack". A wrong word tells you how many letters are already in the right place.',
+  3:'The brief sits at /home/jdoe/documents/project_helios_brief.txt.',
+  4:'Cracking a host opens the next: "disconnect", then "scan" again.',
+  5:'/etc/keys/vault_key.dat on the relay is encrypted. "try" previews shifts for free.',
+  6:'The vault is Caesar-shifted. Decrypt the blueprint before you download it.',
+  7:'Leave with "disconnect" under ' + EXIT_TRACE.blueprint + ' trace; the shop sells wipes.',
+  8:'The leak ended the Nexus contract. Get cold, then "scan" again.',
+  9:'drop.vega.net is a seven-letter lock, and the dossier is in /home/vega/private.',
+  10:'The archive uses a keyword cipher keyed to the house name. They sweep above ' + SWEEP_TRACE + '; "purge" trades archive files for trace.'
+};
+
+function cmdHint(){
+  const m = MISSIONS[state.missionIdx];
+  if(!m){ print('Nothing left to ask about.', 'c-muted'); return; }
+  const paid = addTrace(3);
+  print('Hint - #' + m.id + ' ' + m.name, 'c-accent');
+  print('  ' + (HINTS[m.id] || m.obj), 'c-default');
+  print(`[Trace +${paid}]`, 'c-warning');
 }
 
 function cmdScan(){
@@ -1076,13 +1250,17 @@ function cmdDownload(arg){
   if(enc){ print(`File is encrypted. Decrypt it first.`,'c-warning'); return; }
 
   const fname = path.split('/').pop();
-  if(state.downloaded.includes(fname)){ print(`File already downloaded.`,'c-muted'); return; }
+  const source = srv + ':' + path;
+  if(state.taken.includes(source)){ print(`File already downloaded.`,'c-muted'); return; }
 
-  // Add to local downloads
+  // Two hosts can hold files of the same name; the local copy is keyed by name,
+  // so the later one overwrites it and says so.
   const localDL = getNode('localhost', '/home/ghost/downloads');
+  const overwrote = !!(localDL && localDL[fname]);
   if(localDL) localDL[fname] = getContent(node);
 
-  state.downloaded.push(fname);
+  state.taken.push(source);
+  if(!state.downloaded.includes(fname)) state.downloaded.push(fname);
   state.downloadCount++;
   const classified = typeof node==='object' && node.classified;
   const alarm = typeof node==='object' && node.alarm;
@@ -1099,6 +1277,12 @@ function cmdDownload(arg){
   print(`Downloaded: ${fname}`, 'c-success');
   if(classified) print(`[CLASSIFIED FILE - Trace increased significantly]`, 'c-warning');
   if(alarm) print('[TRIPWIRE] That file bills every copy made. It cost you trace.', 'c-error');
+  if(overwrote) print(`[Overwrote the local copy of ${fname}]`, 'c-muted');
+  if(node.decoy){
+    state.ledgerDecoy = true;
+    print('[COPY] The header calls this a certified summary, not the settlement original.', 'c-warning');
+  }
+  if(source === 'meridian.archive.net:/data/ledger/meridian_ledger.dat') state.ledgerReal = true;
   print(`Saved to /home/ghost/downloads/`, 'c-muted');
 
   checkMissions();
@@ -1195,19 +1379,31 @@ function cmdBuy(arg){
   updateUI();
 }
 
+// Only what has been found is drawn. A line per undiscovered host would hand
+// out the size and order of both acts before the scan that reveals them.
 function cmdMap(){
   print('═══ NETWORK MAP ═══', 'c-accent');
   print('');
-  const names = Object.keys(SERVERS);
-  names.forEach((name, i) => {
-    const srv = SERVERS[name];
-    print('    ' + (srv.discovered ? '[' + name + ']' : '[???]'),
-      srv.cracked ? 'c-success' : srv.discovered ? 'c-info' : 'c-muted');
-    if(i < names.length - 1) print('        │', 'c-muted');
-  });
-  print('');
-  print('  Legend: ', 'c-muted');
-  printHTML(`  <span style="color:var(--success)">● Accessed</span>  <span style="color:var(--info)">● Discovered</span>  <span style="color:var(--muted)">● Unknown</span>`);
+  const chain = names => {
+    const found = names.filter(n => SERVERS[n].discovered);
+    found.forEach((name, i) => {
+      if(i > 0) print('        │', 'c-muted');
+      const srv = SERVERS[name];
+      print('    [' + name + ']  ' + srv.ip, srv.cracked ? 'c-success' : 'c-info');
+    });
+    return found.length;
+  };
+  print('    [localhost]  127.0.0.1', 'c-success');
+  const actOne = chain(['nexus-corp.net', 'relay.nexus-corp.net', 'vault.nexus-corp.net']);
+  const actTwo = chain(['drop.vega.net', 'meridian.archive.net']);
+  if(actOne + actTwo === 0){
+    print('');
+    print('  No hosts found - run "scan".', 'c-muted');
+  } else {
+    print('');
+    print('  Legend: ', 'c-muted');
+    printHTML(`  <span style="color:var(--success)">● Accessed</span>  <span style="color:var(--info)">● Found</span>`);
+  }
   tutorialDid('map');
 }
 
@@ -1359,6 +1555,7 @@ function finishDecrypt(ds){
   print(`Use "cat ${ds.filename}" to read it.`, 'c-info');
   print(`[+50cr]`, 'c-accent');
   tutorialDid('decrypt');
+  tutorialDid('decrypt:' + ds.filename);
   checkMissions();
   updateUI();
 }
@@ -1553,6 +1750,7 @@ function gameOver(){
 function gameWin(){
   state.gameEnded = true;
   dropSavedRun();
+  if(state.ledgerDecoy && !state.ledgerReal){ decoyWin(); return; }
   // One measured width: the old fixed column overflowed on long totals.
   const width = 55;
   const line = text => '║' + text.padEnd(width) + '║';
@@ -1574,6 +1772,30 @@ function gameWin(){
   print(line(''), 'c-success');
   print(line('  Type "restart" to run it again.'), 'c-muted');
   print('╚' + '═'.repeat(width) + '╝\n', 'c-success');
+}
+
+// The other finish: the published document was Nexus legal's certified summary,
+// so the archive survives. It is not a contract, and it is worth nothing.
+function decoyWin(){
+  state.decoyEnding = true;
+  const width = 55;
+  const line = text => '║' + text.padEnd(width) + '║';
+  print('', 'c-default');
+  print('╔' + '═'.repeat(width) + '╗', 'c-warning');
+  print(line('   OPERATION CLOSED - THE LIST WAS A SUMMARY'), 'c-warning');
+  print('╠' + '═'.repeat(width) + '╣', 'c-warning');
+  print(line(''), 'c-warning');
+  print(line('  What you published was certified for release:'), 'c-warning');
+  print(line('  rounded numbers, no names, no account.'), 'c-warning');
+  print(line('  Meridian calls it fabricated and sues the outlet.'), 'c-warning');
+  print(line(''), 'c-warning');
+  print(line('  Eleven witnesses stay bought. The archive keeps'), 'c-warning');
+  print(line('  the settlement original. VEGA is not answering.'), 'c-warning');
+  print(line(''), 'c-warning');
+  print(line('  No contract score: a summary is not evidence.'), 'c-muted');
+  print(line(''), 'c-warning');
+  print(line('  Type "restart" to take the job again.'), 'c-muted');
+  print('╚' + '═'.repeat(width) + '╝\n', 'c-warning');
 }
 
 function restartGame(){
@@ -1600,6 +1822,11 @@ function restartGame(){
   state.proxyBought=false;
   state.burned=[];
   state.hunt=null;
+  state.startedAt=Date.now();
+  state.taken=[];
+  state.ledgerReal=false;
+  state.ledgerDecoy=false;
+  state.decoyEnding=false;
   tutorial.on=false;
   tutorial.step=0;
   tutorial.did={};
@@ -1664,6 +1891,8 @@ async function bootSequence(){
 // --- INPUT HANDLING ---
 
 inputEl.addEventListener('keydown', e=>{
+  if(e.ctrlKey && (e.key==='l' || e.key==='L')){ e.preventDefault(); clearTerm(); return; }
+  if(e.ctrlKey && (e.key==='c' || e.key==='C')){ e.preventDefault(); inputEl.value=''; return; }
   if(e.key==='Enter'){
     const val = inputEl.value;
     inputEl.value = '';
@@ -1699,7 +1928,7 @@ function tabComplete(){
   const parts = val.split(/\s+/);
 
   if(parts.length<=1){
-    const cmds = ['tutorial','help','ls','cd','cat','clear','scan','connect','disconnect','crack','decrypt','download','analyze','purge','status','missions','trace','shop','buy','whoami','map','exit'];
+    const cmds = ['tutorial','help','ls','cd','cat','pwd','grep','man','history','clear','scan','connect','disconnect','crack','decrypt','download','analyze','purge','status','missions','trace','hint','shop','buy','whoami','map','exit'];
     const match = cmds.find(c=>c.startsWith(parts[0]));
     if(match) inputEl.value = match+' ';
   } else if(parts.length===2){
@@ -1772,6 +2001,8 @@ function savedRun(){
       stealthBought:state.stealthBought, crackerV2Bought:state.crackerV2Bought,
       decryptorBought:state.decryptorBought, proxyBought:state.proxyBought,
       downloadCount:state.downloadCount, burned:state.burned.slice(),
+      startedAt:state.startedAt, taken:state.taken.slice(),
+      ledgerReal:state.ledgerReal, ledgerDecoy:state.ledgerDecoy,
       discovered:Array.from(state.discoveredServers), cracked:Array.from(state.crackedServers),
       servers:Object.keys(SERVERS).reduce(function (out, name) {
         out[name] = { discovered:!!SERVERS[name].discovered, cracked:!!SERVERS[name].cracked };
@@ -1805,6 +2036,10 @@ function restoreRun(saved){
   state.downloadCount = Math.max(0, run.downloadCount | 0);
   state.burned = Array.isArray(run.burned) ? run.burned.slice() : [];
   state.hunt = null;
+  state.startedAt = Number(run.startedAt) || Date.now();
+  state.taken = Array.isArray(run.taken) ? run.taken.slice() : [];
+  state.ledgerReal = !!run.ledgerReal;
+  state.ledgerDecoy = !!run.ledgerDecoy;
   state.discoveredServers = new Set(run.discovered.concat(['localhost']));
   state.crackedServers = new Set((run.cracked || []).concat(['localhost']));
   Object.keys(run.servers || {}).forEach(function (name) {

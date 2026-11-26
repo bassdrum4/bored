@@ -333,7 +333,16 @@ export const HIGH_SCORE_GAMES = [
   highScore('lava', 'Lava', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('volletball', 'VolletBall', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('gun-mayhem', 'Gun Mayhem', 'CPU rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
-  highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
+  // shadow.net's board ranks a finished contract, not a running total: credits
+  // kept (money not burnt on wipes), trace left in the meter, and the clock,
+  // which pays under a twenty-minute par. A decoy finish is no evidence and
+  // never posts, so `won` has to be true.
+  highScore('shadow-net', 'shadow.net', 'points', {
+    metric: 'score', min: 1, max: 12000,
+    when: snapshot => snapshot.won === true,
+    key: 'bored.high.shadow-net-score-v1',
+    note: 'Credits kept + trace left + time under 20 minutes'
+  }),
   highScore('asteroids', 'Asteroids', 'points', { metric: 'score' })
 ];
 
