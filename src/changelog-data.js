@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1028,
+  "count": 1030,
   "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f9803d70","date":"2026-11-27","author":"bassdrum4","subject":"Fix browser regressions and scope isolated game CI; integrate leaderboard avatars"},
+  {"sha":"9195d399","date":"2026-11-27","author":"Vettel Xu","subject":"Poké Idle: Team Thaw portraits","pr":380},
   {"sha":"123772c6","date":"2026-11-27","author":"Vettel Xu","subject":"Relic Song: round 3 polish","pr":378},
   {"sha":"11ed6152","date":"2026-11-27","author":"Claude","subject":"Relic Song: sprite, hold and HP layout fixes"},
   {"sha":"ba1afe3c","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros-style look"},

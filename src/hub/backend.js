@@ -116,6 +116,11 @@ export function isTransientError(error) {
 // callers retain their own queues and decide when a failed operation is safe to retry.
 let outageFailures = 0, lastOutageFailure = 0, outageUntil = 0, outageDelay = 0;
 let outageGeneration = 0, outageProbe = 0;
+// A real offline -> online transition is an opportunity for one fresh probe.
+// Do not replay any writes here; each caller owns its retry queue.
+if (typeof window !== 'undefined') window.addEventListener('online', () => {
+  if (outageUntil) outageUntil = Date.now();
+});
 function outageTicket() {
   if (!outageUntil) return { generation: outageGeneration, probe: false };
   if (Date.now() < outageUntil || Date.now() < outageProbe) {

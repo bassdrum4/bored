@@ -1,0 +1,27 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const puppeteer=require('puppeteer-core');
+const {serve}=require('./serve.cjs');
+const {watch,capture}=require('./browser-diagnostics.cjs');
+test('hub smoke: guest can load the catalog, open and close a game',async t=>{
+  const executablePath=[process.env.CHROME_PATH,'/usr/bin/google-chrome','/usr/bin/chromium'].filter(Boolean).find(p=>fs.existsSync(p));
+  assert.ok(executablePath,'Set CHROME_PATH to run browser verification');
+  const site=await serve(path.join(__dirname,'../src'));
+  let browser,page;
+  t.after(async()=>{try{if(page)await capture(page,'hub-smoke');await browser?.close();}finally{await site.close();}});
+  browser=await puppeteer.launch({executablePath,headless:true});
+  page=await browser.newPage();watch(page);
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.setViewport({width:1100,height:800});
+  await page.setRequestInterception(true);
+  page.on('request',r=>r.url().startsWith(site.origin)||!/^https?:/.test(r.url())?r.continue():r.abort());
+  await page.goto(site.url);
+  await page.waitForFunction(()=>document.querySelector('#hub-loading')?.hidden&&document.querySelectorAll('#grid .card').length>0);
+  await page.evaluate(()=>openGame('snake'));
+  await page.waitForFunction(()=>!document.querySelector('#player').hidden&&document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug==='snake');
+  await page.evaluate(()=>closeGame());
+  await page.waitForFunction(()=>document.querySelector('#player').hidden);
+  assert.deepEqual(errors,[]);
+});

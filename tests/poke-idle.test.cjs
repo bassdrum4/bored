@@ -885,9 +885,14 @@ test('Prof Penguin\'s text box never moves the page: the tip slot keeps one heig
   // Space doesn't tap the foe through a scene, and the game keeps running behind it.
   const behind = await tab.evaluate(() => { playScene('open-1'); const taps = S.stats.taps; document.body.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); const r = { taps: S.stats.taps - taps }; endScene(); return r; });
   assert.equal(behind.taps, 0);
-  // Other speakers get a placeholder frame with their initials.
-  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Team Thaw grunt'); return d.textContent; });
-  assert.equal(face, 'TT');
+  // Speakers with no art yet get a placeholder frame with their initials.
+  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Sssssssnakes'); return d.textContent; });
+  assert.equal(face, 'S'); // Single-word speaker: one initial.
+  // Team Thaw has portraits: one each for Sleet and the admins, and four grunts picked by the line, the same every time.
+  const thaw = await tab.evaluate(() => { const pic = (w, k) => { const d = document.createElement('div'); d.innerHTML = dlgFace(w, k); const i = d.querySelector('img'); return i ? i.getAttribute('src').split('/').pop() : null; };
+    const grunts = new Set(Array.from({ length: 40 }, (_, i) => pic('Team Thaw grunt', 'line' + i)));
+    return { sleet: pic('Director Sleet'), rime: pic('Rime'), hail: pic('Hail'), slush: pic('Slush'), cap: pic('Thaw captain'), lab: pic('Lab chief'), grunts: grunts.size, same: pic('Team Thaw grunt', 'x:1') === pic('Team Thaw grunt', 'x:1') }; });
+  assert.deepEqual(thaw, { sleet: 'thaw-sleet.png', rime: 'thaw-rime.png', hail: 'thaw-hail.png', slush: 'thaw-slush.png', cap: 'thaw-captain.png', lab: 'thaw-labchief.png', grunts: 4, same: true });
   // Mail has the letter.
   assert.ok(await tab.evaluate(() => MAIL.some(m => /makeover/.test(m.title))));
   assert.deepEqual(errors, []);
