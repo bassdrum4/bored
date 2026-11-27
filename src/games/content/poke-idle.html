@@ -2117,13 +2117,19 @@ const TIPS = [
 // ── Prof Penguin's text box, shared by the tip slot and the scene overlay. A portrait (Prof Penguin's own; anyone else
 // gets a frame with their initials until their art is drawn), the speaker's name, and the line typed out: a tap
 // finishes it, the next tap moves on. A line too long for the box is split into pages at the ends of sentences.
-const PORTRAIT = { "Prof Penguin": "prof-penguin.png" };
-function dlgFace(who) {
+// Team Thaw's portraits are recoloured trainer sprites in an ice palette. The grunts share four, picked by the line
+// (key) so the same line always shows the same grunt.
+const PORTRAIT = { "Prof Penguin": "prof-penguin.png", "Director Sleet": "thaw-sleet.png", "Sleet": "thaw-sleet.png",
+  "Rime": "thaw-rime.png", "Hail": "thaw-hail.png", "Slush": "thaw-slush.png", "Thaw captain": "thaw-captain.png", "Lab chief": "thaw-labchief.png",
+  "Team Thaw grunt": ["thaw-grunt.png", "thaw-gruntf.png", "thaw-grunt2.png", "thaw-gruntf2.png"] };
+function dlgFace(who, key) {
   const ini = esc((who || "").split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase());
-  return `<span class="dlg-face" aria-hidden="true">${PORTRAIT[who] ? `<img src="${SPRITE_DIR + PORTRAIT[who]}" alt="" onerror="this.replaceWith('${ini}')">` : ini}</span>`;
+  let pic = PORTRAIT[who];
+  if (Array.isArray(pic)) { let h = 0; for (const ch of String(key || who)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; pic = pic[h % pic.length]; }
+  return `<span class="dlg-face" aria-hidden="true">${pic ? `<img src="${SPRITE_DIR + pic}" alt="" onerror="this.replaceWith('${ini}')">` : ini}</span>`;
 }
 // Narration (no speaker) has no portrait or name and uses the whole width.
-const dlgHtml = o => `${(o.face === undefined ? o.who : o.face) ? dlgFace(o.face === undefined ? o.who : o.face) : ""}<span class="who">${esc(o.who || "")}</span><div class="dlg-text">${o.text || ""}</div>${o.extra || ""}<div class="row">${o.row || ""}</div>`;
+const dlgHtml = o => `${(o.face === undefined ? o.who : o.face) ? dlgFace(o.face === undefined ? o.who : o.face, o.key) : ""}<span class="who">${esc(o.who || "")}</span><div class="dlg-text">${o.text || ""}</div>${o.extra || ""}<div class="row">${o.row || ""}</div>`;
 // The pages of a line: as many whole sentences as fit the box at a time. A sentence too long for the box on its own
 // breaks between words.
 function dlgPages(el, text) {
@@ -2633,6 +2639,9 @@ function renderAch() {
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
   { id: "story-y2-end", chapter: true, date: "End of Year 2", from: "Prof Penguin", title: "Warming up", body: `<p>It's warming up. We have a little time. Not much.</p><p>Prof Penguin</p>` },
+  { id: "update-2026-11-27a", story: true, date: "Nov 27, 2026", from: "Prof Penguin", title: "Team Thaw has a new look",
+    body: `<ul><li>Team Thaw has a new look. Director Sleet, the three admins, the grunts, the captains and Aether's lab chief all have their own portraits in my text box now, in Team Thaw's ice colours.</li>
+      <li>The grunts come in four faces, so the one you're talking to isn't always the same.</li></ul>` },
   { id: "update-story-year3", story: true, date: "Nov 27, 2026", from: "Prof Penguin", title: "Story Mode, Year 3: The Thaw",
     body: `<ul><li>Once you've cleared Year 2, <b>Begin Year 3</b> is at the top of your lists. It's the last year, and it tells you what happens before anything does.</li>
       <li>You keep one Pokémon to start. The rest come back to you region by region, as you free each one.</li>
@@ -3868,6 +3877,7 @@ const SCENES = {
   "alola-null": { year: 1, r: 6, title: "The Mask", lines: [
     ["", "The memo has a second page. It mentions a \"subject unit\" kept at Aether Paradise."],
     ["", "Team Thaw has taken over Aether's lower labs. A lab chief blocks the door with a Steel and Psychic team: containment staff, working for Rime."],
+    ["Lab chief", "Containment protocol. Nobody goes past this door. Admin Rime's orders."],
     ["", "Behind the door is a Type: Null, alone in a cold room, locked in its heavy mask. It's terrified."]] },
   "alola-null-after": { year: 1, r: 6, title: "Unit 1", lines: [
     ["", "Type: Null stops fighting. It walks over to you, still in its mask."],
@@ -5026,7 +5036,7 @@ function pairText(t, r) {
 function renderScene() {
   const sc = SCENES[sceneNow.id], [who, raw] = sc.lines[sceneNow.i], el = $("#scene"), text = pairText(raw, sc.r);
   el.classList.remove("free"); el.classList.toggle("narr", !who);
-  el.innerHTML = dlgHtml({ who, row: `<button class="skip" type="button" data-scene="skip">Skip</button><span class="count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next"></button>` });
+  el.innerHTML = dlgHtml({ who, key: sceneNow.id + ":" + sceneNow.i, row: `<button class="skip" type="button" data-scene="skip">Skip</button><span class="count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next"></button>` });
   overlay("#scene", true);
   sceneNow.pages = dlgPages($("#scene .dlg-text"), text); sceneNow.pg = 0;
   scenePage();
