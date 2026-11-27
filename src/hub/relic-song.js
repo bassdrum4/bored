@@ -1,4 +1,4 @@
-// Relic Song, hub side: the coins it pays and what it reads from the other games.
+// Relic Song, hub side: coin payouts and optional crossover state.
 //
 // The game calls this through parent.__boredGacha.relic, the same door Poké
 // Gacha uses, so every coin lands in the one ledger that syncs to the account.

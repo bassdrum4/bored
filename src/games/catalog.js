@@ -81,7 +81,7 @@ export const LAUNCHED = {
   "deep": "2026-10-20"
 };
 export const META = {
-  "relic-song": ["Arcade", "Meloetta's song split into four verses and Kanto's gym leaders each kept one. Win them back on a four-lane note highway, then dodge a spinning judgment line in the boss fights."],
+  "relic-song": ["Arcade", "Meloetta\'s song split into four verses and Kanto\'s gym leaders each kept one. Win them back on a four-lane note highway, then dodge a spinning judgment line in the boss fights."],
   "battleship": ["Strategy", "Deploy five ships and sink the enemy fleet. Play solo or take turns with a friend."],
   "squaretato": ["Arcade", "Survive waves of enemies, stack weapons and upgrades, and build your way to the final boss."],
   "ballistic-chickens": ["Arcade", "Load a chicken into a cannon and fire her as far as the gunpowder, the rocket and the obstacles allow."],

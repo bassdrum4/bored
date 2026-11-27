@@ -435,7 +435,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
       sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
       silver: MAIL.find(m => m.id === 'story-silver').body,
       signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
-      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief' && !k.startsWith('y2-')).map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief' && !k.startsWith('y2-') && !k.startsWith('y3-')).map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
   assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
   assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
@@ -748,7 +748,7 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
     return { labels, j, tools, reset, blocked, off, winBtn, won, gates: [gate, met, ign], roulette: S.story.roulette, all, none, y2, epi: S.story.epilogue, real: localStorage.getItem(STORY_KEY) };
   });
   assert.deepEqual(got.labels.slice(0, 4), ['Prologue: starter picked', 'Kanto: gyms', 'Kanto: Champion Blue', 'Kanto: Team Thaw: Rime']);
-  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.at(-1).startsWith('Year 2 Paldea'));
+  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.some(l => l.startsWith('Year 2 Paldea')) && got.labels.includes('Year 3 Paldea: Liberate Paldea'));
   assert.deepEqual(got.j.champs, [0, 1, 2, 3, 4]);
   assert.equal(got.j.badges, 20);
   assert.deepEqual(got.j.picks, { 0: 150, 1: 249, 2: 382, 3: got.j.picks[3] }, 'the picks asked for, and random where none was');
@@ -776,7 +776,7 @@ test('Story\'s ranked number: progress always outranks the dex, and Year 3 count
   const got = await tab.evaluate(() => {
     const save = (year, ch, dex, lib = 0) => { const s = fresh(); s.mode = 'story'; s.story = { ...freshStory(), year };
       CHAPTERS.slice(0, ch).forEach(c => { s.story.ch[c.id] = 1; }); for (let i = 1; i <= dex; i++) s.lifeDex[i] = 1;
-      if (lib) { s.story.ch = {}; CHAPTERS.filter(c => c.liberates).slice(0, lib).forEach(c => { s.story.ch[c.id] = 1; }); } return storyProgress(s).ranked; };
+      if (lib) { s.story.ch = {}; CHAPTERS.filter(c => c.liberates && (c.year || 1) === year).slice(0, lib).forEach(c => { s.story.ch[c.id] = 1; }); } return storyProgress(s).ranked; };
     return { a: save(1, 3, 1025) < save(1, 4, 1), b: save(1, 23, 1025) < save(2, 0, 1), c: save(3, 9, 1025, 1) < save(3, 1, 1, 2), max: save(3, 23, 1025, 9) };
   });
   assert.deepEqual([got.a, got.b, got.c], [true, true, true]);
@@ -885,9 +885,14 @@ test('Prof Penguin\'s text box never moves the page: the tip slot keeps one heig
   // Space doesn't tap the foe through a scene, and the game keeps running behind it.
   const behind = await tab.evaluate(() => { playScene('open-1'); const taps = S.stats.taps; document.body.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); const r = { taps: S.stats.taps - taps }; endScene(); return r; });
   assert.equal(behind.taps, 0);
-  // Other speakers get a placeholder frame with their initials.
-  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Team Thaw grunt'); return d.textContent; });
-  assert.equal(face, 'TT');
+  // Speakers with no art yet get a placeholder frame with their initials.
+  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Sssssssnakes'); return d.textContent; });
+  assert.equal(face, 'S'); // Single-word speaker: one initial.
+  // Team Thaw has portraits: one each for Sleet and the admins, and four grunts picked by the line, the same every time.
+  const thaw = await tab.evaluate(() => { const pic = (w, k) => { const d = document.createElement('div'); d.innerHTML = dlgFace(w, k); const i = d.querySelector('img'); return i ? i.getAttribute('src').split('/').pop() : null; };
+    const grunts = new Set(Array.from({ length: 40 }, (_, i) => pic('Team Thaw grunt', 'line' + i)));
+    return { sleet: pic('Director Sleet'), rime: pic('Rime'), hail: pic('Hail'), slush: pic('Slush'), cap: pic('Thaw captain'), lab: pic('Lab chief'), grunts: grunts.size, same: pic('Team Thaw grunt', 'x:1') === pic('Team Thaw grunt', 'x:1') }; });
+  assert.deepEqual(thaw, { sleet: 'thaw-sleet.png', rime: 'thaw-rime.png', hail: 'thaw-hail.png', slush: 'thaw-slush.png', cap: 'thaw-captain.png', lab: 'thaw-labchief.png', grunts: 4, same: true });
   // Mail has the letter.
   assert.ok(await tab.evaluate(() => MAIL.some(m => /makeover/.test(m.title))));
   assert.deepEqual(errors, []);
@@ -1117,7 +1122,7 @@ test('Year 2, the Hunt: rows open with the Champions and stay ??? until then, ev
   assert.deepEqual(errors, []);
 });
 
-test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Champion and chapter, the Crown Shrine and its prizes, the Year 3 screens (off), and Replay Year 2', async t => {
+test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Champion and chapter, the Crown Shrine and its prizes, the Year 3 screens, and Replay Year 2', async t => {
   const { tab, errors } = await openIdle(t, '2026-11-26');
   const got = await tab.evaluate(() => {
     const skip = () => { let n = 0; while (sceneNow && n++ < 40) endScene(); };
@@ -1160,8 +1165,9 @@ test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Cham
     viewR = 7; renderLocs();
     const y3row = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).find(t => t.startsWith('Year 3'));
     startLoc({ kind: 'year3', r: 7 }); const y3toast = $('#toast').textContent;
+    const realOpen = year3Open();
     S.test = 1; startLoc({ kind: 'year3', r: 7 });
-    const confirm = { text: $('#scene').textContent, go: $('#scene [data-y3="go"]').disabled };
+    const confirm = { text: $('#scene').textContent, go: $('#scene [data-y3="go"]').disabled, realOpen };
     $('#scene [data-y3="pick"]').click();
     const box = Object.keys(S.box).length, rows = () => [...document.querySelectorAll('#po-list .po-row')];
     const pick = { all: rows().length, first: rows()[0].textContent };
@@ -1198,17 +1204,17 @@ test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Cham
   assert.equal(got.after.engine, "That's when the Engine starts. Far away, something enormous begins to hum, and the tanks start to drain.");
   assert.ok(!/freez/i.test(got.after.endText), 'nothing at the Crown Shrine says the Box freezes');
   assert.equal(got.after.letter, "<p>It's warming up. We have a little time. Not much.</p><p>Prof Penguin</p>");
-  assert.equal(got.after.next, 'Year 2 is done. Year 3 is coming.');
-  assert.equal(got.y3row, 'Year 3: The Thawcoming soon');
-  assert.match(got.y3toast, /isn't here yet/);
-  assert.ok(got.confirm.text.includes("Your Box will freeze. You'll keep one Pokémon. Everything else comes back as you free each region.") && got.confirm.go, 'Begin Year 3. is disabled');
+  assert.equal(got.after.next, 'Year 2 is done. Begin Year 3 is at the top of your lists.');
+  assert.equal(got.y3row, 'Year 3: The Thawbegin');
+  assert.doesNotMatch(got.y3toast, /isn't here yet/);
+  assert.ok(got.confirm.text.includes("Your Box will freeze. You'll keep one Pokémon. Everything else comes back as you free each region.") && !got.confirm.go && got.confirm.realOpen === true, 'Begin Year 3. is open on a real save (YEAR3_READY)');
   assert.equal(got.pick.all, got.box, 'the pick-one screen lists the whole Box');
   assert.match(got.pick.first, /^.+ Lv \d+ Comes back when \w+ is freed\.$/, 'name, level and where it comes back: ' + got.pick.first);
   assert.deepEqual(got.pick.found.length, 1);
   assert.ok(got.pick.galar, 'filter by where it comes back');
   assert.match(got.pick.top, /Lv 100/, 'sort by level');
   assert.match(got.pick.chosen, /Calyrex: Stays with you at Lv \d+\. It fights at your level cap until the cap catches up\./);
-  assert.deepEqual([got.pick.stay, got.pick.stayText], [true, 'This one stays with me.'], 'disabled until Year 3 ships');
+  assert.deepEqual([got.pick.stay, got.pick.stayText], [false, 'This one stays with me.'], 'open for the test account; a real save never gets here before YEAR3_READY');
   assert.ok(got.pick.noBond, 'no bond status or return levels');
   assert.ok(got.menu.includes('replay2'), 'Replay Year 2 on the title screen');
   assert.deepEqual([got.replay.slot, got.replay.year, got.replay.replay, got.replay.max, got.replay.picks], ['bored.poke-idle.story.replay', 2, 1, { 3: 2, 4: 3 }, 249], 'Replay Year 2: its own slot, Year 2’s rules, your Year 1 picks');
@@ -1302,5 +1308,583 @@ test('the admin block in the snapshot: both real saves (party and counts only), 
   assert.equal(got.flagged.admin.story, null, 'a save marked as a test is left out');
   assert.ok(got.size < 1500 && got.bigParty === 6, `party only, never the Box (${got.size} bytes with a full Box)`);
   assert.equal(got.bondUi, false, 'nothing about bonds shows to players');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3 begins (test save): the freeze keeps one, deletes nothing, and leaves the frozen out of the party, teams, evolution and catches; occupied gyms free their leaders; the first thaw', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { let n = 0; while (sceneNow && n++ < 40) endScene(); };
+    const win = () => { const here = B; for (let n = 0; n < 12 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    // Classic's gyms, to check they don't change.
+    S = fresh(); S.box[25] = { xp: 125 }; S.party = [25]; slot = KEY; save(); boot();
+    const classic = { gym: gymTeam(0, 1).map(m => m.num), name: gymName(0, 1), place: locName({ kind: 'gym', r: 0, k: 1 }) };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1); skip(); overlay('#scene', false);
+    // Spread the Box over the nine regions, with a few bonded; a saved team; something to keep.
+    Object.entries(S.box).forEach(([n, b], i) => { b.from = i % 9; if (i % 3 === 0) b.bond = 1; else delete b.bond; });
+    S.box[6].xp = 80 ** 3; S.box[6].from = 0; S.box[6].bond = 1;   // Charizard: bonded, Kanto, Lv 80
+    S.box[9].xp = 61 ** 3; S.box[9].peak = 61; S.box[9].from = 0; delete S.box[9].bond; // Blastoise: unbonded, Kanto, Lv 61
+    S.box[3].xp = 7 ** 3; S.box[3].from = 0; delete S.box[3].bond;  // Venusaur: unbonded, Kanto, Lv 7
+    S.box[248].from = 1;                                             // Tyranitar: Johto
+    S.teams = [{ name: 'Old', party: [6, 248, 9] }]; S.money = 1e6; S.items = { fire: 3 }; S.balls.master = 4; S.stones[10062] = 1; S.won.kitakami = 1; S.ach.st_start = 1;
+    S.party = [150, 6, 248]; save();
+    const before = { box: Object.keys(S.box).length, ids: Object.keys(S.box).sort().join(), charizard: realLevel(6), peak9: lvlOf(S.box[9].xp), keptLv: realLevel(150), eternatus: !!S.box[890] };
+    const row = unlocked({ kind: 'year3' });
+    startLoc({ kind: 'year3', r: 0 }); const goOff = $('#scene [data-y3="go"]').disabled; $('#scene [data-y3="go"]').click();
+    const interlude = sceneNow && sceneNow.id; skip();
+    const pickOpen = !!document.querySelector('#po-list'); document.querySelector('#po-list [data-po="150"]').click(); $('#scene [data-y3="stay"]').click();
+    const kept = sceneNow && sceneNow.id; skip();
+    const frozen = Object.entries(S.box).filter(([n, b]) => b.frozen != null);
+    const after = {
+      year: S.story.year, cleared: S.story.cleared, kept: S.story.kept, party: S.party.slice(), box: Object.keys(S.box).length, ids: Object.keys(S.box).sort().join(),
+      allFrozen: frozen.length === before.box - 1, keptFree: !isFrozen(150) && realLevel(150) === before.keptLv,
+      regions: frozen.every(([n, b]) => b.frozen === b.from && b.frozen >= 0 && b.frozen < 9), stolen: [S.story.eternatusStolen, S.box[890] && S.box[890].stolen],
+      money: S.money, balls: { ...S.balls }, items: S.items, badges: Object.keys(S.badges).length, champs: Object.keys(S.champs).length, cap: levelCap(),
+      key: S.key, stone: S.stones[10062], won: S.won.kitakami, teams: S.teams.length, ach: !!S.ach.st_start,
+      mail: ['story-y3-start', 'story-y3-snakes'].map(id => !!S.mail.got[id]), held: S.story.frozen, recovered: recovered()
+    };
+    const letter = MAIL.find(m => m.id === 'story-y3-start').body, snakes = MAIL.find(m => m.id === 'story-y3-snakes').body;
+    // The frozen stay out of everything.
+    toggleParty(6); const notIn = !S.party.includes(6), refused = $('#toast').textContent;
+    placeIn(9, 1); const notPlaced = !S.party.includes(9);
+    loadTeam(0); const loaded = { party: S.party.slice(), toast: $('#toast').textContent };
+    openTab('party'); renderParty();
+    const tile = document.querySelector('#boxgrid [data-n="6"]'), slots = [...document.querySelectorAll('#party .ghost')].map(g => g.textContent);
+    const evo = canEvolve(4, [5, 'L', 16]);
+    // A wild Pokémon of a frozen species: no throw.
+    S.set.fresh = 'all'; S.set.dupe = 'all'; S.balls.poke = 50; startLoc({ kind: 'route', r: 0, k: 0 }); B.foe = { m: mon(6), L: 5, hp: 1, max: 1, wild: true, reward: 1 }; defeat();
+    const catchText = $('#log').textContent; B = null;
+    // No League rule, and the occupied gyms.
+    const league = { breaks: leagueBreaks([150, 493]), rule: leagueRule([mon(150), mon(493)], mon(890)), max: leagueMax() };
+    const gyms = { names: [0, 1, 2, 3].map(k => gymName(0, k)), place: locName({ kind: 'gym', r: 0, k: 1 }),
+      ice: REGIONS.every((R, r) => [0, 1, 2, 3].every(k => R.gyms[k][1] === 'Ice' || gymTeam(r, k).some(m => m.types.includes('Ice')))),
+      typed: REGIONS.every((R, r) => [0, 1, 2, 3].every(k => gymTeam(r, k).filter(m => m.types.includes(R.gyms[k][1])).length >= gymTeam(r, k).length - 1)) };
+    viewR = 0; renderLocs();
+    const rows = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent);
+    const next0 = storyNext().text;
+    S.party = [150]; S.debug.league = 0;
+    const lines = [];
+    for (let k = 0; k < 4; k++) { S.kills['0-' + k] = KILLS_FOR_GYM; startLoc({ kind: 'gym', r: 0, k }); lines.push($('#log').textContent.split('\n')[0]); win(); }
+    const freed = { names: [0, 1, 2, 3].map(k => gymName(0, k)), record: Object.keys(S.story.freed).length, cap: levelCap() };
+    return new Promise(done => setTimeout(() => {
+      freed.toast = $('#toast').textContent;
+      const lib = chapterRows(0).find(x => x.x === 'y3-kanto-free'), next1 = storyNext().text;
+      startLoc({ kind: 'chapter', r: 0, x: 'y3-kanto-free' }); skip(); win();
+      const msg = $('#scene').textContent;
+      $('#scene [data-thaw]').click(); skip();
+      const thaw = { charizard: [realLevel(6), isFrozen(6)], blastoise: [realLevel(9), S.box[9].peak, remembers(9)], venusaur: realLevel(3), tyranitar: isFrozen(248),
+        champ: S.champs[0], cap: levelCap(), capNext: Math.min(100, gymLevel(4) + CAP_OVER), told: !!S.mail.got['story-y3-told'], toldBody: MAIL.find(m => m.id === 'story-y3-told').body, lib: storyProgress(S).regionsLiberated, recovered: recovered(),
+        kanto: Object.values(S.box).filter(b => b.from === 0 && b.frozen != null && !b.stolen).length };
+      openTab('story'); const story = $('#t-story').textContent;
+      openTab('party'); renderParty(); loadTeam(0); const reload = S.party.slice();
+      const page = document.body.innerText;
+      // Keeping Eternatus: nothing is stolen.
+      storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1); skip(); overlay('#scene', false); year3Reset(890);
+      const keptEternatus = [S.story.eternatusStolen, !!S.box[890].stolen, isFrozen(890)];
+      useSlot(KEY);
+      done({ classic, before, row, goOff, interlude, pickOpen, kept, after, letter, snakes, notIn, refused, notPlaced, loaded, tile: tile && [tile.className, tile.textContent], slots, evo, catchText, league, gyms, rows, next0, lines, freed, lib, next1, msg, thaw, story, reload,
+        bondLeak: /fought beside you|bonded|remember you\./.test(page), keptEternatus,
+        back: { gym: gymTeam(0, 1).map(m => m.num), name: gymName(0, 1), place: locName({ kind: 'gym', r: 0, k: 1 }) } });
+    }, 3600));
+  });
+  assert.ok(got.row && !got.goOff, 'Begin Year 3 is open to the test account');
+  assert.deepEqual([got.interlude, got.pickOpen, got.kept], ['y3-interlude', true, 'y3-kept']);
+  const a = got.after;
+  assert.deepEqual([a.year, a.cleared[2], a.kept, a.party], [3, 1, 150, [150]]);
+  assert.deepEqual([a.box, a.ids], [got.before.box, got.before.ids], 'the freeze deletes nothing');
+  assert.ok(a.allFrozen && a.keptFree && a.regions, 'everything but the kept one is frozen in its from region; the kept one keeps its level');
+  assert.deepEqual(a.stolen, [1, 1], 'Eternatus, not kept, is stolen');
+  assert.deepEqual([a.money, a.balls, a.items, a.badges, a.champs], [0, { poke: 10, great: 0, ultra: 0, master: 0 }, {}, 0, 0], 'money, balls, items, badges and Champions reset');
+  assert.ok(a.cap <= 20, `the cap starts over at Kanto (${a.cap})`);
+  assert.deepEqual([a.key, a.stone, a.won, a.teams, a.ach], [1, 1, 1, 1, true], 'key items, stones, form unlocks, saved teams and achievements stay');
+  assert.deepEqual(a.mail, [true, true]);
+  assert.equal(a.recovered, 1, 'only the kept one is recovered');
+  assert.equal(Object.values(a.held).reduce((x, y) => x + y, 0), got.before.box - 1, 'the frozen-Box record');
+  assert.match(got.letter, /Some of them will come back to you sooner than others\. You'll see\.<\/p><p>Prof Penguin<\/p>$/);
+  assert.match(got.snakes, /THEY FROZE MINE TOO\. I'M FINE\. I'M FINE\. I'LL FIND YOU\./);
+  assert.ok(got.notIn && got.notPlaced, 'a frozen Pokémon can\'t join the party');
+  assert.match(got.refused, /frozen in Kanto\. It comes back when Kanto is freed\./);
+  assert.deepEqual(got.loaded.party, [150], 'a team with no one thawed yet loads nothing');
+  assert.match(got.loaded.toast, /Old is still under the ice\./);
+  assert.match(got.tile[0], /frozen/); assert.match(got.tile[1], /❄ Frozen in Kanto/);
+  assert.equal(got.evo, false, 'frozen Pokémon can\'t evolve');
+  assert.match(got.catchText, /under the ice in Kanto: no throw/);
+  assert.deepEqual([got.league.breaks, got.league.rule, got.league.max], ['', true, null], 'no League rule in Year 3');
+  assert.deepEqual(got.gyms.names, ['Team Thaw grunt', 'Team Thaw grunt', 'Team Thaw grunt', 'Thaw captain']);
+  assert.ok(got.gyms.ice && got.gyms.typed, 'each gym keeps its type, with an ice twist');
+  assert.ok(!got.rows.some(r => r.startsWith('Champion')), 'no Champion row in Year 3');
+  assert.ok(got.rows.some(r => r === 'Liberate Kantogyms 0/4 freed'), got.rows.join(' | '));
+  assert.equal(got.next0, 'Next: Free Kanto\'s gyms, then Liberate Kanto at the Cerulean lab. (Gyms: 0/4 freed)');
+  assert.match(got.lines[3], /Thaw captain: "Gym's under new management\. Badge costs three Thaw Packs\."/);
+  assert.ok(!got.freed.names.some(n => /Thaw/.test(n)) && got.freed.record === 4, 'the real leaders are freed');
+  assert.match(got.freed.toast, /was locked in the back room/);
+  assert.equal(got.lib.note, 'story');
+  assert.equal(got.next1, 'Next: Liberate Kanto at the Cerulean lab, in Kanto.');
+  assert.match(got.msg, /The ice lets go\..*The ones who fought beside you come back just as strong\. ❤ .*Charizard.*The others come back weaker, but they remember you\. ❄ .*Blastoise/);
+  const T = got.thaw;
+  assert.deepEqual(T.charizard, [80, false], 'bonded: back at its real level');
+  assert.deepEqual(T.blastoise, [30, got.before.peak9, true], 'unbonded: half (rounded down), peak unchanged, it remembers you');
+  assert.equal(T.venusaur, 5, 'never below Lv 5');
+  assert.equal(T.tyranitar, true, 'Johto\'s stay frozen');
+  assert.equal(T.kanto, 0, 'everything from Kanto is back');
+  assert.ok(T.champ && T.cap === T.capNext, 'the liberation counts as the Champion for the cap');
+  assert.ok(T.told && /^<p>I told you\. They remember who stood with them\.<\/p>/.test(T.toldBody), 'the first thaw\'s letter');
+  assert.equal(T.lib, 1);
+  assert.match(got.story, /Frozen Box/); assert.match(got.story, new RegExp(`Species recovered: ${T.recovered} / 270`)); assert.match(got.story, /✓ Kanto/); assert.match(got.story, /❄ Johto · \d+/);
+  assert.ok(got.reload.includes(6) && !got.reload.includes(248), 'the team fills in its thawed member');
+  assert.equal(got.bondLeak, false, 'the bond shows nowhere but the thaw message');
+  assert.deepEqual(got.keptEternatus, [0, false, false], 'keeping Eternatus: nothing stolen');
+  assert.deepEqual(got.back, got.classic, 'Classic keeps its gyms');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, the nine liberations (test save): admins and Thaw-bound projections, the ally bonus, Slush stops Hoenn halfway, Cave of Origin, the dealer named at last, and both Galar paths', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; let kos = 0; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); kos++; if (B === here && !B.manual) next(); } return kos; };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints();
+    storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1, { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' }); skip(); overlay('#scene', false);
+    Object.entries(S.box).forEach(([n, b], i) => { b.from = i % 9; });
+    // The test account has every Pokémon seen; a real save never marks the dealer (the Year 2 test checks that).
+    delete S.seen[487];
+    const dealerSeenBefore = !!S.seen[487], namedBefore = Object.entries(SCENES).filter(([id, sc]) => sc.year < 3).some(([id, sc]) => sc.lines.some(l => /Giratina/.test(l[1])));
+    year3Reset(150); S.debug.league = 0;
+    const log = [];
+    const free = r => { for (let k = 0; k < 4; k++) { S.badges[r + '-' + k] = 1; S.story.freed[r + '-' + k] = 1; } };
+    for (let r = 0; r < 9; r++) {
+      free(r); const c = CHAPTER[`y3-${['kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'][r]}-free`];
+      const open = chapterOpen(c);
+      startLoc({ kind: 'chapter', r, x: c.id }); const pre = skip();
+      const fight = { queue: B.queue.map(f => f.name), bound: B.queue.filter(f => f.bound3).map(f => f.num), ally: B.ally, tune: B.tune, say: $('#log').textContent, stopAt: B.stopAt || 0 };
+      if (r === 0) delete S.seen[150];
+      fight.kos = win(); const seen150 = !!S.seen[150]; fight.stopped = !!(B && B.stopped);
+      fight.msg = $('#scene').textContent; $('#scene [data-thaw]') && $('#scene [data-thaw]').click();
+      const post = skip();
+      log.push({ r, open, pre, fight, post, seen150, champ: !!S.champs[r], lib: !!S.story.liberated[r], frozenLeft: Object.values(S.box).filter(b => b.frozen === r).length, letters: Object.keys(S.mail.got).filter(id => id.startsWith('story-y3')) });
+      if (r === 2) {
+        const cave = CHAPTER['y3-cave'], caveOpen = chapterOpen(cave);
+        startLoc({ kind: 'chapter', r: 2, x: 'y3-cave' }); const cavePre = skip(); const caveQ = B.queue.map(f => f.name), caveSay = $('#log').textContent; win(); const cavePost = skip();
+        log[r].cave = { caveOpen, cavePre, caveQ, caveSay, cavePost, won: !!S.won.cave, clue: !!S.story.clues.memos };
+      }
+      if (r === 3) {
+        const d = CHAPTER['y3-distortion'], before = { seen: !!S.seen[487], open: chapterOpen(d) };
+        startLoc({ kind: 'chapter', r: 3, x: 'y3-distortion' }); const ids = skip();
+        log[r].distortion = { before, ids, fight: !!(B && B.kind === 'story'), seen: !!S.seen[487], clue: !!S.story.clues.p, debt: S.story.giratinaDebt, text: SCENES['y3-distortion'].lines.map(l => l[1]).join(' ') };
+      }
+    }
+    const end = { next: storyNext().text, frozen: Object.entries(S.box).filter(([n, b]) => b.frozen != null).map(([n]) => +n), slot: emptySlot(890), cap: levelCap(), lib: storyProgress(S).regionsLiberated,
+      bodyBond: /fought beside you/.test(document.body.innerText) };
+    // Keeping Eternatus: Galar thaws in full.
+    storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1); skip(); overlay('#scene', false);
+    year3Reset(890); for (let r = 0; r < 7; r++) { free(r); S.story.liberated[r] = 1; S.champs[r] = 1; } free(7);
+    startLoc({ kind: 'chapter', r: 7, x: 'y3-galar-free' }); skip(); win(); $('#scene [data-thaw]').click(); const keptPost = skip();
+    const kept = { post: keptPost, frozen: Object.values(S.box).filter(b => b.frozen === 7).length, slot: emptySlot(890) };
+    useSlot(KEY);
+    return { dealerSeenBefore, namedBefore, log, end, kept, slush: ['story-y3-slush-1', 'story-y3-slush-2', 'story-y3-slush-3', 'story-y3-slush-4'].map(id => MAIL.find(m => m.id === id).body), uses: LIB_USE };
+  });
+  const L = got.log;
+  assert.deepEqual([got.dealerSeenBefore, got.namedBefore], [false, false], 'before Year 3 Sinnoh, nothing names or marks the dealer');
+  assert.ok(L.every(x => x.open && x.champ && x.lib), 'every liberation opens with its gyms, and counts as the Champion');
+  assert.equal(L[0].fight.queue.length, 7, 'Rime\'s six, then the projection');
+  assert.equal(L[0].seen150, false, 'a projection never marks the dex');
+  assert.equal(L[0].fight.queue.at(-1), 'Thaw-bound Mewtwo', 'Kanto: one projection');
+  assert.deepEqual(L[0].pre, ['y3-kanto']);
+  assert.deepEqual(L.map(x => x.fight.bound.length), [1, 2, 2, 2, 2, 2, 2, 2, 2], 'pair regions project both legends');
+  assert.deepEqual(L[1].fight.bound, [249, 250], 'your first pick leads');
+  assert.match(L[1].fight.say, /Hail: "Your Lugia was first, wasn't it\? Let's see if the copy remembers\."/);
+  assert.match(L[3].fight.say, /Rime: "Dialga first\. Then the other\. Exactly as I predicted\."/);
+  assert.match(L[5].fight.say, /^The stand-in captain: /);
+  assert.deepEqual(L.map(x => x.fight.ally), [1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.2], 'Sssssssnakes +10%, and Slush too in Paldea');
+  assert.match(L[0].fight.say, /hissing supportively: your team hits 10% harder/);
+  assert.match(L[8].fight.say, /Slush stands next to you.*20% harder/);
+  assert.ok(L.every(x => x.fight.tune > 0));
+  assert.deepEqual(got.uses, [1.05, 1.07, 1.09, 1.11, 1.13, 1.15, 1.17, 1.19, 1.2]);
+  // Hoenn: Slush stops it halfway, and it counts.
+  assert.deepEqual([L[2].fight.stopAt, L[2].fight.kos, L[2].fight.queue.length], [4, 4, 8]);
+  assert.deepEqual(L[2].fight.queue.filter(n => /Thaw-bound/.test(n)).length, 2);
+  assert.ok(L[2].fight.queue.slice(0, 4).some(n => /Thaw-bound/.test(n)), 'the projections come out before Slush calls it');
+  assert.ok(L[2].post.includes('y3-hoenn-after') && L[2].post.includes('y3-hoenn-banter'));
+  const C = L[2].cave;
+  assert.ok(C.caveOpen && C.won && C.clue, 'Cave of Origin opens after Hoenn, and the memos clue');
+  assert.deepEqual(C.caveQ, ['Primal Groudon', 'Primal Kyogre']);
+  assert.deepEqual(C.cavePre, ['y3-cave']);
+  // Sinnoh: the Distortion World, no fight, and only now is Giratina named and seen.
+  const D = L[3].distortion;
+  assert.deepEqual([D.before.seen, D.before.open, D.fight, D.seen, D.clue, D.debt], [false, true, false, true, true, 1]);
+  assert.match(D.text, /the dealer is finally in the light\. It's Giratina, in its Origin Forme/);
+  assert.ok(L[3].letters.includes('story-y3-slush-1') && L[4].letters.includes('story-y3-keepgoing') && L[6].letters.includes('story-y3-slush-4'), 'Penguin\'s "Keep going." and Slush\'s intel');
+  assert.ok(L[5].post.includes('y3-kalos-after') && L[6].post.includes('y3-alola-after'));
+  // Galar, with Eternatus stolen: everything but it.
+  assert.deepEqual(L[7].post, ['y3-galar-after']);
+  assert.ok(L.every((x, r) => x.frozenLeft === (r === 7 ? 1 : 0)), 'each thaw returns everything from its region (but the stolen Eternatus)');
+  assert.deepEqual(L[8].post, ['y3-paldea-after', 'y3-maps']);
+  assert.deepEqual([got.end.next, got.end.frozen, got.end.slot, got.end.cap, got.end.lib, got.end.bodyBond], ['Next: Cerulean Cave at deep under Cerulean, in Kanto.', [890], true, 100, 9, false]);
+  assert.deepEqual(got.kept, { post: ['y3-galar-kept'], frozen: 0, slot: false }, 'keeping Eternatus: Galar thaws in full');
+  assert.ok(got.slush.every(b => b.endsWith('<p>— Slush</p>')));
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, the endgame (test save): the inner circle, Necrozma before Ultra, Arceus with every Plate, Terminus, the Dig, the Darkest Day both ways, and the night before', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    const play = id => { const c = CHAPTER[id]; const open = chapterOpen(c); startLoc({ kind: 'chapter', r: c.r, x: id }); const pre = skip(); const q = B && B.kind === 'story' ? B.queue.map(f => f.name) : null, L = B && B.L; if (q) win(); const post = skip(); return { open, pre, q, L, post, done: chDone(id) }; };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    const begin = stolen => {
+      storyJump(to('ch-y2-crown') + 1); skip(); overlay('#scene', false);
+      for (const n of [800, 493, 1024, 718]) delete S.box[n];
+      for (const k of ['megalo', 'necrozma', 'origin', 'cerulean', 'sky', 'terminus', 'underdepths']) delete S.won[k]; S.eternamax = 0; S.plates = 0; for (const id of [...MEWTWONITES, MEGA_RAYQUAZA, 10301]) delete S.stones[id];
+      year3Reset(stolen ? 150 : 890); S.debug.league = 0; S.balls.master = 50; S.set.manual = 0;
+      for (let r = 0; r < 9; r++) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; const c = CHAPTER[CHAPTERS.find(x => x.type === 'liberate' && x.r === r).id]; S.story.ch[c.id] = 1; thawRegion(r); }
+      for (const id of ['y3-cave', 'y3-distortion']) S.story.ch[id] = 1;
+    };
+    begin(true);
+    const next0 = storyNext().text, originShut = chapterOpen(CHAPTER['y3-origin']);
+    const cer = play('y3-cerulean'), sky = play('y3-sky');
+    const originStill = chapterOpen(CHAPTER['y3-origin']);
+    const meg = play('y3-megalo');
+    const nec = S.box[800] && { lv: realLevel(800), cap: levelCap(), from: S.box[800].from, frozen: isFrozen(800) };
+    S.box[800].forme = 'dusk'; const dusk = !!qforme(800); S.box[800].forme = 'ultra'; const ultraBefore = !!qforme(800); S.box[800].forme = '';
+    const ult = play('y3-ultra'); S.box[800].forme = 'ultra'; const ultraAfter = !!qforme(800); S.box[800].forme = '';
+    const ori = play('y3-origin');
+    const arceus = S.box[493] && { lv: realLevel(493), plates: S.plates, won: !!S.won.origin }; S.box[493].forme = 't:Fire'; const fire = qforme(493) && qforme(493).types[0]; S.box[493].forme = '';
+    const termRow = chapterRows(5).find(x => x.x === 'y3-terminus').note;
+    S.box[718] = { xp: 125, shiny: false, forme: '10', from: 5 }; S.cells = 40; const termCells = chapterRows(5).find(x => x.x === 'y3-terminus').note;
+    S.cells = 100; const term = play('y3-terminus');
+    const dig = play('y3-dig'); const tera = S.box[1024] && { lv: realLevel(1024), from: S.box[1024].from, stellar: !!S.won.underdepths };
+    const etBefore = { stolen: !!S.box[890].stolen, slot: emptySlot(890) };
+    const dark = play('y3-darkest'); const et = { frozen: isFrozen(890), stolen: !!S.box[890].stolen, bond: S.box[890].bond, slot: emptySlot(890), eternamax: S.eternamax };
+    const night = play('y3-night');
+    const letter = MAIL.find(m => m.id === 'story-y3-seven').body, clues = ['notes', 'photo'].map(k => !!S.story.clues[k]);
+    const nextEnd = storyNext().text, stonesWon = [...MEWTWONITES, MEGA_RAYQUAZA, 10301].map(id => !!S.stones[id]);
+    // Keeping Eternatus: the Darkest Day is a Thaw-bound copy, and nothing comes back.
+    begin(false);
+    for (const id of ['y3-cerulean', 'y3-sky', 'y3-megalo', 'y3-origin', 'y3-dig']) S.story.ch[id] = 1;
+    const box = Object.keys(S.box).length, copy = play('y3-darkest');
+    const keptPath = { q: copy.q, post: copy.post, box: Object.keys(S.box).length === box };
+    // Classic: Megalo's one flag still opens all three forms, and Story's fusion flag means nothing there.
+    useSlot(KEY); S = fresh(); S.box[800] = { xp: 125, forme: 'dusk' }; S.won = { necrozma: 1 }; const classicDusk = !!qforme(800);
+    const stones = [...MEWTWONITES, MEGA_RAYQUAZA, 10301].map(id => !!S.stones[id]);
+    return { stones, stonesWon, next0, originShut, originStill, cer, sky, meg, nec, dusk, ultraBefore, ult, ultraAfter, ori, arceus, fire, termRow, termCells, term, dig, tera, etBefore, dark, et, night, letter, clues, nextEnd, keptPath, classicDusk };
+  });
+  assert.equal(got.next0, 'Next: Cerulean Cave at deep under Cerulean, in Kanto.');
+  assert.deepEqual([got.originShut, got.originStill], [false, false], 'the Hall of Origin waits for all three of the inner circle');
+  assert.ok(got.cer.open && got.cer.done && got.sky.done && got.meg.done);
+  assert.deepEqual(got.cer.q, ['Mega Mewtwo X', 'Mega Mewtwo Y']);
+  assert.equal(got.sky.q.length, 4, 'Deoxys in four Formes');
+  assert.deepEqual(got.meg.q, ['Necrozma']);
+  assert.deepEqual(got.nec, { lv: got.nec.cap, cap: got.nec.cap, from: 6, frozen: false }, 'Necrozma joins at the cap, from Alola, never frozen');
+  assert.deepEqual([got.dusk, got.ultraBefore, got.ultraAfter], [true, false, true], 'the fusions first, Ultra Necrozma after the summit');
+  assert.ok(got.ult.open);
+  assert.deepEqual(got.ori.q, ['Arceus'], 'a short trial');
+  assert.equal(got.ori.pre[0], 'y3-origin');
+  assert.deepEqual(got.arceus, { lv: got.nec.cap, plates: 17, won: true }, 'Arceus at the cap, with all 17 Plates');
+  assert.equal(got.fire, 'Fire');
+  assert.equal(got.termRow, 'needs a Zygarde (the Kalos dungeon)');
+  assert.equal(got.termCells, 'Zygarde Cells 40/100');
+  assert.ok(got.term.open && got.term.done);
+  assert.ok(got.dig.done && got.tera && got.tera.stellar && got.tera.from === 8, 'Terapagos caught, from Paldea');
+  assert.deepEqual(got.dig.post, ['y3-dig-after']);
+  assert.deepEqual(got.etBefore, { stolen: true, slot: true });
+  assert.deepEqual(got.dark.q, ['Eternamax Eternatus']);
+  assert.deepEqual(got.et, { frozen: false, stolen: false, bond: 1, slot: false, eternamax: 1 }, 'Eternatus comes back, bonded, and the slot is filled');
+  assert.deepEqual(got.dark.post, ['y3-darkest-after']);
+  assert.ok(got.night.done);
+  assert.match(got.letter, /<p>— Sssssssnakes<\/p>$/);
+  assert.equal('Sssssssnakes'.match(/^S(s*)nakes$/)[1].length + 1, 7, 'exactly seven s\'s');
+  assert.deepEqual(got.clues, [true, true], 'the founder\'s notes and the photo');
+  assert.deepEqual(got.keptPath, { q: ['Thaw-bound Eternamax Eternatus'], post: ['y3-darkest-copy'], box: true });
+  assert.deepEqual(got.stonesWon, [true, true, true, true], 'both Mewtwonites, Mega Rayquaza and the Zygardite');
+  assert.deepEqual(got.stones, [false, false, false, false], 'the second run (kept Eternatus) starts clean');
+  assert.equal(got.classicDusk, false, 'Classic ignores Story\'s fusion flag');
+  assert.deepEqual(errors, []);
+});
+
+// A Year 3 save at the night before Team Thaw HQ (test account), every region thawed.
+const y3Ready = () => {
+  useSlot(TEST_STORY_KEY, testStoryAccount());
+  const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'ch-y3-night') + 1); while (sceneNow) endScene(); overlay('#scene', false);
+  S.debug.league = 0; S.story.roulette = {};
+  // A real Story save never has Giratina before the credits (the test account has every Pokémon).
+  delete S.box[487];
+};
+
+test('Year 3 finales, measured: a team built on Sleet or on Prof Penguin (one run, both phases) wins with a little room, a generic one loses, and the Hall of Fame stays the hardest', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    enter('battle');
+    const measure = (id, phases) => {
+      runChapter(CHAPTER[id]); while (sceneNow) endScene();
+      const cap = areaCap(), typed = (m, f) => refHit(m, cap, f) * bestEff(m, f), pool = [...refPool(...refArea(B.r, 3), cap, 0), ETERNAMAX_FOE];
+      const foes = phases ? phases.flatMap(q => q()) : B.queue, T = phases ? phases.reduce((t, q) => t + fightTime(B.base, q(), regionOffense(B.r), .8, 1.2), 0) : B.bossTime;
+      const counter = refPick(pool, foes.map(f => ({ f, hp: 1 })), typed), any = refPick(pool, foes.map(f => ({ f, hp: 1 })), (m, f) => refHit(m, cap, f));
+      const need = team => foes.reduce((s, f) => s + bossHpFor(f, B.L, B.i) * B.tune * clockRate(f) / (team.reduce((d, m) => d + typed(m, f), 0) * bossBoost()), 0) / (T * refDef(team));
+      const r = { L: B.L, cap, counter: need(counter), any: need(any), team: counter.map(m => m.name) }; B = null; return r;
+    };
+    const sleet = measure('y3-sleet'); S.story.ch['y3-sleet'] = 1;
+    const penguin = measure('y3-penguin', PENGUIN_PHASES); S.story.ch['y3-penguin'] = 1;
+    const hof = measure('y3-hof');
+    return { sleet, penguin, hof, uses: [SLEET_USE, PENGUIN_USE, HOF_USE] };
+  })()`);
+  for (const [k, v] of Object.entries({ sleet: got.sleet, penguin: got.penguin, hof: got.hof })) console.log(`# ${k}: built ${v.counter.toFixed(3)}, generic ${v.any.toFixed(3)}, L ${v.L}, team ${v.team.join(', ')}`);
+  assert.ok(got.sleet.L === 100 && got.penguin.L === 100, 'both at the level cap');
+  assert.ok(got.sleet.counter >= 0.9 && got.sleet.counter <= 0.95, `Sleet: a built team needs 90–95% (${got.sleet.counter.toFixed(3)})`);
+  assert.ok(got.penguin.counter >= 0.9 && got.penguin.counter <= 0.95, `Prof Penguin: a built team needs 90–95% over both phases (${got.penguin.counter.toFixed(3)})`);
+  assert.ok(got.sleet.any > 1 && got.penguin.any > 1, `a generic strong team loses (${got.sleet.any.toFixed(3)}, ${got.penguin.any.toFixed(3)})`);
+  assert.ok(got.penguin.counter > got.sleet.counter, 'the finale is harder than Sleet');
+  assert.ok(got.hof.counter > got.penguin.counter && got.hof.counter < 1, `the Hall of Fame is still the hardest fight (${got.hof.counter.toFixed(3)})`);
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, Sleet and Prof Penguin (test save): the 270 gate, the Silvally branch, the Roulette flag, one run over both phases, the credits, and after them', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    enter('battle');
+    // The 270 gate, shown on the rows from the start.
+    const keep = Object.keys(S.box).slice(200); for (const n of keep) S.box[n].frozen = 4;
+    const gate = { open: chapterOpen(CHAPTER['y3-sleet']), note: chapterRows(8).find(x => x.x === 'y3-sleet').note, pnote: chapterRows(0).find(x => x.x === 'y3-penguin').note, map: yearMap().find(x => x.id === 'y3-penguin').name };
+    for (const n of keep) delete S.box[n].frozen;
+    gate.after = chapterOpen(CHAPTER['y3-sleet']);
+    // Sleet with Silvally in the party: the masked Type: Null walks out.
+    S.party = [773, 150, 6]; runChapter(CHAPTER['y3-sleet']); skip();
+    const sleetQ = B.queue.map(f => f.name);
+    for (let i = 0; i < 4; i++) { B.foe.hp = 1; hit(1e12); next(); }
+    const mask = { broke: !!B.maskBroke, left: B.queue.map(f => f.name) };
+    win(); const sleetPost = skip();
+    const sleet = { maskBroke: S.story.maskBroke, post: sleetPost, done: chDone('y3-sleet') };
+    // Without Silvally, the Type: Null fights.
+    resetChapter('y3-sleet'); S.party = [150, 6]; runChapter(CHAPTER['y3-sleet']); skip(); for (let i = 0; i < 4; i++) { B.foe.hp = 1; hit(1e12); next(); }
+    const noMask = { next: B.queue[B.idx] && B.queue[B.idx].name, broke: !!B.maskBroke }; win(); const noMaskPost = skip();
+    // Prof Penguin, no Roulette flag: Giratina at full HP. Run out of time in phase 2 and it starts over from Giratina.
+    runChapter(CHAPTER['y3-penguin']); const pre = skip();
+    const p1 = { foe: B.foe.m.name, full: B.foe.hp === B.foe.max, say: $('#log').textContent, phase: B.phase };
+    B.foe.hp = 1; hit(1e12); next(); const left = B.left; B.brk = 0; storyGo();
+    const p2 = { phase: B.phase, q: B.queue.map(f => f.name), carried: B.time >= Math.round(B.left || 0) && B.left > 0, say: $('#log').textContent };
+    B.time = 0; lastTick = performance.now() - 50; tick(); const lost = { kind: B && B.kind, done: chDone('y3-penguin') };
+    // With the flag (a Hard win at Shotgun Roulette): Giratina holds back.
+    S.story.roulette = { dealer: 1 }; runChapter(CHAPTER['y3-penguin']); skip();
+    const held = { start: B.phase, hp: B.foe.hp / B.foe.max, say: $('#log').textContent };
+    // Win both phases: the confession was first, then "Wake it up.", the ending, the credits, and after them.
+    win(); B.brk = 0; storyGo(); win(); const ends = skip();
+    const credits = { open: !$('#credits').hidden, text: $('#credits').textContent };
+    $('#credits [data-credits]').click(); const after = skip();
+    const sp = S.box[395], gir = S.box[487];
+    const res = { pre, p1, p2, lost, held, ends, credits, after, empoleon: sp && { special: sp.special, lv: realLevel(395) }, giratina: gir && { bond: gir.bond, lv: realLevel(487), from: gir.from, origin: !!S.won.distortion },
+      story: { debt: S.story.giratinaDebt, title: S.story.title, cleared: S.story.cleared[3], hat: S.story.hatOwned, hofLate: S.story.hofLate }, letter: S.mail.got['story-y3-last'] && MAIL.find(m => m.id === 'story-y3-last').body,
+      progress: storyProgress(S), shared: localStorage.getItem(ROULETTE_KEY) };
+    // The golden top hat, on any party member.
+    openTab('party'); detail = 150; renderParty(); document.querySelector('#t-party [data-hat="150"]').click();
+    res.hat = { on: S.story.hat, tile: !!document.querySelector('#party [data-n="150"] .gtop') };
+    // The Hall of Fame is held back (HOF_READY): no row, no letter yet.
+    res.hof = { listed: chapterRows(3).some(x => x.x === 'y3-hof'), late: !!S.mail.got['story-y3-hof-late'], next: storyNext().text };
+    // A real Story save writes "paid" to the shared key; the test save didn't.
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug; delete real.story.title; delete real.story.credits; localStorage.setItem(STORY_KEY, JSON.stringify(real)); useSlot(STORY_KEY);
+    afterCredits(); skip(); res.realShared = JSON.parse(localStorage.getItem(ROULETTE_KEY) || '{}');
+    useSlot(KEY);
+    return Object.assign(res, { gate, sleetQ, mask, sleet, noMask, noMaskPost });
+  })()`);
+  assert.deepEqual([got.gate.open, got.gate.after], [false, true], 'Team Thaw HQ waits for 270 species recovered');
+  assert.match(got.gate.note, /^Species recovered: 200 \/ 270$/); assert.match(got.gate.pnote, /Species recovered: \d+ \/ 270/);
+  assert.equal(got.gate.map, 'Prof Penguin', 'the finale shows on the Year map from the start');
+  assert.deepEqual(got.sleetQ, ['Baxcalibur', 'Cetitan', 'Glaceon', 'Arctozolt', "Type: Null (the Director's unit)", 'Thaw-bound Kyurem']);
+  assert.deepEqual(got.mask, { broke: true, left: ['Baxcalibur', 'Cetitan', 'Glaceon', 'Arctozolt', 'Thaw-bound Kyurem'] }, 'with Silvally in the party, the Type: Null leaves the fight');
+  assert.deepEqual([got.sleet.maskBroke, got.sleet.post, got.sleet.done], [1, ['y3-mask', 'y3-sleet-after'], true]);
+  assert.deepEqual([got.noMask.next, got.noMask.broke, got.noMaskPost], ["Type: Null (the Director's unit)", false, ['y3-sleet-after']]);
+  assert.deepEqual(got.pre, ['y3-confession']);
+  assert.deepEqual([got.p1.foe, got.p1.full, got.p1.phase], ['Giratina (Origin Forme)', true, 1]);
+  assert.ok(!/own table/.test(got.p1.say));
+  assert.equal(got.p2.phase, 2); assert.equal(got.p2.q.at(-1), "Prof Penguin's Mega Empoleon"); assert.ok(got.p2.carried, 'phase 1\'s time carries over');
+  assert.deepEqual(got.lost, { kind: 'route', done: false }, 'out of time in phase 2: back to the start');
+  assert.equal(got.held.start, 1, 'it starts over from Giratina');
+  assert.ok(Math.abs(got.held.hp - 0.85) < 0.01, `Giratina holds back at 85% (${got.held.hp})`);
+  assert.match(got.held.say, /Prof Penguin: "You beat it at its own table\?"/);
+  assert.deepEqual(got.ends, ['y3-wake', 'y3-ending']);
+  assert.ok(got.credits.open && ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova', 'Kalos', 'Alola', 'Galar', 'Paldea'].every(n => got.credits.text.includes(`${n} thaws.`)), 'the credits roll over all nine regions');
+  assert.deepEqual(got.after, ['y3-after']);
+  assert.equal(got.empoleon.special, 'prof-empoleon');
+  assert.deepEqual(got.giratina, { bond: 1, lv: 100, from: 3, origin: true }, 'Giratina joins, bonded, at the cap, in both Formes');
+  assert.deepEqual(got.story, { debt: 0, title: 'Field Researcher', cleared: 1, hat: 1, hofLate: 1 });
+  assert.equal(got.letter, "<p>The notebook's yours now. Write down the small things.</p><p>— P.</p>");
+  assert.deepEqual([got.progress.cleared, got.progress.title], [true, 'Field Researcher'], 'the story field says Cleared, with the title');
+  assert.equal(got.shared, null, 'the test save never writes the shared key');
+  assert.deepEqual(got.hat, { on: 150, tile: true });
+  assert.deepEqual(got.hof, { listed: false, late: false, next: got.hof.next });
+  assert.equal(got.realShared.paid, 1, 'the real Story save writes "paid" for Shotgun Roulette');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3 Hall of Fame, switched on (HOF_READY): the row after Prof Penguin, the late-arrival letter, and the SP Mega Hydrapple', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27', { hof: true });
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    for (const id of ['y3-sleet', 'y3-penguin']) S.story.ch[id] = 1;
+    S.story.hofLate = 1; save(); boot();
+    const late = MAIL.find(m => m.id === 'story-y3-hof-late').body, gotLate = !!S.mail.got['story-y3-hof-late'];
+    enter('battle'); const row = chapterRows(3).find(x => x.x === 'y3-hof');
+    runChapter(CHAPTER['y3-hof']); const pre = skip(); const q = B.queue.map(f => f.name), L = B.L; delete S.hof; delete S.box[1019]; win(); const post = skip();
+    return { gotLate, late, row: row && row.note, pre, q, L, post, sp: S.box[1019] && S.box[1019].special, letter: !!S.mail.got['story-y3-hof'] };
+  })()`);
+  assert.ok(got.gotLate);
+  assert.equal(got.late, "<p>Took you long enough. I've been standing here for weeks.</p><p>— Sssssssnakes</p>");
+  assert.equal(got.row, 'optional');
+  assert.deepEqual([got.pre, got.post], [['y3-hof'], ['y3-hof-after']]);
+  assert.equal(got.q.at(-1), 'Mega Hydrapple'); assert.equal(got.L, 100);
+  assert.ok(got.sp && got.letter, 'the SP Mega Hydrapple, and his last letter');
+  assert.deepEqual(errors, []);
+});
+
+test('Shotgun Roulette reads and writes the shared Poké Idle flags: the hat note changes to "Paid in full", and a confirmed Hard win is remembered', async t => {
+  const { tab } = await openIdle(t, '2026-11-27');
+  const src = fs.readFileSync(path.join(root, 'src/games/content/shotgun-roulette.html'), 'utf8');
+  const settle = src.slice(src.indexOf('setBalance(reply);'), src.indexOf('loadBoard(game.mode);'));
+  assert.match(settle, /if \(won && game\.mode === "hard"\) penguinMark\("beatOrigin"\);/, 'only inside a confirmed (non-test) settle, and only on Hard');
+  const origin = new URL(tab.url()).origin;
+  const note = async flags => {
+    await tab.evaluate(f => localStorage.setItem('bored.poke-idle.roulette.v1', JSON.stringify(f)), flags);
+    await tab.goto(origin + '/games/content/shotgun-roulette.html');
+    await tab.waitForFunction(() => typeof showPenguinChair === 'function');
+    return tab.evaluate(() => { showPenguinChair(); const c = document.getElementById('pchair'); const hidden = c.hidden; c.click(); return { hidden, text: document.getElementById('pnote').textContent, flags: JSON.parse(localStorage.getItem('bored.poke-idle.roulette.v1')) }; });
+  };
+  const before = await note({ hat: 1 }), paid = await note({ hat: 1, paid: 1, beatOrigin: 1 });
+  assert.deepEqual([before.hidden, before.text], [false, 'P. — you still owe me a rematch. — G.']);
+  assert.deepEqual([paid.hidden, paid.text], [false, 'Paid in full. — G.'], 'the chair and hat stay, and the note changes');
+  assert.deepEqual(paid.flags, { hat: 1, paid: 1, beatOrigin: 1, paidSeen: 1 }, 'reading the paid note is remembered, and the other flags are kept');
+  const merged = await tab.evaluate(() => { localStorage.setItem('bored.poke-idle.roulette.v1', '{nope'); penguinMark('beatOrigin'); return localStorage.getItem('bored.poke-idle.roulette.v1'); });
+  assert.equal(merged, '{"beatOrigin":1}', 'a broken key is replaced, not thrown on');
+});
+
+test('Year 3 achievements, wiki and letter: every ID from the file, hidden ones "???", secret ones unlisted, and nothing that spoils the story or the bond', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    checkAch(true); openTab('ach');
+    const ach = $('#t-ach').textContent;
+    const y3 = ACH.filter(a => a.story && a.year === 3).map(a => [a.id, a.type, !!a.replayOk]);
+    const wiki = wikiSections().find(p => p.id === 'story3');
+    const letter = MAIL.find(m => m.id === 'update-story-year3').body;
+    return { achSnip: ach.slice(ach.indexOf('Story'), ach.indexOf('Story') + 600), ach, y3, wiki: wiki && wiki.html, letter, earned: Object.keys(S.ach).filter(k => /^(st|sc)_/.test(k) && ACH.find(a => a.id === k && a.year === 3)), replay: [...REPLAY_REWARDS] };
+  })()`);
+  const ids = got.y3.map(x => x[0]);
+  assert.deepEqual(ids, ['st_stays', 'st_remember', 'st_hissing', 'st_backroom', 'st_orbs', 'st_p', 'st_draft', 'st_slot', 'st_everyone', 'st_firstfreeze', 'st_dig', 'st_giveback', 'st_other', 'st_taught', 'st_wake', 'st_fr', 'st_clues',
+    'sc_table', 'sc_reflection', 'sc_paid', 'sc_seven', 'sc_bonded'], 'section 4, with First Graduate held back by HOF_READY');
+  assert.deepEqual(got.y3.filter(x => x[1] === 'secret').map(x => x[0]), ['sc_table', 'sc_reflection', 'sc_paid', 'sc_seven', 'sc_bonded']);
+  assert.deepEqual(got.y3.filter(x => x[2]).map(x => x[0]), ['sc_reflection'], 'only You Went There Too is Replay OK');
+  assert.deepEqual(got.replay, ['sc_reflection']);
+  assert.ok(!got.ach.includes('Wake It Up') && /\?\?\? · Keep playing\./.test(got.ach), 'hidden ones are "???" until earned: ' + got.achSnip);
+  assert.ok(got.earned.includes('sc_seven') && /Seven · /.test(got.ach), 'an earned secret is listed');
+  assert.ok(!/Nobody Left Behind|You Went There Too|Paid in Full|Own Table/.test(got.ach) && /\+\d+ secret/.test(got.ach), "the others are not, and the group counts them");
+  assert.ok(got.wiki, 'the Year 3 wiki page');
+  assert.match(got.wiki, /This One Stays With Me/); assert.match(got.wiki, /There are hidden achievements\./);
+  for (const text of [got.wiki, got.letter]) assert.doesNotMatch(text, /bond|fought beside|half their|weaker|Sleet|Rime|Hail|Slush|Giratina|Eternatus|Terapagos|Arceus|Necrozma|Kyurem|Wake It Up|Who Taught Us|Field Researcher|dealer|core|Engine/i, 'no spoilers, nothing about the bond');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, the whole year on a real Story save (YEAR3_READY): Begin Year 3, all 36 gyms and nine liberations, the endgame, Sleet with Silvally, Prof Penguin with the Roulette flag, the credits, Replay Year 3 and You Went There Too', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 24 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    // A real Story save that has cleared Year 2 (built with the test account's jump, then made a real save).
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1, { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' }); skip(); overlay('#scene', false);
+    for (const n of [487, 800, 493, 1024]) delete S.box[n];
+    for (const k of ['megalo', 'necrozma', 'origin', 'cerulean', 'sky', 'terminus', 'underdepths', 'distortion', 'cave']) delete S.won[k];
+    Object.entries(S.box).forEach(([n, b], i) => { b.from = i % 9; if (i % 2) b.bond = 1; else delete b.bond; });
+    S.box[718].from = 5; S.cells = 100; S.box[773].from = 6; S.box[150].xp = 70 ** 3;
+    // Two to watch in Kanto: one bonded, one not.
+    Object.assign(S.box[6], { xp: 84 ** 3, peak: 84, from: 0, bond: 1 }); Object.assign(S.box[9], { xp: 70 ** 3, peak: 70, from: 0 }); delete S.box[9].bond;
+    S.story.clues = { ...S.story.clues, badge: 1, memo: 1, memo2: 1, table: 1 }; S.party = [150, 6, 248, 445, 149, 376];
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug;
+    localStorage.setItem(STORY_KEY, JSON.stringify(real)); localStorage.setItem(ROULETTE_KEY, JSON.stringify({ hat: 1, beatOrigin: 1 }));
+    useSlot(STORY_KEY); enter('battle'); skip();
+    const gate = { ready: YEAR3_READY, test: !!S.test, row: unlocked({ kind: 'year3' }) };
+    const boxIds = Object.keys(S.box).sort().join();
+    startLoc({ kind: 'year3', r: 7 }); $('#scene [data-y3="go"]').click(); skip();
+    document.querySelector('#po-list [data-po="150"]').click(); $('#scene [data-y3="stay"]').click(); skip();
+    const begun = { year: S.story.year, kept: S.story.kept, stolen: S.story.eternatusStolen, same: Object.keys(S.box).sort().join() === boxIds, cap: levelCap(), mewtwo: realLevel(150), synced: level(150) <= levelCap() };
+    S.balls.master = 99; S.set.manual = 0;
+    const log = { gyms: 0, libs: 0, chapters: [], thawMsgs: 0, synced: true };
+    let kanto = null;
+    for (let r = 0; r < 9; r++) {
+      viewR = r;
+      for (let k = 0; k < 4; k++) { S.kills[r + '-' + k] = KILLS_FOR_GYM; startLoc({ kind: 'gym', r, k }); skip(); if (B && B.kind === 'gym') { win(); skip(); if (badge(r, k)) log.gyms++; } }
+      for (let pass = 0; pass < 3; pass++) for (const c of chaptersNow()) {
+        if (chDone(c.id) || !chapterOpen(c) || c.r !== r || c.type === 'sleet' || c.type === 'penguin') continue;
+        if (c.year === 3 && !c.liberates && !['y3-cave', 'y3-distortion'].includes(c.id)) continue;
+        startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+        if (B && B.kind === 'story') win();
+        if (document.querySelector('#scene [data-thaw]')) { log.thawMsgs++; $('#scene [data-thaw]').click(); }
+        skip();
+        if (chDone(c.id)) { log.chapters.push(c.id); if (c.liberates) log.libs++; }
+      }
+      if (r === 0) kanto = { charizard: realLevel(6), blastoise: [realLevel(9), S.box[9].peak, remembers(9)] };
+      S.party = [150, ...Object.keys(S.box).map(Number).filter(n => !isFrozen(n) && n !== 150).slice(0, 5)];
+      log.synced = log.synced && Object.keys(S.box).every(n => isFrozen(n) || level(+n) <= levelCap());
+    }
+    // The endgame, in order.
+    for (let pass = 0; pass < 4; pass++) for (const c of chaptersNow()) {
+      if (chDone(c.id) || !chapterOpen(c) || ['sleet', 'penguin', 'hof3'].includes(c.type)) continue;
+      startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip(); if (B && B.kind === 'story') win(); skip();
+      if (chDone(c.id)) log.chapters.push(c.id);
+    }
+    const before = { recovered: recovered(), sleetOpen: chapterOpen(CHAPTER['y3-sleet']), frozen: Object.keys(S.box).filter(n => isFrozen(n)).length, eternatus: { frozen: isFrozen(890), bond: S.box[890].bond } };
+    // Sleet, with Silvally in the party; then Prof Penguin, with the Shotgun Roulette flag from the shared key.
+    S.party = [773, 150, 6, 248, 445, 149];
+    startLoc({ kind: 'chapter', r: 8, x: 'y3-sleet' }); skip(); win(); const sleetPost = skip();
+    startLoc({ kind: 'chapter', r: 0, x: 'y3-penguin' }); skip();
+    const held = B.foe.hp / B.foe.max; win(); B.brk = 0; storyGo(); win(); const ends = skip();
+    $('#credits [data-credits]').click(); skip();
+    $('#mail').innerHTML; openTab('mail'); const seven = document.querySelector('#mail [data-mail="story-y3-seven"]'); if (seven) seven.click();
+    localStorage.setItem(ROULETTE_KEY, JSON.stringify({ ...JSON.parse(localStorage.getItem(ROULETTE_KEY)), paidSeen: 1 }));
+    checkAch(true);
+    const ach = ['st_stays', 'st_remember', 'st_hissing', 'st_backroom', 'st_orbs', 'st_p', 'st_draft', 'st_slot', 'st_everyone', 'st_firstfreeze', 'st_dig', 'st_giveback', 'st_other', 'st_taught', 'st_wake', 'st_fr', 'st_clues', 'sc_table', 'sc_paid', 'sc_seven', 'sc_bonded', 'sc_reflection'].filter(id => S.ach[id]);
+    const end = { cleared: S.story.cleared[3], title: S.story.title, next: storyNext().text, shared: JSON.parse(localStorage.getItem(ROULETTE_KEY)), sleetPost, held, ends,
+      giratina: S.box[487] && S.box[487].bond, empoleon: S.box[395] && S.box[395].special, progress: storyProgress(S), board: window.__boredSnapshot().story };
+    // Replay Year 3: no freeze, Year 3's caps, and the one thing it can give back.
+    save(); showTitle(); const menu = [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go);
+    go('replay3');
+    const replay = { slot, year: storyYear(), replay: S.replay, cap: levelCap(), frozen: Object.values(S.box).filter(b => b.frozen != null).length, max: leagueMax() };
+    for (const c of CHAPTERS) if (c.year === 3 && c.id !== 'y3-penguin') S.story.ch[c.id] = 1;
+    for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
+    S.box[487].forme = 'origin'; delete S.box[487].special; S.party = [487, 150]; enter('battle');
+    const twice = [];
+    for (let i = 0; i < 2; i++) { startLoc({ kind: 'chapter', r: 0, x: 'y3-penguin' }); skip(); B.foe.hp = 1; hit(1e12); next(); twice.push(readSlot(STORY_KEY).story.replayGot); B = null; }
+    go('endreplay');
+    const main = { ach: !!S.ach.sc_reflection, letter: !!S.mail.got['story-y3-reflection'], look: S.box[487].special, slot, year: storyYear(), got: S.story.replayGot };
+    return { gate, begun, log, kanto, before, end, ach, menu, replay, twice, main };
+  });
+  assert.deepEqual(got.gate, { ready: true, test: false, row: true }, 'Begin Year 3 is open on a real save');
+  assert.deepEqual([got.begun.year, got.begun.kept, got.begun.stolen, got.begun.same], [3, 150, 1, true]);
+  assert.ok(got.begun.cap <= 20 && got.begun.mewtwo > got.begun.cap && got.begun.synced, 'the kept one keeps its level and fights at the cap: ' + JSON.stringify(got.begun));
+  assert.deepEqual([got.log.gyms, got.log.libs, got.log.thawMsgs], [36, 9, 9], 'all 36 gyms, nine liberations, and a thaw message each');
+  assert.ok(got.log.chapters.includes('y3-cave') && got.log.chapters.includes('y3-distortion'));
+  for (const id of ['y3-cerulean', 'y3-sky', 'y3-megalo', 'y3-ultra', 'y3-origin', 'y3-terminus', 'y3-dig', 'y3-darkest', 'y3-night']) assert.ok(got.log.chapters.includes(id), id);
+  assert.deepEqual(got.kanto, { charizard: 84, blastoise: [35, 70, true] }, 'bonded back at Lv 84; unbonded at half (70 → 35), peak kept');
+  assert.ok(got.log.synced, 'level sync: nobody fights above the cap');
+  assert.ok(got.before.recovered >= 270 && got.before.sleetOpen && got.before.frozen === 0, '270 recovered, and nothing left frozen');
+  assert.deepEqual(got.before.eternatus, { frozen: false, bond: 1 }, 'Eternatus won back, bonded');
+  assert.deepEqual(got.end.sleetPost, ['y3-mask', 'y3-sleet-after'], 'Silvally: the mask breaks');
+  assert.ok(Math.abs(got.end.held - 0.85) < 0.01, 'the Roulette flag: Giratina holds back');
+  assert.deepEqual(got.end.ends, ['y3-wake', 'y3-ending']);
+  assert.deepEqual([got.end.cleared, got.end.title, got.end.giratina, got.end.empoleon], [1, 'Field Researcher', 1, 'prof-empoleon']);
+  assert.match(got.end.next, /^Year 3 is done\./);
+  assert.deepEqual(got.end.shared, { hat: 1, beatOrigin: 1, paid: 1, paidSeen: 1 }, 'paid in full, the other flags kept');
+  assert.deepEqual([got.end.progress.cleared, got.end.progress.title, got.end.progress.regionsLiberated], [true, 'Field Researcher', 9]);
+  assert.deepEqual([got.end.board.cleared, got.end.board.title, got.end.board.year], [true, 'Field Researcher', 3], 'the snapshot\'s story field says Cleared');
+  assert.ok(got.end.board.ranked < 400000000, 'and still fits the board');
+  assert.deepEqual(got.ach, ['st_stays', 'st_remember', 'st_hissing', 'st_backroom', 'st_orbs', 'st_p', 'st_draft', 'st_slot', 'st_everyone', 'st_firstfreeze', 'st_dig', 'st_giveback', 'st_other', 'st_taught', 'st_wake', 'st_fr', 'st_clues', 'sc_table', 'sc_paid', 'sc_seven'],
+    'every Year 3 achievement this run earns (not Nobody Left Behind: half the Box never fought; not You Went There Too, yet)');
+  assert.ok(got.menu.includes('replay3'));
+  assert.deepEqual([got.replay.slot, got.replay.year, got.replay.replay, got.replay.frozen, got.replay.max], ['bored.poke-idle.story.replay', 3, 1, 0, null], 'Replay Year 3: no freeze, no League rule');
+  assert.ok(got.replay.cap <= 20, 'from the start, at Year 3\'s caps');
+  assert.deepEqual(got.twice.map(g => !!(g || {}).sc_reflection), [true, true], 'given once');
+  assert.deepEqual([got.main.ach, got.main.letter, got.main.look, got.main.slot, got.main.year], [true, true, 'griseous-giratina', 'bored.poke-idle.story', 3], 'You Went There Too: the achievement, the letter and the Griseous Orb look, on the real save');
   assert.deepEqual(errors, []);
 });

@@ -2,13 +2,24 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1018,
-  "newest": "2026-11-26",
+  "count": 1029,
+  "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9195d399","date":"2026-11-27","author":"Vettel Xu","subject":"Poké Idle: Team Thaw portraits","pr":380},
+  {"sha":"123772c6","date":"2026-11-27","author":"Vettel Xu","subject":"Relic Song: round 3 polish","pr":378},
+  {"sha":"11ed6152","date":"2026-11-27","author":"Claude","subject":"Relic Song: sprite, hold and HP layout fixes"},
+  {"sha":"ba1afe3c","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros-style look"},
+  {"sha":"3f1567f3","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5b: switch Year 3 on"},
+  {"sha":"fdbefe38","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5a: Replay Year 3, achievements, wiki and Mail"},
+  {"sha":"6f4c3142","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 4: Sleet, Prof Penguin and the ending"},
+  {"sha":"455972e0","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 3: the endgame, part 1"},
+  {"sha":"c7931a96","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 2: the nine liberation fights"},
+  {"sha":"a2657816","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 1: the freeze, the thaw and the occupied League"},
+  {"sha":"c6bcf971","date":"2026-11-27","author":"Claude","subject":"Add Relic Song, a Meloetta rhythm game"},
   {"sha":"c9a47080","date":"2026-11-26","author":"Daniel Lowe","subject":"Handle malformed client party data safely"},
   {"sha":"06262a85","date":"2026-11-26","author":"Daniel Lowe","subject":"Bind progress reports to the game-opening account and throttle unchanged snapshots"},
   {"sha":"59293aa0","date":"2026-11-26","author":"Daniel Lowe","subject":"Link private Poké Idle dashboard from existing analytics"},

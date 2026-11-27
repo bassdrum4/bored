@@ -94,7 +94,7 @@
   .finale .gym .row { margin-top: 4px }
   .hidden-list h2 { font-size: 17px }
 
-  /* ── Overlays: options, calibration, first launch, pause ─────────────── */
+  /* ── Overlays: options, calibration, board, first launch, pause ──────── */
   .over { position: absolute; inset: 0; background: rgba(4, 6, 9, .66); display: grid; place-items: center; z-index: 20 }
   .card { width: 620px; max-height: 660px; overflow: auto; background: rgba(18, 21, 27, .95); border: 1px solid var(--rule); border-radius: 6px; padding: 22px 26px }
   .card h2 { font-size: 22px; font-weight: 400; margin-bottom: 10px }
@@ -286,7 +286,7 @@
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
     <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
-    <div class="line"><span>Test mode <span class="dim">(every song open; no coins, nothing posted)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
+    <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <p class="dim" id="o-skin-note" style="margin-top:8px"></p>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
 
@@ -295,7 +295,6 @@
     <div class="calib-dot" id="c-dot"></div>
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
-
 
   <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys, D F J K. Open it on a computer.</p></div></div>
 </div>
@@ -316,10 +315,8 @@
 
    Coins go through the hub (parent.__boredGacha.relic, src/hub/relic-song.js)
    into the same ledger Poké Gacha uses. Sprites come from the shared Poké set
-   (pokedoku/sprites). Opened on its own, every song plays; coins and the main
-   board wait for the arcade. The main board ranks the sum of your best score on
-   every song and difficulty, posted by the hub from __boredSnapshot like every
-   other game. */
+   (pokedoku/sprites). Opened on its own, every song plays; coins and the board
+   wait for the arcade. */
 {
 /* ── Coins: tune these ─────────────────────────────────────────────────── */
 // Shotgun Roulette's rate, worked out from its code (shotgun-roulette.html and
@@ -1375,7 +1372,7 @@ function stop() {
 }
 function retry() { const s = P && P.song, d = P && P.B.diff; stop(); if (s) start(s, d); }
 
-/* ── Results and coins ─────────────────────────────────────────────────── */
+/* ── Results, coins and the board ──────────────────────────────────────── */
 function finish(reachedEnd) {
   if (P.finished) return;
   P.finished = true;
@@ -1398,7 +1395,7 @@ function showResult({ song, diff, s, rank, won, why }) {
   showScreen("result");
   const key = song.id + ":" + diff, old = save.best[key] || null;
   $("#r-title").textContent = song.title + " · " + DIFF_NAME[diff];
-  $("#r-sub").textContent = P.test ? "Test mode: no coins, nothing posted" : "";
+  $("#r-sub").textContent = P.test ? "Test mode: no coins, no board" : "";
   $("#r-rank").textContent = won ? rank : "—";
   $("#r-clear").textContent = won ? (song.boss ? (song.final ? "Meloetta's whole song." : GYMS[song.gym].badge + "!") : "Cleared.") : "Not cleared. " + why;
   const rows = $("#r-table"); rows.replaceChildren();
