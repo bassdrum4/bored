@@ -435,7 +435,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
       sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
       silver: MAIL.find(m => m.id === 'story-silver').body,
       signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
-      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief' && !k.startsWith('y2-')).map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief' && !k.startsWith('y2-') && !k.startsWith('y3-')).map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
   assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
   assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
@@ -1365,7 +1365,7 @@ test('Year 3 begins (test save): the freeze keeps one, deletes nothing, and leav
     return new Promise(done => setTimeout(() => {
       freed.toast = $('#toast').textContent;
       const lib = chapterRows(0).find(x => x.x === 'y3-kanto-free'), next1 = storyNext().text;
-      startLoc({ kind: 'chapter', r: 0, x: 'y3-kanto-free' });
+      startLoc({ kind: 'chapter', r: 0, x: 'y3-kanto-free' }); skip(); win();
       const msg = $('#scene').textContent;
       $('#scene [data-thaw]').click(); skip();
       const thaw = { charizard: [realLevel(6), isFrozen(6)], blastoise: [realLevel(9), S.box[9].peak, remembers(9)], venusaur: realLevel(3), tyranitar: isFrozen(248),
@@ -1431,5 +1431,93 @@ test('Year 3 begins (test save): the freeze keeps one, deletes nothing, and leav
   assert.equal(got.bondLeak, false, 'the bond shows nowhere but the thaw message');
   assert.deepEqual(got.keptEternatus, [0, false, false], 'keeping Eternatus: nothing stolen');
   assert.deepEqual(got.back, got.classic, 'Classic keeps its gyms');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, the nine liberations (test save): admins and Thaw-bound projections, the ally bonus, Slush stops Hoenn halfway, Cave of Origin, the dealer named at last, and both Galar paths', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; let kos = 0; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); kos++; if (B === here && !B.manual) next(); } return kos; };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints();
+    storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1, { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' }); skip(); overlay('#scene', false);
+    Object.entries(S.box).forEach(([n, b], i) => { b.from = i % 9; });
+    // The test account has every Pokémon seen; a real save never marks the dealer (the Year 2 test checks that).
+    delete S.seen[487];
+    const dealerSeenBefore = !!S.seen[487], namedBefore = Object.entries(SCENES).filter(([id, sc]) => sc.year < 3).some(([id, sc]) => sc.lines.some(l => /Giratina/.test(l[1])));
+    year3Reset(150); S.debug.league = 0;
+    const log = [];
+    const free = r => { for (let k = 0; k < 4; k++) { S.badges[r + '-' + k] = 1; S.story.freed[r + '-' + k] = 1; } };
+    for (let r = 0; r < 9; r++) {
+      free(r); const c = CHAPTER[`y3-${['kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'][r]}-free`];
+      const open = chapterOpen(c);
+      startLoc({ kind: 'chapter', r, x: c.id }); const pre = skip();
+      const fight = { queue: B.queue.map(f => f.name), bound: B.queue.filter(f => f.bound3).map(f => f.num), ally: B.ally, tune: B.tune, say: $('#log').textContent, stopAt: B.stopAt || 0 };
+      if (r === 0) delete S.seen[150];
+      fight.kos = win(); const seen150 = !!S.seen[150]; fight.stopped = !!(B && B.stopped);
+      fight.msg = $('#scene').textContent; $('#scene [data-thaw]') && $('#scene [data-thaw]').click();
+      const post = skip();
+      log.push({ r, open, pre, fight, post, seen150, champ: !!S.champs[r], lib: !!S.story.liberated[r], frozenLeft: Object.values(S.box).filter(b => b.frozen === r).length, letters: Object.keys(S.mail.got).filter(id => id.startsWith('story-y3')) });
+      if (r === 2) {
+        const cave = CHAPTER['y3-cave'], caveOpen = chapterOpen(cave);
+        startLoc({ kind: 'chapter', r: 2, x: 'y3-cave' }); const cavePre = skip(); const caveQ = B.queue.map(f => f.name), caveSay = $('#log').textContent; win(); const cavePost = skip();
+        log[r].cave = { caveOpen, cavePre, caveQ, caveSay, cavePost, won: !!S.won.cave, clue: !!S.story.clues.memos };
+      }
+      if (r === 3) {
+        const d = CHAPTER['y3-distortion'], before = { seen: !!S.seen[487], open: chapterOpen(d) };
+        startLoc({ kind: 'chapter', r: 3, x: 'y3-distortion' }); const ids = skip();
+        log[r].distortion = { before, ids, fight: !!(B && B.kind === 'story'), seen: !!S.seen[487], clue: !!S.story.clues.p, debt: S.story.giratinaDebt, text: SCENES['y3-distortion'].lines.map(l => l[1]).join(' ') };
+      }
+    }
+    const end = { next: storyNext().text, frozen: Object.entries(S.box).filter(([n, b]) => b.frozen != null).map(([n]) => +n), slot: emptySlot(890), cap: levelCap(), lib: storyProgress(S).regionsLiberated,
+      bodyBond: /fought beside you/.test(document.body.innerText) };
+    // Keeping Eternatus: Galar thaws in full.
+    storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1); skip(); overlay('#scene', false);
+    year3Reset(890); for (let r = 0; r < 7; r++) { free(r); S.story.liberated[r] = 1; S.champs[r] = 1; } free(7);
+    startLoc({ kind: 'chapter', r: 7, x: 'y3-galar-free' }); skip(); win(); $('#scene [data-thaw]').click(); const keptPost = skip();
+    const kept = { post: keptPost, frozen: Object.values(S.box).filter(b => b.frozen === 7).length, slot: emptySlot(890) };
+    useSlot(KEY);
+    return { dealerSeenBefore, namedBefore, log, end, kept, slush: ['story-y3-slush-1', 'story-y3-slush-2', 'story-y3-slush-3', 'story-y3-slush-4'].map(id => MAIL.find(m => m.id === id).body), uses: LIB_USE };
+  });
+  const L = got.log;
+  assert.deepEqual([got.dealerSeenBefore, got.namedBefore], [false, false], 'before Year 3 Sinnoh, nothing names or marks the dealer');
+  assert.ok(L.every(x => x.open && x.champ && x.lib), 'every liberation opens with its gyms, and counts as the Champion');
+  assert.equal(L[0].fight.queue.length, 7, 'Rime\'s six, then the projection');
+  assert.equal(L[0].seen150, false, 'a projection never marks the dex');
+  assert.equal(L[0].fight.queue.at(-1), 'Thaw-bound Mewtwo', 'Kanto: one projection');
+  assert.deepEqual(L[0].pre, ['y3-kanto']);
+  assert.deepEqual(L.map(x => x.fight.bound.length), [1, 2, 2, 2, 2, 2, 2, 2, 2], 'pair regions project both legends');
+  assert.deepEqual(L[1].fight.bound, [249, 250], 'your first pick leads');
+  assert.match(L[1].fight.say, /Hail: "Your Lugia was first, wasn't it\? Let's see if the copy remembers\."/);
+  assert.match(L[3].fight.say, /Rime: "Dialga first\. Then the other\. Exactly as I predicted\."/);
+  assert.match(L[5].fight.say, /^The stand-in captain: /);
+  assert.deepEqual(L.map(x => x.fight.ally), [1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.2], 'Sssssssnakes +10%, and Slush too in Paldea');
+  assert.match(L[0].fight.say, /hissing supportively: your team hits 10% harder/);
+  assert.match(L[8].fight.say, /Slush stands next to you.*20% harder/);
+  assert.ok(L.every(x => x.fight.tune > 0));
+  assert.deepEqual(got.uses, [1.05, 1.07, 1.09, 1.11, 1.13, 1.15, 1.17, 1.19, 1.2]);
+  // Hoenn: Slush stops it halfway, and it counts.
+  assert.deepEqual([L[2].fight.stopAt, L[2].fight.kos, L[2].fight.queue.length], [4, 4, 8]);
+  assert.deepEqual(L[2].fight.queue.filter(n => /Thaw-bound/.test(n)).length, 2);
+  assert.ok(L[2].fight.queue.slice(0, 4).some(n => /Thaw-bound/.test(n)), 'the projections come out before Slush calls it');
+  assert.ok(L[2].post.includes('y3-hoenn-after') && L[2].post.includes('y3-hoenn-banter'));
+  const C = L[2].cave;
+  assert.ok(C.caveOpen && C.won && C.clue, 'Cave of Origin opens after Hoenn, and the memos clue');
+  assert.deepEqual(C.caveQ, ['Primal Groudon', 'Primal Kyogre']);
+  assert.deepEqual(C.cavePre, ['y3-cave']);
+  // Sinnoh: the Distortion World, no fight, and only now is Giratina named and seen.
+  const D = L[3].distortion;
+  assert.deepEqual([D.before.seen, D.before.open, D.fight, D.seen, D.clue, D.debt], [false, true, false, true, true, 1]);
+  assert.match(D.text, /the dealer is finally in the light\. It's Giratina, in its Origin Forme/);
+  assert.ok(L[3].letters.includes('story-y3-slush-1') && L[4].letters.includes('story-y3-keepgoing') && L[6].letters.includes('story-y3-slush-4'), 'Penguin\'s "Keep going." and Slush\'s intel');
+  assert.ok(L[5].post.includes('y3-kalos-after') && L[6].post.includes('y3-alola-after'));
+  // Galar, with Eternatus stolen: everything but it.
+  assert.deepEqual(L[7].post, ['y3-galar-after']);
+  assert.ok(L.every((x, r) => x.frozenLeft === (r === 7 ? 1 : 0)), 'each thaw returns everything from its region (but the stolen Eternatus)');
+  assert.deepEqual(L[8].post, ['y3-paldea-after', 'y3-maps']);
+  assert.deepEqual([got.end.next, got.end.frozen, got.end.slot, got.end.cap, got.end.lib, got.end.bodyBond], ['Every region is free.', [890], true, 100, 9, false]);
+  assert.deepEqual(got.kept, { post: ['y3-galar-kept'], frozen: 0, slot: false }, 'keeping Eternatus: Galar thaws in full');
+  assert.ok(got.slush.every(b => b.endsWith('<p>— Slush</p>')));
   assert.deepEqual(errors, []);
 });
