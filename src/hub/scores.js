@@ -128,6 +128,10 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Relic Song ranks the sum of the player's best score on every song (one per
+  // song and difficulty). Test mode reports real: false and never counts.
+  highScore("relic-song", "Relic Song", "points", { metric: "total", min: 1, max: 20000000,
+    when: snapshot => snapshot.real === true && snapshot.finished === true }),
   highScore('squaretato', 'Squaretato', 'survival', { metric: 'score', min: 1, max: 50059999, when: snapshot => snapshot.scoreReady === true, format: value => Math.floor(value / 100000) + ' waves · D' + Math.floor(value % 100000 / 10000) + ' · ' + (value % 10000).toLocaleString('en-US') + ' kills' }),
   highScore("ballistic-chickens", "Ballistic Chickens", "m", { metric: "meters", when: snapshot => snapshot.finished === true }),
   // Biggest single-game profit (chips won minus the bet) from a real game that
