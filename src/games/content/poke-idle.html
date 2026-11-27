@@ -2693,6 +2693,9 @@ const MAIL = [
     body: `<p>They froze everything you caught. All of it. They're still there, just under the ice. I can see them.</p><p>Every region you free, the ice lets go of what you caught there. Some of them will come back to you sooner than others. You'll see.</p><p>Prof Penguin</p>` },
   { id: "story-y3-snakes", chapter: true, date: "Year 3", from: "Sssssssnakes", title: "THEY FROZE MINE TOO",
     body: `<p>THEY FROZE MINE TOO. I'M FINE. I'M FINE. I'LL FIND YOU.</p><p>— SSSSSSSSSSSSSNAKES</p>` },
+  // Relic Song finale: one optional crossover letter.
+  { id: "story-relic-song", chapter: true, date: "Kanto", from: "Prof Penguin", title: "A song in Kanto",
+    body: `<p>Odd reports from Kanto\'s gyms. A small Pokémon came through with a song, and each leader gave a piece of it back.</p><p>Prof Penguin</p><p>P.S. Someone\'s been singing to the frozen ones. Was that you?</p>` },
   { id: "story-y2-start", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The cold got into everything",
     body: `<p>The cold got into everything. Every Pokémon in the world felt it last night.</p><p>They're weaker, not gone. They remember you. Give them time.</p><p>One more thing. There's an old shrine in Galar, the Crown Shrine. Its king is old and particular. He won't see anyone who hasn't brought both his steeds, Glastrier and Spectrier, and both of Galar's heroes, the sword and the shield. Start looking early. You'll want to end the year there.</p><p>P.S. My last letter was three words, not two. I counted afterwards. I was upset.</p><p>Prof Penguin</p>` },
   { id: "update-2026-11-26a", date: "Nov 26, 2026", from: "Prof Penguin", title: "My text box got a makeover",
@@ -2916,6 +2919,9 @@ function deliverMail(today = arcadeDay()) {
   if (!S) return;
   const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
   for (const m of fresh) S.mail.got[m.id] = 1;
+  if (isStory() && !S.test && !S.replay && [1, 2].includes(storyYear()) && !S.mail.got["story-relic-song"]) {
+    try { if ((JSON.parse(localStorage.getItem("bored.relic-song.eggs.v1") || "{}") || {}).finale) { S.mail.got["story-relic-song"] = 1; fresh.push(MAIL.find(m => m.id === "story-relic-song")); } } catch {}
+  }
   if (fresh.length) { save(); renderTop(); if (screen === "title") renderTitle(); if (screen === "game") toast(`New mail: ${fresh[0].title}`); }
 }
 const inbox = () => MAIL.filter(delivered);

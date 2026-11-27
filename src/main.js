@@ -20,6 +20,7 @@ import { readWallet, walletBalance, mergeStoredWallet, observeStoredSnapshot, ac
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
 import { createRouletteBridge, rouletteWonOn, ROULETTE } from './hub/roulette.js';
+import { relicBridge } from './hub/relic-song.js';
 import { createClaims } from './hub/claims.js';
 import { tradesBridge } from './hub/trades.js';
 import { submitDailyResult } from './hub/daily-sync.js';
@@ -56,7 +57,7 @@ if (typeof window !== 'undefined') window.dailyDate = defaultDailyDate;
 
 // Games that use Esc themselves: Bored leaves its Esc-closes-the-game shortcut out of their document (the
 // game has its own Back to Bored button, in its Menu and on its title screen). Every other game still closes on Esc.
-const OWNS_ESCAPE = new Set(['ashcrown', 'poke-gacha', 'shotgun-roulette', 'squaretato']);
+const OWNS_ESCAPE = new Set(['ashcrown', 'poke-gacha', 'relic-song', 'shotgun-roulette', 'squaretato']);
 
 /* ── DOM handles ──────────────────────────────────────────────────────────── */
 
@@ -879,6 +880,7 @@ window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); r
   claims,
   // Tower defense: battles, rewards and missions (src/hub/td.js).
   td: tdBridge({ onChange: () => requestCloudPush() }),
+  relic: relicBridge({ onChange: () => requestCloudPush() }),
   // The Collector's way to chips: today's net at Shotgun Roulette against its cap, and a door to it.
   casino: {
     today: () => ({ net: rouletteWonOn(readWallet(), defaultDailyDate()), cap: ROULETTE.dailyCap }),

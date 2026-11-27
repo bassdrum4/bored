@@ -193,6 +193,11 @@
     "min_value": 10,
     "max_value": 2000
   },
+  "relic-song": {
+    "label": "Sum of best scores across every song",
+    "better": "high",
+    "max_value": 20000000
+  },
   "risk": {
     "label": "Fewest human turns to conquer the world vs CPU",
     "better": "low",
