@@ -52,7 +52,7 @@
   /* ── The map ─────────────────────────────────────────────────────────── */
   #map h1 { font-size: 30px; font-weight: 300; letter-spacing: .06em }
   .say { margin: 10px 0 16px; display: flex; gap: 14px; align-items: center; min-height: 72px }
-  .say img { width: 72px; height: 72px; flex: none }
+  .say img { flex: none }
   .say p { max-width: 900px; color: var(--ink) }
   /* The song itself: four verses on one staff, filled in as they come back. */
   .verses { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); height: 22px; margin-bottom: 18px; border-radius: 3px; overflow: hidden }
@@ -61,8 +61,7 @@
   .verses span.got { background: var(--accent); color: #fff }
   .gyms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px }
   .gym { position: relative; border: 1px solid var(--rule); background: var(--panel); padding: 12px; border-radius: 4px; overflow: hidden; min-height: 250px }
-  .gym .top { display: flex; gap: 10px; align-items: center; margin-bottom: 8px }
-  .gym .top img { width: 64px; height: 64px }
+  .gym .top { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; min-height: 64px }
   .gym h2 { font-size: 19px }
   .gym .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; margin-top: 6px; padding: 7px 10px }
   .gym .rank { font-weight: 600; min-width: 1.5em; text-align: right; color: var(--gold) }
@@ -118,9 +117,11 @@
   #keys { position: absolute; left: 0; right: 0; top: 612px; height: 40px; z-index: 2; pointer-events: none; transition: opacity .9s }
   #keys.out { opacity: 0 }
   #keys div { position: absolute; width: 240px; margin-left: -120px; text-align: center; line-height: 1.2 }
-  #keys b { display: block; font-size: 14px; font-weight: 400; color: var(--faint) }
-  #keys span { font-size: 10px; letter-spacing: .08em; color: rgba(255, 255, 255, .22) }
+  #keys b { display: block; font-size: 15px; font-weight: 400; color: rgba(255, 255, 255, .6) }
+  #keys span { font-size: 12px; letter-spacing: .06em; color: rgba(255, 255, 255, .6) }
 
+  /* Notes fade in below the HUD band at the top, so nothing crowds the combo or the score. */
+  #lines { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(to bottom, transparent 0 100px, #000 170px); mask-image: linear-gradient(to bottom, transparent 0 100px, #000 170px) }
   /* Judgment lines. Each is a point the script places and turns; its bar runs
      edge to edge, and its notes ride inside it, travelling straight at it. */
   .jl { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; z-index: 3; transition: opacity .3s }
@@ -135,8 +136,9 @@
               box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75), 0 0 10px rgba(79, 212, 255, .75) }
   .nt.dbl .head { background: var(--gold); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px #fff, 0 0 12px rgba(255, 216, 102, .8) }
   .nt.drag .head { height: 7px; bottom: 1.5px; background: #f3e27a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7), 0 0 8px rgba(243, 226, 122, .7) }
-  .nt .beam { position: absolute; left: 14%; right: 14%; bottom: 5px; background: linear-gradient(to top, rgba(160, 225, 255, .55), var(--beam));
-              border-left: 1px solid rgba(255, 255, 255, .85); border-right: 1px solid rgba(255, 255, 255, .85) }
+  /* A hold: head, beam and tail cap all the same width as a tap. */
+  .nt .beam { position: absolute; left: 0; right: 0; bottom: 5px; background: linear-gradient(to top, rgba(160, 225, 255, .55), var(--beam));
+              border: 1px solid rgba(255, 255, 255, .85); border-bottom: 0; border-top-width: 2px; border-radius: 5px 5px 0 0 }
   .nt.miss { opacity: 0; transition: opacity .25s }
   .nt.done { display: none }
   .skin-charm .nt .head { background: radial-gradient(circle at 20% 40%, #fff 0 1.2px, transparent 2px) 0 0 / 14px 10px,
@@ -163,18 +165,20 @@
   .ring.beat { animation: ring .42s ease-out }
   @keyframes ring { from { opacity: .9; transform: scale(.5) } to { opacity: 0; transform: scale(1.6) } }
 
-  /* The battle layer: two thin HP lines and a fading line of text. */
-  #bossbar { position: absolute; left: 50%; top: 118px; width: 380px; margin-left: -190px; text-align: center; z-index: 6 }
-  #bossbar .nm, #mebar .nm { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 12px; letter-spacing: .08em; color: var(--dim) }
-  #bossbar img, #mebar img { width: 64px; height: 64px; opacity: .55; margin: -22px 0 -18px }
-  .thin { height: 3px; background: rgba(255, 255, 255, .12); margin-top: 6px; border-radius: 2px; overflow: hidden }
-  .thin i { display: block; height: 100%; width: 100%; transition: width .2s }
-  #boss-hp { background: var(--accent); box-shadow: 0 0 8px var(--accent) }
-  #mebar { position: absolute; left: 28px; bottom: 64px; width: 220px; padding-left: 64px; z-index: 6 }
-  #mebar .nm { justify-content: flex-start }
-  #mebar img { position: absolute; left: -6px; top: -26px; margin: 0 }
-  #me-hp { background: var(--tap); box-shadow: 0 0 8px var(--tap) }
-  #btext { position: absolute; left: 28px; bottom: 42px; font-size: 13px; color: var(--dim); z-index: 6; transition: opacity .5s; opacity: 0 }
+  /* The battle layer. The boss sits top right under the score (name, HP, sprite), your
+     side bottom left (battle text, sprite, name, HP) above the song name; nothing over the lanes. */
+  #foecol { position: absolute; right: 28px; top: 58px; width: 300px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; z-index: 6 }
+  #mecol { position: absolute; left: 28px; bottom: 44px; width: 240px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; z-index: 6 }
+  .nm { font-size: 12px; letter-spacing: .08em; color: var(--dim) }
+  .thin { width: 100%; height: 3px; background: rgba(255, 255, 255, .12); border-radius: 2px; overflow: hidden }
+  .thin i { display: block; height: 100%; width: 100%; transition: width .2s; background: var(--hp, #fff); box-shadow: 0 0 8px var(--hp, #fff) }
+  #foecol .spr { margin-top: 10px }
+  #mecol .spr { margin-bottom: 4px }
+  /* Sprites: their own shape at a whole-number scale, a soft glow in the tint, a slow bob. */
+  .spr { opacity: .85; filter: drop-shadow(0 0 6px var(--tint)) drop-shadow(0 0 16px var(--tint)); animation: bob 2.8s ease-in-out infinite }
+  .spr.pir { filter: hue-rotate(-60deg) saturate(2) drop-shadow(0 0 6px var(--tint)) drop-shadow(0 0 16px var(--tint)) }
+  @keyframes bob { 50% { transform: translateY(-3px) } }
+  #btext { min-height: 18px; font-size: 13px; color: var(--dim); transition: opacity .5s; opacity: 0 }
   #btext.on { opacity: 1; transition: none }
   .hurt { animation: hurt .18s }
   @keyframes hurt { 50% { filter: brightness(2.5); transform: translateX(3px) } }
@@ -183,7 +187,7 @@
   /* The Relic Song break: a white flash, Meloetta filling the screen, the name in the thin font. */
   #relicfx { position: absolute; inset: 0; z-index: 8; pointer-events: none; display: grid; place-items: center; opacity: 0; transition: opacity .6s }
   #relicfx.on { opacity: 1 }
-  #relicfx img { position: absolute; width: 780px; height: 780px; left: 50%; top: 50%; margin: -390px 0 0 -390px; opacity: .85; transition: filter 1.2s, transform 3s ease-out; transform: scale(.94) }
+  #relicfx img { position: absolute; opacity: .85; transition: filter 1.2s, transform 3s ease-out; transform: scale(.94) }
   #relicfx.on img { transform: scale(1.04) }
   #relicfx p { position: relative; font: 200 72px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; text-shadow: 0 0 24px rgba(255, 255, 255, .6) }
   #relicfx small { position: absolute; bottom: 150px; left: 0; right: 0; text-align: center; font-size: 14px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase }
@@ -230,9 +234,8 @@
     <div id="combo"><b id="combo-n"></b><span id="combo-l">COMBO</span><em id="jtext"></em></div>
     <div id="score">0000000</div>
     <div id="beatdot" hidden></div>
-    <div id="bossbar" hidden><div class="nm"><img id="boss-img" alt=""><span id="boss-name"></span></div><div class="thin"><i id="boss-hp"></i></div></div>
-    <div id="btext"></div>
-    <div id="mebar" hidden><div class="nm"><img id="me-img" alt=""><span id="me-name"></span></div><div class="thin"><i id="me-hp"></i></div></div>
+    <div id="foecol" hidden><div class="nm" id="boss-name"></div><div class="thin"><i id="boss-hp"></i></div><img class="spr" id="boss-img" alt=""></div>
+    <div id="mecol" hidden><div id="btext"></div><img class="spr" id="me-img" alt=""><div class="nm" id="me-name"></div><div class="thin"><i id="me-hp"></i></div></div>
     <div id="songname"></div><div id="songlv"></div>
     <div id="relicfx"><img id="relic-img" alt=""><p id="relic-name">Relic Song</p><small id="relic-sub"></small></div>
     <div id="whiteflash"></div>
@@ -345,6 +348,17 @@ const fmt = n => Math.round(n).toLocaleString("en-US");
 const CONTENT_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "" : "games/content/";
 const SPRITE_DIR = CONTENT_DIR + "pokedoku/sprites/";
 const sprite = (num, shiny) => SPRITE_DIR + (shiny ? "shiny/" : "") + num + ".png";
+// Sprites keep their own shape: the pack's art is trimmed to each Pokémon, so it is drawn at a
+// whole-number scale (up to `most`, and no bigger than `max` px on its long side), never stretched to a box.
+function pix(img, src, max = 150, most = 2) {
+  const fit = () => {
+    if (!img.naturalWidth) return;
+    const k = Math.max(1, Math.min(most, Math.floor(max / Math.max(img.naturalWidth, img.naturalHeight))));
+    img.style.width = img.naturalWidth * k + "px"; img.style.height = "auto";
+  };
+  img.onload = fit;
+  if (img.getAttribute("src") !== src) img.src = src; else fit();
+}
 // The pack has Meloetta's Aria Forme (648) but no Pirouette art, so Pirouette is
 // the same sprite turned orange with a CSS filter (.pir).
 const MELOETTA = 648;
@@ -836,7 +850,7 @@ const rankIndex = r => ["C", "B", "A", "S"].indexOf(r);
 
 /* ── The map ───────────────────────────────────────────────────────────── */
 function say(text, num = MELOETTA, pir = false) {
-  $("#say-img").src = sprite(num); $("#say-img").className = pir ? "pir" : "";
+  pix($("#say-img"), sprite(num), 110); $("#say-img").className = pir ? "pir" : "";
   $("#say-text").textContent = text;
 }
 function songRow(song, label) {
@@ -865,7 +879,7 @@ function drawMap() {
   const gyms = $("#gyms"); gyms.replaceChildren();
   GYMS.forEach((g, i) => {
     const card = el("div", "gym" + (save.badges[i] ? " thawed" : "") + (open(gymSongs(i)[0]) ? "" : " locked"));
-    const top = el("div", "top"), img = el("img"); img.src = sprite(g.ace); img.alt = g.aceName;
+    const top = el("div", "top"), img = el("img"); pix(img, sprite(g.ace), 80); img.alt = g.aceName;
     const who = el("div"); who.append(el("h2", "", g.name), el("div", "dim", g.place + " · " + g.type));
     top.append(img, who);
     card.append(top);
@@ -877,7 +891,7 @@ function drawMap() {
   const fin = $("#finale"); fin.replaceChildren();
   const final = SONGS.find(s => s.final);
   const fc = el("div", "gym" + (save.badges[4] ? " thawed" : "") + (open(final) ? "" : " locked"));
-  const top = el("div", "top"), img = el("img"); img.src = sprite(MELOETTA); img.alt = "Meloetta";
+  const top = el("div", "top"), img = el("img"); pix(img, sprite(MELOETTA), 80); img.alt = "Meloetta";
   const who = el("div"); who.append(el("h2", "", "Meloetta"), el("div", "dim", "The whole song · Aria and Pirouette"));
   top.append(img, who); fc.append(top, songRow(final, "Final: " + final.title));
   fin.append(fc);
@@ -1006,8 +1020,12 @@ function bossOf(song) {
 // The backdrop: a sprite, huge and blurred, and a tint. Aria green-teal, Pirouette orange-brown, or a gym's type.
 const TINT = { aria: "#1d9a86", pirouette: "#c4652b", Rock: "#8c6f45", Water: "#2a62b4", Electric: "#c4a31c", Grass: "#3f8c3c",
   dark: "#5b3f8f", plain: "#3d6a98", snake: "#4f7d3a" };
+const TYPE_COLOR = { Normal: "#c6c6a7", Fire: "#f08030", Water: "#6890f0", Grass: "#78c850", Electric: "#f8d030", Ice: "#98d8d8",
+  Fighting: "#d0503a", Poison: "#a040a0", Ground: "#e0c068", Flying: "#a890f0", Psychic: "#f85888", Bug: "#a8b820", Rock: "#b8a038",
+  Ghost: "#8a70b8", Dragon: "#7c5cf8", Dark: "#8a7060", Steel: "#b8b8d0", Fairy: "#ee99ac" };
 function backdrop(num, tint, pir = false) {
   const img = $("#bg-img");
+  $("#stage").style.setProperty("--tint", tint);
   if (num != null && !img.src.endsWith("/" + num + ".png")) img.src = sprite(num);
   img.className = pir ? "pir" : "";
   $("#bg-tint").style.backgroundColor = tint;
@@ -1045,15 +1063,19 @@ function start(song) {
   // The count-in: four clicks before beat 0.
   P.ev = [0, 1, 2, 3].map(k => ({ b: k - 4, kind: "drum", hit: "r" })).concat(B.ev);
   // The battle layer
-  $("#bossbar").hidden = $("#mebar").hidden = !boss;
+  $("#foecol").hidden = $("#mecol").hidden = !boss;
   $("#btext").textContent = ""; $("#btext").className = "";
   if (boss) {
     const you = yourSide(song);
     const dmg = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 + BATTLE.charge : n.kind === "drag" ? 0.5 : 1), 0);
     P.battle = { you, youHp: BATTLE.youHp, bossMax: dmg * BATTLE.bossShare, bossHp: dmg * BATTLE.bossShare, hurt: song.final ? BATTLE.finalHurt : BATTLE.missHurt };
-    $("#me-img").src = sprite(you.num, you.shiny); $("#me-name").textContent = you.name;
-    $("#boss-img").src = sprite(boss.num); $("#boss-img").className = ""; $("#boss-name").textContent = boss.name + " · " + boss.types.join("/");
+    pix($("#me-img"), sprite(you.num, you.shiny)); $("#me-name").textContent = you.name;
+    pix($("#boss-img"), sprite(boss.num)); $("#boss-img").className = "spr"; $("#boss-name").textContent = boss.name + " · " + boss.types.join("/");
     $("#boss-hp").style.width = $("#me-hp").style.width = "100%";
+    // Each HP line in its Pokémon's type colour (the buddy's first type, the boss's last).
+    const youTypes = you.buddy && G ? G.typesOf(you.num) : ["Psychic"];
+    $("#me-hp").style.setProperty("--hp", TYPE_COLOR[youTypes[0]] || "#fff");
+    $("#boss-hp").style.setProperty("--hp", TYPE_COLOR[boss.types[boss.types.length - 1]] || "#fff");
     say2(edge ? "Type edge on " + boss.name + ": +3% score" : you.buddy ? "" : "No buddy? Set one in Poké Gacha.");
   }
   $("#play").className = "screen skin-" + skin();
@@ -1120,7 +1142,9 @@ function setForm(form) {
   P.form = form;
   $("#play").classList.toggle("pirouette", form === "pirouette");
   if (P.boss) backdrop(null, TINT[form], P.song.final && form === "pirouette");
-  if (P.song.final) { $("#boss-img").className = form === "pirouette" ? "pir" : ""; $("#boss-name").textContent = "Meloetta · " + (form === "pirouette" ? "Pirouette Forme · " + FINAL.pirouette.join("/") : "Aria Forme · " + FINAL.type.join("/")); }
+  if (P.song.final) {
+    $("#boss-img").className = "spr" + (form === "pirouette" ? " pir" : "");
+    $("#boss-hp").style.setProperty("--hp", TYPE_COLOR[form === "pirouette" ? "Fighting" : "Psychic"]); $("#boss-name").textContent = "Meloetta · " + (form === "pirouette" ? "Pirouette Forme · " + FINAL.pirouette.join("/") : "Aria Forme · " + FINAL.type.join("/")); }
 }
 function segmentAt(beat) {
   let mode = "highway", form = "aria", show = null;
@@ -1145,7 +1169,7 @@ function frame() {
     P.showing = at.show;
     P.nextForm = at.show.kind === "relic" ? "pirouette" : P.form === "aria" ? "pirouette" : "aria";
     const wf = $("#whiteflash"); wf.classList.remove("go"); void wf.offsetWidth; wf.classList.add("go");
-    $("#relic-img").src = sprite(MELOETTA);
+    pix($("#relic-img"), sprite(MELOETTA), 680, 20);
     $("#relic-img").className = P.form === "pirouette" ? "pir" : "";
     $("#relic-name").textContent = at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
     $("#relic-sub").textContent = at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
