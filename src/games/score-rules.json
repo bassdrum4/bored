@@ -196,7 +196,7 @@
   "relic-song": {
     "label": "Sum of best scores across every song",
     "better": "high",
-    "max_value": 20000000
+    "max_value": 50000000
   },
   "risk": {
     "label": "Fewest human turns to conquer the world vs CPU",
