@@ -212,16 +212,45 @@
   .tip { position: relative; margin-top: 8px; padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink); display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55 }
   .tip .who { position: absolute; top: -9px; left: 12px; padding: 0 6px; background: var(--paper); font-size: 12px; font-weight: 700; line-height: 16px }
   .tip p { max-width: 68ch }
-  /* Story scenes use Prof Penguin's text box, over whichever screen is open. */
-  .scene { margin: 0 0 12px }
+  /* Prof Penguin's text box, the one look for the tip slot under the tabs and the scene overlay: a portrait, the
+     speaker's name, the line typed out, thumb-sized buttons. Frost blue with a doubled rule, for the Long Freeze. */
+  :root { --frost: #e9f1f4; --frost-line: #93b4c3; --veil: rgba(20, 32, 40, .45) }
+  @media (prefers-color-scheme: dark) { :root { --frost: #1c2427; --frost-line: #4b6b79; --veil: rgba(0, 0, 0, .55) } }
+  .dlg { position: relative; box-sizing: border-box; display: grid; grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-areas: "face who" "face text" "extra extra" "row row"; column-gap: 12px; row-gap: 4px; padding: 12px 14px;
+    background: var(--frost); color: var(--ink); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--frost), inset 0 0 0 4px var(--frost-line) }
+  .dlg-face { grid-area: face; width: 48px; height: 48px; box-sizing: border-box; border: 1px solid var(--frost-line); border-radius: 4px; background: var(--surface); display: grid; place-items: center; overflow: hidden; font: 700 13px/1 var(--mono); color: var(--dim) }
+  .dlg-face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated }
+  .dlg.narr { grid-template-areas: "who who" "text text" "extra extra" "row row" }
+  .dlg .who { grid-area: who; font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase }
+  .dlg-text { grid-area: text; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; max-width: 62ch }
+  .dlg-text p + p { margin-top: 6px }
+  .dlg-text .tw-rest { visibility: hidden }
+  .dlg > table, .dlg > .picks { grid-area: extra; margin-top: 6px }
+  .dlg .row { grid-area: row; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; flex-wrap: wrap }
+  .dlg .row button.lbl { min-height: 40px; min-width: 76px; padding: 0 14px; font-size: 14px; background: var(--surface); border-radius: 4px }
+  .dlg .row .skip { margin-right: auto; min-height: 40px; padding: 0 6px 0 0; font: inherit; font-size: 13px; border: 0; background: none; color: var(--dim); cursor: pointer; text-decoration: underline 1px; text-underline-offset: 3px }
+  .dlg .row .skip:hover { color: var(--ink) }
+  .dlg .count { font: 12px var(--mono); color: var(--dim) }
+  /* The tip slot keeps one height whether Prof Penguin is talking or not (two lines, then "Next ›"), so nothing below
+     it ever moves. With nothing to say it waits, faint. Shown and hidden by opacity only. */
+  #tip { margin-top: 8px; grid-template-rows: 16px 44px 40px; grid-template-areas: "face who" "face text" "row row" }
+  #tip .dlg-text { font-size: 15px }
+  #tip .row { margin-top: 0 }
+  #tip.idle { opacity: .4 } #tip.idle .row { visibility: hidden }
+  /* Scenes and the league notice open over the bottom of the screen on a veil that dims the page and takes its taps:
+     opening and closing them moves nothing, and a fast "Next" can't land on a battle button. A scene line keeps one
+     height, so Next stays under your thumb from line to line. The game keeps running behind it. */
+  #veil { position: fixed; inset: 0; z-index: 30; background: var(--veil); touch-action: none }
+  #veil[hidden] { display: none }
+  .scene, #league { position: fixed; z-index: 31; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(640px, calc(100vw - 24px)); max-height: 80vh; overflow-y: auto; margin: 0 }
+  .scene:not(.free) { grid-template-rows: 16px 70px auto; overflow: hidden }
+  .scene[hidden], #league[hidden] { display: none }
   .replaybar { margin: 0 0 10px; padding: 6px 10px; border: 1px solid var(--ink); border-radius: 4px; font-size: 13px; font-weight: 700; text-align: center }
-  .scene .count { margin-left: auto }
   .y2 { border-collapse: collapse } .y2 th, .y2 td { border: 1px solid var(--ink); padding: 4px 8px; text-align: left; vertical-align: top }
   .modes { display: grid; gap: 8px }
   .modes button { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
   .modes button span { font-size: 12px; color: var(--dim) }
-  .face { float: left; width: 40px; height: 40px; margin: 0 10px 4px 0; border: 1px solid var(--ink); border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 700; text-align: center; overflow: hidden; background: var(--paper) }
-  .face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated }
   .picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
   .picks button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--ink); border-radius: 4px; background: var(--surface); color: inherit; font: inherit; cursor: pointer }
   .picks button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px }
@@ -347,7 +376,9 @@
 <main>
   <div class="tip syncask" id="syncask" role="alertdialog" aria-labelledby="syncask-h" hidden></div>
   <p class="replaybar" id="replaybar" hidden></p>
-  <div class="tip scene" id="scene" role="dialog" aria-live="polite" hidden></div>
+  <div id="veil" hidden></div>
+  <div class="dlg scene" id="scene" role="dialog" aria-modal="true" aria-live="polite" hidden></div>
+  <div class="dlg" id="league" role="alertdialog" aria-modal="true" hidden></div>
   <section id="title" hidden>
     <div class="head"><h1 id="sign">Poké Idle</h1><b class="ptag" id="t-prest" hidden></b><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
     <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
@@ -385,8 +416,7 @@
       <button data-tab="ach" type="button">Achievements</button>
       <button data-tab="story" type="button" hidden>Story</button>
     </div>
-    <div class="tip" id="tip" role="status" hidden></div>
-    <div class="tip" id="league" role="alertdialog" hidden></div>
+    <div class="dlg idle" id="tip" role="status"></div>
     <div class="credits" id="credits" role="dialog" aria-modal="true" aria-labelledby="credits-h" hidden></div>
 
     <section id="t-battle" class="cols">
@@ -608,6 +638,49 @@ const REGIONS = [
   ["Galar", [["Nessa", "Water"], ["Opal", "Fairy"], ["Piers", "Dark"], ["Raihan", "Dragon"]], "Leon"],
   ["Paldea", [["Larry", "Normal"], ["Ryme", "Ghost"], ["Tulip", "Psychic"], ["Atticus", "Poison"]], "Geeta"]
 ].map(([name, gyms, champ], r) => ({ name, gyms, champ, gen: r + 1 }));
+// Story Year 2, The Hunt (design doc D1): the freeze scattered the gym leaders, and each gym is run by someone else
+// of the same type, with their own team and a line about the town they left. Same size and levels as Year 1's.
+const Y2_GYMS = [
+  [["Roxanne", [74, 299, 95], `Roxanne: "Rustboro's school is shut for the winter. I brought my lesson plans anyway."`],
+    ["Nessa", [118, 846, 834], `Nessa: "Hulbury's harbor froze solid. I'd rather fight here than stand around there."`],
+    ["Gardenia", [420, 387, 407], `Gardenia: "Eterna Forest froze standing up. Every tree. I couldn't watch."`],
+    ["Clay", [536, 552, 530], `Clay: "Driftveil's mines flooded, then froze. Ain't no diggin' through that."`]],
+  [["Skyla", [528, 521, 581], `Skyla: "Mistralton's runway is ice. My planes can't land, and neither can I."`],
+    ["Katy", [919, 918, 920], `Katy brings baked goods, and none of them have thawed.`],
+    ["Lenora", [506, 505, 507], `Lenora: "Nacrene's museum is closed. I locked the fossils in myself."`],
+    ["Byron", [436, 437, 411], `Byron: "Canalave's harbor froze around the ships. My boy's still out there, breaking ice."`]],
+  [["Korrina", [619, 67, 701], `Korrina: "Shalour's tower is a slide now. I'm not even mad. Okay, I'm a little mad."`],
+    ["Elesa", [587, 180, 523], `Elesa: "Nimbasa's lights went out first. You don't know quiet until a city like that goes dark."`],
+    ["Blaine", [77, 126, 59], `Blaine: "Cinnabar's under six feet of snow. A volcano island! Under snow!"`],
+    ["Tulip", [282, 956, 981], `Tulip: "Alfornada's flowers froze mid-bloom. They're still pretty. That's the worst part."`]],
+  [["Ramos", [69, 188, 182, 189], `Ramos: "Coumarine's garden's sleepin' under the snow. It'll keep, young'un. So will I."`],
+    ["Allister", [562, 864, 778, 94], `Allister: "…Stowe-on-Side's quiet now. It was always quiet. It's a different quiet."`],
+    ["Jasmine", [81, 82, 462, 208], `Jasmine: "Olivine's lighthouse is still lit. Amphy's keeping it warm while I'm away."`],
+    ["Brycen", [583, 615, 584, 614], `Brycen: "Icirrus was always cold. This is not cold. This is wrong."`]],
+  [["Koga", [109, 89, 49, 110], `Koga: "My ninja hold Fuchsia. A ninja does not leave his post. Except me, for this."`],
+    ["Giovanni", [51, 31, 34, 112], `Giovanni, a "concerned investor": "Crisis is just another word for market." He's bought Thaw Packs by the crate.`],
+    ["Winona", [357, 279, 227, 277], `Winona: "Fortree's treehouses are icicles. My birds won't fly in this."`],
+    ["Clair", [147, 148, 334, 230], `Clair: "Blackthorn's dragons are asleep in the den. I promised them a real fight when they wake."`]],
+  [["Burgh", [544, 557, 542, 558], `Burgh: "My studio froze with a painting half done. I'm calling it Unfinished."`],
+    ["Maylene", [307, 453, 308, 448], `Maylene: "Veilstone's dojo is buried. I train here now. Barefoot. It's fine."`],
+    ["Opal", [682, 684, 869, 468], `Opal asks you a quiz question about Prof Penguin. You don't know the answer, and neither does anyone else.`],
+    ["Melony", [459, 873, 875, 131], `Melony: "Circhester's baths froze over. Even I miss being warm."`]],
+  [["Roark", [524, 525, 408, 476, 409], `Roark: "Oreburgh's mine froze shut with my crew's lunches inside. Priorities."`],
+    ["Flannery", [322, 218, 219, 323, 324], `Flannery: "Lavaridge's hot springs went cold. Cold! I'm so mad I'm warm."`],
+    ["Volkner", [101, 26, 135, 405, 466], `Volkner: "Sunyshore's solar panels are under the snow. Finally, something interesting happened there."`],
+    ["Piers", [510, 435, 687, 560, 862], `Piers: "Spikemuth's got no power and no crowd. Marnie says I'm sulking. I'm working."`]],
+  [["Wallace", [73, 340, 272, 321, 350], `Wallace: "Sootopolis's crater filled with ice. It's beautiful, and I hate that."`],
+    ["Valerie", [35, 122, 303, 36, 700], `Valerie: "Laverre's fairies are hibernating. I'm trying not to."`],
+    ["Nanu", [198, 302, 359, 430, 553], `Nanu: "Po Town's empty. Emptier. Somebody had to take a gym."`],
+    ["Drayden", [610, 621, 330, 611, 612], `Drayden: "Opelucid froze into its old self. The city remembers what it used to be."`]],
+  [["Norman", [327, 264, 288, 335, 289], `Norman: "Petalburg's gym is shut. Max is minding it, which worries me more than the ice."`],
+    ["Acerola", [353, 426, 478, 770, 781], `Acerola: "The Thrifty Megamart's ghosts are cold too! They keep asking to come with me."`],
+    ["Tate & Liza", [178, 337, 338, 344, 199], `Tate: "We both saw this coming." Liza: "We both decided not to say."`],
+    ["Roxie", [88, 568, 569, 545, 849], `Roxie: "Virbank's clubs froze solid. No crowd, no amps. So I'm here."`]]
+];
+// Year 2's Champions take "partner donations" from Team Thaw: one Ice type in the first three regions, two after,
+// the strongest fully evolved Ice types of their generation, in place of their weakest.
+const Y2_ICE_SWAPS = r => r < 3 ? 1 : 2;
 const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUNGEON_SIZE = 8;
 // Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
 const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 5.3, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
@@ -671,7 +744,10 @@ function routePool(r, k) {
 // in the Flying or Bug area. Money is a normal route's.
 const TRAIN_R = 9, TRAIN_XP = 3, TRAIN_TYPES = Object.keys(TC);
 const trainPool = k => MON.filter(m => m.types.includes(TRAIN_TYPES[k]) && !legendary(m) && !tripOnly(m)).concat(VARIANTS.filter(v => v.types.includes(TRAIN_TYPES[k]) && !legendary(v)));
+// The gym's leader: Year 2 of Story has its own (Y2_GYMS).
+const gymName = (r, k) => storyYear() === 2 ? Y2_GYMS[r][k][0] : REGIONS[r].gyms[k][0];
 function gymTeam(r, k) {
+  if (storyYear() === 2) return Y2_GYMS[r][k][1].map(mon).sort((a, b) => a.bst - b.bst);
   const [, type] = REGIONS[r].gyms[k], gi = r * 4 + k, size = 3 + (r >= 3) + (r >= 6);
   const c = MON.filter(m => m.types.includes(type) && m.gen <= REGIONS[r].gen && !legendary(m) && !tripOnly(m)).sort((a, b) => a.bst - b.bst);
   const centre = Math.floor((0.2 + 0.75 * gi / 35) * (c.length - 1)), rand = rng(gi * 7919 + 13), team = [];
@@ -685,6 +761,14 @@ function champTeam(r) {
   const c = MON.filter(m => m.gen <= REGIONS[r].gen && finalStage(m) && !legendary(m) && !tripOnly(m)).sort((a, b) => b.bst - a.bst).slice(0, 60), rand = rng(r * 104729 + 7), team = [], types = new Set();
   while (team.length < 6) { const m = c[Math.floor(rand() * c.length)]; if (!team.includes(m) && !types.has(m.types[0])) { team.push(m); types.add(m.types[0]); } if (types.size >= 17) types.clear(); }
   team.sort((a, b) => a.bst - b.bst);
+  if (storyYear() === 2) {
+    // The ace stays; the weakest go. The region's own generation's Ice types first, then older ones.
+    const ace = team.pop(), gen = REGIONS[r].gen;
+    const ice = MON.filter(m => m.types.includes("Ice") && m.gen <= gen && finalStage(m) && !legendary(m) && !tripOnly(m) && !team.includes(m) && m !== ace)
+      .sort((a, b) => (b.gen === gen) - (a.gen === gen) || b.bst - a.bst);
+    team.splice(0, Y2_ICE_SWAPS(r), ...ice.slice(0, Y2_ICE_SWAPS(r)));
+    team.sort((a, b) => a.bst - b.bst).push(ace);
+  }
   // The Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on, as PokéRogue's bosses do.
   const ace = team[team.length - 1], form = formsOf(ace.num, "mega")[0] || (r >= BAND_FROM ? formsOf(ace.num, "gmax")[0] : null);
   if (form) team[team.length - 1] = form;
@@ -700,7 +784,8 @@ const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >
 // legendary: -10% to +15%). Each boss Pokémon's HP comes from its HP, Defense and Sp. Def together.
 const offense = m => Math.max(m.atk, m.spa) + m.spe;
 const bossHpFor = (m, L, i, mult = 1) => Math.round((2 * ((m.hp + m.def + m.spd) / 3) * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult * (m.kind === "gmax" ? 2 : 1));
-const teamCache = new Map(), cachedTeam = (key, make) => teamCache.get(key) || teamCache.set(key, make()).get(key);
+const teamCache = new Map(), teamEra = () => !S ? "-" : isStory() ? `s${storyYear()}${S.replay ? "r" : ""}` : "c";
+const cachedTeam = (key, make) => { key = teamEra() + ":" + key; return teamCache.get(key) || teamCache.set(key, make()).get(key); };
 const regionOffense = r => cachedTeam("off" + r, () => { const all = [0, 1, 2, 3].flatMap(k => gymTeam(r, k)).concat(champTeam(r)); return all.reduce((s, m) => s + offense(m), 0) / all.length; });
 const RED_OFFENSE = 180;
 function fightTime(base, foes, ref, lo, hi) { const off = foes.reduce((s, m) => s + offense(m), 0) / foes.length; return Math.round(base * Math.min(hi, Math.max(lo, ref / off))); }
@@ -1140,7 +1225,7 @@ function unlocked(loc) {
   const { kind, r, k } = loc;
   if (kind === "chapter") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
   if (isStory() && STORY_HIDDEN.has(kind)) return false;
-  if (kind === "year2") return YEAR2_READY && isStory() && !!S.story.epilogue && !S.replay;
+  if (kind === "year2") return (YEAR2_READY || S.test) && isStory() && !!S.story.epilogue && !S.replay && storyYear() === 1;
   if (kind === "story") return !!CHAPTER[loc.x] && (chapterOpen(CHAPTER[loc.x]) || chDone(loc.x));
   if (kind === "summit") return isStory() ? chDone(SILVER_AFTER) : Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
@@ -1167,7 +1252,7 @@ function locName(loc) {
   if (loc.r === TRAIN_R) return `${TRAIN_TYPES[loc.k]} training area`;
   const R = REGIONS[loc.r];
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
-  if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
+  if (loc.kind === "gym") return `${gymName(loc.r, loc.k)}'s ${R.gyms[loc.k][1]} gym`;
   if (loc.kind === "dungeon") return loc.x ? TRIP[loc.x].place : `${R.name} dungeon`;
   if (loc.kind === "year2") return `Year 2: ${YEARS[2]}`;
   if (loc.kind === "chapter" || loc.kind === "story") return CHAPTER[loc.x] ? CHAPTER[loc.x].name : "Story";
@@ -1448,7 +1533,7 @@ function hofWin() {
 }
 function startLoc(loc) {
   if (loc.kind === "chapter") return runChapter(CHAPTER[loc.x]);
-  if (loc.kind === "year2") return YEAR2_READY ? year2Confirm() : void toast(`Year 2: ${YEARS[2]} isn't here yet.`);
+  if (loc.kind === "year2") return YEAR2_READY || S.test ? year2Confirm() : void toast(`Year 2: ${YEARS[2]} isn't here yet.`);
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
@@ -1499,7 +1584,7 @@ function startLoc(loc) {
   else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
   else if (B.kind === "hof") B.tune = finalTuning(B, HOF_USE);
   else if (B.kind === "daily") B.tune = tierTuning(B, 5, dailyArea(B.r));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "story" ? storySay(B) : B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "gym" && storyYear() === 2 ? Y2_GYMS[B.r][B.k][2] : B.kind === "champ" && storyYear() === 2 ? `Team Thaw's banners hang over the arena. Champion ${REGIONS[B.r].champ}'s team has new Ice types: "partner donations".` : B.kind === "story" ? storySay(B) : B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1695,9 +1780,9 @@ function next() {
   const R = REGIONS[B.r], galar = (B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "") + (B.r === PLATES_FROM && B.kind !== "quest" ? gainPlates(PLATE_BOSS) : "");
   if (B.kind === "gym" && isStory() && !badge(B.r, B.k)) storyEvent("gym", B.r);
   if (B.kind === "champ" && isStory() && !S.champs[B.r]) storyEvent("champ", B.r);
-  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + gainCells(CELL_BOSS) + galar); }
+  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${gymName(B.r, B.k)}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first && !isStory()) S.balls.master++;
-    const unlock = first && B.r === KEY_STONE_FROM && !S.key ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
+    const unlock = first && B.r === KEY_STONE_FROM && !S.key ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM && !(isStory() && S.band) ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
     toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)}${isStory() ? "" : " and a Master Ball"}. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS)); }
   if (B.kind === "dungeon" && B.bossCaught !== false) delete (S.den || {})[B.x || "d" + B.r];
@@ -1958,16 +2043,67 @@ const TIPS = [
   { id: "tier3", when: () => REGIONS.some((_, r) => badge(r, 1) && dungeonPhase(r) === 3), tab: "battle", text: () => { const r = REGIONS.findIndex((_, r) => badge(r, 1) && dungeonPhase(r) === 3);
     return `You have every Tier 4 legendary from the ${REGIONS[r].name} dungeon, so its Tier 3s come out now: ${dungeonBosses(r).filter(m => tierOf(m) === 3).map(m => m.name).join(", ")}. They're set against Tier 4 legendaries, so bring yours, with types that hit hard. They're harder to catch too: about ${pct(Math.pow(TIER_RATE[3] * 5 / 255, .75))} an Ultra Ball.`; } }
 ];
-let tipNow = null;
+// ── Prof Penguin's text box, shared by the tip slot and the scene overlay. A portrait (Prof Penguin's own; anyone else
+// gets a frame with their initials until their art is drawn), the speaker's name, and the line typed out: a tap
+// finishes it, the next tap moves on. A line too long for the box is split into pages at the ends of sentences.
+const PORTRAIT = { "Prof Penguin": "prof-penguin.png" };
+function dlgFace(who) {
+  const ini = esc((who || "").split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase());
+  return `<span class="dlg-face" aria-hidden="true">${PORTRAIT[who] ? `<img src="${SPRITE_DIR + PORTRAIT[who]}" alt="" onerror="this.replaceWith('${ini}')">` : ini}</span>`;
+}
+// Narration (no speaker) has no portrait or name and uses the whole width.
+const dlgHtml = o => `${(o.face === undefined ? o.who : o.face) ? dlgFace(o.face === undefined ? o.who : o.face) : ""}<span class="who">${esc(o.who || "")}</span><div class="dlg-text">${o.text || ""}</div>${o.extra || ""}<div class="row">${o.row || ""}</div>`;
+// The pages of a line: as many whole sentences as fit the box at a time. A sentence too long for the box on its own
+// breaks between words.
+function dlgPages(el, text) {
+  if (!el.clientHeight) return [text];
+  const fits = t => { el.textContent = t; return el.scrollHeight <= el.clientHeight + 1; };
+  const fill = (parts, join) => { const out = []; let cur = ""; for (const p of parts) { const next = cur ? cur + join + p : p; if (!cur || fits(next)) cur = next; else { out.push(cur); cur = p; } } if (cur) out.push(cur); return out; };
+  const pages = fill(text.split(/(?<=[.!?…]["'”’)]?)\s+/), " ").flatMap(p => fits(p) ? [p] : fill(p.split(/\s+/), " "));
+  el.textContent = "";
+  return pages;
+}
+// The typewriter. The rest of the line is laid out already, just not shown, so the words never jump to a new line as
+// they appear. Reduced motion shows the line at once.
+const TYPE_MS = 18;
+const typer = { el: null, text: "", i: 0, t: 0, shown: null, rest: null };
+function typeInto(el, text) {
+  typeStop();
+  Object.assign(typer, { el, text, i: 0, shown: document.createTextNode(""), rest: document.createElement("span") });
+  typer.rest.className = "tw-rest"; el.textContent = ""; el.scrollTop = 0; el.append(typer.shown, typer.rest);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) typer.i = text.length;
+  typeDraw();
+  if (typer.i < text.length) typer.t = setInterval(() => { typer.i++; typeDraw(); if (typer.i >= typer.text.length) typeStop(); }, TYPE_MS);
+}
+function typeDraw() { typer.shown.data = typer.text.slice(0, typer.i); typer.rest.textContent = typer.text.slice(typer.i); }
+function typeStop() { clearInterval(typer.t); typer.t = 0; }
+// Finishes the line being typed; true if there was one, so that tap does nothing else.
+function typeFinish() { if (!typer.t) return false; typer.i = typer.text.length; typeDraw(); typeStop(); return true; }
+
+let tipNow = null, tipPages = [], tipPg = 0;
 function tutor() {
   if (!S || !S.tut || S.tut.off || screen !== "game" || tipNow || sceneNow) return;
   const t = TIPS.find(x => !S.tut.seen[x.id] && x.when());
   if (!t) return;
   tipNow = t;
-  $("#tip").innerHTML = `<span class="who">Prof Penguin</span><p>${esc(t.text())}</p><div class="row"><button class="skip" type="button" data-tip="off">Skip the tips</button>${t.tab && t.tab !== tab ? '<button class="lbl" type="button" data-tip="show">Show me</button>' : ""}<button class="lbl" type="button" data-tip="ok">Got it</button></div>`;
-  $("#tip").hidden = false;
+  const el = $("#tip");
+  el.innerHTML = dlgHtml({ who: "Prof Penguin" }); el.classList.remove("idle");
+  tipPages = dlgPages($("#tip .dlg-text"), t.text()); tipPg = 0;
+  tipPage();
 }
-function hideTip() { tipNow = null; $("#tip").hidden = true; }
+function tipPage() {
+  const t = tipNow, more = tipPg < tipPages.length - 1;
+  $("#tip .row").innerHTML = `<button class="skip" type="button" data-tip="off">Skip the tips</button>${!more && t.tab && t.tab !== tab ? '<button class="lbl" type="button" data-tip="show">Show me</button>' : ""}<button class="lbl" type="button" data-tip="${more ? "more" : "ok"}">${more ? "Next ›" : "Got it"}</button>`;
+  typeInto($("#tip .dlg-text"), tipPages[tipPg]);
+}
+// No tip: the slot stays where it is, Prof Penguin's frame faint and quiet.
+function hideTip() {
+  tipNow = null; if (typer.el && $("#tip").contains(typer.el)) typeStop();
+  const el = $("#tip"); el.classList.add("idle"); el.innerHTML = dlgHtml({ who: "Prof Penguin", text: "…" });
+}
+hideTip();
+// A scene or the league notice: shown over the page, with the veil behind it.
+function overlay(id, on) { $(id).hidden = !on; $("#veil").hidden = $("#scene").hidden && $("#league").hidden; }
 
 // ── Rendering
 let tab = "battle", dexR = 0, viewR = 0, detail = null;
@@ -1988,7 +2124,7 @@ function renderLocs() {
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Sssssssnakes sits at the very top of each of those regions' lists.
   if (RIVAL_AT[r] && !isStory()) { const x = RIVAL_AT[r]; items.push({ kind: "rival", r, note: !S.champs[r] ? `after ${REGIONS[r].champ}` : rivalWon(x.id) ? "beaten" : `${x.team.length} Pokémon · ${Math.round(rivalTime(x) * partyTime())}s`, done: rivalWon(x.id) }); }
-  if (isStory() && S.story.epilogue && !S.replay) items.push({ kind: "year2", r, note: YEAR2_READY ? "begin" : "coming soon" });
+  if (isStory() && S.story.epilogue && !S.replay && storyYear() === 1) items.push({ kind: "year2", r, note: YEAR2_READY || S.test ? "begin" : "coming soon" });
   // Prof Penguin's Lab sits at the top of every list.
   const hofRow = HOF_READY && !isStory() ? { kind: "hof", r: HOF_R, note: !labBeaten() ? "after Prof Penguin" : `${RIVAL_NAME}, first graduate${hofWon() ? " · won" : ""}`, done: hofWon() } : null;
   if (!isStory()) items.push({ kind: "final", r: FINAL_R, note: !finalOpen() ? `${sqGot}/${sqAll} side quests` : S.pbeat || (S.beat && !S.prestige) ? `graduated ${S.beat}` : "2 phases, no ticket", done: !!(S.pbeat || (S.beat && !S.prestige)) });
@@ -2003,7 +2139,7 @@ function renderLocs() {
       items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
       if (k === 1) { const t4 = dungeonT4(r); items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${dungeonPhase(r) === 4 ? `Legends ${t4.filter(ownsFoe).length}/${t4.length}` : "Tier 3"} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] }); }
     }
-    items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
+    items.push({ kind: "champ", r, note: (storyYear() === 2 ? "sponsored by Team Thaw · " : "") + (S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`), done: !!S.champs[r] });
     if (isStory()) items.push(...chapterRows(r));
     if (r === PIECES_FROM && !isStory()) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
     if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
@@ -2303,6 +2439,9 @@ const ACH = [
   storyAch("st_started", "It's Started", "story", "Win the Paldea finale", () => chDone("paldea-finale")),
   storyAch("st_red", "…", "story", "Beat Red on Mt. Silver", () => chDone("johto-silver")),
   storyAch("st_y1", "Two Words", "story", "Clear Year 1", st => st.epilogue),
+  // Year 2 (the rest come with its chapters).
+  storyAch("st_three", "Three Words", "secret", "Read Prof Penguin's first letter of Year 2", () => !!S.mail.read["story-y2-start"]),
+  storyAch("st_investor", "Concerned Investor", "story", "Beat Giovanni's gym in Year 2", st => st.year === 2 && !!S.badges["4-1"]),
   storyAch("ch_lugia", "Of Course You'd Pick the Cold", "choice", "Pick Lugia in Johto", st => st.pickLinesSeen["johto-249"], { replayOk: true }),
   storyAch("ch_hooh", "We'll Need It", "choice", "Pick Ho-Oh in Johto", st => st.pickLinesSeen["johto-250"], { replayOk: true }),
   storyAch("ch_dialga", "Time, Like Him", "choice", "Pick Dialga in Sinnoh", st => st.pickLinesSeen["sinnoh-483"], { replayOk: true }),
@@ -2380,6 +2519,12 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "story-y2-start", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The cold got into everything",
+    body: `<p>The cold got into everything. Every Pokémon in the world felt it last night.</p><p>They're weaker, not gone. They remember you. Give them time.</p><p>One more thing. There's an old shrine in Galar, the Crown Shrine. Its king is old and particular. He won't see anyone who hasn't brought both his steeds, Glastrier and Spectrier, and both of Galar's heroes, the sword and the shield. Start looking early. You'll want to end the year there.</p><p>P.S. My last letter was three words, not two. I counted afterwards. I was upset.</p><p>Prof Penguin</p>` },
+  { id: "update-2026-11-26a", date: "Nov 26, 2026", from: "Prof Penguin", title: "My text box got a makeover",
+    body: `<ul><li>My text box got a makeover, and the screen no longer jumps when I talk. The box under the tabs keeps its place even when I have nothing to say, so your next tap lands where you aimed it. A long tip comes in pages: tap Next ›.</li>
+      <li>Words type out as I say them. Tap once to see the whole line, and again to move on. The buttons are bigger, for thumbs.</li>
+      <li>Story scenes and the League rules open over the bottom of the screen instead, and the page behind them stays put until you close them. Your party keeps fighting while you read.</li></ul>` },
   { id: "update-story-mode", story: true, date: "Nov 25, 2026", from: "Prof Penguin", title: "Story Mode, Year 1",
     body: `<ul><li><b>New game</b> now asks: Classic or <b>Story</b>. Each has its own save, and you switch between them on the title screen. Your Classic save stays as it is.</li>
       <li>Year 1 is <b>The Long Freeze</b>. Snow in Kanto three weeks early, legends waking up, and a cheerful outfit called Team Thaw that always seems to get there first.</li>
@@ -2610,7 +2755,7 @@ let mailOpen = null;
 function renderMail() {
   if (!S) return;
   if (!inbox().some(m => m.id === mailOpen)) mailOpen = inbox().length ? inbox()[0].id : null;
-  if (mailOpen) S.mail.read[mailOpen] = 1;
+  if (mailOpen && !S.mail.read[mailOpen]) { S.mail.read[mailOpen] = 1; if (isStory()) setTimeout(() => checkAch(), 0); }
   const m = MAIL.find(x => x.id === mailOpen);
   $("#mail").innerHTML = `<div class="mail-list">${inbox().map(x => `<button class="mail-item${S.mail.read[x.id] ? "" : " new"}${x.id === mailOpen ? " on" : ""}" type="button" data-mail="${x.id}"><span>${esc(x.title)}</span><span class="small muted">${esc(x.date)} · ${esc(x.from)}${x.gift ? ` · <span class="gift">${S.mail.claimed[x.id] ? "gift claimed" : "gift"}</span>` : ""}</span></button>`).join("")}</div>` +
     (m ? `<article class="letter"><b>${esc(m.title)}</b><span class="small muted">${esc(m.from)}, ${esc(m.date)}</span>${m.body}` +
@@ -2946,6 +3091,7 @@ $("#foe").addEventListener("pointerdown", e => {
 // Space or Enter taps the foe from anywhere on the battle screen, except while typing or with a button picked by keyboard.
 document.addEventListener("keydown", e => {
   if (screen !== "game" || tab !== "battle" || (e.key !== " " && e.key !== "Enter") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!$("#veil").hidden) return;
   const t = e.target; if (t !== $("#foe") && t.closest && t.closest("textarea, input, select, button, a, [contenteditable]")) return;
   e.preventDefault(); if (!e.repeat) tap(e);
 });
@@ -3006,7 +3152,10 @@ $("#t-party").addEventListener("change", e => {
   S.box[detail].forme = sel.value; save(); renderAll();
 });
 $("#tip").onclick = e => {
-  const b = e.target.closest("[data-tip]"), t = tipNow; if (!b || !t) return;
+  const b = e.target.closest("[data-tip]"), t = tipNow; if (!t) return;
+  if ((!b || b.dataset.tip !== "off") && typeFinish()) return;
+  if (!b) return;
+  if (b.dataset.tip === "more") { tipPg++; tipPage(); return; }
   S.tut.seen[t.id] = 1; hideTip();
   if (b.dataset.tip === "off") { S.tut.off = 1; toast("Tips are off. Settings can bring them back."); }
   if (b.dataset.tip === "show") openTab(t.tab);
@@ -3196,6 +3345,8 @@ const YEAR2_READY = false;
 const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
+// The Story year this save is in (0 in Classic).
+const storyYear = () => isStory() && S.story ? S.story.year || 1 : 0;
 const otherSlot = () => ({ [KEY]: STORY_KEY, [STORY_KEY]: KEY, [TEST_KEY]: TEST_STORY_KEY, [TEST_STORY_KEY]: TEST_KEY })[slot] || null;
 // The story block. lifeDex is the Story lifetime dex (kept in step with S.lifeDex, the save's own). silvally: 0 not
 // freed, 1 freed (Type: Null, its trust in nullTrust, up to TRUST_NEED), 2 evolved. The fields after epilogue are
@@ -3233,12 +3384,26 @@ const YEAR2_RESETS = ["Every Pokémon goes back to Lv 5 (❄ catch-up XP helps t
 const YEAR2_STAYS = ["your whole Box", "your dex", "key items, Mega Stones and form unlocks", "achievements, Mail and saved teams"];
 function year2Confirm() {
   hideTip();
-  $("#scene").innerHTML = `<span class="who">Year 2: ${esc(YEARS[2])}</span><p>Begin Year 2? This can't be undone.</p>
-    <table class="small y2"><tr><th>Resets</th><th>Stays</th></tr>${YEAR2_RESETS.map((r, i) => `<tr><td>${esc(r)}</td><td>${esc(YEAR2_STAYS[i] || "")}</td></tr>`).join("")}</table>
-    <div class="row"><button class="skip" type="button" data-y2="no">Not yet.</button><button class="lbl danger" type="button" data-y2="go"${YEAR2_READY ? "" : " disabled"}>Begin Year 2.</button></div>`;
-  $("#scene").hidden = false;
+  $("#scene").classList.add("free"); $("#scene").classList.remove("narr");
+  $("#scene").innerHTML = dlgHtml({ who: `Year 2: ${YEARS[2]}`, face: "Prof Penguin", text: "<p>Begin Year 2? This can't be undone.</p>",
+    extra: `<table class="small y2"><tr><th>Resets</th><th>Stays</th></tr>${YEAR2_RESETS.map((r, i) => `<tr><td>${esc(r)}</td><td>${esc(YEAR2_STAYS[i] || "")}</td></tr>`).join("")}</table>`,
+    row: `<button class="skip" type="button" data-y2="no">Not yet.</button><button class="lbl danger" type="button" data-y2="go"${YEAR2_READY || S.test ? "" : " disabled"}>Begin Year 2.</button>` });
+  overlay("#scene", true);
 }
-function beginYear2() { if (!YEAR2_READY) return; /* Year 2 builds the reset itself. */ }
+function beginYear2() {
+  if (!(YEAR2_READY || S.test) || !isStory() || S.replay || storyYear() !== 1) return;
+  year2Reset(); save(); backToRoute(); renderAll(); if (tab === "story") renderStory();
+  playScene("y2-interlude", () => { toast("Year 2: The Hunt. Prof Penguin's letter is in Mail."); });
+}
+// The reset itself (the test account's jump uses it too). Zygarde cells stay: they "wake up wherever you've been".
+function year2Reset() {
+  for (const b of Object.values(S.box)) { notePeak(b); b.xp = Math.min(b.xp, 125); }
+  Object.assign(S, { badges: {}, champs: {}, money: 0, balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, kills: {}, dungeons: {}, trips: {}, tickets: {}, den: {}, protein: 0, cords: 0,
+    loc: { kind: "route", r: 0, k: 0 } });
+  S.story.cleared = { ...(S.story.cleared || {}), 1: 1 }; S.story.year = 2;
+  S.mail.got["story-y2-start"] = 1;
+  B = null; viewR = 0;
+}
 function endReplay() { try { localStorage.removeItem(REPLAY_KEY); } catch {} S = null; B = null; useSlot(STORY_KEY); }
 function startStory() { S.mode = "story"; S.story = freshStory(); for (const id of preSeen.splice(0)) S.story.seen[id] = 1; }
 // Tracking from day one, in both modes, for the years to come: from (the region a Pokémon counts as caught in, by
@@ -3442,6 +3607,12 @@ const SCENES = {
     ["", "There's one person who hasn't been on any screen."],
     ["", "At the top of Mt. Silver, where the snow never stops, a trainer in a red cap stands with his back to you. Red felt the cold before anyone else, months before Kanto's early snow, up here where nobody would have noticed."],
     ["", "He doesn't speak. He turns, and he battles you."]] },
+  // Year 2, The Hunt.
+  "y2-interlude": { year: 2, r: -1, title: "The freeze takes the levels", lines: [
+    ["", "You wake up the next morning and your team won't get up. They're not hurt, just slow and heavy, like they've been asleep for a hundred years."],
+    ["", "Every one of them is down to Lv 5."],
+    ["", "A letter from Penguin is already waiting."],
+    ["", "A small ❄ appears by each name in your Box. Pokémon that remember you learn faster."]] },
   "silver-after": { year: 1, r: 1, title: "Red", lines: [
     ["", "When it's over, he presses something into your hand: the Shiny Charm. Then he turns back to the snow, as if you were never there."],
     ["", "You write down the fight, and the way Red's Pokémon stood with him in the snow without a single command. Penguin replies:"],
@@ -3458,7 +3629,6 @@ const CLUES = {
 // legend chapter has a prize: a Mega pseudo stone where one exists, a Master Ball where none does. Red waits on Mt.
 // Silver (Johto) once the year is over.
 const CHIEF_USE = 0.95, ADMIN_USE = 1.02, ADMIN_PAY = 60, FINALE_USE = 1.30, FINALE_SLUSH_USE = 1.17, FINALE_PAY = 150, FINALE_DEX = 150, SILVER_AFTER = "paldea-pick";
-const ADMIN_PIC = { Rime: "thaw-rime.png", Hail: "thaw-hail.png", Slush: "thaw-slush.png", Sssssssnakes: "sssssssnakes.png", "Team Thaw grunt": "thaw-grunt.png", "Prof Penguin": "prof-penguin.png" };
 const foeFrom = x => typeof x === "string" ? VARIANT[x] : mon(x);
 // Rime: Ice, with Steel and Psychic. Hail: Steel and Ice, the heavy hitters. Slush: Water and Dark, with an Ice or two.
 // Six each, all from that region's generation (forms included); the finale's are all Generation 9.
@@ -3518,8 +3688,17 @@ const CHAPTERS = [
   { id: "paldea-finale", r: 8, type: "finale", finale: true, name: "Paldea finale", at: "Area Zero", after: ["champ", ...LEGENDS], pre: "paldea-admins",
     open: () => storyDex() >= FINALE_DEX, note: () => storyDex() >= FINALE_DEX ? "all three admins, back to back" : `Dex ${storyDex()} / ${FINALE_DEX}` },
   pick("paldea-pick", 8, [1007, 1008], ["It runs on the old land.", "It runs on what comes next."], { stone: 10325 }, ["paldea-finale"], "Area Zero", { post: "paldea-watches", after2: "paldea-freeze", letter: ["story-started", "story-snakes-end"] }),
-  { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", at: "the summit", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", letter: "story-silver", doneNote: "Shiny Charm" }
-];
+  { id: "johto-silver", r: 1, type: "red", name: "Mt. Silver", at: "the summit", after: ["champ", SILVER_AFTER], pre: "silver", post: "silver-after", letter: "story-silver", doneNote: "Shiny Charm", always: true },
+  // ── Year 2, The Hunt. The Crown Shrine finale (D4) shows from the first day of the year, greyed, with its checklist.
+  { id: "y2-crown", year: 2, r: 7, type: "crown", finale: true, name: "Crown Shrine", at: "the Crown Shrine", after: ["champ"], open: () => crownReady(), note: () => crownNote() }
+].map(c => ({ year: 1, ...c }));
+// The chapters of the year this save is in. Red stays on Johto's list after Year 1, for rematches (no second Shiny Charm).
+const chaptersNow = () => CHAPTERS.filter(c => (c.year || 1) === storyYear());
+const chapterListed = c => (c.year || 1) === storyYear() || (c.always && chDone(c.id));
+// Year 2's finale needs 300 in the Story dex, and Glastrier, Spectrier, Zacian and Zamazenta in the Box (A3a).
+const CROWN_DEX = 300, CROWN_NEED = [896, 897, 888, 889];
+const crownReady = () => storyDex() >= CROWN_DEX && CROWN_NEED.every(n => S.box[n]);
+const crownNote = () => `Dex ${storyDex()} / ${CROWN_DEX} · ${CROWN_NEED.map(n => `${mon(n).name} ${S.box[n] ? "✓" : "✗"}`).join(" · ")}`;
 const CHAPTER = Object.fromEntries(CHAPTERS.map(c => [c.id, c]));
 const storyDex = () => S.test && S.debug && S.debug.dex === "met" ? Math.max(lifeDex(), 9999) : lifeDex();
 // After a first gym badge or Champion win in a region: its scene, and any clue or letter that comes with it.
@@ -3529,6 +3708,7 @@ const STORY_EVENTS = {
   "champ:6": { scene: "alola-memo", letter: "story-memo", clue: "memo" }, "champ:8": { scene: "paldea-white" }
 };
 function storyEvent(kind, r) {
+  if (storyYear() !== 1) return;
   if (kind === "gym" && Object.keys(S.badges).some(k => k.startsWith(r + "-"))) return;
   const e = STORY_EVENTS[kind + ":" + r]; if (!e) return;
   if (e.clue) S.story.clues[e.clue] = 1;
@@ -3545,7 +3725,9 @@ const CHAPTER_RUN = {
   finale: c => startLoc({ kind: "story", r: c.r, x: c.id }),
   legend: c => startLoc({ kind: "story", r: c.r, x: c.id }),
   pick: c => S.story.picks[c.r] ? startLoc({ kind: "story", r: c.r, x: c.id }) : pickScreen(c),
-  red: c => { startLoc({ kind: "summit", r: 1 }); if (B && B.kind === "summit") B.storyCh = c.id; }
+  red: c => { startLoc({ kind: "summit", r: 1 }); if (B && B.kind === "summit") B.storyCh = c.id; },
+  // The Crown Shrine fight comes with the rest of Year 2.
+  crown: () => toast("The Crown Shrine isn't open yet.")
 };
 // The fight for a chapter (startLoc builds the rest).
 function storyFight(c) {
@@ -3651,51 +3833,54 @@ function pickScreen(c) {
 }
 function renderPick() {
   const { c, n } = pickNow;
-  $("#scene").innerHTML = `<span class="who">Prof Penguin</span><p>Both of them are awake. Team Thaw will take whichever you leave. Pick one.</p>
-    <div class="picks">${c.mons.map((m, i) => `<button type="button" data-pick="${m}" aria-pressed="${n === m}"><img src="${sprite(m)}" alt="A silhouette"><span>${esc(c.hints[i])}</span></button>`).join("")}</div>
-    <div class="row"><button class="skip" type="button" data-pick="later">Not yet</button><button class="lbl" type="button" data-pick="mine"${n ? "" : " disabled"}>This one's mine.</button></div>`;
-  $("#scene").hidden = false;
+  $("#scene").classList.add("free"); $("#scene").classList.remove("narr");
+  $("#scene").innerHTML = dlgHtml({ who: "Prof Penguin", text: "<p>Both of them are awake. Team Thaw will take whichever you leave. Pick one.</p>",
+    extra: `<div class="picks">${c.mons.map((m, i) => `<button type="button" data-pick="${m}" aria-pressed="${n === m}"><img src="${sprite(m)}" alt="A silhouette"><span>${esc(c.hints[i])}</span></button>`).join("")}</div>`,
+    row: `<button class="skip" type="button" data-pick="later">Not yet</button><button class="lbl" type="button" data-pick="mine"${n ? "" : " disabled"}>This one's mine.</button>` });
+  overlay("#scene", true);
 }
 function pickClick(b) {
   const v = b.dataset.pick, c = pickNow.c;
-  if (v === "later") { pickNow = null; $("#scene").hidden = true; return; }
-  if (v === "mine") { const n = pickNow.n; pickNow = null; $("#scene").hidden = true; S.story.picks[c.r] = n; notePickLine(c, n); save(); checkAch(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
+  if (v === "later") { pickNow = null; overlay("#scene", false); return; }
+  if (v === "mine") { const n = pickNow.n; pickNow = null; overlay("#scene", false); S.story.picks[c.r] = n; notePickLine(c, n); save(); checkAch(); playScene(`${REGIONS[c.r].name.toLowerCase()}-${n}`, () => startLoc({ kind: "story", r: c.r, x: c.id })); return; }
   pickNow.n = +v; renderPick();
 }
-// ── The League rules, for Story's gyms and Champions: no Tier 0 to 2, at most one Tier 3 and two Tier 4s.
-const LEAGUE_MAX = { 3: 1, 4: 2 };
-const leagueRule = (out, m) => { const t = tierOf(m); if (t != null && t < 3) return false; return !LEAGUE_MAX[t] || out.filter(x => tierOf(x) === t).length < LEAGUE_MAX[t]; };
+// ── The League rules, for Story's gyms and Champions: no Tier 0, 1 or 2, and a limit on Tier 3s and 4s by year: one
+// and two in Year 1, two and three in Year 2.
+const LEAGUE_MAXES = { 1: { 3: 1, 4: 2 }, 2: { 3: 2, 4: 3 } };
+const leagueMax = () => LEAGUE_MAXES[storyYear()] || LEAGUE_MAXES[1];
+const leagueRule = (out, m) => { const t = tierOf(m), max = leagueMax(); if (t != null && t < 3) return false; return !max[t] || out.filter(x => tierOf(x) === t).length < max[t]; };
 // The same rules for a list of Pokémon (a reference team), as a message or "".
-const leagueBreaksList = list => { for (const t of [0, 1, 2]) if (list.some(m => tierOf(m) === t)) return `Tier ${t}`; for (const t of [3, 4]) if (list.filter(m => tierOf(m) === t).length > LEAGUE_MAX[t]) return `${t}`; return ""; };
+const leagueBreaksList = list => { for (const t of [0, 1, 2]) if (list.some(m => tierOf(m) === t)) return `Tier ${t}`; for (const t of [3, 4]) if (list.filter(m => tierOf(m) === t).length > leagueMax()[t]) return `${t}`; return ""; };
 function leagueBreaks(party = S.party) {
   const ts = party.map(n => tierOf(fighter(n))), low = party.filter((n, i) => ts[i] != null && ts[i] < 3);
   if (low.length) return `${low.map(n => lookOf(n).name).join(", ")} ${low.length > 1 ? "are" : "is"} Tier ${Math.min(...low.map(n => tierOf(fighter(n))))} or stronger: not allowed.`;
-  for (const t of [3, 4]) { const k = ts.filter(x => x === t).length; if (k > LEAGUE_MAX[t]) return `${k} Tier ${t}s in the party: at most ${LEAGUE_MAX[t]}.`; }
+  for (const t of [3, 4]) { const k = ts.filter(x => x === t).length; if (k > leagueMax()[t]) return `${k} Tier ${t}s in the party: at most ${leagueMax()[t]}.`; }
   return "";
 }
 let leagueFor = null;
 function leagueNotice(loc) {
   leagueFor = loc; hideTip();
   const teams = (S.teams || []).map((t, i) => [t, i]).filter(([t]) => !leagueBreaks(t.party.filter(n => S.box[n])));
-  $("#league").innerHTML = `<span class="who">League rules</span><p>Gyms and Champions in Story Mode allow no Tier 0, 1 or 2 Pokémon, at most one Tier 3 and at most two Tier 4s. ${esc(leagueBreaks())}</p>
-    <p class="small muted">Mascot legends and Mega pseudo forms are both Tier 3.</p>
-    <div class="row">${teams.length ? teams.map(([t, i]) => `<button class="lbl" type="button" data-league="${i}">Load ${esc(t.name)}</button>`).join("") : '<span class="small muted">No saved team fits. Save one in Party &amp; Box.</span>'}<button class="skip" type="button" data-league="close">Close</button></div>`;
-  $("#league").hidden = false;
+  $("#league").innerHTML = dlgHtml({ who: "League rules", face: "Prof Penguin", text: `<p>Gyms and Champions in Story Mode allow no Tier 0, 1 or 2 Pokémon, at most ${["", "one", "two", "three"][leagueMax()[3]]} Tier 3 and at most ${["", "one", "two", "three"][leagueMax()[4]]} Tier 4s. ${esc(leagueBreaks())}</p>
+    <p class="small muted">Mascot legends and Mega pseudo forms are both Tier 3.</p>`,
+    row: `<button class="skip" type="button" data-league="close">Close</button>${teams.length ? teams.map(([t, i]) => `<button class="lbl" type="button" data-league="${i}">Load ${esc(t.name)}</button>`).join("") : '<span class="small muted">No saved team fits. Save one in Party &amp; Box.</span>'}` });
+  overlay("#league", true);
 }
 $("#league").onclick = e => {
   const b = e.target.closest("[data-league]"); if (!b) return;
-  $("#league").hidden = true;
+  overlay("#league", false);
   if (b.dataset.league === "close") return;
   loadTeam(+b.dataset.league);
   if (leagueFor && !leagueBreaks()) startLoc(leagueFor);
 };
 const chDone = id => !!(S && S.story && S.story.ch[id]);
-const chaptersDone = () => CHAPTERS.filter(c => chDone(c.id)).length;
+const chaptersDone = () => chaptersNow().filter(c => chDone(c.id)).length;
 // What a chapter waits for: "champ", another chapter's id, or nothing.
 const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a)) || null;
 const chapterOpen = c => isStory() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open() || !!(S.test && S.debug && S.debug.dex === "ignore"));
 function chapterRows(r) {
-  return CHAPTERS.filter(c => c.r === r).map(c => {
+  return CHAPTERS.filter(c => c.r === r && chapterListed(c)).map(c => {
     const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
     return { kind: "chapter", r, x: c.id, done: chDone(c.id),
       note: chDone(c.id) ? c.doneNote || (c.type === "pick" && S.story.picks[c.r] ? mon(S.story.picks[c.r]).name : "done") : !wait ? (c.note ? c.note() : c.optional ? "optional" : "story")
@@ -3718,7 +3903,7 @@ function finishChapter(c) {
 }
 // Next up, at the top of the Story tab: the next chapter that isn't optional, where it is, and what it waits for.
 function storyNext() {
-  const c = CHAPTERS.find(c => !c.optional && !chDone(c.id)); if (!c) return { c: null, text: "Year 1 is done. Year 2 is coming." };
+  const c = chaptersNow().find(c => !c.optional && !chDone(c.id)); if (!c) return { c: null, text: storyYear() === 1 ? (YEAR2_READY ? "Year 1 is done. Begin Year 2 is on Johto's list." : "Year 1 is done. Year 2 is coming.") : "Year 2 is done. Year 3 is coming." };
   const at = c.at ? ` at ${c.at}` : "", R = REGIONS[c.r].name, wait = waitOf(c);
   if (wait === "champ") return { c, text: `Next: Champion of ${R}, then ${c.name}${at}.` };
   if (wait) return { c, text: `Next: ${CHAPTER[wait].name}, then ${c.name}${at}.` };
@@ -3729,7 +3914,7 @@ function storyNext() {
 // as ???, except the finale, which shows from the start with its checklist.
 function yearMap() {
   const now = storyNext().c;
-  return CHAPTERS.map(c => {
+  return chaptersNow().map(c => {
     const done = chDone(c.id), cur = c === now, known = done || cur || chapterOpen(c) || c.finale;
     return { id: c.id, mark: done ? "✓" : cur ? "▶" : "🔒", name: known ? c.name : "???", optional: !!c.optional, note: c.finale && !done && c.note ? c.note() : "", r: c.r, grey: !done && !cur };
   });
@@ -3753,13 +3938,19 @@ function jumpPoints() {
   REGIONS.forEach((R, r) => {
     pts.push({ id: "gyms-" + r, label: `${R.name}: gyms`, r });
     pts.push({ id: "champ-" + r, label: `${R.name}: Champion ${R.champ}`, r });
-    for (const c of CHAPTERS) if (c.r === r && c.type !== "red") pts.push({ id: "ch-" + c.id, label: `${R.name}: ${c.name}${c.optional ? " (optional)" : ""}`, r, c });
+    for (const c of CHAPTERS) if (c.year === 1 && c.r === r && c.type !== "red") pts.push({ id: "ch-" + c.id, label: `${R.name}: ${c.name}${c.optional ? " (optional)" : ""}`, r, c });
   });
   for (const c of CHAPTERS) if (c.type === "red") pts.push({ id: "ch-" + c.id, label: `Epilogue: ${c.name}`, r: c.r, c });
   pts.push({ id: "year1-end", label: "Year 1 cleared: the Begin Year 2 screen", r: 1 });
+  pts.push({ id: "y2-begin", label: "Year 2: begun (the reset)", r: 0, year: 2 });
+  REGIONS.forEach((R, r) => {
+    pts.push({ id: "y2gyms-" + r, label: `Year 2 ${R.name}: gyms`, r, year: 2 });
+    pts.push({ id: "y2champ-" + r, label: `Year 2 ${R.name}: Champion ${R.champ}`, r, year: 2 });
+    for (const c of CHAPTERS) if (c.year === 2 && c.r === r) pts.push({ id: "ch-" + c.id, label: `Year 2 ${R.name}: ${c.name}${c.optional ? " (optional)" : ""}`, r, c, year: 2 });
+  });
   return pts;
 }
-const JUMP_LATER = ["Year 2: Begin Year 2 and the level reset", "Year 2 chapters", "Year 3: the Box freeze and picking one", "Year 3: thawing region by region"];
+const JUMP_LATER = ["Year 3: the Box freeze and picking one", "Year 3: thawing region by region"];
 const pickChapters = () => CHAPTERS.filter(c => c.type === "pick");
 // Every pick you've made, here or in Replay ("johto-249"), for the choice achievements. The only thing a replay keeps:
 // it's written to the main Story save through storyReward's allowlist.
@@ -3775,12 +3966,15 @@ function notePickLine(c, n) {
 function storyJump(i, picks = {}) {
   if (!S || !S.test || !isStory()) return;
   const pts = jumpPoints(), keepDex = S.story.lifeDex, see = id => { if (id && SCENES[id]) S.story.seen[id] = 1; };
-  S.badges = {}; S.champs = {}; S.kills = {}; S.dungeons = {}; S.mail.got = {};
+  S.badges = {}; S.champs = {}; S.kills = {}; S.dungeons = {}; S.mail.got = {}; B = null;
   S.story = { ...freshStory(), roulette: S.story.roulette, lifeDex: keepDex, seen: { "open-1": 1, "open-2": 1 } };
   const event = (kind, r) => { const e = STORY_EVENTS[kind + ":" + r]; if (!e) return; see(e.scene); if (e.clue) S.story.clues[e.clue] = 1; if (e.letter) S.mail.got[e.letter] = 1; };
   for (let j = 0; j < Math.min(i, pts.length); j++) {
     const p = pts[j], c = p.c;
-    if (p.id.startsWith("gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; } event("gym", p.r); }
+    if (p.id === "y2-begin") { year2Reset(); see("y2-interlude"); }
+    else if (p.id.startsWith("y2gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; } }
+    else if (p.id.startsWith("y2champ-")) S.champs[p.r] = 1;
+    else if (p.id.startsWith("gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; } event("gym", p.r); }
     else if (p.id.startsWith("champ-")) { S.champs[p.r] = 1; event("champ", p.r); }
     else if (c) {
       S.story.ch[c.id] = 1;
@@ -3861,7 +4055,7 @@ const STORY_RANK = { year: 1e8, liberated: 1e6, chapter: 1e4 };
 function storyProgress(st) {
   if (!st || st.mode !== "story" || !st.story) return null;
   const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
-  const p = { year: st.story.year || 1, chapter: CHAPTERS.filter(c => ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
+  const p = { year: st.story.year || 1, chapter: CHAPTERS.filter(c => (c.year || 1) === (st.story.year || 1) && ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
     lifeDex: new Set([...keys(st.lifeDex), ...keys(st.story.lifeDex), ...keys(st.box)]).size };
   p.ranked = p.year * STORY_RANK.year + (p.year === 3 ? p.regionsLiberated * STORY_RANK.liberated : 0) + Math.min(99, p.chapter) * STORY_RANK.chapter + Math.min(9999, p.lifeDex);
   return p;
@@ -3880,14 +4074,22 @@ function playScene(id, then) {
   renderScene();
 }
 function renderScene() {
-  const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], last = sceneNow.i === sc.lines.length - 1;
-  $("#scene").innerHTML = (who ? `<span class="who">${esc(who)}</span>${ADMIN_PIC[who] ? `<span class="face"><img src="${SPRITE_DIR + ADMIN_PIC[who]}" alt="" onerror="this.parentNode.textContent='${esc(who.split(" ").pop().toUpperCase())}'"></span>` : ""}` : "") + `<p>${esc(text)}</p><div class="row"><button class="skip" type="button" data-scene="skip">Skip</button><span class="muted small count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next">${last ? "Close" : "Next"}</button></div>`;
-  $("#scene").hidden = false;
+  const sc = SCENES[sceneNow.id], [who, text] = sc.lines[sceneNow.i], el = $("#scene");
+  el.classList.remove("free"); el.classList.toggle("narr", !who);
+  el.innerHTML = dlgHtml({ who, row: `<button class="skip" type="button" data-scene="skip">Skip</button><span class="count">${sceneNow.i + 1}/${sc.lines.length}</span><button class="lbl" type="button" data-scene="next"></button>` });
+  overlay("#scene", true);
+  sceneNow.pages = dlgPages($("#scene .dlg-text"), text); sceneNow.pg = 0;
+  scenePage();
   $("#scene [data-scene=next]").focus({ preventScroll: true });
+}
+function scenePage() {
+  const s = sceneNow, last = s.i === SCENES[s.id].lines.length - 1 && s.pg === s.pages.length - 1;
+  $("#scene [data-scene=next]").textContent = last ? "Close" : "Next ›";
+  typeInto($("#scene .dlg-text"), s.pages[s.pg]);
 }
 function endScene() {
   const s = sceneNow; if (!s) return;
-  sceneNow = null; $("#scene").hidden = true;
+  sceneNow = null; typeStop(); overlay("#scene", false);
   markSeen(s.id);
   if (tab === "story" && screen === "game") renderStory();
   if (s.then) s.then();
@@ -3896,9 +4098,14 @@ function endScene() {
 function markSeen(id) { if (S && S.story) { if (!S.story.seen[id]) { S.story.seen[id] = 1; save(); } } else if (!preSeen.includes(id)) preSeen.push(id); }
 $("#scene").onclick = e => {
   const p = e.target.closest("[data-pick]"); if (p && pickNow) return pickClick(p);
-  const y = e.target.closest("[data-y2]"); if (y) { $("#scene").hidden = true; if (y.dataset.y2 === "go") beginYear2(); return; }
-  const b = e.target.closest("[data-scene]"); if (!b || !sceneNow) return;
-  if (b.dataset.scene === "skip" || sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
+  const y = e.target.closest("[data-y2]"); if (y) { overlay("#scene", false); if (y.dataset.y2 === "go") beginYear2(); return; }
+  // In a scene, Next or a tap anywhere on the box: finish the line, then the next page, then the next line.
+  if (!sceneNow) return;
+  const b = e.target.closest("[data-scene]");
+  if (b && b.dataset.scene === "skip") return endScene();
+  if (typeFinish()) return;
+  if (sceneNow.pg < sceneNow.pages.length - 1) { sceneNow.pg++; scenePage(); }
+  else if (sceneNow.i >= SCENES[sceneNow.id].lines.length - 1) endScene();
   else { sceneNow.i++; renderScene(); }
 };
 
@@ -4041,7 +4248,7 @@ function leadField() {
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
-    ...(isStory() ? [["Story", `Year ${S.story.year}: ${YEARS[S.story.year]}, ${chaptersDone()} of ${CHAPTERS.length} chapters`], ["Story dex", `${lifeDex()} ever caught`]] : []),
+    ...(isStory() ? [["Story", `Year ${S.story.year}: ${YEARS[S.story.year]}, ${chaptersDone()} of ${chaptersNow().length} chapters`], ["Story dex", `${lifeDex()} ever caught`]] : []),
     ...(!isStory() && (S.prestige || S.beat) ? [["Prestige", S.prestige ? `P${S.prestige}: XP ×${PRESTIGE_XP}, shinies ×${prestigeShiny()}` : "not yet"]] : []),
     ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ...(isStory() ? [] : [["Leaderboard", `${boardScore()} points${S.prestige ? `, P${S.prestige}` : ""}`]])].concat([["Achievements", `${achCounted().filter(a => S.ach[a.id]).length} of ${achCounted().length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +

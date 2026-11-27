@@ -728,7 +728,7 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
     // Reset Hoenn's pick.
     resetChapter('hoenn-pick'); const reset = { done: chDone('hoenn-pick'), pick: S.story.picks[2] || null };
     // League rules: two Tier 3s in the party block a gym, until the test switch turns them off.
-    S.party = [150, 249]; B = null; startLoc({ kind: 'gym', r: 0, k: 0 }); const blocked = !$('#league').hidden; $('#league').hidden = true;
+    S.party = [150, 249]; B = null; startLoc({ kind: 'gym', r: 0, k: 0 }); const blocked = !$('#league').hidden; overlay('#league', false);
     testTool('league'); startLoc({ kind: 'gym', r: 0, k: 0 }); const off = B && B.kind;
     // Win the fight at once.
     const winBtn = !$('#testwin').hidden; testWin(); await sleep(800); while (sceneNow) endScene();
@@ -748,7 +748,7 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
     return { labels, j, tools, reset, blocked, off, winBtn, won, gates: [gate, met, ign], roulette: S.story.roulette, all, none, y2, epi: S.story.epilogue, real: localStorage.getItem(STORY_KEY) };
   });
   assert.deepEqual(got.labels.slice(0, 4), ['Prologue: starter picked', 'Kanto: gyms', 'Kanto: Champion Blue', 'Kanto: Team Thaw: Rime']);
-  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels.at(-2) === 'Epilogue: Mt. Silver' && got.labels.at(-1).startsWith('Year 1 cleared'));
+  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.at(-1).startsWith('Year 2 Paldea'));
   assert.deepEqual(got.j.champs, [0, 1, 2, 3, 4]);
   assert.equal(got.j.badges, 20);
   assert.deepEqual(got.j.picks, { 0: 150, 1: 249, 2: 382, 3: got.j.picks[3] }, 'the picks asked for, and random where none was');
@@ -811,10 +811,10 @@ test('Story achievements: types and display rules, Story only, Replay awards onl
     const back = { both: !!S.ach.ch_both, hooh: !!S.ach.ch_hooh, seen: { ...S.story.pickLinesSeen } };
     const wiki = wikiSections().find(x => x.id === 'story').html;
     ACH.pop();
-    return { classic, before, after, reread, mainBoth, replayAch, back, wiki };
+    return { classic, before, after, reread, mainBoth, replayAch, back, wiki, secrets: ACH.filter(a => a.type === 'secret').length };
   });
   assert.equal(got.classic.story, false, 'no Story group in Classic');
-  assert.ok(got.before.head.includes('+1 secret'), 'the header counts the unearned secret: ' + got.before.head);
+  assert.ok(got.before.head.includes(`+${got.secrets + 1} secret`), 'the header counts the unearned secrets: ' + got.before.head);
   assert.ok(!got.before.rows.some(r => r.includes('Test Secret')), 'a secret one is not listed');
   assert.ok(got.before.rows.some(r => r.startsWith('??? · Keep playing.')), 'a hidden one is ???');
   assert.ok(!got.before.rows.some(r => r.includes('He Always Did')));
@@ -826,6 +826,155 @@ test('Story achievements: types and display rules, Story only, Replay awards onl
   assert.deepEqual(got.back.seen, { 'johto-249': 1, 'johto-250': 1 }, 'the replay’s pick is kept on the main save');
   assert.deepEqual([got.back.both, got.back.hooh], [true, true], 'Both Halves and the other pick, earned on the main save');
   assert.ok(got.wiki.includes('There are hidden achievements.') && got.wiki.includes('Write It Down') && !got.wiki.includes('He Always Did'));
+  assert.deepEqual(errors, []);
+});
+
+test('Prof Penguin\'s text box never moves the page: the tip slot keeps one height, scenes open over it, and a fast tap can\'t reach the battle', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  await tab.setViewport({ width: 375, height: 740, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  // An old Classic save, from before tips and Story existed.
+  await tab.evaluate(old => { localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot(); go('continue'); }, OLD_SAVE);
+  // What the text box could push: the tabs, the slot itself and the top of the battle screen (the field's own height
+  // changes as the fight goes on, so only where it starts is measured).
+  const where = () => tab.evaluate(() => [['#tabs', 1], ['#tip', 1], ['#t-battle', 0], ['#field', 0]].map(([q, h]) => { const r = $(q).getBoundingClientRect(); return [q, r.top, r.left, r.width, h ? r.height : 0]; }));
+  // An old save gets the tips from the start: the welcome one is up.
+  assert.deepEqual(await tab.evaluate(() => [screen, tipNow && tipNow.id]), ['game', 'hello']);
+  const before = await where();
+  await tab.evaluate(() => { S.tut.seen.hello = 1; hideTip(); });
+  const idle = await tab.evaluate(() => ({ cls: $('#tip').className, text: $('#tip .dlg-text').textContent, shown: getComputedStyle($('#tip')).display, op: +getComputedStyle($('#tip')).opacity }));
+  assert.ok(idle.cls.includes('idle') && idle.text === '…' && idle.shown !== 'none' && idle.op < 1, 'with nothing to say, the slot is there and faint');
+  assert.deepEqual(await where(), before, 'the welcome tip closing moves nothing');
+  for (let k = 0; k < 4; k++) {
+    // A tip, the longest one too: the slot doesn't grow; a long one comes in pages.
+    const tip = await tab.evaluate(k => { S.tut = { seen: {}, off: 0 }; if (k % 2) for (const x of TIPS) if (x.id !== 'tier3') S.tut.seen[x.id] = 1; tutor(); return { now: tipNow && tipNow.id, pages: tipPages.length, idle: $('#tip').classList.contains('idle'), face: $('#tip .dlg-face img') && $('#tip .dlg-face img').getAttribute('src') }; }, k);
+    if (tip.now) {
+      assert.equal(tip.idle, false);
+      assert.match(tip.face, /pokedoku\/sprites\/prof-penguin\.png$/);
+      assert.deepEqual(await where(), before, `the page stays put while Prof Penguin talks (${tip.now})`);
+      // Tap once: the line finishes. Tap again: the next page, or done.
+      const tap1 = await tab.evaluate(() => { $('#tip [data-tip=more], #tip [data-tip=ok]').click(); return { typing: !!typer.t, pg: tipPg, full: typer.i === typer.text.length }; });
+      assert.deepEqual(tap1, { typing: false, pg: 0, full: true }, 'the first tap finishes the line');
+      for (let p = 1; p < tip.pages; p++) { await tab.evaluate(() => { $('#tip [data-tip=more]').click(); typeFinish(); }); assert.deepEqual(await where(), before); }
+      await tab.evaluate(() => $('#tip [data-tip=ok]').click());
+      assert.equal(await tab.evaluate(() => tipNow), null);
+    }
+    assert.deepEqual(await where(), before, 'and when he stops');
+  }
+  // The welcome tip at phone width is more than two lines, so it pages, and no page overflows the box.
+  const paged = await tab.evaluate(() => { hideTip(); S.tut = { seen: {}, off: 0 }; tutor(); const n = tipPages.length, el = $('#tip .dlg-text'); let over = 0; for (let i = 0; i < n; i++) { tipPg = i; tipPage(); typeFinish(); if (el.scrollHeight > el.clientHeight + 1) over++; } hideTip(); return { n, over }; });
+  assert.ok(paged.n >= 2, `a long tip is paged (${paged.n})`);
+  assert.equal(paged.over, 0, 'every page fits the box');
+  // A scene (Story content isn't in Classic, so play one directly): an overlay on a veil that takes the taps.
+  for (let k = 0; k < 3; k++) {
+    const open = await tab.evaluate(() => {
+      playScene('open-1');
+      const f = $('#foe').getBoundingClientRect(), hit = document.elementFromPoint(f.left + f.width / 2, f.top + f.height / 2);
+      const p = $('#scene').getBoundingClientRect();
+      return { veil: !$('#veil').hidden, hitFoe: !!(hit && hit.closest('#foe')), fixed: getComputedStyle($('#scene')).position, inView: p.bottom <= innerHeight && p.left >= 0 && p.right <= innerWidth, next: $('#scene [data-scene=next]').getBoundingClientRect().height };
+    });
+    assert.deepEqual(open, { veil: true, hitFoe: false, fixed: 'fixed', inView: true, next: open.next });
+    assert.ok(open.next >= 40, 'Next is big enough for a thumb');
+    assert.deepEqual(await where(), before, 'opening a scene moves nothing behind it');
+    // Next stays in one place from line to line, and a tap first finishes the line.
+    const lines = await tab.evaluate(() => { const at = [], b = () => $('#scene [data-scene=next]').getBoundingClientRect(); const taps = []; while (sceneNow) { at.push(Math.round(b().top)); const typing = !!typer.t; $('#scene [data-scene=next]').click(); taps.push(typing ? !!sceneNow && !typer.t : true); if (sceneNow) $('#scene [data-scene=next]').click(); } return { at: [...new Set(at)], taps: taps.every(Boolean), veil: !$('#veil').hidden }; });
+    assert.equal(lines.at.length, 1, 'Next never moves');
+    assert.ok(lines.taps);
+    assert.equal(lines.veil, false, 'the veil goes with the scene');
+    assert.deepEqual(await where(), before, 'closing it moves nothing either');
+  }
+  // Space doesn't tap the foe through a scene, and the game keeps running behind it.
+  const behind = await tab.evaluate(() => { playScene('open-1'); const taps = S.stats.taps; document.body.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); const r = { taps: S.stats.taps - taps }; endScene(); return r; });
+  assert.equal(behind.taps, 0);
+  // Other speakers get a placeholder frame with their initials.
+  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Team Thaw grunt'); return d.textContent; });
+  assert.equal(face, 'TT');
+  // Mail has the letter.
+  assert.ok(await tab.evaluate(() => MAIL.some(m => /makeover/.test(m.title))));
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2 begins (test save): the reset keeps the A10 list, the new League has its own leaders and Ice-shifted Champions, and Classic never sees it', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    // Classic's teams first, to check they don't change once a Story year has been open.
+    S = fresh(); S.box[25] = { xp: 125 }; S.party = [25]; slot = KEY; save(); boot();
+    const classic = { gym: gymTeam(0, 1).map(m => m.num), champ: champTeam(5).map(m => m.num), name: gymName(0, 1), year: storyYear() };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    storyJump(to('year1-end')); while (sceneNow) endScene();
+    // Something to keep: a bond, a from, a Mega Stone, a form unlock, cells, a saved team, an achievement, a key item.
+    S.box[25].bond = 1; S.box[25].from = 3; S.box[25].xp = 1e6; S.stones[10062] = 1; S.won = { ...(S.won || {}), kitakami: 1 }; S.cells = 37; S.teams = [{ name: 'Keep', party: [25] }]; S.ach.st_start = Date.now();
+    S.money = 5e6; S.items = { fire: 3 }; S.tickets = { 0: 2 }; S.protein = 9; S.balls.master = 3;
+    const before = { peak: lvlOf(S.box[25].xp), box: Object.keys(S.box).length, dex: lifeDex(), red: chapterRows(1).some(x => x.x === 'johto-silver') };
+    // The Begin Year 2 row is open to the test account (YEAR2_READY is still off for players).
+    const row = unlocked({ kind: 'year2' }), ready = YEAR2_READY;
+    year2Confirm(); const go = !$('#scene [data-y2="go"]').disabled; $('#scene [data-y2="go"]').click();
+    const interlude = sceneNow && sceneNow.id; while (sceneNow) endScene();
+    const b = S.box[25];
+    const after = {
+      year: S.story.year, cleared: S.story.cleared, lv: realLevel(25), peak: b.peak, remembers: remembers(25), bond: b.bond, from: b.from,
+      all5: Object.values(S.box).every(x => lvlOf(x.xp) <= 5), box: Object.keys(S.box).length, dex: lifeDex(),
+      badges: Object.keys(S.badges).length, champs: Object.keys(S.champs).length, money: S.money, balls: S.balls, items: S.items, tickets: S.tickets, protein: S.protein,
+      key: S.key, stone: S.stones[10062], won: S.won.kitakami, cells: S.cells, teams: S.teams.length, ach: !!S.ach.st_start, charm: S.charm,
+      letter: !!S.mail.got['story-y2-start'], cap: levelCap()
+    };
+    // The new League.
+    const league = {
+      names: REGIONS.map((R, r) => [0, 1, 2, 3].map(k => gymName(r, k))),
+      nessa: gymTeam(0, 1).map(m => m.num), place: locName({ kind: 'gym', r: 0, k: 1 }),
+      sizes: REGIONS.map((R, r) => gymTeam(r, 3).length),
+      typed: REGIONS.every((R, r) => [0, 1, 2, 3].every(k => gymTeam(r, k).every(m => m.types.includes(R.gyms[k][1])))),
+      ice: REGIONS.map((R, r) => champTeam(r).filter(m => m.types.includes('Ice')).length),
+      max: leagueMax(), rule: [leagueRule([mon(384)], mon(646)), leagueRule([mon(384), mon(646)], mon(888)), leagueRule([mon(380), mon(381)], mon(386)), leagueRule([mon(380), mon(381), mon(386)], mon(641))]
+    };
+    S.kills['0-1'] = KILLS_FOR_GYM; S.debug.league = 0; startLoc({ kind: 'gym', r: 0, k: 1 }); const line = $('#log').textContent; B = null;
+    startLoc({ kind: 'champ', r: 0 }); B = null;
+    // The Story tab: Year 2's map with the Crown Shrine row and its checklist; Red still on Johto's list.
+    openTab('story');
+    const tabText = $('#t-story').textContent;
+    const crown = yearMap().find(x => x.id === 'y2-crown');
+    const story = { crown, next: storyNext().text, red: chapterRows(1).some(x => x.x === 'johto-silver'), y1rows: chapterRows(0).length, header: tabText.includes('Year 2: The Hunt') };
+    // Three Words: secret, so not listed until the letter is read.
+    openTab('ach'); const unread = { listed: $('#t-ach').textContent.includes('Three Words'), secret: /\+\d+ secret/.test($('#t-ach').textContent) };
+    openTab('mail'); document.querySelector('#mail [data-mail="story-y2-start"]').click();
+    const letter = $('#mail').textContent;
+    return new Promise(done => setTimeout(() => { checkAch(true); openTab('ach'); done({ classic, before, row, ready, go, interlude, after, league, line, story, unread, letter,
+      three: !!S.ach.st_three, listed: $('#t-ach').textContent.includes('Three Words'),
+      // Back in Classic: the teams are the ones from before, and nothing of Year 2 shows.
+      back: (useSlot(KEY), { gym: gymTeam(0, 1).map(m => m.num), champ: champTeam(5).map(m => m.num), name: gymName(0, 1), year: storyYear(), place: locName({ kind: 'gym', r: 0, k: 1 }) }) }); }, 50));
+  });
+  assert.equal(got.ready, false, 'Year 2 stays off for players until all of it ships');
+  assert.ok(got.row && got.go, 'the test account can begin Year 2');
+  assert.equal(got.interlude, 'y2-interlude');
+  const a = got.after;
+  assert.deepEqual([a.year, a.cleared, a.lv, a.remembers, a.all5, a.bond, a.from], [2, { 1: 1 }, 5, true, true, 1, 3]);
+  assert.equal(a.peak, got.before.peak, 'the peak is kept, so it remembers you');
+  assert.deepEqual([a.box, a.dex], [got.before.box, got.before.dex], 'the Box and dex stay');
+  assert.deepEqual([a.badges, a.champs, a.money, a.balls, a.items, a.tickets, a.protein], [0, 0, 0, { poke: 10, great: 0, ultra: 0, master: 0 }, {}, {}, 0], 'badges, money, balls and items reset');
+  assert.deepEqual([a.key, a.stone, a.won, a.cells, a.teams, a.ach, a.charm], [1, 1, 1, 37, 1, true, 1], 'key items, Mega Stones, form unlocks, cells, saved teams and achievements stay');
+  assert.ok(a.letter);
+  assert.ok(a.cap <= 20, `the cap starts over at Kanto (${a.cap})`);
+  const L = got.league;
+  assert.deepEqual(L.names[0], ['Roxanne', 'Nessa', 'Gardenia', 'Clay']);
+  assert.deepEqual(L.names[4], ['Koga', 'Giovanni', 'Winona', 'Clair']);
+  assert.deepEqual(L.names[8], ['Norman', 'Acerola', 'Tate & Liza', 'Roxie']);
+  assert.deepEqual([...L.nessa].sort((x, y) => x - y), [118, 834, 846], "Nessa's own team");
+  assert.equal(L.place, "Nessa's Water gym");
+  assert.deepEqual(L.sizes, [3, 3, 3, 4, 4, 4, 5, 5, 5]);
+  assert.ok(L.typed, 'every Year 2 leader keeps the gym type');
+  assert.deepEqual(L.ice.map(n => n >= 1), Array(9).fill(true), `every Champion has Ice types (${L.ice})`);
+  assert.deepEqual(L.max, { 3: 2, 4: 3 }, 'Year 2 League rules');
+  assert.deepEqual(L.rule, [true, false, true, false], 'Year 2 allows two Tier 3s (Rayquaza, Kyurem) and three Tier 4s (Latias, Latios, Deoxys), no more');
+  assert.match(got.line, /Hulbury's harbor froze solid/);
+  assert.ok(got.story.crown && got.story.crown.name === 'Crown Shrine' && /Dex \d+ \/ 300/.test(got.story.crown.note) && /Glastrier [✓✗]/.test(got.story.crown.note), 'the Crown Shrine row shows from the start, with its checklist');
+  assert.ok(got.story.red, 'Red stays on Johto\'s list');
+  assert.equal(got.story.y1rows, 0, 'Year 1\'s chapters are off the lists');
+  assert.ok(got.story.header);
+  assert.deepEqual(got.unread, { listed: false, secret: true }, 'Three Words is secret until earned');
+  assert.match(got.letter, /three words, not two/);
+  assert.ok(got.three && got.listed, 'reading the letter earns Three Words');
+  assert.deepEqual(got.back, { ...got.classic, place: got.back.place }, 'Classic keeps its own teams and leaders');
+  assert.equal(got.back.place, "Misty's Water gym");
   assert.deepEqual(errors, []);
 });
 
