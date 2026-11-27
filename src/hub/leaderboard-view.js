@@ -437,7 +437,9 @@ async function loadLeaderboard(force = false, full = false) {
     const displayed = shownHandles();
     await loadStreaks(force, displayed);
     await loadBuddies(force, displayed);
-    await loadRelicBadges(force, displayed);
+    // Badges are only read when one of the names shown has a Relic Song score.
+    const relic = new Set((state.lbCache.get('overall')?.rows || []).filter(row => row.game === 'relic-song').map(row => String(row.handle || '').toLowerCase()));
+    await loadRelicBadges(force, displayed.filter(handle => relic.has(handle.toLowerCase())));
   }
   renderLeaderboard();
   // The library cards read the top of each board, so they redraw once it lands.
