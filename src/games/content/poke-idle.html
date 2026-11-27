@@ -3533,9 +3533,8 @@ const STORY_XP = 2, STORY_SHINY = 2, REMEMBER = 2;
 const YEARS = { 1: "The Long Freeze", 2: "The Hunt", 3: "The Thaw" };
 // Year 2 is built later. Until YEAR2_READY, its row shows (after Red) but can't be started, and nothing resets.
 const YEAR2_READY = true;
-// Year 3 is built later. Until YEAR3_READY, its row shows after the Crown Shrine; the test account can open its
-// confirm screen and the pick-one screen, but nothing freezes.
-const YEAR3_READY = false;
+// Year 3, The Thaw: Begin Year 3 shows after the Crown Shrine. (Before YEAR3_READY only the test account could open it.)
+const YEAR3_READY = true;
 const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
