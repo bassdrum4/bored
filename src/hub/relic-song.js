@@ -1,5 +1,4 @@
-// Relic Song, hub side: the coins it pays, what it reads from the other games,
-// and its own board.
+// Relic Song, hub side: coin payouts and optional crossover state.
 //
 // The game calls this through parent.__boredGacha.relic, the same door Poké
 // Gacha uses, so every coin lands in the one ledger that syncs to the account.
@@ -12,7 +11,7 @@ import { readWallet, writeWallet, grantOnce, walletBalance } from './rewards.js'
 import { storedBuddy } from './gacha.js';
 import { DEX, DEX_TYPES, DEX_CHART } from './gacha-dex.js';
 import { rouletteGames } from './roulette.js';
-import { request, freshSession, hasIdentity, ANON_TOKEN } from './backend.js';
+import { hasIdentity } from './backend.js';
 
 export const RELIC = Object.freeze({
   // The most one ledger entry may pay, whatever the page asks for.
@@ -65,41 +64,6 @@ export function typeEdge(species, defend) {
   return best;
 }
 
-/* ── The board ─────────────────────────────────────────────────────────────── */
-// sql/relic-song.sql (not applied yet). Until it is, every call here logs one
-// line and gives up: a missing table never blocks a song or a payout.
-const quiet = (what, error) => console.log('Relic Song: ' + what + ' (' + (error && (error.status === 404 || /does not exist|schema cache/i.test(error.message || ''))
-  ? 'the relic_song table is not set up yet: run sql/relic-song.sql' : (error && error.message) || 'unavailable') + ').');
-
-export async function submitRelicScore(song, diff, score) {
-  if (!hasIdentity()) return { ok: false, reason: 'signin' };
-  try {
-    const session = await freshSession();
-    if (!session) return { ok: false, reason: 'signin' };
-    await request('/rest/v1/rpc/submit_relic_song', { method: 'POST', token: session.access_token,
-      body: { p_song: song, p_diff: diff, p_score: Math.max(0, Math.floor(score)) } });
-    return { ok: true };
-  } catch (error) {
-    quiet('score not posted', error);
-    return { ok: false, reason: 'board' };
-  }
-}
-
-/** Top 10 by the sum of each player's best score on every song. */
-export async function relicBoard() {
-  try {
-    const rows = await request('/rest/v1/rpc/relic_song_top', { method: 'POST', token: ANON_TOKEN, body: {} });
-    return (Array.isArray(rows) ? rows : []).slice(0, 10).map(row => ({
-      handle: String(row.handle || '').slice(0, 40),
-      total: Math.max(0, Math.trunc(Number(row.total)) || 0),
-      songs: Math.max(0, Math.trunc(Number(row.songs)) || 0)
-    }));
-  } catch (error) {
-    quiet('board unavailable', error);
-    return null;
-  }
-}
-
 /* ── The bridge ────────────────────────────────────────────────────────────── */
 export function relicBridge({ onChange = () => {} } = {}) {
   return {
@@ -118,8 +82,6 @@ export function relicBridge({ onChange = () => {} } = {}) {
       const result = payRelicSong(readWallet(), options || {});
       if (result.ok && result.paid.total > 0) { writeWallet(result.wallet); try { onChange(); } catch {} }
       return { ok: result.ok, reason: result.reason, paid: result.paid, coins: walletBalance(readWallet()).coins || 0 };
-    },
-    submit: (song, diff, score) => submitRelicScore(song, diff, score),
-    board: () => relicBoard()
+    }
   };
 }

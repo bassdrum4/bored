@@ -216,7 +216,7 @@
       <h1 style="text-transform:none;letter-spacing:0">Relic Song</h1><span class="grow"></span>
       <span>Coins <b id="m-coins">—</b></span><span>Badges <b id="m-badges">0/4</b></span><span>Total <b id="m-total">0</b></span>
       <span id="m-test" hidden><b>Test mode</b></span>
-      <button id="b-board" type="button">Board</button><button id="b-opts" type="button">Options</button>
+      <button id="b-opts" type="button">Options</button>
     </div>
     <div class="say"><img id="say-img" alt=""><p id="say-text"></p></div>
     <div class="verses" id="verses"></div>
@@ -279,11 +279,6 @@
     <div class="calib-dot" id="c-dot"></div>
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
-
-  <div class="over" id="board" hidden><div class="card"><h2>Board</h2>
-    <p class="dim">Sum of each player's best score on every song.</p>
-    <table><tbody id="bd-rows"></tbody></table>
-    <div class="btns"><button id="bd-close" type="button">Close (Esc)</button></div></div></div>
 
   <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys, D F J K. Open it on a computer.</p></div></div>
 </div>
@@ -974,19 +969,6 @@ function calTap() {
 function endCal() { if (cal) cancelAnimationFrame(cal.raf); cal = null; $("#calib").hidden = true; }
 $("#c-close").onclick = endCal;
 
-async function drawBoard() {
-  $("#board").hidden = false;
-  const rows = $("#bd-rows"); rows.replaceChildren();
-  const tr = el("tr"); tr.append(el("td", "dim", "Loading..."), el("td")); rows.append(tr);
-  const list = G ? await G.board() : null;
-  rows.replaceChildren();
-  if (!list) { const r = el("tr"); r.append(el("td", "dim", G ? "The board isn't available right now." : "Open Relic Song from the arcade to see the board."), el("td")); rows.append(r); }
-  else if (!list.length) { const r = el("tr"); r.append(el("td", "dim", "No scores yet. Be the first."), el("td")); rows.append(r); }
-  else list.forEach((row, i) => { const r = el("tr"); r.append(el("td", "", (i + 1) + ". " + row.handle + " · " + row.songs + " songs"), el("td", "", fmt(row.total))); rows.append(r); });
-  const mine = el("tr"); mine.append(el("td", "dim", opts.test ? "Yours (test mode, not posted)" : "Yours, in this browser"), el("td", "", fmt(total()))); rows.append(mine);
-}
-$("#b-board").onclick = drawBoard;
-$("#bd-close").onclick = () => { $("#board").hidden = true; };
 $("#f-sound").onclick = () => { opts.sound = 1; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
 $("#f-muted").onclick = () => { opts.sound = 0; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
 
@@ -1413,7 +1395,6 @@ function showResult({ song, diff, s, rank, won, why }) {
     if (paid && paid.ok && paid.paid.total > 0)
       $("#r-pay").textContent = "+" + paid.paid.total + " coins (" + [paid.paid.clear && "first clear " + paid.paid.clear, paid.paid.rank && "rank up " + paid.paid.rank].filter(Boolean).join(", ") + "). You have " + fmt(paid.coins) + ".";
     else $("#r-pay").textContent = "No coins this time: this song and rank have already paid.";
-    if (better) G.submit(song.id, diff, save.best[key].score).catch(() => {});
   } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn coins and post scores.";
 }
 $("#r-retry").onclick = () => { if (P) start(P.song); };
@@ -1430,7 +1411,6 @@ addEventListener("keydown", e => {
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
   if (!$("#opts").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#o-close").click(); } return; }
-  if (!$("#board").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#board").hidden = true; } return; }
   if (!$("#play").hidden && P && !P.done) {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
     if (P.paused) { if (k === "r" && !e.shiftKey) retry(); return; }

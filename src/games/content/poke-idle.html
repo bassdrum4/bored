@@ -62,6 +62,7 @@
   .plate { padding: 10px 10px 0; display: flex; flex-direction: column; gap: 5px }
   #foeinfo { font-size: 13px; gap: 6px }
   #foeimg.shade { filter: brightness(0) }
+  #foeimg.bound3 { filter: grayscale(.85) brightness(1.15) contrast(.9); outline: 1px dashed var(--frost-line); outline-offset: -6px }
   #foeinfo b { font-size: 15px }
   .hpline { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim) }
   .hpline .bar { flex: 1 }
@@ -128,6 +129,13 @@
   .mon.empty { border-style: dashed; background: none; cursor: default; min-height: 64px }
   .mon.empty:hover { border-color: var(--rule) }
   .mon.ghost .pic img { opacity: .28; filter: grayscale(1) } .mon.ghost .nm { color: var(--dim) }
+  .mon.frozen { background: var(--frost); border-color: var(--frost-line) } .mon.frozen .pic img { opacity: .45; filter: grayscale(1) }
+  .mon.frozen .nm, .mon.frozen .ice { color: var(--dim) } .mon.outline .pic img { opacity: .5; filter: brightness(0) invert(1) drop-shadow(0 0 0 var(--frost-line)) }
+  .mon.outline { background: none; border-style: dashed; border-color: var(--frost-line) }
+  .mon .gtop { position: absolute; top: 4px; left: 50%; width: 14px; height: 9px; margin-left: -7px; background: var(--gold); border-radius: 1px 1px 0 0; pointer-events: none }
+  .mon .gtop::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: -2px; height: 2px; background: var(--gold) }
+  .roll { max-height: 46vh; overflow-y: auto; text-align: center; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 6px 0 } .roll p { margin: 6px 0 }
+  .frozenbox { list-style: none; padding: 0; margin: 4px 0; columns: 3 9em } .frozenbox li { break-inside: avoid; padding: 1px 0 }
   .ptag { color: var(--gold); font-weight: 700 } #title .head .ptag { margin-right: auto }
   .mon .eff { position: absolute; top: 2px; left: 3px; font-weight: 700 }
   .mon .star { position: absolute; top: 2px; right: 3px; color: var(--gold); font-weight: 700 }
@@ -611,6 +619,9 @@ const SPECIALS = {
 };
 // The Hall of Fame's prize: Sssssssnakes's ace, Mega Hydrapple, a custom form (Grass/Dragon, 650), Tier 2 (key: see TIER).
 // A permanent Mega like Prof Penguin's Empoleon. Its custom sprite isn't ready: img is Hydrapple's own until it is.
+SPECIALS["griseous-giratina"] = { num: 487, key: "griseous", name: "Giratina", title: "Griseous Orb Giratina", move: "Shadow Force",
+  note: "Your own Giratina, holding the Griseous Orb: for knocking out Prof Penguin's with it in a replay of his finale. Its Origin Forme's stats, always.",
+  img: SPRITE_DIR + "10007.png", hp: 150, atk: 130, def: 100, spa: 130, spd: 100, spe: 90 };
 if (HOF_READY) SPECIALS[HOF_SP] = { num: 1019, key: "hof", name: "Hydrapple", title: "Mega Hydrapple", move: "Fickle Beam",
   note: "Sssssssnakes's ace, yours for beating the Hall of Fame. A permanent Mega: no Mega Stone, and it doesn't take your Mega slot. Tier 2.",
   where: "Mega Hydrapple is the prize for beating the Hall of Fame",
@@ -752,8 +763,18 @@ const TRAIN_R = 9, TRAIN_XP = 3, TRAIN_TYPES = Object.keys(TC);
 // Story Year 2's Hunt has a list of its own (another place that isn't a region), next to the regions.
 const HUNT_R = 10;
 const trainPool = k => MON.filter(m => m.types.includes(TRAIN_TYPES[k]) && !legendary(m) && !tripOnly(m)).concat(VARIANTS.filter(v => v.types.includes(TRAIN_TYPES[k]) && !legendary(v)));
-// The gym's leader: Year 2 of Story has its own (Y2_GYMS).
-const gymName = (r, k) => storyYear() === 2 ? Y2_GYMS[r][k][0] : REGIONS[r].gyms[k][0];
+// Story Year 3, The Thaw (E0): Team Thaw holds every gym. Gyms 1-3 are a grunt in the leader's chair, gym 4 a Thaw
+// captain, each with the gym's own type and an ice twist (see gymTeam). Win, and the real leader is found locked in the
+// back room and gives you the badge with one of three lines. Each region's captain has a line of its own (the plot).
+const Y3_GRUNT_LINES = ["This gym's under Team Thaw management now. Thaw Packs are at the front desk.", "The leader? Taking a long break. In the back.", "Cold in here? That's the point."];
+const Y3_CAPTAIN_LINES = ["Gym's under new management. Badge costs three Thaw Packs.", "Bells don't ring for free anymore.", "Slush said to go easy on you. I don't take orders from Slush.",
+  "Time's up. Literally. The clocks stopped.", "Mr. Giovanni sold us this building. Fair and square.", "The admin's gone. Doesn't mean we are.", "Snow on the beach. Admit it, it's pretty.",
+  "Sold-out stadium. Every seat paid for in Thaw Packs.", "Last region. Last chance. For you, I mean."];
+const Y3_FREED_LINES = ["They used my own gym to sell Thaw Packs. Here. Take it before they come back.", "I heard every battle through the door. Good ones.", "Tell Penguin we're still here."];
+const GRUNT_USE = .97, CAPTAIN_USE = 1;
+const y3GymLine = (r, k) => k === 3 ? `Thaw captain: "${Y3_CAPTAIN_LINES[r]}"` : `Team Thaw grunt: "${Y3_GRUNT_LINES[k]}"`;
+// The gym's leader: Year 2 of Story has its own (Y2_GYMS); in Year 3 it's Team Thaw's until you free the real one.
+const gymName = (r, k) => storyYear() === 2 ? Y2_GYMS[r][k][0] : storyYear() === 3 && !S.badges[r + "-" + k] ? (k === 3 ? "Thaw captain" : "Team Thaw grunt") : REGIONS[r].gyms[k][0];
 function gymTeam(r, k) {
   if (storyYear() === 2) return Y2_GYMS[r][k][1].map(mon).sort((a, b) => a.bst - b.bst);
   const [, type] = REGIONS[r].gyms[k], gi = r * 4 + k, size = 3 + (r >= 3) + (r >= 6);
@@ -763,7 +784,16 @@ function gymTeam(r, k) {
     const pick = c[Math.max(0, Math.min(c.length - 1, centre + Math.round((rand() - 0.5) * span)))];
     if (!team.includes(pick)) team.push(pick);
   }
-  return team.sort((a, b) => a.bst - b.bst);
+  team.sort((a, b) => a.bst - b.bst);
+  // Year 3's ice twist: the weakest is swapped for the Ice type closest to it in strength, from the region's
+  // generations (an Ice gym keeps its own).
+  if (storyYear() === 3 && type !== "Ice") {
+    const out = team[0], ice = MON.filter(m => m.types.includes("Ice") && m.gen <= REGIONS[r].gen && !legendary(m) && !tripOnly(m) && !team.includes(m))
+      .sort((a, b) => Math.abs(a.bst - out.bst) - Math.abs(b.bst - out.bst) || a.num - b.num)[0];
+    if (ice) team[0] = ice;
+    team.sort((a, b) => a.bst - b.bst);
+  }
+  return team;
 }
 function champTeam(r) {
   const c = MON.filter(m => m.gen <= REGIONS[r].gen && finalStage(m) && !legendary(m) && !tripOnly(m)).sort((a, b) => b.bst - a.bst).slice(0, 60), rand = rng(r * 104729 + 7), team = [], types = new Set();
@@ -1055,7 +1085,10 @@ const QFORMES = {
 };
 // Arceus and Silvally take a type rather than a form: picked from a list in the detail.
 const ANY_TYPE = { 493: { what: "Plate", what2: "Plates", quest: "origin" }, 773: { what: "Memory", what2: "Memories", quest: "aether" } };
-const qforme = n => { const b = S.box[n], f = QFORMES[n] && b && b.forme && QFORMES[n].find(x => x.key === b.forme); return f && S.won && S.won[f.quest] ? f : null; };
+// A quest form is open once its quest is won. In Story, Year 3's Megalo Tower opens Dusk Mane and Dawn Wings
+// (S.won.necrozma) before Ultra Necrozma's summit fight (S.won.megalo).
+const formWon = f => !!(S && S.won && (S.won[f.quest] || (isStory() && f.num === 800 && f.key !== "ultra" && S.won.necrozma)));
+const qforme = n => { const b = S.box[n], f = QFORMES[n] && b && b.forme && QFORMES[n].find(x => x.key === b.forme); return f && formWon(f) ? f : null; };
 // The form a Pokémon is in, short of Mega and Gigantamax: Zygarde's formes, Urshifu's style, a quest form or a regional form.
 const altOf = n => zforme(n) || ustyle(n) || qforme(n) || variantOf(n);
 // Regional and quest forms go by their own names on tiles and in the detail ("Galarian Meowth", "Dusk Mane Necrozma").
@@ -1079,7 +1112,7 @@ mon(ARCEUS).move = "Judgment";
 const TIER_OF = [
   [ETERNAMAX_FOE],
   [...MEWTWONITES, MEGA_RAYQUAZA, MEGA_ZYGARDE].map(formById).concat([QFORMES[800][2], mon(ARCEUS), SPECIALS["prof-empoleon"]]),
-  [...QFORMES[646], QFORMES[888][0], QFORMES[889][0], ...QFORMES[898], QFORMES[383][0], QFORMES[382][0], QFORMES[487][0], ...(HOF_READY ? [SPECIALS[HOF_SP]] : [])],
+  [...QFORMES[646], QFORMES[888][0], QFORMES[889][0], ...QFORMES[898], QFORMES[383][0], QFORMES[382][0], QFORMES[487][0], SPECIALS["griseous-giratina"], ...(HOF_READY ? [SPECIALS[HOF_SP]] : [])],
   [150, 249, 250, 382, 383, 384, 483, 484, 487, 486, 643, 644, 646, 716, 717, 791, 792, 888, 889, 890, 1007, 1008, 773].map(mon)
     .concat(QFORMES[800].slice(0, 2), [ZFORMES.complete], QFORMES[386], [641, 642, 645, 905, 647, 1024].map(n => QFORMES[n][0]))
     // Mega pseudo-legendaries, Mega Latios and Latias, and the Megas of Tier 4 legendaries (Heatran, Darkrai, Diancie,
@@ -1219,7 +1252,7 @@ function signature(n) { const m = fighter(n), boost = tierBonus(m); return boost
 // cap a Pokémon also hits × (level ÷ cap), so a Lv 80 hits 69% as hard as one at 96. At the cap nothing changes.
 const underCap = L => Math.min(1, L / areaCap());
 const power = (n, L = level(n), foe) => { const m = fighter(n); return hitStat(m, foe) * L / 50 * underCap(L) * hitRate(m) * truant(n) * (1 + proteinBoost()) * tierBonus(m); };
-const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n), foe) * (foe ? bestEff(fighter(n), foe) : 1), 0);
+const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n), foe) * (foe ? bestEff(fighter(n), foe) : 1), 0) * (B && B.ally || 1);
 // A tap is a helper, not the engine: 4% of the party's damage per second, so 8 a second add about a third. Your team
 // wins or loses a fight; tapping only rescues a close one.
 const TAP_SHARE = .04;
@@ -1252,7 +1285,7 @@ function unlocked(loc) {
   if (kind === "route") return k === 0 || badge(r, k - 1);
   if (kind === "gym") return kills(r, k) >= KILLS_FOR_GYM;
   if (kind === "dungeon") return badge(r, 1);
-  if (kind === "champ") return badge(r, 3);
+  if (kind === "champ") return storyYear() !== 3 && badge(r, 3);
 }
 function locName(loc) {
   if (loc.kind === "final") return "Prof Penguin's Lab";
@@ -1457,7 +1490,17 @@ function showCredits() {
     <p>Thanks for playing.</p><button class="lbl" type="button" data-credits="close">Close</button></div>`;
   el.hidden = false; el.querySelector("[data-credits]").focus();
 }
-$("#credits").onclick = e => { if (e.target.closest("[data-credits]")) $("#credits").hidden = true; };
+let creditsThen = null;
+$("#credits").onclick = e => { if (e.target.closest("[data-credits]")) { $("#credits").hidden = true; const f = creditsThen; creditsThen = null; if (f) f(); } };
+// Story's credits, after Prof Penguin's finale: a scrolling box over all nine regions as they thaw.
+function storyCredits(then) {
+  creditsThen = then || null;
+  const el = $("#credits");
+  el.innerHTML = `<div class="box"><h2 id="credits-h">The Long Freeze</h2><div class="roll">${REGIONS.map(R => `<p>${esc(R.name)} thaws.</p>`).join("")}
+    <p><b>Poké Idle: Story Mode</b><br>Made by Vettel, for the Bored arcade.</p><p>Prof Penguin as himself.<br>${RIVAL_NAME} as himself.<br>Rime, Hail, Slush and Director Sleet as Team Thaw.</p>
+    <p class="small muted">Sprites from PokeAPI. Pokémon is © Nintendo, Creatures and Game Freak; this is a fan game.</p><p>Thanks for playing.</p></div><button class="lbl" type="button" data-credits="close">Close</button></div>`;
+  el.hidden = false; el.querySelector("[data-credits]").focus();
+}
 // ── Prestige, after Prof Penguin: start the journey over from Kanto Route 1 with a new starter, for bonuses that last.
 // S.prestige counts them. XP is ×PRESTIGE_XP from Prestige 1 on; shinies are ×2 a prestige up to ×PRESTIGE_SHINY_MAX
 // (1/4096, 1/2048, 1/1024, 1/512), and the Shiny Charm's ×3 stacks on top once you win it again. One prestige per win
@@ -1589,7 +1632,7 @@ function startLoc(loc) {
     B = { kind: "dungeon", ...(T ? { x: T.id } : {}), r, i: Math.max(r * 4 + (T ? 3 : 2), cleared(r) ? levelIndex(L) : 0), queue: q, L, base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
   }
   if (B.kind !== "route") { B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def); }
-  if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
+  if (B.kind === "gym") B.tune = storyYear() === 3 ? gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6, [B.r, B.k], B.k === 3 ? CAPTAIN_USE : GRUNT_USE) : gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "rival") B.tune = gymTuning(B, 3, 6, [B.r, 3], RIVAL_USE);
   else if (B.kind === "story") B.tune = storyTune(B);
@@ -1600,7 +1643,7 @@ function startLoc(loc) {
   else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
   else if (B.kind === "hof") B.tune = finalTuning(B, HOF_USE);
   else if (B.kind === "daily") B.tune = tierTuning(B, 5, dailyArea(B.r));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "gym" && storyYear() === 2 ? Y2_GYMS[B.r][B.k][2] : B.kind === "champ" && storyYear() === 2 ? `Team Thaw's banners hang over the arena. Champion ${REGIONS[B.r].champ}'s team has new Ice types: "partner donations".` : B.kind === "story" ? storySay(B) : B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "gym" && storyYear() === 2 ? Y2_GYMS[B.r][B.k][2] : B.kind === "gym" && storyYear() === 3 ? y3GymLine(B.r, B.k) : B.kind === "champ" && storyYear() === 2 ? `Team Thaw's banners hang over the arena. Champion ${REGIONS[B.r].champ}'s team has new Ice types: "partner donations".` : B.kind === "story" ? storySay(B) : B.kind === "hof" ? `${RIVAL_NAME}, first graduate: "Welcome to my Hall of Fame. You're not in it yet."` : B.kind === "rival" ? `${RIVAL_NAME}: "${RIVAL_AT[B.r].line}"` : B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1619,11 +1662,12 @@ function spawn() {
   }
   B.foe = { m, L, shiny, max: (boss ? bossHpFor : hpFor)(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
   B.foe.hp = B.foe.max; B.pause = 0;
-  if (!m.shade) S.seen[m.num] = 1;
-  $("#foeimg").src = spriteOf(m, shiny); $("#foeimg").classList.toggle("shade", !!m.shade);
+  if (B.kind === "story" && B.holdBack && B.phase === 1 && B.idx === 0) B.foe.hp = Math.round(B.foe.max * HOLD_BACK);
+  if (!m.shade && !m.bound3) S.seen[m.num] = 1;
+  $("#foeimg").src = spriteOf(m, shiny); $("#foeimg").classList.toggle("shade", !!m.shade); $("#foeimg").classList.toggle("bound3", !!m.bound3);
   $("#shiny").hidden = !shiny;
   $("#trainerimg").hidden = B.kind !== "final"; renderFinalBox();
-  $("#foeinfo").innerHTML = m.shade ? `<b>???</b> <span class="muted small">the dealer</span>` : `<b>${esc(m.name)}</b>${m.kind === "mega" ? ' <span class="muted small">MEGA</span>' : ""} Lv ${L} ${m.types.map(tyChip).join(" ")} <span class="muted small">Def ${statAt(m.def, L)} · SpD ${statAt(m.spd, L)}</span>${ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
+  $("#foeinfo").innerHTML = m.shade ? `<b>???</b> <span class="muted small">the dealer</span>` : `<b>${esc(m.name)}</b>${m.kind === "mega" ? ' <span class="muted small">MEGA</span>' : ""} Lv ${L} ${m.types.map(tyChip).join(" ")} <span class="muted small">Def ${statAt(m.def, L)} · SpD ${statAt(m.spd, L)}</span>${m.bound3 ? ' <span class="muted">· a copy of ice and cable</span>' : ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
   renderMinis();
 }
 function hit(dmg) {
@@ -1647,6 +1691,7 @@ function defeat() {
   const boss = ((f.wild && B.kind === "dungeon") || B.catchIt) && B.idx === B.queue.length - 1;
   if ((boss || (f.wild && f.shiny)) && S.set.manual && BALLS.some(b => S.balls[b.id] > 0)) { say(text); startManual(f, boss); return; }
   if (boss) text += S.replay ? (B.bossCaught = true, " It's a replay: no catch, the chapter goes on.") : bossThrows(f);
+  else if (f.wild && !S.replay && isFrozen(f.m.num)) text += ` Yours is under the ice in ${frozenIn(f.m.num)}: no throw.`;
   else if (f.wild && !S.replay) {
     const ball = chooseBall(f);
     if (ball) {
@@ -1788,15 +1833,22 @@ function next() {
   if (!B) return;
   if (B.kind === "route") { spawn(); return; }
   B.idx++;
+  if (B.kind === "story" && B.stopAt && B.idx >= B.stopAt) { B.idx = B.queue.length; B.stopped = 1; }
+  if (B.kind === "story" && B.sleet && B.queue[B.idx] && B.queue[B.idx].masked && S.party.includes(SILVALLY)) {
+    B.queue.splice(B.idx, 1); B.maskBroke = 1;
+    toast("Sleet's Type: Null stops and looks at your Silvally. Its mask cracks and falls away, and it walks out of the room. Sleet, quietly: \"…It remembered the other one.\"");
+  }
   if (B.idx < B.queue.length) { spawn(); return; }
   if (B.kind === "tower") { towerFloor(); return; }
   if (B.kind === "final" && B.phase === 1) { finalBreak(); return; }
-  if (B.kind === "story" && B.phases && B.phase < B.phases.length) { storyBreak(); return; }
+  if (B.kind === "story" && B.phases && B.phase < B.phases.length) { if (B.carry && B.phase === 1) reflection(); storyBreak(); return; }
   // Bosses in Galar bring Wishing Pieces, in Sinnoh Plates.
   const R = REGIONS[B.r], galar = (B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "") + (B.r === PLATES_FROM && B.kind !== "quest" ? gainPlates(PLATE_BOSS) : "");
   if (B.kind === "gym" && isStory() && !badge(B.r, B.k)) storyEvent("gym", B.r);
   if (B.kind === "champ" && isStory() && !S.champs[B.r]) storyEvent("champ", B.r);
+  const y3free = B.kind === "gym" && storyYear() === 3 && !badge(B.r, B.k);
   if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${gymName(B.r, B.k)}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + gainCells(CELL_BOSS) + galar); }
+  if (y3free) freeLeader(B.r, B.k);
   if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first && !isStory()) S.balls.master++;
     const unlock = first && B.r === KEY_STONE_FROM && !S.key ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM && !(isStory() && S.band) ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
     toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)}${isStory() ? "" : " and a Master Ball"}. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + gainCells(CELL_BOSS) + galar); }
@@ -1852,6 +1904,7 @@ function backToRoute() {
   B = null; startLoc({ kind: "route", r, k }); renderAll();
 }
 function addMon(num, L, shiny, vid) {
+  if (isFrozen(num)) return;
   const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num), again = !had && !shiny && !lineWasShiny && lineRecorded(num);
   if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny || again, from: catchRegion(B || S.loc) };
   else if (shiny) shineOne(had);
@@ -1960,6 +2013,7 @@ const evoOpen = (n, e) => { if (n === KUBFU && isStory() && !(S.won && S.won.tow
 const evoOptions = n => evosOf(n).filter(e => evoOpen(n, e));
 function canEvolve(n, e) {
   const [, how, v] = e;
+  if (isFrozen(n) || isFrozen(e[0])) return false;
   if (how === "L") return level(n) >= v;
   if (how === "I") return (S.items[v] || 0) > 0;
   return S.cords > 0;
@@ -2157,10 +2211,10 @@ function renderLocs() {
   else {
     for (let k = 0; k < 4; k++) {
       items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
-      items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
+      items.push({ kind: "gym", r, k, note: badge(r, k) ? (storyYear() === 3 ? "freed" : "badge") : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
       if (k === 1) { const t4 = dungeonT4(r); items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${dungeonPhase(r) === 4 ? `Legends ${t4.filter(ownsFoe).length}/${t4.length}` : "Tier 3"} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] }); }
     }
-    items.push({ kind: "champ", r, note: (storyYear() === 2 ? "sponsored by Team Thaw · " : "") + (S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`), done: !!S.champs[r] });
+    if (storyYear() !== 3) items.push({ kind: "champ", r, note: (storyYear() === 2 ? "sponsored by Team Thaw · " : "") + (S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`), done: !!S.champs[r] });
     if (isStory()) items.push(...chapterRows(r));
     if (r === PIECES_FROM && !isStory()) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
     if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
@@ -2179,12 +2233,14 @@ function renderLocs() {
 const lookOf = n => megaOn(n) || (S.gmax === n && gmaxOf(n)) || special(n) || altOf(n) || mon(n);
 function monTile(n, opts = {}) {
   const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || altOf(n) || m, fm = fighter(n), te = opts.foe ? bestEff(fm, opts.foe) : null;
+  // Year 3: frozen in its region (greyed, under frost), or Eternatus's empty slot once Galar is free without it.
+  const fz = isFrozen(n), gone = fz && emptySlot(n);
   // In battle: how hard it hits this foe, type matchup × Defense or Sp. Def side, shown when it's 10% or more off even.
   const ph = opts.foe && hitsPhys(fm, opts.foe), dm = opts.foe ? defMult(opts.foe, ph) : 1, e = te == null ? null : te * dm;
   const eLabel = e == null ? "" : dm > .95 && dm < 1.05 ? ({ 0: "0x", .25: "¼x", .5: "½x" })[te] || te + "x" : (e >= 10 ? Math.round(e) : Math.round(e * 10) / 10) + "x";
   const eTitle = e == null ? "" : `${te}x type; ${ph ? "Attack vs Defense" : "Sp. Atk vs Sp. Def"} ×${dm.toFixed(2)}`;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span>${remembers(n) ? `<span class="peak" title="It remembers you: ×${REMEMBER} XP back to Lv ${S.box[n].peak}">❄${S.box[n].peak}</span>` : ""}<span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : lvText(n, opts.battle ? battleLevel(n) : level(n))}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}${fz ? (gone ? " outline" : " frozen") : ""}" type="button" data-n="${n}">${isStory() && S.story.hat === +n ? '<span class="gtop" title="The golden top hat"></span>' : ""}${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span>${remembers(n) ? `<span class="peak" title="It remembers you: ×${REMEMBER} XP back to Lv ${S.box[n].peak}">❄${S.box[n].peak}</span>` : ""}<span class="nm">${esc(nameOf(n))}</span><span${fz ? ' class="ice"' : ""}>${gone ? "an empty slot" : fz ? `❄ Frozen in ${frozenIn(n)}` : opts.stat ? `${opts.stat[0]} ${opts.stat[1](n)}` : lvText(n, opts.battle ? battleLevel(n) : level(n))}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -2198,7 +2254,7 @@ function boxMatch(n, q) {
   q = q.toLowerCase(); if (!q) return true;
   const num = q.replace(/^#0*/, "");
   if (/^\d+$/.test(num)) return String(n) === num;
-  const names = [mon(n).name, nameOf(n), ...variantsOf(n).filter(v => hasVar(n, v.vid)).map(v => v.name), ...(S.won ? (QFORMES[n] || []).filter(f => S.won[f.quest]).map(f => f.name) : [])];
+  const names = [mon(n).name, nameOf(n), ...variantsOf(n).filter(v => hasVar(n, v.vid)).map(v => v.name), ...(S.won ? (QFORMES[n] || []).filter(formWon).map(f => f.name) : [])];
   return names.some(x => x.toLowerCase().includes(q));
 }
 // Box sorts: each Pokémon's stats now, at its level (the tile shows the value), and its base total for its potential.
@@ -2222,18 +2278,19 @@ function saveTeam() {
 }
 // A saved team is a template: loading it fills in the members you own, and the rest show as faded empty slots until
 // you have them (after a prestige, most of a team starts out that way). S.tmpl is the last team loaded.
-const ghosts = () => (S.tmpl || []).filter(n => !S.box[n]).slice(0, Math.max(0, 6 - S.party.length));
-const ghostTile = n => n ? `<div class="mon empty ghost" title="${esc(mon(n).name)}: not in your Box yet" aria-label="${esc(mon(n).name)}, not in your Box yet"><span class="pic"><img class="spr" src="${sprite(n)}" alt="" loading="lazy"></span><span class="nm">${esc(mon(n).name)}</span><span>not caught</span></div>` : '<div class="mon empty" aria-hidden="true"></div>';
+const ghosts = () => (S.tmpl || []).filter(n => !S.box[n] || isFrozen(n)).slice(0, Math.max(0, 6 - S.party.length));
+// A saved team's member that's still frozen (Year 3) shows as a faded slot with its region.
+const ghostTile = n => n && isFrozen(n) ? `<div class="mon empty ghost" title="${esc(mon(n).name)}: frozen in ${frozenIn(n)}" aria-label="${esc(mon(n).name)}, frozen in ${frozenIn(n)}"><span class="pic"><img class="spr" src="${sprite(n)}" alt="" loading="lazy"></span><span class="nm">${esc(mon(n).name)}</span><span>❄ Frozen in ${frozenIn(n)}</span></div>` : n ? `<div class="mon empty ghost" title="${esc(mon(n).name)}: not in your Box yet" aria-label="${esc(mon(n).name)}, not in your Box yet"><span class="pic"><img class="spr" src="${sprite(n)}" alt="" loading="lazy"></span><span class="nm">${esc(mon(n).name)}</span><span>not caught</span></div>` : '<div class="mon empty" aria-hidden="true"></div>';
 function loadTeam(i) {
   if (bossLocked()) { toast("Switch teams between battles."); return; }
   const t = (S.teams || [])[i]; if (!t) return;
-  const party = t.party.filter(n => S.box[n]).slice(0, 6), missing = t.party.length - party.length;
-  if (!party.length) { toast(`None of ${t.name} is in your Box yet.`); return; }
+  const party = t.party.filter(n => S.box[n] && !isFrozen(n)).slice(0, 6), frozenN = t.party.filter(n => isFrozen(n)).length, missing = t.party.length - party.length - frozenN;
+  if (!party.length) { toast(frozenN ? `${t.name} is still under the ice.` : `None of ${t.name} is in your Box yet.`); return; }
   for (const n of S.party) if (!party.includes(n)) dropForm(n);
   S.party = party; S.tmpl = t.party.slice(0, 6);
   if (t.mega && party.includes(t.mega.n) && S.key && S.stones[t.mega.f]) S.mega = { ...t.mega };
   if (t.gmax && party.includes(t.gmax) && S.band && S.gfactor[t.gmax]) S.gmax = t.gmax;
-  save(); renderAll(); toast(`${t.name} is your party now.${missing ? ` ${missing} of it ${missing > 1 ? "aren't" : "isn't"} in your Box yet: ${missing > 1 ? "they show" : "it shows"} as faded slots.` : ""}`);
+  save(); renderAll(); toast(`${t.name} is your party now.${missing ? ` ${missing} of it ${missing > 1 ? "aren't" : "isn't"} in your Box yet: ${missing > 1 ? "they show" : "it shows"} as faded slots.` : ""}${frozenN ? ` ${frozenN} ${frozenN > 1 ? "are" : "is"} still frozen: faded slots until ${frozenN > 1 ? "their regions are" : "its region is"} freed.` : ""}`);
 }
 const PARTY_HINT = "Drag to rearrange your party, drag a Box Pokémon onto a slot to swap it in, or drag one down to the Box. On a phone, hold it first. Tap any Pokémon for its details; EVOLVE means it can evolve now.";
 function renderParty() {
@@ -2285,8 +2342,8 @@ function formeLine(n) {
     return `<div class="row small"><span class="muted">${A.what}</span><select data-plate="1" aria-label="${esc(mon(n).name)}'s type"${won ? "" : " disabled"}>${["", ...QFORMES[n].map(f => f.key)].map(k => `<option value="${k}"${k === cur ? " selected" : ""}>${k ? k.slice(2) : "Normal"}</option>`).join("")}</select><span class="muted">${won ? `any of the 17 ${A.what2}, same stats${tierBonus(mon(n)) > 1 ? `; ${bonusText(mon(n))} (Tier ${tierOf(mon(n))}) in every type` : ""}` : `win ${questAt(A.quest)} to change its type`}</span></div>`;
   }
   if (QFORMES[n]) {
-    const Q = QUEST[QFORMES[n][0].quest], won = S.won && S.won[Q.id], cur = qforme(n) ? S.box[n].forme : "";
-    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme$/, "").trim(), cur, won)).join("")}<span class="muted">${won ? QFORMES[n].filter(f => tierBonus(f) > 1).map(f => f.move ? bonusText(f) : `${f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme?$/, "").trim()} ×${tierBonus(f)}`).concat("same level").join("; ") : `win at ${theQ(Q)} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
+    const Q = QUEST[QFORMES[n][0].quest], won = QFORMES[n].some(formWon), cur = qforme(n) ? S.box[n].forme : "";
+    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme$/, "").trim(), cur, formWon(f))).join("")}<span class="muted">${won ? QFORMES[n].filter(f => tierBonus(f) > 1).map(f => f.move ? bonusText(f) : `${f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme?$/, "").trim()} ×${tierBonus(f)}`).concat("same level").join("; ") : `win at ${theQ(Q)} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
   }
   if (n === URSHIFU) {
     const cur = ustyle(n) ? "rapid" : "single", opt = (k, label) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-forme="${k}" aria-pressed="${k === cur}">${label}</button>`;
@@ -2321,7 +2378,7 @@ function renderDetail() {
       const yours = owned ? ` <span class="muted">· yours is Lv ${level(t)}${open ? ", evolving gives it these levels" : ""}</span>` : "";
       return `<div class="row" style="justify-content:space-between"><span>→ ${esc(form ? form.name : mon(t).name)} <span class="muted">${need}</span>${yours}${elsewhere ? ` <span class="muted">· in ${regionLabel(elsewhere)} it becomes ${esc(elsewhere.name)}</span>` : ""}</span>${open ? `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>` : '<span class="good">have it</span>'}</div>`;
     }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') + formLines(detail) +
-    `<div class="row">${!S.party.includes(detail) && S.party.length >= 6 ? `<button class="lbl" type="button" data-swap="${detail}">Swap into party</button>` : `<button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button>`}<button class="lbl" type="button" data-close="1">Close</button></div>`;
+    `<div class="row">${isFrozen(detail) ? `<span class="small">${emptySlot(detail) ? "An empty slot, its outline traced in frost." : `❄ Frozen in ${frozenIn(detail)}. ${esc(comesBack(detail))}`}</span>` : !S.party.includes(detail) && S.party.length >= 6 ? `<button class="lbl" type="button" data-swap="${detail}">Swap into party</button>` : `<button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button>`}${isStory() && S.story.hatOwned && !isFrozen(detail) ? `<button class="lbl" type="button" data-hat="${detail}">${S.story.hat === +detail ? "Take off the golden top hat" : "Wear the golden top hat"}</button>` : ""}<button class="lbl" type="button" data-close="1">Close</button></div>`;
 }
 // The Pokédex shows normal or shiny pictures. Shiny shows the ones you have shiny; the rest stay dark. Tap one to
 // open its page in the wiki.
@@ -2474,6 +2531,30 @@ const ACH = [
   storyAch("st_tanks", "The Tanks Are Full", "story", "Unlock Black and White Kyurem", () => chDone("y2-chasm"), { year: 2 }),
   storyAch("st_bridges", "Burned Bridges", "hidden", "Win the Crown Shrine finale", () => chDone("y2-crown"), { year: 2 }),
   storyAch("st_king", "Chosen by the King", "story", "Receive Calyrex", () => chDone("y2-crown") && !!S.box[CALYREX], { year: 2 }),
+  // Year 3 (the achievements file, section 4).
+  storyAch("st_stays", "This One Stays With Me", "story", "Keep one Pokémon out of the ice", st => st.kept != null && (st.year || 1) >= 3, { year: 3 }),
+  storyAch("st_remember", "They Remember", "hidden", "See the first thaw", st => !!st.firstThaw, { year: 3 }),
+  storyAch("st_hissing", "Hissing Supportively", "story", "Win your first liberation fight", st => Object.keys(st.liberated || {}).length > 0, { year: 3 }),
+  storyAch("st_backroom", "The Back Room", "story", "Free all 36 gym leaders", st => Object.keys(st.freed || {}).length >= 36, { year: 3 }),
+  storyAch("st_orbs", "Consider Them Safe", "hidden", "Receive the Red and Blue Orbs", st => !!st.seen["y3-cave"], { year: 3 }),
+  storyAch("st_p", "Signed, P.", "hidden", "Find the note signed \"P.\"", st => !!st.clues.p, { year: 3 }),
+  storyAch("st_draft", "The First Draft", "hidden", "Free Alola", st => !!(st.liberated || {})[6], { year: 3 }),
+  storyAch("st_slot", "The Empty Slot", "hidden", "Free Galar", st => !!(st.liberated || {})[7], { year: 3 }),
+  storyAch("st_everyone", "Everyone's Here", "story", "Free all nine regions", st => Object.keys(st.liberated || {}).length >= 9, { year: 3 }),
+  storyAch("st_firstfreeze", "The First Freeze", "hidden", "See what Arceus shows you", st => !!st.seen["y3-origin"], { year: 3 }),
+  storyAch("st_dig", "I Told You We'd Come Back", "story", "Finish the Dig", () => chDone("y3-dig"), { year: 3 }),
+  storyAch("st_giveback", "Give It Back", "hidden", "Win the Darkest Day", () => chDone("y3-darkest"), { year: 3 }),
+  storyAch("st_other", "It Remembered the Other One", "hidden", "Win at Team Thaw HQ with Silvally in your party", st => !!st.maskBroke && chDone("y3-sleet"), { year: 3 }),
+  storyAch("st_taught", "Who Taught Us", "hidden", "Beat Director Sleet", () => chDone("y3-sleet"), { year: 3 }),
+  storyAch("st_wake", "Wake It Up", "hidden", "Beat Prof Penguin", () => chDone("y3-penguin"), { year: 3 }),
+  storyAch("st_fr", "Field Researcher", "hidden", "See what comes after the credits", st => !!st.seen["y3-after"], { year: 3 }),
+  storyAch("st_clues", "Every Small Thing", "discovery", "Find all eight clues", st => Object.keys(CLUES).every(k => st.clues[k]), { year: 3 }),
+  ...(HOF_READY ? [storyAch("st_hof", "First Graduate", "story", "Beat Sssssssnakes in the Hall of Fame", () => chDone("y3-hof"), { year: 3 })] : []),
+  storyAch("sc_table", "You Beat It at Its Own Table?", "secret", "Reach Prof Penguin's finale having beaten the dealer at its own table, on Hard", st => !!st.table, { year: 3 }),
+  storyAch("sc_reflection", "You Went There Too", "secret", "In a replay of Prof Penguin's finale, knock out his partner with your own, in the same Forme", st => !!st.griseous, { year: 3, replayOk: true }),
+  storyAch("sc_paid", "Paid in Full", "secret", "Read the note under the hat at the Shotgun Roulette table, after the credits", st => !!st.credits && rouletteFlag("paidSeen"), { year: 3 }),
+  storyAch("sc_seven", "Seven", "secret", "Get Sssssssnakes' letter the night before", () => !!S.mail.got["story-y3-seven"], { year: 3 }),
+  storyAch("sc_bonded", "Nobody Left Behind", "secret", "Clear Year 3 with everyone", st => !!st.allBonded, { year: 3 }),
   storyAch("ch_lugia", "Of Course You'd Pick the Cold", "choice", "Pick Lugia in Johto", st => st.pickLinesSeen["johto-249"], { replayOk: true }),
   storyAch("ch_hooh", "We'll Need It", "choice", "Pick Ho-Oh in Johto", st => st.pickLinesSeen["johto-250"], { replayOk: true }),
   storyAch("ch_dialga", "Time, Like Him", "choice", "Pick Dialga in Sinnoh", st => st.pickLinesSeen["sinnoh-483"], { replayOk: true }),
@@ -2552,6 +2633,11 @@ function renderAch() {
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
   { id: "story-y2-end", chapter: true, date: "End of Year 2", from: "Prof Penguin", title: "Warming up", body: `<p>It's warming up. We have a little time. Not much.</p><p>Prof Penguin</p>` },
+  { id: "update-story-year3", story: true, date: "Nov 27, 2026", from: "Prof Penguin", title: "Story Mode, Year 3: The Thaw",
+    body: `<ul><li>Once you've cleared Year 2, <b>Begin Year 3</b> is at the top of your lists. It's the last year, and it tells you what happens before anything does.</li>
+      <li>You keep one Pokémon to start. The rest come back to you region by region, as you free each one.</li>
+      <li>Every gym is under new management. Win your badges back, then take back each region. There are no League rules this year.</li>
+      <li>Clear the year and you can replay it from the title screen, and your save stays open. The Wiki's Story pages have the rules, without the story.</li></ul>` },
   { id: "update-story-year2", story: true, date: "Nov 26, 2026", from: "Prof Penguin", title: "Story Mode, Year 2: The Hunt",
     body: `<ul><li>Once you've cleared Year 1, <b>Begin Year 2</b> is at the top of your lists. It tells you exactly what resets and what stays before anything happens.</li>
       <li>A new League: strangers in every gym, the Champions with new Ice types, and League rules that allow two Tier 3s and three Tier 4s.</li>
@@ -2585,9 +2671,31 @@ const MAIL = [
   { id: "story-y2-galar-889", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The other half", body: `<p>Shield and sword. The shrine will want to see both.</p><p>Prof Penguin</p>` },
   { id: "story-y2-paldea-1007", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The other half", body: `<p>Past and future. You picked the past first. So did I, once.</p><p>Prof Penguin</p>` },
   { id: "story-y2-paldea-1008", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The other half", body: `<p>Future and past. You picked the future first. Good. Somebody should.</p><p>Prof Penguin</p>` },
-  // Relic Song's finale (bored.relic-song.eggs.v1), in Year 1 or 2 of a real Story save: once, see deliverMail.
+  { id: "story-y3-reflection", chapter: true, date: "Year 3", from: "Prof Penguin", title: "You went there too", body: `<p>You went there too, didn't you?</p><p>— P.</p>` },
+  { id: "story-y3-last", chapter: true, date: "Year 3", from: "Prof Penguin", title: "The notebook", body: `<p>The notebook's yours now. Write down the small things.</p><p>— P.</p>` },
+  { id: "story-y3-hof", chapter: true, hof: true, date: "Year 3", from: "Sssssssnakes", title: "Rematch",
+    body: `<p>Rematch whenever you want. I'll be here. I'm always here now. Penguin left me a hat too, by the way. It's got a snake on it. Obviously.</p><p>— Sssssssssnakes</p>` },
+  { id: "story-y3-hof-late", chapter: true, hof: true, date: "Year 3", from: "Sssssssnakes", title: "Took you long enough", body: `<p>Took you long enough. I've been standing here for weeks.</p><p>— Sssssssnakes</p>` },
+  { id: "story-y3-seven", chapter: true, date: "Year 3", from: "Sssssssnakes", title: "The night before",
+    body: `<p>I know what you found. The notes. The photo. He did the same thing to me he did to you. Sent me out. Didn't tell me anything. I used to think that meant he didn't trust me. I think maybe he didn't trust himself.</p><p>Go. I'll be at the League after. Someone has to be.</p><p>— Sssssssnakes</p>` },
+  { id: "story-y3-keepgoing", chapter: true, date: "Year 3", from: "Prof Penguin", title: "Keep going", body: `<p>Keep going.</p>` },
+  { id: "story-y3-slush-1", chapter: true, date: "Year 3", from: "Slush", title: "Dragonspiral",
+    body: `<p>Dragonspiral changes guards at dusk. Hail's people hate the night shift, so the first hour is sloppy. Go at dusk.</p><p>— Slush</p>` },
+  { id: "story-y3-slush-2", chapter: true, date: "Year 3", from: "Slush", title: "My old post",
+    body: `<p>Kalos was mine. They sent a captain who's never run a projection before. They're scared of you. Be nice. Or don't.</p><p>— Slush</p>` },
+  { id: "story-y3-slush-3", chapter: true, date: "Year 3", from: "Slush", title: "Page 40",
+    body: `<p>Rime runs the altar by the manual. Page 40: the projections reset every time the lights dip. They dip a lot. She'll never skip a step, so you can count on it.</p><p>— Slush</p>` },
+  { id: "story-y3-slush-4", chapter: true, date: "Year 3", from: "Slush", title: "Crates",
+    body: `<p>Hail's been moving crates out of the Weald all week. Heavy ones. I don't know what's in them, and I don't like that I don't know.</p><p>— Slush</p>` },
+  { id: "story-y3-told", chapter: true, date: "Year 3", from: "Prof Penguin", title: "I told you",
+    body: `<p>I told you. They remember who stood with them.</p><p>He was my first, you know. Sssssssnakes. Before you. I sent him out the same way I sent you: one Pokémon and a notebook, and no answers. I should have told him too.</p><p>Prof Penguin</p>` },
+  { id: "story-y3-start", chapter: true, date: "Year 3", from: "Prof Penguin", title: "Under the ice",
+    body: `<p>They froze everything you caught. All of it. They're still there, just under the ice. I can see them.</p><p>Every region you free, the ice lets go of what you caught there. Some of them will come back to you sooner than others. You'll see.</p><p>Prof Penguin</p>` },
+  { id: "story-y3-snakes", chapter: true, date: "Year 3", from: "Sssssssnakes", title: "THEY FROZE MINE TOO",
+    body: `<p>THEY FROZE MINE TOO. I'M FINE. I'M FINE. I'LL FIND YOU.</p><p>— SSSSSSSSSSSSSNAKES</p>` },
+  // Relic Song finale: one optional crossover letter.
   { id: "story-relic-song", chapter: true, date: "Kanto", from: "Prof Penguin", title: "A song in Kanto",
-    body: `<p>Odd reports from Kanto's gyms. A small Pokémon came through with a song, and each leader gave a piece of it back.</p><p>Prof Penguin</p><p>P.S. Someone's been singing to the frozen ones. Was that you?</p>` },
+    body: `<p>Odd reports from Kanto\'s gyms. A small Pokémon came through with a song, and each leader gave a piece of it back.</p><p>Prof Penguin</p><p>P.S. Someone\'s been singing to the frozen ones. Was that you?</p>` },
   { id: "story-y2-start", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The cold got into everything",
     body: `<p>The cold got into everything. Every Pokémon in the world felt it last night.</p><p>They're weaker, not gone. They remember you. Give them time.</p><p>One more thing. There's an old shrine in Galar, the Crown Shrine. Its king is old and particular. He won't see anyone who hasn't brought both his steeds, Glastrier and Spectrier, and both of Galar's heroes, the sword and the shield. Start looking early. You'll want to end the year there.</p><p>P.S. My last letter was three words, not two. I counted afterwards. I was upset.</p><p>Prof Penguin</p>` },
   { id: "update-2026-11-26a", date: "Nov 26, 2026", from: "Prof Penguin", title: "My text box got a makeover",
@@ -2925,6 +3033,13 @@ function wikiSections() {
       <p><b>The finale</b>, the Crown Shrine in Galar, is on Galar's list from the first day with its checklist: ${CROWN_DEX} in your Story dex, and Glastrier, Spectrier, Zacian and Zamazenta in your Box. It's the hardest fight of the year.</p>
       <p><b>After it</b>, Begin Year 3 waits for Year 3, and the title screen offers <b>Replay Year 2</b>: the year again with a copy of your Box, at Year 2's level caps, where nothing counts.</p>
       <p><b>Achievements.</b> ${ACH.filter(a => a.story && a.year === 2 && ["story", "discovery", "choice"].includes(a.type)).map(a => `${esc(a.title)} (${esc(a.desc)})`).join("; ")}. There are hidden achievements.</p>` },
+    { id: "story3", group: "Story Mode", title: "Story Mode: Year 3", html: `<p><b>Begin Year 3</b> appears once Year 2 is cleared, and shows what happens before anything does. Your Box freezes, and you keep one Pokémon. It keeps its level, and fights at your level cap until the cap catches up. Before you choose, the pick-one screen shows your whole Box and where each Pokémon comes back.</p>
+      <p><b>What resets:</b> money, balls and items, badges and Champions, so the level cap starts over at Kanto. <b>What stays:</b> key items, Mega Stones and form unlocks, shiny lines, achievements, Mail and saved teams.</p>
+      <p><b>Frozen Pokémon</b> stay in your Box, greyed under the frost with the region they come back in. They can't join your party, evolve or be caught again until then. Loading a saved team fills in the members who are back, and shows the rest as faded slots. Each region you free brings back everything frozen there. The Story tab's Frozen Box shows what each region still holds, and <b>Species recovered</b>: the different species in your Box that aren't frozen.</p>
+      <p><b>The League.</b> Team Thaw holds every gym, with the gym's own type. Win one and its leader is free, and gives you the badge. Four badges open that region's liberation fight, which counts as its Champion for the level cap. There are no League rules in Year 3.</p>
+      <p><b>After every region</b>, more chapters open. The last two need ${RECOVER_NEED} species recovered, and show the count on their rows from the start.</p>
+      <p><b>After the year</b>, the save stays open, and the title screen offers <b>Replay Year 3</b>: the year again with a copy of your Box and team, at Year 3's level caps, where nothing counts.</p>
+      <p><b>Achievements.</b> ${ACH.filter(a => a.story && a.year === 3 && ["story", "discovery", "choice"].includes(a.type)).map(a => `${esc(a.title)} (${esc(a.desc)})`).join("; ")}. There are hidden achievements.</p>` },
     { id: "rival", group: "Side quests", title: `Rival ${RIVAL_NAME}`, html: `<p>${RIVAL_NAME} was the first trainer ever to beat Poké Idle, and now an optional rival: one fight each in Johto, Unova and Galar, at the top of that region's list once its Champion is beaten.</p>
       <ul>${RIVALS.map(x => `<li><b>${REGIONS[x.r].name}</b> (after ${REGIONS[x.r].champ}): ${x.team.map(m => m.name).join(", ")}, at Lv ${Math.min(100, champLevel(x.r) + CAP_OVER)}.</li>`).join("")}</ul>
       <p>Each one uses that Champion's rules: your party is held to the Champion's level cap, the clock starts at ${CHAMP_TIME}s and moves with the team's Attack and Speed (−20% to +20%) and your party's bulk, and the fight is set against the best six that region offers. It's a little harder: that team, with a quarter of your Protein (see Tiers), needs ${pct(RIVAL_USE)} of the clock idling where a Champion needs ${pct(BOSS_USE)}. A little more Protein, or a few taps, makes up the difference.</p>
@@ -3183,6 +3298,8 @@ function partyClick(e) {
   const slotEl = e.target.closest("#party > .mon");
   if (swapPick && slotEl) { const n = swapPick; swapPick = 0; if (placeIn(n, [...$("#party").children].indexOf(slotEl))) { save(); renderMinis(); } renderParty(); return; }
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
+  const hat = e.target.closest("[data-hat]");
+  if (hat && isStory() && S.story.hatOwned) { const n = +hat.dataset.hat; S.story.hat = S.story.hat === n ? 0 : n; save(); renderParty(); renderMinis(); return; }
   const fm = e.target.closest("[data-forme]");
   if (fm) {
     if (bossLocked()) { toast("Change formes between battles."); return; }
@@ -3217,6 +3334,7 @@ function setGmax(n) {
   save(); renderAll();
 }
 function toggleParty(n) {
+  if (isFrozen(n) && !S.party.includes(n)) { toast(frozenNote(n)); return; }
   if (bossLocked()) { toast("You can't change your party during a gym, dungeon or Champion battle."); return; }
   const i = S.party.indexOf(n);
   if (i >= 0) { if (S.party.length === 1) { toast("Keep at least one Pokémon in your party."); return; } S.party.splice(i, 1); dropForm(n); }
@@ -3256,6 +3374,7 @@ function placeIn(n, j) {
     if (out == null) { S.party.splice(i, 1); S.party.push(n); } else { S.party[i] = out; S.party[j] = n; }
     return true;
   }
+  if (isFrozen(n)) { toast(frozenNote(n)); return false; }
   if (bossLocked()) { toast("You can't change your party during a gym, dungeon or Champion battle."); return false; }
   if (out == null) { if (S.party.length >= 6) return false; joinParty(n); toast(`${mon(n).name} joined your party.`); return true; }
   S.party[j] = n; dropForm(out);
@@ -3396,7 +3515,7 @@ function migrateSave() {
   // Shinies go by line now: a line with any shiny member is shiny all through (this also undoes the one-shiny change).
   shineLines();
   // The party is at most six different Pokémon you have; anything past that showed as in the party in the Box, and fought.
-  S.party = [...new Set(S.party.map(Number))].filter(n => S.box[n]).slice(0, 6);
+  S.party = [...new Set(S.party.map(Number))].filter(n => S.box[n] && S.box[n].frozen == null).slice(0, 6);
   // Tiers: a dungeon's kept legendary the rules don't allow now (a quest prize, a Mega, a Tier 3 from before the
   // dungeon's Tier 4s were all caught) rolls again, and so does a Max Raid for Urshifu or Melmetal.
   for (const k of Object.keys(S.den)) if (/^d\d+$/.test(k) && !denValid(+k.slice(1), foeOf(S.den[k]))) delete S.den[k];
@@ -3420,9 +3539,8 @@ const STORY_XP = 2, STORY_SHINY = 2, REMEMBER = 2;
 const YEARS = { 1: "The Long Freeze", 2: "The Hunt", 3: "The Thaw" };
 // Year 2 is built later. Until YEAR2_READY, its row shows (after Red) but can't be started, and nothing resets.
 const YEAR2_READY = true;
-// Year 3 is built later. Until YEAR3_READY, its row shows after the Crown Shrine; the test account can open its
-// confirm screen and the pick-one screen, but nothing freezes.
-const YEAR3_READY = false;
+// Year 3, The Thaw: Begin Year 3 shows after the Crown Shrine. (Before YEAR3_READY only the test account could open it.)
+const YEAR3_READY = true;
 const MODES = [[KEY, "Classic", "The journey as it's always been: nine regions, side quests, Prof Penguin's Lab and prestige."],
   [STORY_KEY, "Story", `Year 1: ${YEARS[1]}. Something is waking the legends early. ×${STORY_XP} XP and ×${STORY_SHINY} shinies, your shiny lines carry over, and no prestige.`]];
 const isStory = () => !!(S && S.mode === "story");
@@ -3452,8 +3570,9 @@ function newGame(k) {
 function startReplay(year = 1) {
   const m = S; save();
   const copy = o => JSON.parse(JSON.stringify(o || {})), R = fresh();
-  Object.assign(R, { mode: "story", replay: 1, story: { ...freshStory(), year, cleared: year === 2 ? { 1: 1 } : {}, picks: year === 2 ? { ...m.story.picks } : {}, seen: { ...m.story.seen }, clues: { ...m.story.clues } }, box: copy(m.box), party: m.party.slice(), teams: copy(m.teams || []),
+  Object.assign(R, { mode: "story", replay: 1, story: { ...freshStory(), year, cleared: year === 3 ? { 1: 1, 2: 1 } : year === 2 ? { 1: 1 } : {}, picks: year >= 2 ? { ...m.story.picks } : {}, ...(year === 3 ? { freed: {}, liberated: {}, kept: m.party[0] } : {}), seen: { ...m.story.seen }, clues: { ...m.story.clues } }, box: copy(m.box), party: m.party.slice(), teams: copy(m.teams || []), won: { ...(m.won || {}) },
     stones: { ...m.stones }, gfactor: { ...m.gfactor }, key: m.key, band: m.band, mega: m.mega, gmax: m.gmax, set: { ...m.set }, lifeDex: { ...m.lifeDex }, tut: { seen: {}, off: 1 }, items: { ...m.items }, full: 1 });
+  for (const b of Object.values(R.box)) { delete b.frozen; delete b.stolen; }
   R.loc = { kind: "route", r: 0, k: 0 };
   slot = REPLAY_KEY; setSlotPref(REPLAY_KEY); S = R; save(); boot();
   titleMsg = `Replay started: Year ${year} from the beginning, at Year ${year}'s level caps. Nothing in it counts.`; renderTitle();
@@ -3477,7 +3596,7 @@ function year3Confirm() {
   hideTip();
   $("#scene").classList.add("free"); $("#scene").classList.remove("narr");
   $("#scene").innerHTML = dlgHtml({ who: `Year 3: ${YEARS[3]}`, face: "Prof Penguin", text: `<p>${YEAR3_TEXT}</p>`,
-    row: `<button class="skip" type="button" data-y3="no">Not yet.</button><button class="lbl" type="button" data-y3="pick">Choose the one you keep</button><button class="lbl danger" type="button" data-y3="go" disabled>Begin Year 3.</button>` });
+    row: `<button class="skip" type="button" data-y3="no">Not yet.</button><button class="lbl" type="button" data-y3="pick">Choose the one you keep</button><button class="lbl danger" type="button" data-y3="go"${year3Open() ? "" : " disabled"}>Begin Year 3.</button>` });
   overlay("#scene", true);
 }
 // The pick-one screen: your whole Box, to browse, sort and filter, each with its name, its level and where it comes
@@ -3504,7 +3623,71 @@ function renderPickOne() {
       <label>Comes back in <select id="po-r"><option value="all">anywhere</option>${REGIONS.map((R, i) => `<option value="${i}"${pickOne.r === String(i) ? " selected" : ""}>${R.name}</option>`).join("")}</select></label></div>
       <div class="po-list" id="po-list">${pickOneRows()}</div>
       <p class="po-chosen">${n ? `<b>${esc(nameOf(n))}</b>: Stays with you at Lv ${realLevel(n)}. It fights at your level cap until the cap catches up.` : "Tap one to see what happens to it."}</p></div>`,
-    row: `<button class="skip" type="button" data-y3="back">Back</button><button class="lbl" type="button" data-y3="stay"${n && YEAR3_READY ? "" : " disabled"}>This one stays with me.</button>` });
+    row: `<button class="skip" type="button" data-y3="back">Back</button><button class="lbl" type="button" data-y3="stay"${n && year3Open() ? "" : " disabled"}>This one stays with me.</button>` });
+  overlay("#scene", true);
+}
+// Year 3 opens for the test account before YEAR3_READY, as Year 2 did.
+const year3Open = () => (YEAR3_READY || !!S.test) && isStory() && !S.replay && storyYear() === 2 && !!(S.story.cleared || {})[2];
+// ── The freeze (A11). Nothing is deleted: every Pokémon but the one you keep gets frozen: r, its from region, and stays
+// in the Box, out of the party, saved teams, evolution and the dex count for "Species recovered". Eternatus, unless you
+// kept it, is also stolen: Galar's thaw leaves it frozen, and the Darkest Day gives it back. Money, balls and items
+// reset, and so do badges and Champions (the cap starts over at Kanto); key items, form unlocks, S.won, shiny lines,
+// achievements, Mail and saved teams stay.
+const isFrozen = n => !!(S && S.box && S.box[n] && S.box[n].frozen != null);
+const frozenIn = n => (REGIONS[S.box[n].frozen] || REGIONS[0]).name;
+const frozenNote = n => `${nameOf(n)} is frozen in ${frozenIn(n)}. It comes back when ${frozenIn(n)} is freed.`;
+// Eternatus's empty slot: stolen, and Galar thawed without it.
+const emptySlot = n => !!(S.box[n] && S.box[n].stolen && S.story && (S.story.liberated || {})[7]);
+// Species recovered: the different species in your Box that aren't frozen (thawed, kept, or caught in Year 3).
+const RECOVER_NEED = 270;
+const recovered = () => Object.keys(S.box).filter(n => mon(+n) && !isFrozen(n)).length;
+function beginYear3(n) {
+  if (!year3Open() || !S.box[n]) return;
+  year3Reset(n); save(); backToRoute(); renderAll(); if (tab === "story") renderStory();
+  playScene("y3-kept", () => { toast(`Year 3: ${YEARS[3]}. Letters from Prof Penguin and ${RIVAL_NAME} are in Mail.`); });
+}
+function year3Reset(keep) {
+  keep = +keep;
+  const stolen = keep !== ETERNATUS && !!S.box[ETERNATUS], held = {};
+  for (const [k, b] of Object.entries(S.box)) { notePeak(b); if (+k === keep) continue; b.frozen = b.from || 0; held[b.frozen] = (held[b.frozen] || 0) + 1; }
+  if (stolen) S.box[ETERNATUS].stolen = 1;
+  Object.assign(S, { badges: {}, champs: {}, money: 0, balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, kills: {}, dungeons: {}, trips: {}, tickets: {}, den: {}, protein: 0, cords: 0,
+    party: [keep], tmpl: null, mega: S.mega && S.mega.n === keep ? S.mega : null, gmax: S.gmax === keep ? S.gmax : 0, loc: { kind: "route", r: 0, k: 0 } });
+  Object.assign(S.story, { cleared: { ...(S.story.cleared || {}), 2: 1 }, year: 3, kept: keep, frozen: held, liberated: {}, freed: {}, eternatusStolen: stolen ? 1 : 0, firstThaw: 0 });
+  for (const id of ["story-y3-snakes", "story-y3-start"]) S.mail.got[id] = 1;
+  B = null; viewR = 0;
+}
+// A freed gym (Year 3): the real leader was in the back room, and gives you the badge with a line.
+function freeLeader(r, k) {
+  S.story.freed = { ...(S.story.freed || {}), [r + "-" + k]: 1 };
+  const who = REGIONS[r].gyms[k][0];
+  setTimeout(() => toast(`${who} was locked in the back room. ${who}: "${Y3_FREED_LINES[(r + k) % 3]}"`), 3400);
+}
+const gymsFreed = r => [0, 1, 2, 3].filter(k => S.badges[r + "-" + k]).length;
+// The thaw (A11): every Pokémon frozen in region r comes back. Bonded ones at their real level; the others at half of
+// it (Lv 5 at least), and their peak stays, so "It remembers you" helps them back. Level sync does the rest. A stolen
+// Eternatus stays where it is. The liberation counts as the region's Champion for the level cap.
+function thawRegion(r) {
+  const back = { r, bonded: [], weaker: [] };
+  for (const [k, b] of Object.entries(S.box)) {
+    if (b.frozen !== r || b.stolen) continue;
+    notePeak(b); delete b.frozen;
+    if (!b.bond) b.xp = Math.min(b.xp, Math.pow(Math.max(5, Math.floor(lvlOf(b.xp) / 2)), 3));
+    (b.bond ? back.bonded : back.weaker).push(+k);
+  }
+  S.story.liberated = { ...(S.story.liberated || {}), [r]: 1 }; S.champs[r] = 1;
+  back.first = !S.story.firstThaw; S.story.firstThaw = 1;
+  if (back.first) S.mail.got["story-y3-told"] = 1;
+  return back;
+}
+// The thaw message: the only place the bond ever shows (A6), at every thaw.
+let thawThen = null;
+function thawMessage(t, then) {
+  hideTip(); thawThen = then || null;
+  const names = l => l.map(n => esc(nameOf(n))).join(", ");
+  $("#scene").classList.add("free"); $("#scene").classList.remove("narr");
+  $("#scene").innerHTML = dlgHtml({ who: `${REGIONS[t.r].name} is free`, face: "", text: `<p><i>The ice lets go.</i></p>${t.bonded.length ? `<p><i>The ones who fought beside you come back just as strong.</i> ❤ ${names(t.bonded)}</p>` : ""}${t.weaker.length ? `<p><i>The others come back weaker, but they remember you.</i> ❄ ${names(t.weaker)}</p>` : ""}`,
+    row: `<button class="lbl" type="button" data-thaw="ok">Okay</button>` });
   overlay("#scene", true);
 }
 function beginYear2() {
@@ -3532,7 +3715,7 @@ const notePeak = b => { const L = lvlOf(b.xp); if (!(b.peak >= L)) b.peak = L; i
 function notePeaks() { if (S && S.box) for (const b of Object.values(S.box)) notePeak(b); }
 // Places outside the region lists: a side quest counts as its region (the Mystery Box as Galar), Mt. Silver as Johto,
 // the Max Raid Den as Galar. Year 2's places are here already, so the map stays in one place.
-const CATCH_PLACE = { underdepths: 8, summit: 1, raid: 7, distortion: 3, kitakami: 8, meteor: 2, southern: 2, abundant: 4, icirrus: 4, chasm: 4, towers: 7, meltan: 7, crown: 7, aether: 6 };
+const CATCH_PLACE = { cerulean: 0, sky: 2, megalo: 6, origin: 3, terminus: 5, darkest: 7, underdepths: 8, summit: 1, raid: 7, distortion: 3, kitakami: 8, meteor: 2, southern: 2, abundant: 4, icirrus: 4, chasm: 4, towers: 7, meltan: 7, crown: 7, aether: 6 };
 function catchRegion(src) {
   if (!src) return 0;
   if (src.place && src.place in CATCH_PLACE) return CATCH_PLACE[src.place];
@@ -3726,6 +3909,198 @@ const SCENES = {
     ["", "At the top of Mt. Silver, where the snow never stops, a trainer in a red cap stands with his back to you. Red felt the cold before anyone else, months before Kanto's early snow, up here where nobody would have noticed."],
     ["", "He doesn't speak. He turns, and he battles you."]] },
   // Year 2, The Hunt.
+  // Year 3, The Thaw: the interlude (Begin Year 3, then the pick-one), and the one you keep.
+  "y3-interlude": { year: 3, r: -1, title: "The machine takes the Box", lines: [
+    ["", "It happens everywhere at the same moment. Every PC in every Pokémon Center frosts over, and the screens turn white."],
+    ["", "When you open your Box, every Pokémon you own is frozen, locked in a block of ice."],
+    ["", "A letter from Sssssssnakes arrives first, typed in capitals."],
+    ["Prof Penguin", "They froze everything you caught. All of it. They're still there, just under the ice. I can see them."],
+    ["Prof Penguin", "Pick one. Just one. Like the first day."]] },
+  "y3-kept": { year: 3, r: -1, title: "This one stays with me", lines: [
+    ["", "You take it out of the ice. It's warm, and it's yours."],
+    ["Prof Penguin", "Every region you free, the ice lets go of what you caught there. Some of them will come back to you sooner than others. You'll see. Let's get them back."],
+    ["", "Team Thaw doesn't sponsor the League anymore. It owns it. Grunts sit in every gym leader's chair, and the real leaders are locked in the back rooms of their own gyms."],
+    ["", "The cold is still in everyone's joints. Until you've earned the badges back, no Pokémon fights above the League's limit, not even the one you kept."]] },
+  // Year 3's liberations (the plot, E1).
+  "y3-kanto": { year: 3, r: 0, title: "The lab, again", lines: [
+    ["", "Sssssssnakes is with you now."],
+    ["Sssssssnakes", "I'm not helping. I'm just standing here. Hissing supportively."],
+    ["", "He's helping. In every liberation fight, your team hits 10% harder."],
+    ["", "The rebuilt Cerulean lab. Rime is inside, with a bound copy of Mewtwo made of light and frost."]] },
+  "y3-kanto-after": { year: 3, r: 0, title: "The lab, again", lines: [["", "She hasn't adjusted enough. The site thaws, and your Kanto catches come back."]] },
+  "y3-johto": { year: 3, r: 1, title: "We built something", lines: [["", "Hail is at the Tin Tower. Bound to it are copies of both Lugia and Ho-Oh. It's two legends at once, the heaviest fight of the occupation so far."]] },
+  "y3-johto-after": { year: 3, r: 1, title: "We built something", lines: [["Hail", "He left us with nothing. We built something. You're breaking it."], ["", "You break it. Johto thaws."]] },
+  "y3-hoenn": { year: 3, r: 2, title: "Slush flips", lines: [["", "The liberation fight is at the shore where Slush first set Groudon against Kyogre. Over the water, the Engine is projecting both of them, a bound Groudon and a bound Kyogre."],
+    ["", "The fight starts. Slush's team comes out slow, almost lazy, and the projections hit hard."]] },
+  "y3-hoenn-after": { year: 3, r: 2, title: "Slush flips", lines: [
+    ["", "Halfway through, Slush stops and calls their Pokémon back."],
+    ["Slush", "Okay. I can't do this one."],
+    ["", "Slush reaches into their coat and flips a switch. The projections over the water flicker and go out. The shore thaws, and your Hoenn catches come back."],
+    ["", "They sit down on the same rock as two years ago."],
+    ["Slush", "I sent you the memos. Both of them. I wanted someone to stop us, and nobody else was going to."],
+    ["Slush", "I was the youngest. I thought it was a science project. Then Sleet started talking about margins."],
+    ["", "A shrug."],
+    ["Slush", "Anyway. I'm out. There. That one's on me."]] },
+  "y3-hoenn-banter": { year: 3, r: 2, title: "Slush flips", lines: [
+    ["Sssssssnakes", "Slush? Slush? You were the one who laughed at all my jokes!"],
+    ["Slush", "They were bad jokes. I was being supportive."],
+    ["Sssssssnakes", "…Fair."]] },
+  "y3-cave": { year: 3, r: 2, title: "Cave of Origin", lines: [
+    ["", "Slush hands you two glowing orbs, one red and one blue, from a Team Thaw vault."],
+    ["Slush", "I was supposed to keep these safe. Consider them safe."],
+    ["", "Your Groudon and Kyogre have just thawed. You take them to the Cave of Origin, where the orbs wake their oldest forms."]] },
+  "y3-cave-after": { year: 3, r: 2, title: "Cave of Origin", lines: [["", "Primal Groudon and Primal Kyogre are unlocked."], ["", "From then on, Slush's letters bring intel: hidden bases, guard rotations, which doors are unlocked."]] },
+  "y3-sinnoh": { year: 3, r: 3, title: "The note signed P.", lines: [["", "Rime is at Spear Pillar with bound copies of Dialga and Palkia."]] },
+  "y3-sinnoh-after": { year: 3, r: 3, title: "The note signed P.", lines: [["", "You win, and Sinnoh thaws."]] },
+  "y3-distortion": { year: 3, r: 3, title: "The note signed P.", lines: [
+    ["", "You go back through the rift into the Distortion World. The camp is the same: the card table, the shotgun and the empty chair. The top hat is still there."],
+    ["", "But there's something new on the table. It's a handwritten note, old and yellowed, half-frozen to the wood:"],
+    ["", "Move the core before the students find it. Deeper. G. will guard it if I win the hand. — P."],
+    ["", "You know that handwriting. It's on every letter you've gotten for three years."],
+    ["", "Deeper in, past the camp, the dealer is finally in the light. It's Giratina, in its Origin Forme, coiled tight around something you can't see."],
+    ["", "Between its coils, something hums: an old machine part, cold and very small. It's the original Engine core, the one Team Thaw never found. That's why their rebuilt Engine has to run on Kyurem's ice."],
+    ["", "Giratina looks at you for a long time. It doesn't fight you, and it doesn't move."],
+    ["", "It promised P. it would guard this until the debt is settled. Fighting you was never part of the deal."]] },
+  "y3-unova": { year: 3, r: 4, title: "Truth and ideals", lines: [["", "Hail is at Dragonspiral Tower, with bound copies of Reshiram and Zekrom."]] },
+  "y3-unova-after": { year: 3, r: 4, title: "Truth and ideals", lines: [["", "You win, and Unova thaws."], ["", "Penguin's letters start coming later, and they get shorter."]] },
+  "y3-kalos": { year: 3, r: 5, title: "Tell him I said hello", lines: [["", "Slush's old post is empty. Team Thaw has sent a stand-in, a grunt captain, nervous and out of their depth, with bound copies of Xerneas and Yveltal behind them."]] },
+  "y3-kalos-after": { year: 3, r: 5, title: "Tell him I said hello", lines: [
+    ["", "It isn't. You win, and Kalos thaws."],
+    ["", "The arena screens flicker on. For the first time you see Director Sleet. They're calm, in a coat of perfect white, behind a desk made of ice."],
+    ["Sleet", "So you're the new one."],
+    ["", "They tilt their head."],
+    ["Sleet", "Tell him I said hello."],
+    ["", "The screen goes dark."],
+    ["Sssssssnakes", "That's the Director. I met them once. They shook my hand like they were checking it for damage."]] },
+  "y3-alola": { year: 3, r: 6, title: "The first draft", lines: [["", "Rime's last stand, at the Altar of the Sunne, with bound copies of Solgaleo and Lunala."]] },
+  "y3-alola-after": { year: 3, r: 6, title: "The first draft", lines: [
+    ["", "You win, and Alola thaws. For the first time, Rime puts the clipboard down."],
+    ["Rime", "I wrote the manuals. Every procedure. Every tolerance."],
+    ["", "A pause."],
+    ["Rime", "He wrote the first draft."]] },
+  "y3-galar": { year: 3, r: 7, title: "The empty slot", lines: [["", "Hail's last stand, at the Slumbering Weald, with bound copies of Zacian and Zamazenta."]] },
+  "y3-galar-after": { year: 3, r: 7, title: "The empty slot", lines: [
+    ["", "You win. The site thaws, and your Galar Pokémon come back to you…"],
+    ["", "…all except one."],
+    ["", "In your Box, where Eternatus should be, there's an empty slot with only its outline, traced in frost."],
+    ["Hail", "Did you think we'd leave that in a box?"],
+    ["Prof Penguin", "They took it out of the ice. Out of your Box. I'm so sorry. We'll get it back. I don't know how yet, but we will."]] },
+  "y3-galar-kept": { year: 3, r: 7, title: "Sword and shield", lines: [
+    ["", "You win. The site thaws, and your Galar Pokémon come back to you, every one."],
+    ["Hail", "We went for your Eternatus too. Couldn't get yours. You kept it too close."]] },
+  "y3-paldea": { year: 3, r: 8, title: "Everyone's on your side now", lines: [
+    ["", "The last liberation fight is at Area Zero, where Year 1 ended, against the three admins' combined squads, with bound copies of Koraidon and Miraidon."],
+    ["", "This time Slush stands next to you. Sssssssnakes is on the other side."],
+    ["Sssssssnakes", "Look at us. A whole team. Penguin would cry."],
+    ["", "A beat."],
+    ["Sssssssnakes", "…Penguin's going to have some explaining to do, isn't he."],
+    ["", "With both of them beside you, your team hits 20% harder."]] },
+  "y3-paldea-after": { year: 3, r: 8, title: "Everyone's on your side now", lines: [["", "Area Zero thaws, and the last of your Pokémon come back to you. There's still that one empty slot."]] },
+  "y3-paldea-kept": { year: 3, r: 8, title: "Everyone's on your side now", lines: [["", "Area Zero thaws, and the last of your Pokémon come back to you."]] },
+  "y3-maps": { year: 3, r: 8, title: "The base maps", lines: [
+    ["", "With every region free, Sssssssnakes spreads the base maps across the ground."],
+    ["Sssssssnakes", "That's the regions. Now the real stuff. Their vaults, their towers, their HQ. In order."]] },
+  // Year 3's endgame (E2).
+  "y3-cerulean": { year: 3, r: 0, title: "The inner circle", lines: [["", "These are Team Thaw's three most secret strongholds, and each one holds something it took. You can do them in any order."],
+    ["", "Deep under Cerulean, Team Thaw kept two stones it was studying."]] },
+  "y3-cerulean-after": { year: 3, r: 0, title: "The inner circle", lines: [["", "You take back the Mewtwonite X and Y, and your Mewtwo can now Mega Evolve."]] },
+  "y3-sky": { year: 3, r: 2, title: "The inner circle", lines: [["", "At the summit of the Sky Pillar, the air is thin and freezing. Rayquaza's old meteorite shard is locked in a Team Thaw case."]] },
+  "y3-sky-after": { year: 3, r: 2, title: "The inner circle", lines: [["", "You free it, and Mega Rayquaza is unlocked."]] },
+  "y3-megalo": { year: 3, r: 6, title: "The inner circle", lines: [["", "At the very top of Megalo Tower, in a cage of Team Thaw cable, is Necrozma, drained and dim. Team Thaw was using it to steal light."]] },
+  "y3-megalo-after": { year: 3, r: 6, title: "The inner circle", lines: [
+    ["", "You free it, and Necrozma comes with you. It can fuse with your Solgaleo into Dusk Mane or with your Lunala into Dawn Wings."],
+    ["", "In a locked archive at the top of the tower, you find a box of papers. They're the founder's notes, the original designs for the Engine, dated twenty years ago."],
+    ["", "They're in Penguin's handwriting."]] },
+  "y3-ultra": { year: 3, r: 6, title: "Ultra Necrozma", lines: [["", "With both fusions unlocked, a new fight opens at the summit."]] },
+  "y3-ultra-after": { year: 3, r: 6, title: "Ultra Necrozma", lines: [["", "You win, and Ultra Necrozma is unlocked."]] },
+  "y3-origin": { year: 3, r: 3, title: "The First Freeze", lines: [
+    ["", "Arceus is waiting at the top of the world. Before it fights you, it shows you something."],
+    ["", "It's a small lab twenty years ago, with a young Prinplup in a top hat, laughing."],
+    ["", "Four students are around him: Sleet, Rime, Hail and Slush, young and eager. Sleet is the warmest of them all."],
+    ["", "Between them is a small machine, the first Engine. They built it to listen to the legends, to understand them by waking them very gently, just for a moment."],
+    ["", "Then it's the first test. It goes wrong. The legend wakes too far, and a whole region turns white. It's a winter that lasts a year."],
+    ["", "The young Penguin pulls the plug and pulls out the core."],
+    ["", "The students argue. Sleet says it worked, and that they just need to control it. Penguin says no, never again."],
+    ["", "Sleet walks out, and the others follow, one by one, with Slush last."],
+    ["", "The vision fades. Arceus looks down at you and tests you with a short trial, to see whether you understood what you saw."]] },
+  "y3-origin-after": { year: 3, r: 3, title: "The First Freeze", lines: [
+    ["", "You pass. Arceus joins you, and with it come all of its Plates, one for every type."],
+    ["Prof Penguin", "It's been holding those since before any of us were born. Don't lose them."],
+    ["", "A lab photo with five faces. In pen, someone has circled the one in the top hat."]] },
+  "y3-terminus": { year: 3, r: 5, title: "The Land Heals", lines: [["", "With the regions free, Zygarde's cells are waking up everywhere you've been. You gather all 100 of them and bring them to your Zygarde."]] },
+  "y3-terminus-after": { year: 3, r: 5, title: "The Land Heals", lines: [["", "You get Zygarde Complete, and with it, Mega Zygarde."], ["", "As each cell comes home, the frozen land begins to knit itself back together."]] },
+  "y3-dig": { year: 3, r: 8, title: "The Dig", lines: [["", "With Sssssssnakes' maps, you go back to the Underdepths and dig."], ["", "It takes a long time. Then something warm glows through the rock."]] },
+  "y3-dig-after": { year: 3, r: 8, title: "The Dig", lines: [["", "Terapagos comes out of the dark into your hands, glowing with Stellar light."], ["Prof Penguin", "I told you we'd come back for it."]] },
+  "y3-darkest": { year: 3, r: 7, title: "Give it back", lines: [["", "Team Thaw makes its last move. In the skies over Galar, they wake your stolen Eternatus, and they force it into Eternamax, to wake every legend in the world at once."]] },
+  "y3-darkest-after": { year: 3, r: 7, title: "Give it back", lines: [
+    ["", "You fight it, and you stop it."],
+    ["", "When the red light fades, Eternatus is on the ground, small and tired. It looks at you."],
+    ["", "Eternatus comes back to you, bonded and at its old level. The empty slot is filled."],
+    ["Prof Penguin", "It was always yours. They just borrowed it."]] },
+  "y3-darkest-copy": { year: 3, r: 7, title: "Give it back", lines: [
+    ["", "You fight it, and you stop it."],
+    ["", "When the red light fades, the copy comes apart into ice and cable. Yours was never theirs to take."]] },
+  "y3-night": { year: 3, r: 8, title: "The night before", lines: [["", "A letter from Sssssssnakes arrives. For the first and only time, it has the right number of s's."]] },
+  // Year 3: Sleet, Prof Penguin, the ending and the Hall of Fame.
+  "y3-sleet": { year: 3, r: 8, title: "Team Thaw HQ", lines: [
+    ["", "The last base is under the ice at the top of the world. It's all white glass and silent halls, and it looks more like a bank than a lair."],
+    ["", "Director Sleet is waiting behind the ice desk, and they stand up when you come in."],
+    ["Sleet", "You know, I almost respect it. Three years. Every site. Every Pokémon, back."],
+    ["", "They take off their gloves."],
+    ["Sleet", "Let's finish the business."],
+    ["", "Rising out of the floor in ice and cable is a Thaw-bound copy of Kyurem."],
+    ["Sleet", "You took the real one. The Engine remembers its shape."]] },
+  "y3-mask": { year: 3, r: 8, title: "Team Thaw HQ", lines: [
+    ["", "Partway through the fight, Sleet's Type: Null stopped. It looked at your Silvally for a long moment, the one that came from the same lab, wore the same mask, and was the first unit."],
+    ["", "Its mask cracked and fell away. It wouldn't attack. It turned and walked out of the room."],
+    ["Sleet", "…It remembered the other one."]] },
+  "y3-sleet-after": { year: 3, r: 8, title: "Team Thaw HQ", lines: [
+    ["", "You win. Sleet sits back down, very slowly."],
+    ["Sleet", "We were his students. He taught us everything. How to wake them. How to listen. And then the first test went wrong and he just… walked away. Took the core and left us with the plans and the guilt and no one to tell us what to do with either."],
+    ["", "They look up at you."],
+    ["Sleet", "Ask your professor who taught us."]] },
+  "y3-confession": { year: 3, r: 0, title: "Prof Penguin", lines: [
+    ["", "The lab is the same as on the first day, except colder."],
+    ["", "The maps are gone. In the middle of the room, where the table used to be, there's a throne made of ice. Prof Penguin sits on it in his top hat, waiting."],
+    ["Prof Penguin", "You came. Good. Sit. …No, don't sit. Stand. This is the part where you stand."],
+    ["", "He takes off the hat and turns it over in his flippers."],
+    ["Prof Penguin", "I founded Team Thaw. Not this version. The first one. The Thaw Project. It was supposed to be a way of listening to them. Of understanding the oldest things in the world without hurting them."],
+    ["", "His voice cracks."],
+    ["Prof Penguin", "And then it wasn't."],
+    ["Prof Penguin", "I hid the core. I gambled with Giratina for a place to put it, and I won. I told myself that was enough. Then my students rebuilt it anyway, without the core, on stolen ice. And I was too ashamed to stop them. Too afraid of what they'd tell the world about me."],
+    ["", "He puts the hat back on."],
+    ["Prof Penguin", "I couldn't stop them. I built the thing. But I needed to know someone could. So I sent you out with one Pokémon and a notebook, and I've been watching ever since."],
+    ["", "He stands."],
+    ["Prof Penguin", "Show me."]] },
+  "y3-wake": { year: 3, r: 0, title: "Wake it up", lines: [
+    ["", "You win. He doesn't fall. He sits down on the throne again, very gently."],
+    ["Prof Penguin", "Good."],
+    ["", "He laughs, quiet and tired."],
+    ["Prof Penguin", "…Good. Wake it up."]] },
+  "y3-ending": { year: 3, r: 0, title: "The Thaw", lines: [
+    ["", "You stand on the roof of the lab, and Terapagos glows in your arms."],
+    ["", "You wake it."],
+    ["", "Its Stellar light pours out, first over Pallet Town, then over Kanto, then over everything."],
+    ["", "Region by region, the ice gives way. The bells of the Tin Tower ring again. The snow on Alola's beaches melts into the sea."],
+    ["", "The frozen PCs in every Pokémon Center flicker back to life."],
+    ["", "Deep in the Distortion World, the old Engine core goes cold and dark, for good."]] },
+  "y3-after": { year: 3, r: 0, title: "After the credits", lines: [
+    ["", "Penguin's room at the lab is empty. The throne is just water on the floor."],
+    ["", "In your Box is a new Pokémon, his Empoleon, with a note tied to its flipper."],
+    ["", "The Distortion World rift is open one more time. The old camp is gone. The card table, the shotgun, the chair and the hat have all faded away, along with the dead core. Giratina is waiting there alone."],
+    ["", "Penguin's debt is paid. Giratina joins you, in both its Altered and Origin Formes."],
+    ["", "In your Mail is one last letter. Beside it, on the table, is a golden top hat. It's your size."],
+    ["", "You're now a Field Researcher."],
+    ["", "Your Story save stays open. You can keep catching, training and battling, rematch the Hall of Fame, or replay any year."]] },
+  "y3-hof": { year: 3, r: 3, title: "First Graduate", lines: [
+    ["", "At the top of the League, Sssssssnakes is waiting in the Hall of Fame."],
+    ["Sssssssnakes", "So. You did it. Saved the world. Got the hat."],
+    ["", "He grins, the old cocky grin from the steps in Johto."],
+    ["Sssssssnakes", "Now let's see if you're actually better than me. I was his first graduate, you know. Before you. Someone has to defend the title."],
+    ["", "He's leaning on something new: a staff carved like a snake, with a Mega Stone held in its mouth."]] },
+  "y3-hof-after": { year: 3, r: 3, title: "First Graduate", lines: [
+    ["", "Win, and he hands you one of your own."],
+    ["Sssssssnakes", "Fine. Fine. You're better than me. Don't let it go to your head. …Okay, let it go to your head a little."]] },
   "y2-interlude": { year: 2, r: -1, title: "The freeze takes the levels", lines: [
     ["", "You wake up the next morning and your team won't get up. They're not hurt, just slow and heavy, like they've been asleep for a hundred years."],
     ["", "Every one of them is down to Lv 5."],
@@ -3886,6 +4261,10 @@ const CLUES = {
   badge: { title: "The melting-snowflake badge", text: "Grunts in white coats outside every Pokémon Center wear it: a snowflake melting into a drop of water. They hand out free hand warmers." },
   memo2: { title: "Memo #2: The Director's unit", text: "No sender again, the night you freed Alola's other half. One line: \"The Director's unit is ready.\"" },
   table: { title: "The card table", text: "An old camp in the Distortion World: a card table, an old deck, a shotgun, and an empty chair with a frosted top hat very like Prof Penguin's. Something waits behind it, like a dealer." },
+  memos: { title: "Who sent the memos", text: "Slush, on the rock by the shore in Hoenn: \"I sent you the memos. Both of them. I wanted someone to stop us, and nobody else was going to.\"" },
+  p: { title: "The note signed \"P.\"", text: "Old and yellowed, half-frozen to the card table in the Distortion World: \"Move the core before the students find it. Deeper. G. will guard it if I win the hand. — P.\" You know that handwriting." },
+  notes: { title: "The founder's notes", text: "A box of papers in a locked archive at the top of Megalo Tower: the original designs for the Engine, dated twenty years ago. They're in Penguin's handwriting." },
+  photo: { title: "The photo", text: "From the Hall of Origin: a lab photo with five faces. In pen, someone has circled the one in the top hat." },
   memo: { title: "Memo #1: The Engine", text: "No sender. \"The Engine wakes and binds each legend in turn, per the list.\" A second unit is \"assigned to the Director\"." }
 };
 // ── Year 1 chapters. Per region: gyms, the Champion, then (Johto, Unova, Galar) Sssssssnakes, the Team Thaw admin, and
@@ -3923,8 +4302,87 @@ const ADMIN_TEAMS = {
   "y2-kalos": ["Slush", [593, 594, 553, 635, 461, 699]],
   "y2-alola": ["Rime", [681, 707, 579, 614, 713, 589]],
   "y2-galar": ["Hail", [875, 873, 866, 883, 681, 530]],
-  "y2-paldea": ["Slush", [914, 961, 978, 983, 902, 975]]
+  "y2-paldea": ["Slush", [914, 961, 978, 983, 902, 975]],
+  // Year 3, Kalos: Slush's old post, and a nervous stand-in (Kalos's generation, Water and Dark with Ice).
+  "y3-kalos": ["the stand-in captain", [675, 689, 693, 687, 699, 713]]
 };
+// Year 3's liberations (E1). Each region's admin brings the same squad as in Year 1 (Kalos a stand-in), then the
+// Engine's Thaw-bound copies of the legends you caught there: Mewtwo in Kanto, both mascots elsewhere, your first pick
+// first. Paldea is all three admins' squads, two each. Use rises region by region; the ally bonus comes on top.
+const LIB_USE = [1.05, 1.07, 1.09, 1.11, 1.13, 1.15, 1.17, 1.19, 1.20];
+const LIB = [
+  ["kanto", "Rime", `"You've done this before. I've adjusted for it."`],
+  ["johto", "Hail", `"Your {first} was first, wasn't it? Let's see if the copy remembers."`],
+  ["hoenn", "Slush", `"Your {first} again. You always did like that one."`],
+  ["sinnoh", "Rime", `"{first} first. Then the other. Exactly as I predicted."`],
+  ["unova", "Hail", `"Truth and ideals. Let's see which one breaks first. Your {first}, I bet."`],
+  ["y3-kalos", "The stand-in captain", `"They said the projections do most of the work. Please let that be true."`],
+  ["alola", "Rime", `"Your {first} first, again. You're very consistent. He'd have liked that."`],
+  ["galar", "Hail", `"Sword and shield. Your {first} first. I hit the sword first too."`],
+  [null, "Slush", `"Phase one, phase two, phase three. Sorry, there's a lot of us. Again."`]];
+// The region's legends, the one you picked first leading (Kanto: Mewtwo alone).
+function libMons(r) {
+  if (r === 0) return [150];
+  const c = CHAPTERS.find(x => x.type === "pick" && x.r === r), first = S.story.picks[r] && c.mons.includes(S.story.picks[r]) ? S.story.picks[r] : c.mons[0];
+  return [first, ...c.mons.filter(n => n !== first)];
+}
+const projection = n => ({ ...mon(n), name: `Thaw-bound ${mon(n).name}`, bound3: true });
+function libFoes(c) {
+  const r = c.r, legends = libMons(r).map(projection);
+  if (r === 8) return [...["paldea-rime", "paldea-hail", "paldea-slush"].flatMap(k => adminTeam(k).slice(0, 2)), ...legends];
+  const t = adminTeam(LIB[r][0]);
+  // Hoenn: the projections come out in the first half, before Slush calls it off.
+  if (c.stopAt) return [t[0], t[1], legends[0], t[2], legends[1], ...t.slice(3)];
+  return [...t, ...legends];
+}
+// Director Sleet (E2): Baxcalibur, Cetitan, Glaceon, Arctozolt, the masked Type: Null (the Director's unit) and a
+// Thaw-bound Kyurem. Prof Penguin (E3): Giratina in its Origin Forme, then his Classic line-up with the frosty Mega
+// Empoleon as its ace. Both are set like the Hall of Fame (finalTuning: the best six of every tier, Eternamax
+// included, every matchup 1×), a little easier: Sleet at SLEET_USE, Penguin at PENGUIN_USE over both phases as one
+// run, the Hall of Fame at HOF_USE. Teams built on their weaknesses get through with a little room.
+const SLEET_USE = 1.6, PENGUIN_USE = 1.29, HOLD_BACK = .85;
+const SLEET_TEAM = () => [mon(998), mon(975), mon(471), mon(881), { ...mon(772), name: "Type: Null (the Director's unit)", masked: 1 }, { ...projection(646), name: "Thaw-bound Kyurem" }];
+const PENGUIN_PHASES = [() => [QFORMES[487][0]], () => [...FINAL_P1.filter(m => m.num !== 395), PROF_EMPOLEON]];
+function penguinTuning(B) {
+  const keep = [B.queue, B.bossTime], all = PENGUIN_PHASES.map(p => p());
+  B.queue = all.flat(); B.bossTime = all.reduce((t, q) => t + fightTime(B.base, q, regionOffense(B.r), .8, 1.2), 0);
+  try { return finalTuning(B, PENGUIN_USE); } finally { [B.queue, B.bossTime] = keep; }
+}
+// The shared flags with Shotgun Roulette (Part F). The test save keeps its own (story.roulette: "dealer" for a Hard
+// win there, "paid", "replay"); a real save reads the shared key.
+const ROULETTE_TEST = { beatOrigin: "dealer", paid: "paid", paidSeen: "paid" };
+function rouletteFlag(k) {
+  if (S.test) return !!(S.story.roulette || {})[ROULETTE_TEST[k] || k];
+  try { return !!(JSON.parse(localStorage.getItem(ROULETTE_KEY) || "{}") || {})[k]; } catch { return false; }
+}
+// After the credits (E4): Penguin's Empoleon (his frosty Mega SP) and Giratina (bonded, both Formes) join at the cap;
+// the debt is paid; the last letter; the golden top hat and the Field Researcher title; Shotgun Roulette's hat note
+// says "Paid in full". Year 3 is cleared, and the save stays open. Replay gets none of it.
+function afterCredits() {
+  storyReward("prize:y3-after", T => {
+    const cap = Math.pow(levelCap(), 3), sp = SPECIALS[PROF_SP], had = T.box[sp.num];
+    T.box[sp.num] = { ...(had || {}), xp: Math.max(cap, had ? had.xp : 0), shiny: had ? had.shiny : lineShiny(sp.num), special: PROF_SP, look: "special", from: had && had.from != null ? had.from : 0 };
+    if (!T.box[GIRATINA]) T.box[GIRATINA] = { xp: cap, shiny: lineShiny(GIRATINA), from: CATCH_PLACE.distortion, bond: 1 }; else T.box[GIRATINA].bond = 1;
+    T.won = { ...(T.won || {}), distortion: 1 };
+    Object.assign(T.story, { giratinaDebt: 0, hatOwned: 1, title: "Field Researcher", credits: 1, cleared: { ...(T.story.cleared || {}), 3: 1 }, ...(HOF_READY ? {} : { hofLate: 1 }) });
+    T.mail.got["story-y3-last"] = 1;
+    if (Object.values(T.box).every(b => b.bond)) T.story.allBonded = 1;
+    if (T === S) for (const n of [sp.num, GIRATINA]) if (!S.party.includes(n) && joinsParty()) joinParty(n);
+  });
+  if (S.replay) return;
+  shareRoulette("paid");
+  save(); renderAll();
+  playScene("y3-after", () => toast("Prof Penguin's Empoleon and Giratina are in your Box. There's a golden top hat on the table, your size: put it on any Pokémon in its detail."));
+}
+const GIRATINA = 487;
+function reflection() {
+  if (!S.replay || !S.party.includes(GIRATINA) || !(qforme(GIRATINA) || special(GIRATINA)) || ((qforme(GIRATINA) || {}).key !== "origin" && !special(GIRATINA))) return;
+  if (storyReward("sc_reflection", T => {
+    T.story.griseous = 1; T.ach.sc_reflection = Date.now(); T.mail.got["story-y3-reflection"] = 1;
+    if (T.box[GIRATINA]) Object.assign(T.box[GIRATINA], { special: "griseous-giratina", look: "special" });
+  })) toast("Something changed in your own save. Check your Mail when the replay is over.");
+}
+const libLine = c => `${LIB[c.r][1]}: ${LIB[c.r][2].replace("{first}", mon(libMons(c.r)[0]).name)}`;
 const adminTeam = k => ADMIN_TEAMS[k][1].map(foeFrom);
 // Story's dungeons, in every year: no mascot and no Mewtwo (the one you didn't pick belongs to Year 2), and no legend
 // a Story chapter gives you in any year. Glastrier and Spectrier stay (Year 2's finale needs them), and so does Zygarde
@@ -3932,6 +4390,17 @@ const adminTeam = k => ADMIN_TEAMS[k][1].map(foeFrom);
 const STORY_NO_DEN = new Set([150, 249, 250, 382, 383, 483, 484, 643, 644, 716, 717, 791, 792, 888, 889, 1007, 1008,
   384, 487, 646, 890, 1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 1024, 898, 800, 493]);
 const STORY_HIDDEN = new Set(["final", "hof", "rival", "darkest", "quest"]);
+// Year 3's liberation extras: Hoenn stops halfway (Slush calls it off) and gives the memos clue; the letters that
+// follow (Penguin's, and Slush's intel from Sinnoh on); Galar's and Paldea's after-scenes depend on Eternatus.
+const Y3_MORE = {
+  hoenn: { stopAt: 4, clue: "memos", after2: "y3-hoenn-banter" },
+  sinnoh: { letter: "story-y3-slush-1" },
+  unova: { letter: ["story-y3-keepgoing", "story-y3-slush-2"] },
+  kalos: { letter: "story-y3-slush-3" },
+  alola: { letter: "story-y3-slush-4" },
+  galar: { post: () => S && S.story.eternatusStolen ? "y3-galar-after" : "y3-galar-kept" },
+  paldea: { post: () => S && S.story.eternatusStolen ? "y3-paldea-after" : "y3-paldea-kept", after2: "y3-maps" }
+};
 const LEGENDS = ["kanto-legend", "johto-pick", "hoenn-pick", "sinnoh-pick", "unova-pick", "kalos-pick", "alola-pick", "galar-pick"];
 const admin = (id, r, team, pre, post, after = ["champ"], at = "") => ({ id, r, type: "admin", team, name: `Team Thaw: ${ADMIN_TEAMS[team][0]}`, after, pre, post, at });
 const pick = (id, r, mons, hints, prize, after, at = "", more = {}) => ({ id, r, type: "pick", mons, hints, prize, name: `${mons.map(n => mon(n).name).join(" or ")}`, after, at, liberates: true, ...more });
@@ -4019,11 +4488,60 @@ const CHAPTERS = [
     pre: "y2-chasm", unlock: "chasm", letter: "story-y2-chasm", doneNote: "Black and White Kyurem" },
   // The Crown Shrine finale (D4) shows from the first day of the year, greyed, with its checklist.
   { id: "y2-crown", year: 2, r: 7, type: "crown", finale: true, name: "Crown Shrine", at: "the Crown Shrine", after: ["champ"], open: () => crownReady(), note: () => crownNote(),
-    pre: "y2-crown", post: "y2-crown-after", after2: "y2-engine", letter: "story-y2-end", doneNote: "Calyrex" }
+    pre: "y2-crown", post: "y2-crown-after", after2: "y2-engine", letter: "story-y2-end", doneNote: "Calyrex" },
+  // Year 3: each region's liberation, once its four gyms are freed. It counts as the region's Champion.
+  ...[["kanto", "the Cerulean lab"], ["johto", "the Tin Tower"], ["hoenn", "the shore"], ["sinnoh", "Spear Pillar"], ["unova", "Dragonspiral Tower"], ["kalos", "the Team Flare ruins"],
+    ["alola", "the Altar of the Sunne"], ["galar", "the Slumbering Weald"], ["paldea", "Area Zero"]].map(([reg, at], r) => ({ id: `y3-${reg}-free`, year: 3, r, type: "liberate", name: `Liberate ${REGIONS[r].name}`, at, after: ["gyms"], liberates: true, shown: true,
+      pre: `y3-${reg}`, post: `y3-${reg}-after`, ...(Y3_MORE[reg] || {}) })),
+  // Hoenn: the Red and Blue Orbs, then your Groudon and Kyogre's oldest forms (Classic's Cave of Origin fight).
+  { id: "y3-cave", year: 3, r: 2, type: "hunt", name: "Cave of Origin", at: "the Cave of Origin", after: ["y3-hoenn-free"], foes: () => QUEST.cave.foes, tier: 2, atCap: true, place: "cave",
+    unlock: "cave", pre: "y3-cave", post: "y3-cave-after", doneNote: "Primal Groudon and Kyogre", say: B => `Your Groudon and Kyogre's oldest forms wake in the orbs' light: ${B.queue.map(f => f.name).join(", ")}.` },
+  // Sinnoh: back through the rift. The note signed "P.", and the dealer, in the light at last. No fight, no catch.
+  { id: "y3-distortion", year: 3, r: 3, type: "scene", name: "The Distortion World", at: "the camp", after: ["y3-sinnoh-free"], pre: "y3-distortion", clue: "p", doneNote: "the core",
+    won: () => { S.seen[487] = 1; S.story.giratinaDebt = 1; } },
+  // The endgame (E2). The inner circle first, in any order: Cerulean Cave, Sky Pillar and Megalo Tower, each Classic's
+  // fight at your cap with its quest tuning. Megalo gives Necrozma at the cap and its fusions; Ultra Necrozma's summit
+  // (optional) waits for your Solgaleo and Lunala. Then the Hall of Origin (the vision, a short trial, Arceus with all
+  // its Plates), Terminus (optional: it needs a Zygarde and 100 cells), the Dig (Terapagos), the Darkest Day, and the
+  // night before Team Thaw HQ.
+  { id: "y3-cerulean", year: 3, r: 0, type: "hunt", name: "Cerulean Cave", at: "deep under Cerulean", after: ["y3-paldea-free"], foes: () => QUEST.cerulean.foes, tier: 1, atCap: true, place: "cerulean",
+    unlock: "cerulean", stones: MEWTWONITES, pre: "y3-cerulean", post: "y3-cerulean-after", doneNote: "both Mewtwonites", say: B => `Team Thaw's study stones wake around your Mewtwo: ${B.queue.map(f => f.name).join(", ")}.` },
+  { id: "y3-sky", year: 3, r: 2, type: "hunt", name: "Sky Pillar", at: "the summit", after: ["y3-paldea-free"], foes: () => QUEST.sky.foes, tier: 1, atCap: true, place: "sky",
+    unlock: "sky", stones: [MEGA_RAYQUAZA], pre: "y3-sky", post: "y3-sky-after", doneNote: "Mega Rayquaza", say: B => `Something guards the case at the top of the Sky Pillar: ${B.queue.map(f => f.name).join(", ")}.` },
+  { id: "y3-megalo", year: 3, r: 6, type: "hunt", name: "Megalo Tower", at: "the very top", after: ["y3-paldea-free"], foes: () => [mon(800)], tier: 1, atCap: true, place: "megalo",
+    unlock: "necrozma", gifts: [800], clue: "notes", pre: "y3-megalo", post: "y3-megalo-after", doneNote: "Necrozma", say: () => "Necrozma thrashes in its cage of Team Thaw cable, drained and dim. Calm it down." },
+  { id: "y3-ultra", year: 3, r: 6, type: "hunt", name: "Megalo Tower summit", at: "the summit", after: ["y3-megalo"], optional: true, foes: () => QUEST.megalo.foes, tier: 1, atCap: true, place: "megalo",
+    open: () => [791, 792].every(n => S.box[n] && !isFrozen(n)), note: () => [791, 792].every(n => S.box[n] && !isFrozen(n)) ? "optional" : "needs Solgaleo and Lunala",
+    unlock: "megalo", pre: "y3-ultra", post: "y3-ultra-after", doneNote: "Ultra Necrozma", say: () => "The stolen light comes back all at once, and Necrozma burns too bright to hold." },
+  { id: "y3-origin", year: 3, r: 3, type: "hunt", name: "Hall of Origin", at: "the top of the world", after: ["y3-cerulean", "y3-sky", "y3-megalo"], foes: () => [QUEST.origin.foes[0]], tier: 1, atCap: true, place: "origin",
+    unlock: "origin", gifts: [493], clue: "photo", won: () => { S.plates = PLATES_NEED; }, pre: "y3-origin", post: "y3-origin-after", doneNote: "Arceus, every Plate", say: () => "Arceus tests you, to see whether you understood what you saw." },
+  { id: "y3-terminus", year: 3, r: 5, type: "hunt", name: "Terminus Cave", at: "Terminus Cave", after: ["y3-origin"], optional: true, foes: () => QUEST.terminus.foes, tier: 1, atCap: true, place: "terminus",
+    open: () => !!S.box[ZYGARDE] && !isFrozen(ZYGARDE) && (S.cells || 0) >= 100,
+    note: () => !S.box[ZYGARDE] || isFrozen(ZYGARDE) ? "needs a Zygarde (the Kalos dungeon)" : (S.cells || 0) < 100 ? `Zygarde Cells ${S.cells || 0}/100` : "optional",
+    unlock: "terminus", stones: [10301], pre: "y3-terminus", post: "y3-terminus-after", doneNote: "Zygarde Complete, Mega Zygarde", say: B => `Every cell comes home: ${B.queue.map(f => f.name).join(", ")}.` },
+  { id: "y3-dig", year: 3, r: 8, type: "hunt", name: "The Dig", at: "the Underdepths", after: ["y3-origin"], foes: () => QUEST.underdepths.foes, tier: 3, atCap: true, place: "underdepths", catches: true,
+    unlock: "underdepths", pre: "y3-dig", post: "y3-dig-after", doneNote: "Terapagos", say: () => "Something warm glows through the rock. Terapagos comes out of the dark, glowing with Stellar light." },
+  // The Darkest Day: your stolen Eternatus, forced into Eternamax. Win it back, bonded, at its old level. If Team
+  // Thaw never got it (you kept it), the Engine sends a Thaw-bound copy instead, and nothing comes back.
+  { id: "y3-darkest", year: 3, r: 7, type: "hunt", name: "Darkest Day", at: "the skies over Galar", after: ["y3-dig"], foes: () => [S.story.eternatusStolen ? ETERNAMAX_FOE : { ...ETERNAMAX_FOE, name: `Thaw-bound ${ETERNAMAX_FOE.name}`, bound3: true }],
+    tier: 0, atCap: true, place: "darkest", pre: "y3-darkest", post: () => S && S.story.eternatusStolen ? "y3-darkest-after" : "y3-darkest-copy", doneNote: "Eternatus",
+    won: () => { S.eternamax = 1; S.gfactor[ETERNATUS] = 1; const b = S.box[ETERNATUS]; if (b && b.stolen) { delete b.stolen; delete b.frozen; b.bond = 1; } },
+    say: B => `Team Thaw's last move: ${B.queue[0].name}, to wake every legend in the world at once.` },
+  { id: "y3-night", year: 3, r: 8, type: "scene", name: "The night before", at: "", after: ["y3-darkest"], pre: "y3-night", letter: "story-y3-seven", doneNote: "a letter" },
+  // Team Thaw HQ and the finale: both need 270 species recovered (A3a), shown on the row from the start of the year.
+  { id: "y3-sleet", year: 3, r: 8, type: "sleet", name: "Team Thaw HQ", at: "under the ice at the top of the world", after: ["y3-night"], finale: true, atCap: true,
+    open: () => recovered() >= RECOVER_NEED, note: () => `Species recovered: ${recovered()} / ${RECOVER_NEED}`,
+    pre: "y3-sleet", post: () => S && S.story.sleetMask ? "y3-mask" : "y3-sleet-after", after2: () => S && S.story.sleetMask ? "y3-sleet-after" : null, doneNote: "Director Sleet" },
+  { id: "y3-penguin", year: 3, r: 0, type: "penguin", name: "Prof Penguin", at: "the lab", after: ["y3-sleet"], finale: true, atCap: true,
+    open: () => recovered() >= RECOVER_NEED, note: () => `Species recovered: ${recovered()} / ${RECOVER_NEED}`,
+    pre: "y3-confession", post: "y3-wake", after2: "y3-ending", then: () => storyCredits(afterCredits), doneNote: "Wake it up." },
+  // The Hall of Fame, once HOF_READY: Sssssssnakes, first graduate, with the snake staff.
+  { id: "y3-hof", year: 3, r: 3, type: "hof3", name: "Hall of Fame", at: "the top of the League", after: ["y3-penguin"], optional: true, atCap: true, ready: () => HOF_READY,
+    pre: "y3-hof", post: "y3-hof-after", letter: "story-y3-hof", doneNote: "First Graduate" }
 ].map(c => ({ year: 1, ...c }));
 // The chapters of the year this save is in. Red stays on Johto's list after Year 1, for rematches (no second Shiny Charm).
-const chaptersNow = () => CHAPTERS.filter(c => (c.year || 1) === storyYear());
-const chapterListed = c => (c.year || 1) === storyYear() || (c.always && chDone(c.id));
+const chaptersNow = () => CHAPTERS.filter(c => (c.year || 1) === storyYear() && (!c.ready || c.ready()));
+const chapterListed = c => ((c.year || 1) === storyYear() || (c.always && chDone(c.id))) && (!c.ready || c.ready());
 // Year 2's finale needs 300 in the Story dex, and Glastrier, Spectrier, Zacian and Zamazenta in the Box (A3a).
 const CALYREX = 898;
 const CROWN_DEX = 300, CROWN_NEED = [896, 897, 888, 889];
@@ -4065,7 +4583,11 @@ const CHAPTER_RUN = {
   dealer: c => startLoc({ kind: "story", r: c.r, x: c.id }),
   pick: c => S.story.picks[c.r] ? startLoc({ kind: "story", r: c.r, x: c.id }) : pickScreen(c),
   red: c => { startLoc({ kind: "summit", r: 1 }); if (B && B.kind === "summit") B.storyCh = c.id; },
-  crown: c => startLoc({ kind: "story", r: c.r, x: c.id })
+  crown: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  liberate: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  sleet: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  penguin: c => startLoc({ kind: "story", r: c.r, x: c.id }),
+  hof3: c => startLoc({ kind: "story", r: c.r, x: c.id })
 };
 // The fight for a chapter (startLoc builds the rest).
 function storyFight(c) {
@@ -4077,6 +4599,15 @@ function storyFight(c) {
   if (c.type === "rival") { const x = RIVAL[c.rival], extra = otherPick(c.extra); return { ...boss([...x.team, ...(extra ? [mon(extra)] : [])]), rival: x.id }; }
   if (c.type === "rescue") { const phases = ["aether-chief", "aether-null"]; return { ...boss(adminTeam(phases[0])), phases, phase: 1 }; }
   if (c.type === "crown") return { ...boss(CROWN_TEAM(), FINAL_TIME), crown: 1 };
+  // A Year 3 liberation: the admin's (or the stand-in's) team, then Thaw-bound projections of the region's legends,
+  // the one you picked first leading. Sssssssnakes is with you, and in Paldea Slush too.
+  // Team Thaw HQ: Director Sleet. Prof Penguin: Giratina (the debt), then his frosty Mega Empoleon and the rest of
+  // his team; out of time in either and it starts over from Giratina. The Hall of Fame (once HOF_READY): Classic's.
+  const top = () => { const L = levelCap(); return { L, i: Math.max(r * 4 + 3, levelIndex(L)) }; };
+  if (c.type === "sleet") return { ...boss(SLEET_TEAM(), FINAL_TIME), ...top(), sleet: 1 };
+  if (c.type === "penguin") return { ...boss(PENGUIN_PHASES[0](), FINAL_TIME), ...top(), phases: ["giratina", "penguin"], phaseTeams: PENGUIN_PHASES, phaseNames: ["Giratina", "Prof Penguin"], phase: 1, carry: 1, holdBack: rouletteFlag("beatOrigin") && (S.story.table = 1, true) };
+  if (c.type === "hof3") return { ...boss(HOF_TEAM(), FINAL_TIME), ...top() };
+  if (c.type === "liberate") { const q = libFoes(c); return { ...boss(q, FINAL_TIME), ally: c.r === 8 ? 1.2 : 1.1, ...(c.stopAt ? { stopAt: c.stopAt } : {}) }; }
   if (c.type === "finale") { const phases = ["paldea-rime", "paldea-hail", "paldea-slush"]; return { ...boss(adminTeam(phases[0]), FINAL_TIME), phases, phase: 1 }; }
   // The dealer: one shadowed fight, no throws, no name (DEALER).
   if (c.type === "dealer") return { ...base, queue: [DEALER()], base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [mon(487)], regionOffense(r), .9, 1.15), hidden: 1 };
@@ -4090,6 +4621,11 @@ function storyTune(B) {
   const c = CHAPTER[B.ch];
   // The Hunt's legends: Classic's quest tuning for their tier. Scouts, grunts and the drills: a little under the Champion.
   if (c.type === "crown") return leagueTuning(B, CROWN_USE);
+  // Liberations: harder region by region, before the ally bonus. Hoenn is set on the half Slush lets you fight.
+  if (c.type === "sleet") return finalTuning(B, SLEET_USE);
+  if (c.type === "hof3") return finalTuning(B, HOF_USE);
+  if (c.type === "penguin") return B.tune0 || (B.tune0 = penguinTuning(B));
+  if (c.type === "liberate") { const q = B.queue; if (B.stopAt) B.queue = q.slice(0, B.stopAt); const t = leagueTuning(B, LIB_USE[c.r]); B.queue = q; return t; }
   if (c.type === "hunt") return c.tier ? tierTuning(B, c.tier, refArea(B.r, 3)) : gymTuning(B, 3, B.queue.length, [B.r, 3], CHIEF_USE);
   if (B.catchIt || B.hidden) return legendTuning(B);
   // Slush's all Water and Dark finale team is the hardest to cover with one team, so its phase is set lower: one
@@ -4106,6 +4642,12 @@ function leagueTuning(B, use) {
 }
 function storySay(B) {
   const c = CHAPTER[B.ch];
+  if (c.say) return c.say(B);
+  if (c.type === "sleet") return `Director Sleet: "Let's finish the business." ${B.queue.map(f => f.name).join(", ")}.`;
+  if (c.type === "penguin") return B.phase === 1 ? `Prof Penguin calls in the debt one last time. The air tears open, and Giratina comes out of the Distortion World to fight for him.${B.holdBack ? ' It comes out already hurt, and it holds back. Prof Penguin: "You beat it at its own table?"' : ""} Out of time in either phase and it starts over from Giratina.`
+    : `His ace rises from the ice throne, crowned in frost: ${B.queue.map(f => f.name).join(", ")}. The time you had left carries over.`;
+  if (c.type === "hof3") return `${RIVAL_NAME}, first graduate, raises the snake staff: ${B.queue.map(f => f.name).join(", ")}.`;
+  if (c.type === "liberate") return `${libLine(c)} ${c.r === 8 ? "Slush stands next to you, and Sssssssnakes is on the other side: your team hits 20% harder." : `${RIVAL_NAME} is hissing supportively: your team hits 10% harder.`}`;
   if (c.type === "finale") return `Phase ${B.phase} of 3: ${ADMIN_TEAMS[B.phases[B.phase - 1]][0]}. Lose anywhere and it starts over from Rime.`;
   if (B.hidden) return "The dealer deals you in.";
   if (c.type === "crown") return `${RIVAL_NAME} sends out everything he's got: ${B.queue.map(f => f.name).join(", ")}.`;
@@ -4118,22 +4660,29 @@ function storySay(B) {
 }
 function storyLose(B) {
   const c = CHAPTER[B.ch];
+  if (c.type === "penguin") return "Prof Penguin: \"Again.\" It starts over from Giratina.";
+  if (c.type === "sleet") return "Sleet: \"Again, then.\"";
+  if (c.type === "hof3") return `${RIVAL_NAME}: "The Hall of Fame isn't for everyone."`;
+  if (c.type === "liberate") return "The projections flicker back on. Build a team for this fight and try again.";
   return c.type === "finale" ? "The admins regroup. It starts over from Rime." : B.hidden ? "The dealer shuffles the deck and waits." : B.catchIt ? `${B.queue[0].name} is still here. Try again when you're ready.` : c.type === "rival" ? `${RIVAL_NAME}: "Too ssslow."` : "Build a team for this fight and try again.";
 }
 // The finale's break between admins: the party is free, like Prof Penguin's.
 function storyBreak() {
+  // Prof Penguin's finale is one run: the time left after Giratina carries over into phase 2.
+  if (B.carry) B.left = Math.max(0, B.time);
   B.foe = null; B.queue = null; B.brk = FINAL_BREAK;
-  const next = B.phases[B.phase]; $("#shiny").hidden = true; $("#timerwrap").hidden = true;
-  $("#foeimg").src = sprite(ADMIN_TEAMS[next][1].find(x => typeof x === "number"));
+  const nm = i => B.phaseNames ? B.phaseNames[i] : ADMIN_TEAMS[B.phases[i]][0]; $("#shiny").hidden = true; $("#timerwrap").hidden = true;
+  $("#foeimg").src = B.phaseTeams ? spriteOf(B.phaseTeams[B.phase]().at(-1), false) : sprite(ADMIN_TEAMS[B.phases[B.phase]][1].find(x => typeof x === "number")); $("#foeimg").classList.remove("shade", "bound3");
   $("#hpbar").style.width = "0%"; $("#hptext").textContent = ""; $("#where").textContent = `${CHAPTER[B.ch].name} · break`;
-  $("#foeinfo").innerHTML = `<b>${ADMIN_TEAMS[next][0]}</b> <span class="muted small">is next</span>`;
-  say(`${ADMIN_TEAMS[B.phases[B.phase - 1]][0]} is down. Your party is free: load a saved team in Party & Box. ${ADMIN_TEAMS[next][0]} is next.`);
+  $("#foeinfo").innerHTML = `<b>${nm(B.phase)}</b> <span class="muted small">is next</span>`;
+  say(`${nm(B.phase - 1)} is down. Your party is free: load a saved team in Party & Box. ${nm(B.phase)} is next.`);
   renderFinalBox(); renderAll(); save();
 }
 function storyGo() {
-  if (!S.party.length) { say("Put at least one Pokémon in your party. It starts over from Rime.", true); backToRoute(); return; }
-  B.brk = null; B.phase++; B.queue = adminTeam(B.phases[B.phase - 1]); B.idx = 0;
+  if (!S.party.length) { say(`Put at least one Pokémon in your party. It starts over from ${B.phaseNames ? B.phaseNames[0] : "Rime"}.`, true); backToRoute(); return; }
+  B.brk = null; B.phase++; B.queue = B.phaseTeams ? B.phaseTeams[B.phase - 1]() : adminTeam(B.phases[B.phase - 1]); B.idx = 0;
   B.time = fightTime(B.base, B.queue, regionOffense(B.r), .8, 1.2); B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def);
+  if (B.carry) B.time += Math.round(B.left || 0);
   B.tune = storyTune(B); B.total = B.time;
   say(storySay(B)); renderFinalBox(); spawn(); renderAll(); save();
 }
@@ -4143,6 +4692,9 @@ function storyWin() {
   if (B.catchIt && !B.bossCaught) { toast(`${B.queue[0].name} got away. It's still here: try again from the list.`); return; }
   const first = !chDone(c.id);
   if (c.type === "rival") rivalWin(RIVAL[c.rival], c.letter);
+  else if (c.type === "hof3") hofWin();
+  else if (c.type === "sleet" || c.type === "penguin") { const prize = rewardFor(B.L, B.i, first ? FINALE_PAY : 30); S.money += prize; if (c.type === "sleet") { S.story.sleetMask = B.maskBroke ? 1 : 0; if (B.maskBroke) S.story.maskBroke = 1; } toast(`${c.name}: won! +$${fmt(prize)}.`); }
+  else if (c.type === "liberate" || (c.type === "hunt" && c.year === 3)) { const prize = rewardFor(B.L, B.i, first ? FINALE_PAY : 30); S.money += prize; toast(`${B.stopped ? "Slush calls it off" : `${c.name}: won`}! +$${fmt(prize)}.`); }
   else if (c.type === "admin" || c.type === "finale" || c.type === "crown") { const prize = rewardFor(B.L, B.i, first ? (c.type === "finale" ? FINALE_PAY : c.type === "crown" ? CROWN_PAY : ADMIN_PAY) : 30); S.money += prize; toast(`${c.name} beaten! +$${fmt(prize)}.`); }
   if (first) chapterPrize(c);
   finishChapter(c);
@@ -4152,7 +4704,7 @@ function storyWin() {
 // then it's the main Story save, once ever (story.replayGot). The list is empty in Year 1. Year 3 adds one: knocking out
 // Prof Penguin's Giratina with your own Origin Giratina in a replay of the Year 3 finale (a secret achievement, a hidden
 // letter and the Griseous Orb SP look).
-const REPLAY_REWARDS = new Set(), REPLAY_PREFIXES = ["pickline:"];
+const REPLAY_REWARDS = new Set(["sc_reflection"]), REPLAY_PREFIXES = ["pickline:"];
 // The flag Shotgun Roulette reads (design doc Part F): Penguin's chair and hat at its table. Only the real Story save
 // sets it: not the test saves, and not Replay.
 const ROULETTE_KEY = "bored.poke-idle.roulette.v1";
@@ -4217,12 +4769,14 @@ function pickClick(b) {
 }
 // ── The League rules, for Story's gyms and Champions: no Tier 0, 1 or 2, and a limit on Tier 3s and 4s by year: one
 // and two in Year 1, two and three in Year 2.
-const LEAGUE_MAXES = { 1: { 3: 1, 4: 2 }, 2: { 3: 2, 4: 3 } };
-const leagueMax = () => LEAGUE_MAXES[storyYear()] || LEAGUE_MAXES[1];
-const leagueRule = (out, m) => { const t = tierOf(m), max = leagueMax(); if (t != null && t < 3) return false; return !max[t] || out.filter(x => tierOf(x) === t).length < max[t]; };
+// Year 3 has none (null): Team Thaw owns the League, and there are no rules left to keep.
+const LEAGUE_MAXES = { 1: { 3: 1, 4: 2 }, 2: { 3: 2, 4: 3 }, 3: null };
+const leagueMax = () => storyYear() === 3 ? null : LEAGUE_MAXES[storyYear()] || LEAGUE_MAXES[1];
+const leagueRule = (out, m) => { const t = tierOf(m), max = leagueMax(); if (!max) return true; if (t != null && t < 3) return false; return !max[t] || out.filter(x => tierOf(x) === t).length < max[t]; };
 // The same rules for a list of Pokémon (a reference team), as a message or "".
-const leagueBreaksList = list => { for (const t of [0, 1, 2]) if (list.some(m => tierOf(m) === t)) return `Tier ${t}`; for (const t of [3, 4]) if (list.filter(m => tierOf(m) === t).length > leagueMax()[t]) return `${t}`; return ""; };
+const leagueBreaksList = list => { if (!leagueMax()) return ""; for (const t of [0, 1, 2]) if (list.some(m => tierOf(m) === t)) return `Tier ${t}`; for (const t of [3, 4]) if (list.filter(m => tierOf(m) === t).length > leagueMax()[t]) return `${t}`; return ""; };
 function leagueBreaks(party = S.party) {
+  if (!leagueMax()) return "";
   const ts = party.map(n => tierOf(fighter(n))), low = party.filter((n, i) => ts[i] != null && ts[i] < 3);
   if (low.length) return `${low.map(n => lookOf(n).name).join(", ")} ${low.length > 1 ? "are" : "is"} Tier ${Math.min(...low.map(n => tierOf(fighter(n))))} or stronger: not allowed.`;
   for (const t of [3, 4]) { const k = ts.filter(x => x === t).length; if (k > leagueMax()[t]) return `${k} Tier ${t}s in the party: at most ${leagueMax()[t]}.`; }
@@ -4247,15 +4801,15 @@ $("#league").onclick = e => {
 const chDone = id => !!(S && S.story && S.story.ch[id]);
 const chaptersDone = () => chaptersNow().filter(c => chDone(c.id)).length;
 // What a chapter waits for: "champ", another chapter's id, or nothing.
-const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a)) || null;
-const chapterOpen = c => isStory() && (c.year || 1) === storyYear() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : chDone(a)) && (!c.open || c.open() || !!(S.test && S.debug && S.debug.dex === "ignore"));
+const waitOf = c => (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : a === "gyms" ? gymsFreed(c.r) < 4 : !chDone(a)) || null;
+const chapterOpen = c => isStory() && (c.year || 1) === storyYear() && (c.after || ["champ"]).every(a => a === "champ" ? !!S.champs[c.r] : a === "gyms" ? gymsFreed(c.r) === 4 : chDone(a)) && (!c.open || c.open() || !!(S.test && S.debug && S.debug.dex === "ignore"));
 function chapterRows(r) {
   return CHAPTERS.filter(c => (c.hunt ? r === HUNT_R : c.r === r) && chapterListed(c)).map(c => {
-    const wait = (c.after || ["champ"]).find(a => a === "champ" ? !S.champs[c.r] : !chDone(a));
+    const wait = waitOf(c);
     if (c.hide && !chDone(c.id) && !chapterOpen(c)) return { kind: "chapter", r, x: c.id, done: false, hidden: true, note: c.note ? c.note() : "the Hunt" };
     return { kind: "chapter", r, x: c.id, done: chDone(c.id),
       note: chDone(c.id) ? c.doneNote || (c.type === "pick" && S.story.picks[c.r] ? mon(S.story.picks[c.r]).name : "done") : !wait ? (c.note ? c.note() : c.optional ? "optional" : "story")
-        : wait === "champ" ? `after ${REGIONS[r].champ}` : `after ${CHAPTER[wait].name}${CHAPTER[wait].r !== r ? ` (${REGIONS[CHAPTER[wait].r].name})` : ""}` };
+        : wait === "champ" ? `after ${REGIONS[r].champ}` : wait === "gyms" ? `gyms ${gymsFreed(c.r)}/4 freed` : `after ${CHAPTER[wait].name}${CHAPTER[wait].r !== r ? ` (${REGIONS[CHAPTER[wait].r].name})` : ""}${c.finale && c.note ? ` · ${c.note()}` : ""}` };
   });
 }
 function runChapter(c) {
@@ -4269,14 +4823,17 @@ function finishChapter(c) {
   const first = !chDone(c.id);
   S.story.ch[c.id] = 1;
   if (first) { if (c.clue) S.story.clues[c.clue] = 1; if (c.won) c.won(); if (c.type === "scene") chapterPrize(c); }
+  // A Year 3 liberation: the region thaws, and the thaw message comes before the region's scenes.
+  if (first && c.type === "liberate") { const t = thawRegion(c.r); liftCap(); save(); renderAll(); return thawMessage(t, () => playScene(c.post, () => playScene(c.after2))); }
   save(); renderAll();
-  playScene(c.post, () => playScene(c.after2));
+  playScene(c.post, () => playScene(c.after2, first && c.then ? c.then : null));
 }
 // Next up, at the top of the Story tab: the next chapter that isn't optional, where it is, and what it waits for.
 function storyNext() {
-  const c = chaptersNow().find(c => !c.optional && !chDone(c.id)); if (!c) return { c: null, text: storyYear() === 1 ? (YEAR2_READY ? "Year 1 is done. Begin Year 2 is on Johto's list." : "Year 1 is done. Year 2 is coming.") : "Year 2 is done. Year 3 is coming." };
+  const c = chaptersNow().find(c => !c.optional && !chDone(c.id)); if (!c) return { c: null, text: storyYear() === 1 ? (YEAR2_READY ? "Year 1 is done. Begin Year 2 is on Johto's list." : "Year 1 is done. Year 2 is coming.") : storyYear() === 2 ? (YEAR3_READY ? "Year 2 is done. Begin Year 3 is at the top of your lists." : "Year 2 is done. Year 3 is coming.") : (S.story.cleared || {})[3] ? "Year 3 is done. Your save stays open: keep catching, or replay any year." : "Every region is free." };
   const at = c.at ? ` at ${c.at}` : "", R = REGIONS[c.r].name, wait = waitOf(c);
   if (wait === "champ") return { c, text: `Next: Champion of ${R}, then ${c.name}${at}.` };
+  if (wait === "gyms") return { c, text: `Next: Free ${R}'s gyms, then ${c.name}${at}. (Gyms: ${gymsFreed(c.r)}/4 freed)` };
   if (wait) return { c, text: `Next: ${CHAPTER[wait].name}, then ${c.name}${at}.` };
   if (c.open && !c.open()) return { c, text: `Next: ${c.hide ? "???" : c.name}. ${c.note ? c.note() : ""}`.trim() };
   return { c, text: `Next: ${c.name}${at}, in ${R}.` };
@@ -4286,7 +4843,7 @@ function storyNext() {
 function yearMap() {
   const now = storyNext().c;
   return chaptersNow().map(c => {
-    const done = chDone(c.id), cur = c === now, known = done || chapterOpen(c) || c.finale || (cur && !c.hide);
+    const done = chDone(c.id), cur = c === now, known = done || chapterOpen(c) || c.finale || c.shown || (cur && !c.hide);
     return { id: c.id, mark: done ? "✓" : cur ? "▶" : "🔒", name: known ? c.name : "???", optional: !!c.optional, note: c.finale && !done && c.note ? c.note() : "", r: c.r, grey: !done && !cur };
   });
 }
@@ -4319,9 +4876,19 @@ function jumpPoints() {
     pts.push({ id: "y2champ-" + r, label: `Year 2 ${R.name}: Champion ${R.champ}`, r, year: 2 });
     for (const c of CHAPTERS) if (c.year === 2 && c.r === r) pts.push({ id: "ch-" + c.id, label: `Year 2 ${R.name}: ${c.name}${c.optional ? " (optional)" : ""}`, r, c, year: 2 });
   });
+  pts.push({ id: "y3-begin", label: "Year 3: begun (the freeze, keeping your party's first)", r: 0, year: 3 });
+  REGIONS.forEach((R, r) => {
+    pts.push({ id: "y3gyms-" + r, label: `Year 3 ${R.name}: gyms freed`, r, year: 3 });
+    // The liberation, and what comes straight after it in that region (Cave of Origin, the Distortion World).
+    for (const c of CHAPTERS) if (c.year === 3 && c.r === r && (c.type === "liberate" || (c.after || []).includes(`y3-${R.name.toLowerCase()}-free`) && c.id !== "y3-cerulean" && c.id !== "y3-sky" && c.id !== "y3-megalo"))
+      pts.push({ id: "ch-" + c.id, label: `Year 3 ${R.name}: ${c.name}${c.optional ? " (optional)" : ""}`, r, c, year: 3 });
+  });
+  // The endgame, in story order (its chapters sit in several regions' lists).
+  const seen = new Set(pts.map(p => p.id));
+  for (const c of CHAPTERS) if (c.year === 3 && !seen.has("ch-" + c.id)) pts.push({ id: "ch-" + c.id, label: `Year 3 endgame: ${c.name}${c.optional ? " (optional)" : ""}`, r: c.r, c, year: 3 });
   return pts;
 }
-const JUMP_LATER = ["Year 3: the Box freeze and picking one", "Year 3: thawing region by region"];
+const JUMP_LATER = ["Year 3: the endgame, Sleet and Prof Penguin"];
 const pickChapters = () => CHAPTERS.filter(c => c.type === "pick");
 // Every pick you've made, here or in Replay ("johto-249"), for the choice achievements. The only thing a replay keeps:
 // it's written to the main Story save through storyReward's allowlist.
@@ -4336,13 +4903,16 @@ function notePickLine(c, n) {
 // letters on the way, the Key Stone, The Mask, Red. The Box, items and money stay as they are.
 function storyJump(i, picks = {}) {
   if (!S || !S.test || !isStory()) return;
-  const pts = jumpPoints(), keepDex = S.story.lifeDex, see = id => { if (id && SCENES[id]) S.story.seen[id] = 1; };
+  const pts = jumpPoints(), keepDex = S.story.lifeDex, see = id => { if (typeof id === "function") id = id(); if (id && SCENES[id]) S.story.seen[id] = 1; };
   S.badges = {}; S.champs = {}; S.kills = {}; S.dungeons = {}; S.mail.got = {}; B = null;
+  for (const b of Object.values(S.box)) { delete b.frozen; delete b.stolen; }
   S.story = { ...freshStory(), roulette: S.story.roulette, lifeDex: keepDex, seen: { "open-1": 1, "open-2": 1 } };
   const event = (kind, r) => { const e = STORY_EVENTS[kind + ":" + r]; if (!e) return; see(e.scene); if (e.clue) S.story.clues[e.clue] = 1; if (e.letter) S.mail.got[e.letter] = 1; };
   for (let j = 0; j < Math.min(i, pts.length); j++) {
     const p = pts[j], c = p.c;
     if (p.id === "y2-begin") { year2Reset(); see("y2-interlude"); }
+    else if (p.id === "y3-begin") { year3Reset(S.party[0] || +Object.keys(S.box)[0]); see("y3-interlude"); see("y3-kept"); }
+    else if (p.id.startsWith("y3gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; S.story.freed[p.r + "-" + k] = 1; } }
     else if (p.id.startsWith("y2gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; } }
     else if (p.id.startsWith("y2champ-")) S.champs[p.r] = 1;
     else if (p.id.startsWith("gyms-")) { for (let k = 0; k < 4; k++) { S.badges[p.r + "-" + k] = 1; S.kills[p.r + "-" + k] = KILLS_FOR_GYM; } event("gym", p.r); }
@@ -4359,6 +4929,8 @@ function storyJump(i, picks = {}) {
       if (c.type === "rival") S.rivals = { ...(S.rivals || {}), [c.rival]: 1 };
       if (c.type === "rescue") { S.story.silvally = Math.max(1, S.story.silvally); S.story.nullTrust = 0; }
       if (c.type === "red") S.story.epilogue = 1;
+      if (c.type === "crown") S.story.cleared = { ...(S.story.cleared || {}), 2: 1 };
+      if (c.type === "liberate") thawRegion(c.r);
     }
   }
   const at = pts[Math.min(i, pts.length - 1)];
@@ -4371,7 +4943,7 @@ function storyJump(i, picks = {}) {
 function resetChapter(id) {
   const c = CHAPTER[id]; if (!c || !S.test) return;
   delete S.story.ch[id];
-  for (const sid of [c.pre, c.post, c.after2]) if (sid) delete S.story.seen[sid];
+  for (const sid of [c.pre, c.post, c.after2].map(x => typeof x === "function" ? x() : x)) if (sid) delete S.story.seen[sid];
   if (c.type === "pick") { for (const n of c.mons) delete S.story.seen[`${REGIONS[c.r].name.toLowerCase()}-${n}`]; delete S.story.picks[c.r]; }
   const letters = c.id === "johto-pick" ? ["story-johto-249", "story-johto-250"] : [].concat(typeof c.letter === "function" ? [] : c.letter || []);
   for (const l of letters) delete S.mail.got[l];
@@ -4426,8 +4998,9 @@ const STORY_RANK = { year: 1e8, liberated: 1e6, chapter: 1e4 };
 function storyProgress(st) {
   if (!st || st.mode !== "story" || !st.story) return null;
   const ch = st.story.ch || {}, keys = o => Object.keys(o || {});
-  const p = { year: st.story.year || 1, chapter: CHAPTERS.filter(c => (c.year || 1) === (st.story.year || 1) && ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id]).length,
+  const p = { year: st.story.year || 1, chapter: CHAPTERS.filter(c => (c.year || 1) === (st.story.year || 1) && ch[c.id]).length, regionsLiberated: CHAPTERS.filter(c => c.liberates && ch[c.id] && ((st.story.year || 1) !== 3 || c.year === 3)).length,
     lifeDex: new Set([...keys(st.lifeDex), ...keys(st.story.lifeDex), ...keys(st.box)]).size };
+  if ((st.story.cleared || {})[3]) { p.cleared = true; p.title = st.story.title || "Field Researcher"; }
   p.ranked = p.year * STORY_RANK.year + (p.year === 3 ? p.regionsLiberated * STORY_RANK.liberated : 0) + Math.min(99, p.chapter) * STORY_RANK.chapter + Math.min(9999, p.lifeDex);
   return p;
 }
@@ -4437,6 +5010,7 @@ function storyProgress(st) {
 let sceneNow = null;
 const preSeen = [];
 function playScene(id, then) {
+  if (typeof id === "function") id = id();
   const sc = id && SCENES[id];
   if (!sc) { if (then) then(); return; }
   hideTip();
@@ -4485,7 +5059,11 @@ $("#scene").onclick = e => {
   const p = e.target.closest("[data-pick]"); if (p && pickNow) return pickClick(p);
   const y = e.target.closest("[data-y2]"); if (y) { overlay("#scene", false); if (y.dataset.y2 === "go") beginYear2(); return; }
   const y3 = e.target.closest("[data-y3]");
-  if (y3) { const v = y3.dataset.y3; if (v === "no") overlay("#scene", false); else if (v === "pick") pickOneScreen(); else if (v === "back") { pickOne = null; year3Confirm(); } return; }
+  if (y3) { const v = y3.dataset.y3; if (v === "no") overlay("#scene", false); else if (v === "pick") pickOneScreen(); else if (v === "back") { pickOne = null; year3Confirm(); }
+    else if (v === "go" && year3Open()) { overlay("#scene", false); playScene("y3-interlude", () => pickOneScreen()); }
+    else if (v === "stay" && pickOne && pickOne.n && year3Open()) { const n = pickOne.n; pickOne = null; overlay("#scene", false); beginYear3(n); }
+    return; }
+  if (e.target.closest("[data-thaw]")) { overlay("#scene", false); const f = thawThen; thawThen = null; if (f) f(); return; }
   const po = e.target.closest("[data-po]"); if (po && pickOne) { pickOne.n = +po.dataset.po; const top = $("#po-list").scrollTop; renderPickOne(); $("#po-list").scrollTop = top; return; }
   // In a scene, Next or a tap anywhere on the box: finish the line, then the next page, then the next line.
   if (!sceneNow) return;
@@ -4507,9 +5085,15 @@ function renderStory() {
   const map = yearMap(), next = CHAPTERS.length ? storyNext().text : "";
   $("#t-story").innerHTML = (next ? `<p class="next"><b>${esc(next)}</b></p>` : "") + `<h2>Notebook</h2><p class="small muted">"Write down everything, especially the things that seem small." Prof Penguin</p>
     ${map.length ? `<h2>Year ${st.year}: ${esc(YEARS[st.year] || "")}</h2>${[map.filter(x => !CHAPTER[x.id].hunt), map.filter(x => CHAPTER[x.id].hunt)].map((part, i) => !part.length ? "" : `${i ? '<h3 class="small">The Hunt</h3>' : ""}<ul class="yearmap">${part.map(x => `<li class="${x.grey ? "muted" : ""}"><span class="mk">${x.mark}</span> ${esc(x.name)}${x.optional ? " (optional)" : ""}${x.note ? ` <span class="small">· ${esc(x.note)}</span>` : ""}</li>`).join("")}</ul>`).join("")}` : ""}
+    ${storyYear() === 3 ? frozenBoxHtml() : ""}
     <h2>Story so far</h2>${order.length ? order.map(g => `<div class="st-group"><h4>Year ${g.year}: ${esc(YEARS[g.year] || "")} · ${g.r < 0 ? "Prologue" : esc(REGIONS[g.r].name)}</h4><div class="st-scenes">${g.ids.map(id => `<button class="lbl" type="button" data-reread="${id}">${esc(SCENES[id].title)}</button>`).join("")}</div></div>`).join("") : '<p class="small muted">Nothing yet.</p>'}
     ${S.test ? testToolsHtml() : ""}
     <h2>Clues</h2>${clues.length ? `<div class="clues">${clues.map(k => `<div class="clue"><b>${esc(CLUES[k].title)}</b>${esc(CLUES[k].text)}</div>`).join("")}</div>` : '<p class="small muted">No clues yet. Keep your eyes open.</p>'}`;
+}
+// The Frozen Box (Year 3): each region ❄ with how many it's holding, or ✓ once it's free; Eternatus's empty slot.
+function frozenBoxHtml() {
+  const held = r => Object.values(S.box).filter(b => b.frozen === r && !(b.stolen && S.story.liberated[r])).length, gone = Object.keys(S.box).some(n => emptySlot(n));
+  return `<h2>Frozen Box</h2><p class="small">Species recovered: ${recovered()} / ${RECOVER_NEED}</p><ul class="frozenbox small">${REGIONS.map((R, r) => `<li>${(S.story.liberated || {})[r] ? "✓" : "❄"} ${esc(R.name)}${held(r) ? ` · ${held(r)}` : ""}</li>`).join("")}</ul>${gone ? `<div class="row small"><span class="mon outline" style="width:64px"><span class="pic"><img class="spr" src="${sprite(ETERNATUS)}" alt=""></span></span> An empty slot, its outline traced in frost.</div>` : ""}`;
 }
 $("#t-story").onclick = e => {
   const t = e.target.closest("[data-test]"); if (t && S.test) return testTool(t.dataset.test, t);
@@ -4523,6 +5107,7 @@ function show(name) { const rb = $("#replaybar"); rb.hidden = !(S && S.replay); 
 function boot() {
   B = null; awayText = ""; titleMsg = ""; hideTip();
   let earned = [];
+  if (S && isStory() && HOF_READY && S.story && S.story.hofLate) S.mail.got["story-y3-hof-late"] = 1;
   if (S) { migrateSave(); deliverMail(); awayText = offline(); earned = checkAch(true); save(); }
   showTitle();
   if (earned.length) { titleMsg = `${earned.length} achievement${earned.length > 1 ? "s" : ""} earned: see the Achievements tab.`; renderTitle(); }
@@ -4613,7 +5198,8 @@ $("#testdoor").onsubmit = e => {
 function renderTitle() {
   const other = otherSlot(), items = MENU[S ? "save" : "fresh"].filter(([id]) => !(slot === REPLAY_KEY && id === "new")).concat(testSlot() ? [["back", "Back to my save"], ["switch", slot === TEST_KEY ? "Switch to Story" : "Switch to Classic"]] : slot === REPLAY_KEY ? [["endreplay", "End the replay"]]
     : [...(other && readSlot(other) ? [["switch", other === STORY_KEY ? "Switch to Story" : "Switch to Classic"]] : []), ...(isStory() && S.story.epilogue && !S.test ? [["replay", readSlot(REPLAY_KEY) ? "Back to the replay" : "Replay Year 1"]] : []),
-      ...(isStory() && (S.story.cleared || {})[2] && !S.test && !readSlot(REPLAY_KEY) ? [["replay2", "Replay Year 2"]] : [])]);
+      ...(isStory() && (S.story.cleared || {})[2] && !S.test && !readSlot(REPLAY_KEY) ? [["replay2", "Replay Year 2"]] : []),
+      ...(isStory() && (S.story.cleared || {})[3] && !S.test && !readSlot(REPLAY_KEY) ? [["replay3", "Replay Year 3"]] : [])]);
   $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : slot === TEST_STORY_KEY ? "Test account, Story Mode: maxed out, with test tools in the Story tab. Nothing here reaches the leaderboard or your real saves." : slot === REPLAY_KEY ? REPLAY_LINE : slot === STORY_KEY ? `Story Mode, Year ${S && S.story ? S.story.year : 1}: ${YEARS[(S && S.story ? S.story.year : 1)]}.` : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
   $("#t-prest").hidden = !(S && S.prestige); $("#t-prest").textContent = S && S.prestige ? "P" + S.prestige : ""; $("#t-prest").title = S && S.prestige ? "Prestige " + S.prestige : "";
@@ -4655,6 +5241,7 @@ function go(id) {
   if (id === "switch" && otherSlot()) return useSlot(otherSlot());
   if (id === "replay" && isStory()) return readSlot(REPLAY_KEY) ? useSlot(REPLAY_KEY) : startReplay();
   if (id === "replay2" && isStory() && (S.story.cleared || {})[2]) return readSlot(REPLAY_KEY) ? useSlot(REPLAY_KEY) : startReplay(2);
+  if (id === "replay3" && isStory() && (S.story.cleared || {})[3]) return readSlot(REPLAY_KEY) ? useSlot(REPLAY_KEY) : startReplay(3);
   if (id === "endreplay") return endReplay();
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
   panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();

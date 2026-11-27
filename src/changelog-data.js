@@ -2,13 +2,19 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1018,
-  "newest": "2026-11-26",
+  "count": 1024,
+  "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3f1567f3","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5b: switch Year 3 on"},
+  {"sha":"fdbefe38","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5a: Replay Year 3, achievements, wiki and Mail"},
+  {"sha":"6f4c3142","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 4: Sleet, Prof Penguin and the ending"},
+  {"sha":"455972e0","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 3: the endgame, part 1"},
+  {"sha":"c7931a96","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 2: the nine liberation fights"},
+  {"sha":"a2657816","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 1: the freeze, the thaw and the occupied League"},
   {"sha":"c9a47080","date":"2026-11-26","author":"Daniel Lowe","subject":"Handle malformed client party data safely"},
   {"sha":"06262a85","date":"2026-11-26","author":"Daniel Lowe","subject":"Bind progress reports to the game-opening account and throttle unchanged snapshots"},
   {"sha":"59293aa0","date":"2026-11-26","author":"Daniel Lowe","subject":"Link private Poké Idle dashboard from existing analytics"},
