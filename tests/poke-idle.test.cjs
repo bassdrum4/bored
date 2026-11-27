@@ -728,7 +728,7 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
     // Reset Hoenn's pick.
     resetChapter('hoenn-pick'); const reset = { done: chDone('hoenn-pick'), pick: S.story.picks[2] || null };
     // League rules: two Tier 3s in the party block a gym, until the test switch turns them off.
-    S.party = [150, 249]; B = null; startLoc({ kind: 'gym', r: 0, k: 0 }); const blocked = !$('#league').hidden; $('#league').hidden = true;
+    S.party = [150, 249]; B = null; startLoc({ kind: 'gym', r: 0, k: 0 }); const blocked = !$('#league').hidden; overlay('#league', false);
     testTool('league'); startLoc({ kind: 'gym', r: 0, k: 0 }); const off = B && B.kind;
     // Win the fight at once.
     const winBtn = !$('#testwin').hidden; testWin(); await sleep(800); while (sceneNow) endScene();
@@ -826,5 +826,69 @@ test('Story achievements: types and display rules, Story only, Replay awards onl
   assert.deepEqual(got.back.seen, { 'johto-249': 1, 'johto-250': 1 }, 'the replay’s pick is kept on the main save');
   assert.deepEqual([got.back.both, got.back.hooh], [true, true], 'Both Halves and the other pick, earned on the main save');
   assert.ok(got.wiki.includes('There are hidden achievements.') && got.wiki.includes('Write It Down') && !got.wiki.includes('He Always Did'));
+  assert.deepEqual(errors, []);
+});
+
+test('Prof Penguin\'s text box never moves the page: the tip slot keeps one height, scenes open over it, and a fast tap can\'t reach the battle', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  await tab.setViewport({ width: 375, height: 740, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  // An old Classic save, from before tips and Story existed.
+  await tab.evaluate(old => { localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot(); go('continue'); }, OLD_SAVE);
+  // What the text box could push: the tabs, the slot itself and the top of the battle screen (the field's own height
+  // changes as the fight goes on, so only where it starts is measured).
+  const where = () => tab.evaluate(() => [['#tabs', 1], ['#tip', 1], ['#t-battle', 0], ['#field', 0]].map(([q, h]) => { const r = $(q).getBoundingClientRect(); return [q, r.top, r.left, r.width, h ? r.height : 0]; }));
+  // An old save gets the tips from the start: the welcome one is up.
+  assert.deepEqual(await tab.evaluate(() => [screen, tipNow && tipNow.id]), ['game', 'hello']);
+  const before = await where();
+  await tab.evaluate(() => { S.tut.seen.hello = 1; hideTip(); });
+  const idle = await tab.evaluate(() => ({ cls: $('#tip').className, text: $('#tip .dlg-text').textContent, shown: getComputedStyle($('#tip')).display, op: +getComputedStyle($('#tip')).opacity }));
+  assert.ok(idle.cls.includes('idle') && idle.text === '…' && idle.shown !== 'none' && idle.op < 1, 'with nothing to say, the slot is there and faint');
+  assert.deepEqual(await where(), before, 'the welcome tip closing moves nothing');
+  for (let k = 0; k < 4; k++) {
+    // A tip, the longest one too: the slot doesn't grow; a long one comes in pages.
+    const tip = await tab.evaluate(k => { S.tut = { seen: {}, off: 0 }; if (k % 2) for (const x of TIPS) if (x.id !== 'tier3') S.tut.seen[x.id] = 1; tutor(); return { now: tipNow && tipNow.id, pages: tipPages.length, idle: $('#tip').classList.contains('idle'), face: $('#tip .dlg-face img') && $('#tip .dlg-face img').getAttribute('src') }; }, k);
+    if (tip.now) {
+      assert.equal(tip.idle, false);
+      assert.match(tip.face, /pokedoku\/sprites\/prof-penguin\.png$/);
+      assert.deepEqual(await where(), before, `the page stays put while Prof Penguin talks (${tip.now})`);
+      // Tap once: the line finishes. Tap again: the next page, or done.
+      const tap1 = await tab.evaluate(() => { $('#tip [data-tip=more], #tip [data-tip=ok]').click(); return { typing: !!typer.t, pg: tipPg, full: typer.i === typer.text.length }; });
+      assert.deepEqual(tap1, { typing: false, pg: 0, full: true }, 'the first tap finishes the line');
+      for (let p = 1; p < tip.pages; p++) { await tab.evaluate(() => { $('#tip [data-tip=more]').click(); typeFinish(); }); assert.deepEqual(await where(), before); }
+      await tab.evaluate(() => $('#tip [data-tip=ok]').click());
+      assert.equal(await tab.evaluate(() => tipNow), null);
+    }
+    assert.deepEqual(await where(), before, 'and when he stops');
+  }
+  // The welcome tip at phone width is more than two lines, so it pages, and no page overflows the box.
+  const paged = await tab.evaluate(() => { hideTip(); S.tut = { seen: {}, off: 0 }; tutor(); const n = tipPages.length, el = $('#tip .dlg-text'); let over = 0; for (let i = 0; i < n; i++) { tipPg = i; tipPage(); typeFinish(); if (el.scrollHeight > el.clientHeight + 1) over++; } hideTip(); return { n, over }; });
+  assert.ok(paged.n >= 2, `a long tip is paged (${paged.n})`);
+  assert.equal(paged.over, 0, 'every page fits the box');
+  // A scene (Story content isn't in Classic, so play one directly): an overlay on a veil that takes the taps.
+  for (let k = 0; k < 3; k++) {
+    const open = await tab.evaluate(() => {
+      playScene('open-1');
+      const f = $('#foe').getBoundingClientRect(), hit = document.elementFromPoint(f.left + f.width / 2, f.top + f.height / 2);
+      const p = $('#scene').getBoundingClientRect();
+      return { veil: !$('#veil').hidden, hitFoe: !!(hit && hit.closest('#foe')), fixed: getComputedStyle($('#scene')).position, inView: p.bottom <= innerHeight && p.left >= 0 && p.right <= innerWidth, next: $('#scene [data-scene=next]').getBoundingClientRect().height };
+    });
+    assert.deepEqual(open, { veil: true, hitFoe: false, fixed: 'fixed', inView: true, next: open.next });
+    assert.ok(open.next >= 40, 'Next is big enough for a thumb');
+    assert.deepEqual(await where(), before, 'opening a scene moves nothing behind it');
+    // Next stays in one place from line to line, and a tap first finishes the line.
+    const lines = await tab.evaluate(() => { const at = [], b = () => $('#scene [data-scene=next]').getBoundingClientRect(); const taps = []; while (sceneNow) { at.push(Math.round(b().top)); const typing = !!typer.t; $('#scene [data-scene=next]').click(); taps.push(typing ? !!sceneNow && !typer.t : true); if (sceneNow) $('#scene [data-scene=next]').click(); } return { at: [...new Set(at)], taps: taps.every(Boolean), veil: !$('#veil').hidden }; });
+    assert.equal(lines.at.length, 1, 'Next never moves');
+    assert.ok(lines.taps);
+    assert.equal(lines.veil, false, 'the veil goes with the scene');
+    assert.deepEqual(await where(), before, 'closing it moves nothing either');
+  }
+  // Space doesn't tap the foe through a scene, and the game keeps running behind it.
+  const behind = await tab.evaluate(() => { playScene('open-1'); const taps = S.stats.taps; document.body.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); const r = { taps: S.stats.taps - taps }; endScene(); return r; });
+  assert.equal(behind.taps, 0);
+  // Other speakers get a placeholder frame with their initials.
+  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Team Thaw grunt'); return d.textContent; });
+  assert.equal(face, 'TT');
+  // Mail has the letter.
+  assert.ok(await tab.evaluate(() => MAIL.some(m => /makeover/.test(m.title))));
   assert.deepEqual(errors, []);
 });
