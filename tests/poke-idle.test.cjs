@@ -748,7 +748,7 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
     return { labels, j, tools, reset, blocked, off, winBtn, won, gates: [gate, met, ign], roulette: S.story.roulette, all, none, y2, epi: S.story.epilogue, real: localStorage.getItem(STORY_KEY) };
   });
   assert.deepEqual(got.labels.slice(0, 4), ['Prologue: starter picked', 'Kanto: gyms', 'Kanto: Champion Blue', 'Kanto: Team Thaw: Rime']);
-  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.at(-1).startsWith('Year 2 Paldea'));
+  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.some(l => l.startsWith('Year 2 Paldea')) && got.labels.at(-1) === 'Year 3 Paldea: Liberate Paldea');
   assert.deepEqual(got.j.champs, [0, 1, 2, 3, 4]);
   assert.equal(got.j.badges, 20);
   assert.deepEqual(got.j.picks, { 0: 150, 1: 249, 2: 382, 3: got.j.picks[3] }, 'the picks asked for, and random where none was');
@@ -776,7 +776,7 @@ test('Story\'s ranked number: progress always outranks the dex, and Year 3 count
   const got = await tab.evaluate(() => {
     const save = (year, ch, dex, lib = 0) => { const s = fresh(); s.mode = 'story'; s.story = { ...freshStory(), year };
       CHAPTERS.slice(0, ch).forEach(c => { s.story.ch[c.id] = 1; }); for (let i = 1; i <= dex; i++) s.lifeDex[i] = 1;
-      if (lib) { s.story.ch = {}; CHAPTERS.filter(c => c.liberates).slice(0, lib).forEach(c => { s.story.ch[c.id] = 1; }); } return storyProgress(s).ranked; };
+      if (lib) { s.story.ch = {}; CHAPTERS.filter(c => c.liberates && (c.year || 1) === year).slice(0, lib).forEach(c => { s.story.ch[c.id] = 1; }); } return storyProgress(s).ranked; };
     return { a: save(1, 3, 1025) < save(1, 4, 1), b: save(1, 23, 1025) < save(2, 0, 1), c: save(3, 9, 1025, 1) < save(3, 1, 1, 2), max: save(3, 23, 1025, 9) };
   });
   assert.deepEqual([got.a, got.b, got.c], [true, true, true]);
@@ -1160,8 +1160,9 @@ test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Cham
     viewR = 7; renderLocs();
     const y3row = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).find(t => t.startsWith('Year 3'));
     startLoc({ kind: 'year3', r: 7 }); const y3toast = $('#toast').textContent;
+    const realOpen = year3Open();
     S.test = 1; startLoc({ kind: 'year3', r: 7 });
-    const confirm = { text: $('#scene').textContent, go: $('#scene [data-y3="go"]').disabled };
+    const confirm = { text: $('#scene').textContent, go: $('#scene [data-y3="go"]').disabled, realOpen };
     $('#scene [data-y3="pick"]').click();
     const box = Object.keys(S.box).length, rows = () => [...document.querySelectorAll('#po-list .po-row')];
     const pick = { all: rows().length, first: rows()[0].textContent };
@@ -1201,14 +1202,14 @@ test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Cham
   assert.equal(got.after.next, 'Year 2 is done. Year 3 is coming.');
   assert.equal(got.y3row, 'Year 3: The Thawcoming soon');
   assert.match(got.y3toast, /isn't here yet/);
-  assert.ok(got.confirm.text.includes("Your Box will freeze. You'll keep one Pokémon. Everything else comes back as you free each region.") && got.confirm.go, 'Begin Year 3. is disabled');
+  assert.ok(got.confirm.text.includes("Your Box will freeze. You'll keep one Pokémon. Everything else comes back as you free each region.") && !got.confirm.go && got.confirm.realOpen === false, 'Begin Year 3. is off on a real save (YEAR3_READY), on for the test account');
   assert.equal(got.pick.all, got.box, 'the pick-one screen lists the whole Box');
   assert.match(got.pick.first, /^.+ Lv \d+ Comes back when \w+ is freed\.$/, 'name, level and where it comes back: ' + got.pick.first);
   assert.deepEqual(got.pick.found.length, 1);
   assert.ok(got.pick.galar, 'filter by where it comes back');
   assert.match(got.pick.top, /Lv 100/, 'sort by level');
   assert.match(got.pick.chosen, /Calyrex: Stays with you at Lv \d+\. It fights at your level cap until the cap catches up\./);
-  assert.deepEqual([got.pick.stay, got.pick.stayText], [true, 'This one stays with me.'], 'disabled until Year 3 ships');
+  assert.deepEqual([got.pick.stay, got.pick.stayText], [false, 'This one stays with me.'], 'open for the test account; a real save never gets here before YEAR3_READY');
   assert.ok(got.pick.noBond, 'no bond status or return levels');
   assert.ok(got.menu.includes('replay2'), 'Replay Year 2 on the title screen');
   assert.deepEqual([got.replay.slot, got.replay.year, got.replay.replay, got.replay.max, got.replay.picks], ['bored.poke-idle.story.replay', 2, 1, { 3: 2, 4: 3 }, 249], 'Replay Year 2: its own slot, Year 2’s rules, your Year 1 picks');
@@ -1302,5 +1303,133 @@ test('the admin block in the snapshot: both real saves (party and counts only), 
   assert.equal(got.flagged.admin.story, null, 'a save marked as a test is left out');
   assert.ok(got.size < 1500 && got.bigParty === 6, `party only, never the Box (${got.size} bytes with a full Box)`);
   assert.equal(got.bondUi, false, 'nothing about bonds shows to players');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3 begins (test save): the freeze keeps one, deletes nothing, and leaves the frozen out of the party, teams, evolution and catches; occupied gyms free their leaders; the first thaw', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { let n = 0; while (sceneNow && n++ < 40) endScene(); };
+    const win = () => { const here = B; for (let n = 0; n < 12 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    // Classic's gyms, to check they don't change.
+    S = fresh(); S.box[25] = { xp: 125 }; S.party = [25]; slot = KEY; save(); boot();
+    const classic = { gym: gymTeam(0, 1).map(m => m.num), name: gymName(0, 1), place: locName({ kind: 'gym', r: 0, k: 1 }) };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1); skip(); overlay('#scene', false);
+    // Spread the Box over the nine regions, with a few bonded; a saved team; something to keep.
+    Object.entries(S.box).forEach(([n, b], i) => { b.from = i % 9; if (i % 3 === 0) b.bond = 1; else delete b.bond; });
+    S.box[6].xp = 80 ** 3; S.box[6].from = 0; S.box[6].bond = 1;   // Charizard: bonded, Kanto, Lv 80
+    S.box[9].xp = 61 ** 3; S.box[9].peak = 61; S.box[9].from = 0; delete S.box[9].bond; // Blastoise: unbonded, Kanto, Lv 61
+    S.box[3].xp = 7 ** 3; S.box[3].from = 0; delete S.box[3].bond;  // Venusaur: unbonded, Kanto, Lv 7
+    S.box[248].from = 1;                                             // Tyranitar: Johto
+    S.teams = [{ name: 'Old', party: [6, 248, 9] }]; S.money = 1e6; S.items = { fire: 3 }; S.balls.master = 4; S.stones[10062] = 1; S.won.kitakami = 1; S.ach.st_start = 1;
+    S.party = [150, 6, 248]; save();
+    const before = { box: Object.keys(S.box).length, ids: Object.keys(S.box).sort().join(), charizard: realLevel(6), peak9: lvlOf(S.box[9].xp), keptLv: realLevel(150), eternatus: !!S.box[890] };
+    const row = unlocked({ kind: 'year3' });
+    startLoc({ kind: 'year3', r: 0 }); const goOff = $('#scene [data-y3="go"]').disabled; $('#scene [data-y3="go"]').click();
+    const interlude = sceneNow && sceneNow.id; skip();
+    const pickOpen = !!document.querySelector('#po-list'); document.querySelector('#po-list [data-po="150"]').click(); $('#scene [data-y3="stay"]').click();
+    const kept = sceneNow && sceneNow.id; skip();
+    const frozen = Object.entries(S.box).filter(([n, b]) => b.frozen != null);
+    const after = {
+      year: S.story.year, cleared: S.story.cleared, kept: S.story.kept, party: S.party.slice(), box: Object.keys(S.box).length, ids: Object.keys(S.box).sort().join(),
+      allFrozen: frozen.length === before.box - 1, keptFree: !isFrozen(150) && realLevel(150) === before.keptLv,
+      regions: frozen.every(([n, b]) => b.frozen === b.from && b.frozen >= 0 && b.frozen < 9), stolen: [S.story.eternatusStolen, S.box[890] && S.box[890].stolen],
+      money: S.money, balls: { ...S.balls }, items: S.items, badges: Object.keys(S.badges).length, champs: Object.keys(S.champs).length, cap: levelCap(),
+      key: S.key, stone: S.stones[10062], won: S.won.kitakami, teams: S.teams.length, ach: !!S.ach.st_start,
+      mail: ['story-y3-start', 'story-y3-snakes'].map(id => !!S.mail.got[id]), held: S.story.frozen, recovered: recovered()
+    };
+    const letter = MAIL.find(m => m.id === 'story-y3-start').body, snakes = MAIL.find(m => m.id === 'story-y3-snakes').body;
+    // The frozen stay out of everything.
+    toggleParty(6); const notIn = !S.party.includes(6), refused = $('#toast').textContent;
+    placeIn(9, 1); const notPlaced = !S.party.includes(9);
+    loadTeam(0); const loaded = { party: S.party.slice(), toast: $('#toast').textContent };
+    openTab('party'); renderParty();
+    const tile = document.querySelector('#boxgrid [data-n="6"]'), slots = [...document.querySelectorAll('#party .ghost')].map(g => g.textContent);
+    const evo = canEvolve(4, [5, 'L', 16]);
+    // A wild Pokémon of a frozen species: no throw.
+    S.set.fresh = 'all'; S.set.dupe = 'all'; S.balls.poke = 50; startLoc({ kind: 'route', r: 0, k: 0 }); B.foe = { m: mon(6), L: 5, hp: 1, max: 1, wild: true, reward: 1 }; defeat();
+    const catchText = $('#log').textContent; B = null;
+    // No League rule, and the occupied gyms.
+    const league = { breaks: leagueBreaks([150, 493]), rule: leagueRule([mon(150), mon(493)], mon(890)), max: leagueMax() };
+    const gyms = { names: [0, 1, 2, 3].map(k => gymName(0, k)), place: locName({ kind: 'gym', r: 0, k: 1 }),
+      ice: REGIONS.every((R, r) => [0, 1, 2, 3].every(k => R.gyms[k][1] === 'Ice' || gymTeam(r, k).some(m => m.types.includes('Ice')))),
+      typed: REGIONS.every((R, r) => [0, 1, 2, 3].every(k => gymTeam(r, k).filter(m => m.types.includes(R.gyms[k][1])).length >= gymTeam(r, k).length - 1)) };
+    viewR = 0; renderLocs();
+    const rows = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent);
+    const next0 = storyNext().text;
+    S.party = [150]; S.debug.league = 0;
+    const lines = [];
+    for (let k = 0; k < 4; k++) { S.kills['0-' + k] = KILLS_FOR_GYM; startLoc({ kind: 'gym', r: 0, k }); lines.push($('#log').textContent.split('\n')[0]); win(); }
+    const freed = { names: [0, 1, 2, 3].map(k => gymName(0, k)), record: Object.keys(S.story.freed).length, cap: levelCap() };
+    return new Promise(done => setTimeout(() => {
+      freed.toast = $('#toast').textContent;
+      const lib = chapterRows(0).find(x => x.x === 'y3-kanto-free'), next1 = storyNext().text;
+      startLoc({ kind: 'chapter', r: 0, x: 'y3-kanto-free' });
+      const msg = $('#scene').textContent;
+      $('#scene [data-thaw]').click(); skip();
+      const thaw = { charizard: [realLevel(6), isFrozen(6)], blastoise: [realLevel(9), S.box[9].peak, remembers(9)], venusaur: realLevel(3), tyranitar: isFrozen(248),
+        champ: S.champs[0], cap: levelCap(), capNext: Math.min(100, gymLevel(4) + CAP_OVER), told: !!S.mail.got['story-y3-told'], toldBody: MAIL.find(m => m.id === 'story-y3-told').body, lib: storyProgress(S).regionsLiberated, recovered: recovered(),
+        kanto: Object.values(S.box).filter(b => b.from === 0 && b.frozen != null && !b.stolen).length };
+      openTab('story'); const story = $('#t-story').textContent;
+      openTab('party'); renderParty(); loadTeam(0); const reload = S.party.slice();
+      const page = document.body.innerText;
+      // Keeping Eternatus: nothing is stolen.
+      storyJump(pts.findIndex(p => p.id === 'ch-y2-crown') + 1); skip(); overlay('#scene', false); year3Reset(890);
+      const keptEternatus = [S.story.eternatusStolen, !!S.box[890].stolen, isFrozen(890)];
+      useSlot(KEY);
+      done({ classic, before, row, goOff, interlude, pickOpen, kept, after, letter, snakes, notIn, refused, notPlaced, loaded, tile: tile && [tile.className, tile.textContent], slots, evo, catchText, league, gyms, rows, next0, lines, freed, lib, next1, msg, thaw, story, reload,
+        bondLeak: /fought beside you|bonded|remember you\./.test(page), keptEternatus,
+        back: { gym: gymTeam(0, 1).map(m => m.num), name: gymName(0, 1), place: locName({ kind: 'gym', r: 0, k: 1 }) } });
+    }, 3600));
+  });
+  assert.ok(got.row && !got.goOff, 'Begin Year 3 is open to the test account');
+  assert.deepEqual([got.interlude, got.pickOpen, got.kept], ['y3-interlude', true, 'y3-kept']);
+  const a = got.after;
+  assert.deepEqual([a.year, a.cleared[2], a.kept, a.party], [3, 1, 150, [150]]);
+  assert.deepEqual([a.box, a.ids], [got.before.box, got.before.ids], 'the freeze deletes nothing');
+  assert.ok(a.allFrozen && a.keptFree && a.regions, 'everything but the kept one is frozen in its from region; the kept one keeps its level');
+  assert.deepEqual(a.stolen, [1, 1], 'Eternatus, not kept, is stolen');
+  assert.deepEqual([a.money, a.balls, a.items, a.badges, a.champs], [0, { poke: 10, great: 0, ultra: 0, master: 0 }, {}, 0, 0], 'money, balls, items, badges and Champions reset');
+  assert.ok(a.cap <= 20, `the cap starts over at Kanto (${a.cap})`);
+  assert.deepEqual([a.key, a.stone, a.won, a.teams, a.ach], [1, 1, 1, 1, true], 'key items, stones, form unlocks, saved teams and achievements stay');
+  assert.deepEqual(a.mail, [true, true]);
+  assert.equal(a.recovered, 1, 'only the kept one is recovered');
+  assert.equal(Object.values(a.held).reduce((x, y) => x + y, 0), got.before.box - 1, 'the frozen-Box record');
+  assert.match(got.letter, /Some of them will come back to you sooner than others\. You'll see\.<\/p><p>Prof Penguin<\/p>$/);
+  assert.match(got.snakes, /THEY FROZE MINE TOO\. I'M FINE\. I'M FINE\. I'LL FIND YOU\./);
+  assert.ok(got.notIn && got.notPlaced, 'a frozen Pokémon can\'t join the party');
+  assert.match(got.refused, /frozen in Kanto\. It comes back when Kanto is freed\./);
+  assert.deepEqual(got.loaded.party, [150], 'a team with no one thawed yet loads nothing');
+  assert.match(got.loaded.toast, /Old is still under the ice\./);
+  assert.match(got.tile[0], /frozen/); assert.match(got.tile[1], /❄ Frozen in Kanto/);
+  assert.equal(got.evo, false, 'frozen Pokémon can\'t evolve');
+  assert.match(got.catchText, /under the ice in Kanto: no throw/);
+  assert.deepEqual([got.league.breaks, got.league.rule, got.league.max], ['', true, null], 'no League rule in Year 3');
+  assert.deepEqual(got.gyms.names, ['Team Thaw grunt', 'Team Thaw grunt', 'Team Thaw grunt', 'Thaw captain']);
+  assert.ok(got.gyms.ice && got.gyms.typed, 'each gym keeps its type, with an ice twist');
+  assert.ok(!got.rows.some(r => r.startsWith('Champion')), 'no Champion row in Year 3');
+  assert.ok(got.rows.some(r => r === 'Liberate Kantogyms 0/4 freed'), got.rows.join(' | '));
+  assert.equal(got.next0, 'Next: Free Kanto\'s gyms, then Liberate Kanto at the Cerulean lab. (Gyms: 0/4 freed)');
+  assert.match(got.lines[3], /Thaw captain: "Gym's under new management\. Badge costs three Thaw Packs\."/);
+  assert.ok(!got.freed.names.some(n => /Thaw/.test(n)) && got.freed.record === 4, 'the real leaders are freed');
+  assert.match(got.freed.toast, /was locked in the back room/);
+  assert.equal(got.lib.note, 'story');
+  assert.equal(got.next1, 'Next: Liberate Kanto at the Cerulean lab, in Kanto.');
+  assert.match(got.msg, /The ice lets go\..*The ones who fought beside you come back just as strong\. ❤ .*Charizard.*The others come back weaker, but they remember you\. ❄ .*Blastoise/);
+  const T = got.thaw;
+  assert.deepEqual(T.charizard, [80, false], 'bonded: back at its real level');
+  assert.deepEqual(T.blastoise, [30, got.before.peak9, true], 'unbonded: half (rounded down), peak unchanged, it remembers you');
+  assert.equal(T.venusaur, 5, 'never below Lv 5');
+  assert.equal(T.tyranitar, true, 'Johto\'s stay frozen');
+  assert.equal(T.kanto, 0, 'everything from Kanto is back');
+  assert.ok(T.champ && T.cap === T.capNext, 'the liberation counts as the Champion for the cap');
+  assert.ok(T.told && /^<p>I told you\. They remember who stood with them\.<\/p>/.test(T.toldBody), 'the first thaw\'s letter');
+  assert.equal(T.lib, 1);
+  assert.match(got.story, /Frozen Box/); assert.match(got.story, new RegExp(`Species recovered: ${T.recovered} / 270`)); assert.match(got.story, /✓ Kanto/); assert.match(got.story, /❄ Johto · \d+/);
+  assert.ok(got.reload.includes(6) && !got.reload.includes(248), 'the team fills in its thawed member');
+  assert.equal(got.bondLeak, false, 'the bond shows nowhere but the thaw message');
+  assert.deepEqual(got.keptEternatus, [0, false, false], 'keeping Eternatus: nothing stolen');
+  assert.deepEqual(got.back, got.classic, 'Classic keeps its gyms');
   assert.deepEqual(errors, []);
 });
