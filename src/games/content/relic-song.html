@@ -106,8 +106,16 @@
   .card td { padding: 5px 4px; border-bottom: 1px solid var(--rule) }
   .card td:last-child { text-align: right }
   .seg button.on { background: var(--ink); color: var(--bg) }
+  /* Options holds a lot now: tighter rows so it fits the stage without scrolling. */
+  #opts .card { max-height: 704px; padding: 16px 26px }
+  #opts .card h2 { margin-bottom: 4px }
+  #opts .card .line { padding: 4px 0; min-height: 38px }
+  .binds { display: flex; gap: 4px; align-items: center }
+  .binds .slot { min-width: 34px; height: 30px; padding: 0 6px; font-size: 13px }
+  .binds .slot.wait { border-color: var(--tap); color: var(--tap) }
+  .binds .reset { margin-left: 8px; font-size: 12px; padding: 4px 8px }
   .keytest { display: flex; gap: 4px; align-items: center }
-  .keytest b { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 3px; font-weight: 400; color: var(--dim) }
+  .keytest b { min-width: 30px; padding: 0 5px; height: 30px; display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 3px; font-weight: 400; color: var(--dim) }
   .keytest b.on { background: var(--tap); color: var(--bg); border-color: var(--tap) }
   .keytest span { width: 70px; text-align: right; font-size: 12px; color: var(--dim) }
   .calib-dot { width: 90px; height: 90px; border: 2px solid var(--ink); border-radius: 50%; margin: 18px auto; transition: background .06s, box-shadow .06s }
@@ -296,6 +304,9 @@
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
     <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
+    <div class="line"><span>Keybinds <span class="dim">(click a key, then press the new one)</span></span><span class="dim" id="o-bind-note"></span></div>
+    <div class="line"><span>4 lanes <span class="dim">(EZ, HD)</span></span><span class="binds" id="o-bind4"></span></div>
+    <div class="line"><span>6 lanes <span class="dim">(IN, AT)</span></span><span class="binds" id="o-bind6"></span></div>
     <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
     <p class="dim" style="margin-top:6px">If some keys don't light up together, your keyboard can't press them at once. Stick to EZ/HD.</p>
     <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
@@ -308,7 +319,7 @@
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
 
-  <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys, D F J K. Open it on a computer.</p></div></div>
+  <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys on a keyboard. Open it on a computer.</p></div></div>
 </div>
 
 <script>
@@ -355,7 +366,7 @@ const DIFF_NAME = { ez: "EZ", hd: "HD", in: "IN", at: "AT" };
 // How a difficulty builds its chart from the parts (see build()). Every song has
 // EZ and HD; bosses and hidden tracks add IN; the finale, The Dealer and
 // Sssssssnakes add AT. IN and AT open after an A on the song's HD.
-//   lanes   4 (D F J K) or 6 (S D F J K L)
+//   lanes   4 (D F J K by default) or 6 (S D F J K L); the keys are the player's binds
 //   step    the closest two moments in the chart may sit, in seconds
 //   jack    the closest two notes in one lane may sit (after a hold's tail), in seconds
 //   chord   the most keys down at once, holds included (never more than 4: keyboards ghost)
@@ -370,8 +381,20 @@ const CHART_DIFFS = {
   in: { lanes: 6, holdMin: 3, step: 0.1, jack: 0.18, chord: 3, fill: 1, chords: 1, fillChords: 0.5, burst: true, six: true },
   at: { lanes: 6, holdMin: 2, step: 0.075, jack: 0.15, chord: 4, fill: 1, chords: 1.4, fillChords: 0.5, burst: true, six: true }
 };
-const KEYS4 = ["d", "f", "j", "k"], KEYS6 = ["s", "d", "f", "j", "k", "l"];
-const keysFor = lanes => lanes === 6 ? KEYS6 : KEYS4;
+// Lane keys, by physical key (e.code), so they sit in the same place on any layout.
+// Players rebind them in Options; opts.binds keeps both rows.
+const DEFAULT_BINDS = { 4: ["KeyD", "KeyF", "KeyJ", "KeyK"], 6: ["KeyS", "KeyD", "KeyF", "KeyJ", "KeyK", "KeyL"] };
+// Esc pauses, R retries, Enter continues: never a lane. Ctrl, Alt and the OS key belong to the browser.
+const RESERVED_KEYS = ["Escape", "KeyR", "Enter", "NumpadEnter", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "OSLeft", "OSRight"];
+const keysFor = lanes => opts.binds[lanes === 6 ? 6 : 4];
+// Every bound key, either row: any of them plays on the moving line.
+const boundKeys = () => new Set([...opts.binds[4], ...opts.binds[6]]);
+// A key's name as printed on it: "Space", ";", "Shift", "F", "7".
+const KEY_NAMES = { Space: "Space", Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", BracketLeft: "[", BracketRight: "]",
+  Minus: "-", Equal: "=", Backquote: "`", ShiftLeft: "Shift", ShiftRight: "Shift", Tab: "Tab", CapsLock: "Caps", Backspace: "Bksp",
+  ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", IntlBackslash: "\\", ContextMenu: "Menu" };
+const keyName = code => KEY_NAMES[code] || (/^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5)
+  : /^Numpad/.test(code) ? "Num " + code.slice(6).replace("Add", "+").replace("Subtract", "-").replace("Multiply", "*").replace("Divide", "/").replace("Decimal", ".") : code);
 // IN and AT open with an A or better on HD.
 const UNLOCK_RANK = "A";
 
@@ -423,6 +446,12 @@ const STORY_KEY = "bored.poke-idle.story";
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0 }, readJSON(OPTS_KEY) || {});
+// Saved binds are kept only if each row is whole, has no repeats and no reserved key.
+{
+  const saved = opts.binds || {}, ok = (row, n) => Array.isArray(row) && row.length === n && new Set(row).size === n
+    && row.every(c => typeof c === "string" && /^[A-Za-z0-9]{1,24}$/.test(c) && !RESERVED_KEYS.includes(c));
+  opts.binds = { 4: ok(saved[4], 4) ? saved[4].slice() : DEFAULT_BINDS[4].slice(), 6: ok(saved[6], 6) ? saved[6].slice() : DEFAULT_BINDS[6].slice() };
+}
 const keepOpts = () => writeJSON(OPTS_KEY, opts);
 let save = null;
 const slotKey = () => opts.test ? TEST_KEY : SAVE_KEY;
@@ -1098,7 +1127,7 @@ function drawMap() {
   const next = GYMS.findIndex((g, i) => !save.badges[i]);
   if (save.badges[4]) say("You gave me my whole song back. Thank you. I'll keep singing it, for the ones who are still cold.");
   else if (next < 0) say("All four verses! Now let me sing the whole thing. Come and keep up with me, if you can.", MELOETTA, true);
-  else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? Hit D F J K as the notes reach the line. " + GYMS[0].hello);
+  else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? Hit " + opts.binds[4].map(keyName).join(" ") + " as the notes reach the line. " + GYMS[0].hello);
   else say(GYMS[next].hello);
 }
 
@@ -1130,22 +1159,49 @@ function drawOpts() {
     b.onclick = () => { opts.skin = s.id; keepOpts(); drawOpts(); };
     box.append(b, " ");
   }
-  keyHeld.clear(); drawKeyTest();
+  keyHeld.clear(); binding = null; drawBinds();
   $("#o-skin-note").textContent = locked.length ? "Locked skins come from somewhere else in the arcade." : "";
 }
-// The key test: hold the six lane keys and see which ones the keyboard reports together.
+// The key test: hold your lane keys (both rows) and see which ones the keyboard reports together.
 const keyHeld = new Set();
 function drawKeyTest() {
   const box = $("#o-keys"); box.replaceChildren();
-  for (const k of KEYS6) box.append(el("b", keyHeld.has(k) ? "on" : "", k.toUpperCase()));
+  for (const code of boundKeys()) box.append(el("b", keyHeld.has(code) ? "on" : "", keyName(code)));
   box.append(el("span", "", keyHeld.size + " down"));
 }
 function keyTest(e, down) {
-  const k = e.key.toLowerCase();
-  if (!KEYS6.includes(k)) return;
+  if (!boundKeys().has(e.code)) return;
   e.preventDefault();
-  if (down) keyHeld.add(k); else keyHeld.delete(k);
+  if (down) keyHeld.add(e.code); else keyHeld.delete(e.code);
   drawKeyTest();
+}
+// Keybinds: click a slot, press a key. A key already in the row swaps places with it.
+let binding = null;   // { lanes, i } while a slot waits for its key
+function drawBinds(note = "") {
+  for (const lanes of [4, 6]) {
+    const box = $("#o-bind" + lanes); box.replaceChildren();
+    opts.binds[lanes].forEach((code, i) => {
+      const wait = binding && binding.lanes === lanes && binding.i === i;
+      const b = el("button", "slot" + (wait ? " wait" : ""), wait ? "press" : keyName(code)); b.type = "button";
+      b.title = wait ? "Press a key (Esc cancels)" : "Lane " + (i + 1) + ": " + keyName(code) + ". Click to change.";
+      b.onclick = () => { binding = wait ? null : { lanes, i }; b.blur(); drawBinds(); };
+      box.append(b);
+    });
+    const r = el("button", "reset", "Reset to default"); r.type = "button";
+    r.onclick = () => { opts.binds[lanes] = DEFAULT_BINDS[lanes].slice(); binding = null; keepOpts(); r.blur(); drawBinds(); };
+    box.append(r);
+  }
+  $("#o-bind-note").textContent = note;
+  drawKeyTest();
+}
+function bindKey(e) {
+  e.preventDefault();
+  if (e.code === "Escape") { binding = null; drawBinds(); return; }
+  if (RESERVED_KEYS.includes(e.code) || !e.code) { drawBinds(keyName(e.code) + " is taken: Esc pauses, R retries, Enter continues."); return; }
+  const row = opts.binds[binding.lanes], was = row.indexOf(e.code);
+  if (was >= 0 && was !== binding.i) row[was] = row[binding.i];   // already in this row: the two swap
+  row[binding.i] = e.code;
+  binding = null; keepOpts(); drawBinds();
 }
 $("#b-opts").onclick = drawOpts;
 $("#o-close").onclick = () => { $("#opts").hidden = true; drawMap(); };
@@ -1316,7 +1372,7 @@ function start(song, diff = pickedDiff(song)) {
   const keys = $("#keys"); keys.replaceChildren(); keys.className = "";
   P.keys.forEach((k, i) => {
     const d = el("div"); d.style.left = (640 + laneX(i, L)) + "px"; d.style.width = W + "px"; d.style.marginLeft = -W / 2 + "px";
-    d.append(el("b", "", k.toUpperCase()));
+    d.append(el("b", "", keyName(k)));
     const m = i - (L - 4) / 2;
     if (P.battle && m >= 0 && m < 4) d.append(el("span", "", P.battle.you.moves[m]));
     keys.append(d);
@@ -1670,22 +1726,23 @@ $("#b-quit").onclick = () => { stop(); drawMap(); };
 
 /* ── Keys ──────────────────────────────────────────────────────────────── */
 addEventListener("keydown", e => {
+  // A slot waiting for its key takes the next key, Ctrl and Alt included (so they can be refused).
+  if (binding && !$("#opts").hidden) { bindKey(e); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const k = e.key.toLowerCase();
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
   if (!$("#opts").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#o-close").click(); } else keyTest(e, true); return; }
   if (!$("#play").hidden && P && !P.done) {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
-    if (P.paused) { if (k === "r" && !e.shiftKey) retry(); return; }
+    if (P.paused) { if (e.code === "KeyR" && !e.shiftKey) retry(); return; }
     if (e.repeat) { e.preventDefault(); return; }
-    const lane = P.keys.indexOf(k);
-    // Any letter or Space plays on the line; the highway wants its lane keys (D F J K, or S D F J K L).
-    if (lane >= 0 || (P.mode === "line" && (k.length === 1 || k === " "))) { e.preventDefault(); press(lane, e.code); }
+    const lane = P.keys.indexOf(e.code);
+    // The highway wants its lane keys; on the moving line any bound key plays (either row).
+    if (lane >= 0 || (P.mode === "line" && boundKeys().has(e.code))) { e.preventDefault(); press(lane, e.code); }
     return;
   }
   if (!$("#result").hidden) {
-    if (k === "r" && !e.shiftKey) { e.preventDefault(); $("#r-retry").click(); }
+    if (e.code === "KeyR" && !e.shiftKey) { e.preventDefault(); $("#r-retry").click(); }
     else if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); drawMap(); }
     return;
   }
@@ -1695,7 +1752,7 @@ addEventListener("keydown", e => {
 addEventListener("keyup", e => {
   if (!$("#opts").hidden) keyTest(e, false);
   if (!P || P.done) return;
-  release(P.keys.indexOf(e.key.toLowerCase()), e.code);
+  release(P.keys.indexOf(e.code), e.code);
 });
 // Losing the window lets go of every key, and pauses a song in play.
 addEventListener("blur", () => { if (keyHeld.size) { keyHeld.clear(); drawKeyTest(); } if (P && !P.done && !P.paused && !$("#play").hidden) { for (const code of [...P.held]) release(-1, code); pause(true); } });
