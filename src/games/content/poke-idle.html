@@ -1079,7 +1079,10 @@ const QFORMES = {
 };
 // Arceus and Silvally take a type rather than a form: picked from a list in the detail.
 const ANY_TYPE = { 493: { what: "Plate", what2: "Plates", quest: "origin" }, 773: { what: "Memory", what2: "Memories", quest: "aether" } };
-const qforme = n => { const b = S.box[n], f = QFORMES[n] && b && b.forme && QFORMES[n].find(x => x.key === b.forme); return f && S.won && S.won[f.quest] ? f : null; };
+// A quest form is open once its quest is won. In Story, Year 3's Megalo Tower opens Dusk Mane and Dawn Wings
+// (S.won.necrozma) before Ultra Necrozma's summit fight (S.won.megalo).
+const formWon = f => !!(S && S.won && (S.won[f.quest] || (isStory() && f.num === 800 && f.key !== "ultra" && S.won.necrozma)));
+const qforme = n => { const b = S.box[n], f = QFORMES[n] && b && b.forme && QFORMES[n].find(x => x.key === b.forme); return f && formWon(f) ? f : null; };
 // The form a Pokémon is in, short of Mega and Gigantamax: Zygarde's formes, Urshifu's style, a quest form or a regional form.
 const altOf = n => zforme(n) || ustyle(n) || qforme(n) || variantOf(n);
 // Regional and quest forms go by their own names on tiles and in the detail ("Galarian Meowth", "Dusk Mane Necrozma").
@@ -2230,7 +2233,7 @@ function boxMatch(n, q) {
   q = q.toLowerCase(); if (!q) return true;
   const num = q.replace(/^#0*/, "");
   if (/^\d+$/.test(num)) return String(n) === num;
-  const names = [mon(n).name, nameOf(n), ...variantsOf(n).filter(v => hasVar(n, v.vid)).map(v => v.name), ...(S.won ? (QFORMES[n] || []).filter(f => S.won[f.quest]).map(f => f.name) : [])];
+  const names = [mon(n).name, nameOf(n), ...variantsOf(n).filter(v => hasVar(n, v.vid)).map(v => v.name), ...(S.won ? (QFORMES[n] || []).filter(formWon).map(f => f.name) : [])];
   return names.some(x => x.toLowerCase().includes(q));
 }
 // Box sorts: each Pokémon's stats now, at its level (the tile shows the value), and its base total for its potential.
@@ -2318,8 +2321,8 @@ function formeLine(n) {
     return `<div class="row small"><span class="muted">${A.what}</span><select data-plate="1" aria-label="${esc(mon(n).name)}'s type"${won ? "" : " disabled"}>${["", ...QFORMES[n].map(f => f.key)].map(k => `<option value="${k}"${k === cur ? " selected" : ""}>${k ? k.slice(2) : "Normal"}</option>`).join("")}</select><span class="muted">${won ? `any of the 17 ${A.what2}, same stats${tierBonus(mon(n)) > 1 ? `; ${bonusText(mon(n))} (Tier ${tierOf(mon(n))}) in every type` : ""}` : `win ${questAt(A.quest)} to change its type`}</span></div>`;
   }
   if (QFORMES[n]) {
-    const Q = QUEST[QFORMES[n][0].quest], won = S.won && S.won[Q.id], cur = qforme(n) ? S.box[n].forme : "";
-    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme$/, "").trim(), cur, won)).join("")}<span class="muted">${won ? QFORMES[n].filter(f => tierBonus(f) > 1).map(f => f.move ? bonusText(f) : `${f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme?$/, "").trim()} ×${tierBonus(f)}`).concat("same level").join("; ") : `win at ${theQ(Q)} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
+    const Q = QUEST[QFORMES[n][0].quest], won = QFORMES[n].some(formWon), cur = qforme(n) ? S.box[n].forme : "";
+    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme$/, "").trim(), cur, formWon(f))).join("")}<span class="muted">${won ? QFORMES[n].filter(f => tierBonus(f) > 1).map(f => f.move ? bonusText(f) : `${f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme?$/, "").trim()} ×${tierBonus(f)}`).concat("same level").join("; ") : `win at ${theQ(Q)} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
   }
   if (n === URSHIFU) {
     const cur = ustyle(n) ? "rapid" : "single", opt = (k, label) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-forme="${k}" aria-pressed="${k === cur}">${label}</button>`;
@@ -2618,6 +2621,8 @@ const MAIL = [
   { id: "story-y2-galar-889", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The other half", body: `<p>Shield and sword. The shrine will want to see both.</p><p>Prof Penguin</p>` },
   { id: "story-y2-paldea-1007", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The other half", body: `<p>Past and future. You picked the past first. So did I, once.</p><p>Prof Penguin</p>` },
   { id: "story-y2-paldea-1008", chapter: true, date: "Year 2", from: "Prof Penguin", title: "The other half", body: `<p>Future and past. You picked the future first. Good. Somebody should.</p><p>Prof Penguin</p>` },
+  { id: "story-y3-seven", chapter: true, date: "Year 3", from: "Sssssssnakes", title: "The night before",
+    body: `<p>I know what you found. The notes. The photo. He did the same thing to me he did to you. Sent me out. Didn't tell me anything. I used to think that meant he didn't trust me. I think maybe he didn't trust himself.</p><p>Go. I'll be at the League after. Someone has to be.</p><p>— Sssssssnakes</p>` },
   { id: "story-y3-keepgoing", chapter: true, date: "Year 3", from: "Prof Penguin", title: "Keep going", body: `<p>Keep going.</p>` },
   { id: "story-y3-slush-1", chapter: true, date: "Year 3", from: "Slush", title: "Dragonspiral",
     body: `<p>Dragonspiral changes guards at dusk. Hail's people hate the night shift, so the first hour is sloppy. Go at dusk.</p><p>— Slush</p>` },
@@ -3641,7 +3646,7 @@ const notePeak = b => { const L = lvlOf(b.xp); if (!(b.peak >= L)) b.peak = L; i
 function notePeaks() { if (S && S.box) for (const b of Object.values(S.box)) notePeak(b); }
 // Places outside the region lists: a side quest counts as its region (the Mystery Box as Galar), Mt. Silver as Johto,
 // the Max Raid Den as Galar. Year 2's places are here already, so the map stays in one place.
-const CATCH_PLACE = { underdepths: 8, summit: 1, raid: 7, distortion: 3, kitakami: 8, meteor: 2, southern: 2, abundant: 4, icirrus: 4, chasm: 4, towers: 7, meltan: 7, crown: 7, aether: 6 };
+const CATCH_PLACE = { cerulean: 0, sky: 2, megalo: 6, origin: 3, terminus: 5, darkest: 7, underdepths: 8, summit: 1, raid: 7, distortion: 3, kitakami: 8, meteor: 2, southern: 2, abundant: 4, icirrus: 4, chasm: 4, towers: 7, meltan: 7, crown: 7, aether: 6 };
 function catchRegion(src) {
   if (!src) return 0;
   if (src.place && src.place in CATCH_PLACE) return CATCH_PLACE[src.place];
@@ -3926,6 +3931,47 @@ const SCENES = {
   "y3-maps": { year: 3, r: 8, title: "The base maps", lines: [
     ["", "With every region free, Sssssssnakes spreads the base maps across the ground."],
     ["Sssssssnakes", "That's the regions. Now the real stuff. Their vaults, their towers, their HQ. In order."]] },
+  // Year 3's endgame (E2).
+  "y3-cerulean": { year: 3, r: 0, title: "The inner circle", lines: [["", "These are Team Thaw's three most secret strongholds, and each one holds something it took. You can do them in any order."],
+    ["", "Deep under Cerulean, Team Thaw kept two stones it was studying."]] },
+  "y3-cerulean-after": { year: 3, r: 0, title: "The inner circle", lines: [["", "You take back the Mewtwonite X and Y, and your Mewtwo can now Mega Evolve."]] },
+  "y3-sky": { year: 3, r: 2, title: "The inner circle", lines: [["", "At the summit of the Sky Pillar, the air is thin and freezing. Rayquaza's old meteorite shard is locked in a Team Thaw case."]] },
+  "y3-sky-after": { year: 3, r: 2, title: "The inner circle", lines: [["", "You free it, and Mega Rayquaza is unlocked."]] },
+  "y3-megalo": { year: 3, r: 6, title: "The inner circle", lines: [["", "At the very top of Megalo Tower, in a cage of Team Thaw cable, is Necrozma, drained and dim. Team Thaw was using it to steal light."]] },
+  "y3-megalo-after": { year: 3, r: 6, title: "The inner circle", lines: [
+    ["", "You free it, and Necrozma comes with you. It can fuse with your Solgaleo into Dusk Mane or with your Lunala into Dawn Wings."],
+    ["", "In a locked archive at the top of the tower, you find a box of papers. They're the founder's notes, the original designs for the Engine, dated twenty years ago."],
+    ["", "They're in Penguin's handwriting."]] },
+  "y3-ultra": { year: 3, r: 6, title: "Ultra Necrozma", lines: [["", "With both fusions unlocked, a new fight opens at the summit."]] },
+  "y3-ultra-after": { year: 3, r: 6, title: "Ultra Necrozma", lines: [["", "You win, and Ultra Necrozma is unlocked."]] },
+  "y3-origin": { year: 3, r: 3, title: "The First Freeze", lines: [
+    ["", "Arceus is waiting at the top of the world. Before it fights you, it shows you something."],
+    ["", "It's a small lab twenty years ago, with a young Prinplup in a top hat, laughing."],
+    ["", "Four students are around him: Sleet, Rime, Hail and Slush, young and eager. Sleet is the warmest of them all."],
+    ["", "Between them is a small machine, the first Engine. They built it to listen to the legends, to understand them by waking them very gently, just for a moment."],
+    ["", "Then it's the first test. It goes wrong. The legend wakes too far, and a whole region turns white. It's a winter that lasts a year."],
+    ["", "The young Penguin pulls the plug and pulls out the core."],
+    ["", "The students argue. Sleet says it worked, and that they just need to control it. Penguin says no, never again."],
+    ["", "Sleet walks out, and the others follow, one by one, with Slush last."],
+    ["", "The vision fades. Arceus looks down at you and tests you with a short trial, to see whether you understood what you saw."]] },
+  "y3-origin-after": { year: 3, r: 3, title: "The First Freeze", lines: [
+    ["", "You pass. Arceus joins you, and with it come all of its Plates, one for every type."],
+    ["Prof Penguin", "It's been holding those since before any of us were born. Don't lose them."],
+    ["", "A lab photo with five faces. In pen, someone has circled the one in the top hat."]] },
+  "y3-terminus": { year: 3, r: 5, title: "The Land Heals", lines: [["", "With the regions free, Zygarde's cells are waking up everywhere you've been. You gather all 100 of them and bring them to your Zygarde."]] },
+  "y3-terminus-after": { year: 3, r: 5, title: "The Land Heals", lines: [["", "You get Zygarde Complete, and with it, Mega Zygarde."], ["", "As each cell comes home, the frozen land begins to knit itself back together."]] },
+  "y3-dig": { year: 3, r: 8, title: "The Dig", lines: [["", "With Sssssssnakes' maps, you go back to the Underdepths and dig."], ["", "It takes a long time. Then something warm glows through the rock."]] },
+  "y3-dig-after": { year: 3, r: 8, title: "The Dig", lines: [["", "Terapagos comes out of the dark into your hands, glowing with Stellar light."], ["Prof Penguin", "I told you we'd come back for it."]] },
+  "y3-darkest": { year: 3, r: 7, title: "Give it back", lines: [["", "Team Thaw makes its last move. In the skies over Galar, they wake your stolen Eternatus, and they force it into Eternamax, to wake every legend in the world at once."]] },
+  "y3-darkest-after": { year: 3, r: 7, title: "Give it back", lines: [
+    ["", "You fight it, and you stop it."],
+    ["", "When the red light fades, Eternatus is on the ground, small and tired. It looks at you."],
+    ["", "Eternatus comes back to you, bonded and at its old level. The empty slot is filled."],
+    ["Prof Penguin", "It was always yours. They just borrowed it."]] },
+  "y3-darkest-copy": { year: 3, r: 7, title: "Give it back", lines: [
+    ["", "You fight it, and you stop it."],
+    ["", "When the red light fades, the copy comes apart into ice and cable. Yours was never theirs to take."]] },
+  "y3-night": { year: 3, r: 8, title: "The night before", lines: [["", "A letter from Sssssssnakes arrives. For the first and only time, it has the right number of s's."]] },
   "y2-interlude": { year: 2, r: -1, title: "The freeze takes the levels", lines: [
     ["", "You wake up the next morning and your team won't get up. They're not hurt, just slow and heavy, like they've been asleep for a hundred years."],
     ["", "Every one of them is down to Lv 5."],
@@ -4088,6 +4134,8 @@ const CLUES = {
   table: { title: "The card table", text: "An old camp in the Distortion World: a card table, an old deck, a shotgun, and an empty chair with a frosted top hat very like Prof Penguin's. Something waits behind it, like a dealer." },
   memos: { title: "Who sent the memos", text: "Slush, on the rock by the shore in Hoenn: \"I sent you the memos. Both of them. I wanted someone to stop us, and nobody else was going to.\"" },
   p: { title: "The note signed \"P.\"", text: "Old and yellowed, half-frozen to the card table in the Distortion World: \"Move the core before the students find it. Deeper. G. will guard it if I win the hand. — P.\" You know that handwriting." },
+  notes: { title: "The founder's notes", text: "A box of papers in a locked archive at the top of Megalo Tower: the original designs for the Engine, dated twenty years ago. They're in Penguin's handwriting." },
+  photo: { title: "The photo", text: "From the Hall of Origin: a lab photo with five faces. In pen, someone has circled the one in the top hat." },
   memo: { title: "Memo #1: The Engine", text: "No sender. \"The Engine wakes and binds each legend in turn, per the list.\" A second unit is \"assigned to the Director\"." }
 };
 // ── Year 1 chapters. Per region: gyms, the Champion, then (Johto, Unova, Galar) Sssssssnakes, the Team Thaw admin, and
@@ -4274,7 +4322,36 @@ const CHAPTERS = [
     unlock: "cave", pre: "y3-cave", post: "y3-cave-after", doneNote: "Primal Groudon and Kyogre", say: B => `Your Groudon and Kyogre's oldest forms wake in the orbs' light: ${B.queue.map(f => f.name).join(", ")}.` },
   // Sinnoh: back through the rift. The note signed "P.", and the dealer, in the light at last. No fight, no catch.
   { id: "y3-distortion", year: 3, r: 3, type: "scene", name: "The Distortion World", at: "the camp", after: ["y3-sinnoh-free"], pre: "y3-distortion", clue: "p", doneNote: "the core",
-    won: () => { S.seen[487] = 1; S.story.giratinaDebt = 1; } }
+    won: () => { S.seen[487] = 1; S.story.giratinaDebt = 1; } },
+  // The endgame (E2). The inner circle first, in any order: Cerulean Cave, Sky Pillar and Megalo Tower, each Classic's
+  // fight at your cap with its quest tuning. Megalo gives Necrozma at the cap and its fusions; Ultra Necrozma's summit
+  // (optional) waits for your Solgaleo and Lunala. Then the Hall of Origin (the vision, a short trial, Arceus with all
+  // its Plates), Terminus (optional: it needs a Zygarde and 100 cells), the Dig (Terapagos), the Darkest Day, and the
+  // night before Team Thaw HQ.
+  { id: "y3-cerulean", year: 3, r: 0, type: "hunt", name: "Cerulean Cave", at: "deep under Cerulean", after: ["y3-paldea-free"], foes: () => QUEST.cerulean.foes, tier: 1, atCap: true, place: "cerulean",
+    unlock: "cerulean", stones: MEWTWONITES, pre: "y3-cerulean", post: "y3-cerulean-after", doneNote: "both Mewtwonites", say: B => `Team Thaw's study stones wake around your Mewtwo: ${B.queue.map(f => f.name).join(", ")}.` },
+  { id: "y3-sky", year: 3, r: 2, type: "hunt", name: "Sky Pillar", at: "the summit", after: ["y3-paldea-free"], foes: () => QUEST.sky.foes, tier: 1, atCap: true, place: "sky",
+    unlock: "sky", stones: [MEGA_RAYQUAZA], pre: "y3-sky", post: "y3-sky-after", doneNote: "Mega Rayquaza", say: B => `Something guards the case at the top of the Sky Pillar: ${B.queue.map(f => f.name).join(", ")}.` },
+  { id: "y3-megalo", year: 3, r: 6, type: "hunt", name: "Megalo Tower", at: "the very top", after: ["y3-paldea-free"], foes: () => [mon(800)], tier: 1, atCap: true, place: "megalo",
+    unlock: "necrozma", gifts: [800], clue: "notes", pre: "y3-megalo", post: "y3-megalo-after", doneNote: "Necrozma", say: () => "Necrozma thrashes in its cage of Team Thaw cable, drained and dim. Calm it down." },
+  { id: "y3-ultra", year: 3, r: 6, type: "hunt", name: "Megalo Tower summit", at: "the summit", after: ["y3-megalo"], optional: true, foes: () => QUEST.megalo.foes, tier: 1, atCap: true, place: "megalo",
+    open: () => [791, 792].every(n => S.box[n] && !isFrozen(n)), note: () => [791, 792].every(n => S.box[n] && !isFrozen(n)) ? "optional" : "needs Solgaleo and Lunala",
+    unlock: "megalo", pre: "y3-ultra", post: "y3-ultra-after", doneNote: "Ultra Necrozma", say: () => "The stolen light comes back all at once, and Necrozma burns too bright to hold." },
+  { id: "y3-origin", year: 3, r: 3, type: "hunt", name: "Hall of Origin", at: "the top of the world", after: ["y3-cerulean", "y3-sky", "y3-megalo"], foes: () => [QUEST.origin.foes[0]], tier: 1, atCap: true, place: "origin",
+    unlock: "origin", gifts: [493], clue: "photo", won: () => { S.plates = PLATES_NEED; }, pre: "y3-origin", post: "y3-origin-after", doneNote: "Arceus, every Plate", say: () => "Arceus tests you, to see whether you understood what you saw." },
+  { id: "y3-terminus", year: 3, r: 5, type: "hunt", name: "Terminus Cave", at: "Terminus Cave", after: ["y3-origin"], optional: true, foes: () => QUEST.terminus.foes, tier: 1, atCap: true, place: "terminus",
+    open: () => !!S.box[ZYGARDE] && !isFrozen(ZYGARDE) && (S.cells || 0) >= 100,
+    note: () => !S.box[ZYGARDE] || isFrozen(ZYGARDE) ? "needs a Zygarde (the Kalos dungeon)" : (S.cells || 0) < 100 ? `Zygarde Cells ${S.cells || 0}/100` : "optional",
+    unlock: "terminus", stones: [10301], pre: "y3-terminus", post: "y3-terminus-after", doneNote: "Zygarde Complete, Mega Zygarde", say: B => `Every cell comes home: ${B.queue.map(f => f.name).join(", ")}.` },
+  { id: "y3-dig", year: 3, r: 8, type: "hunt", name: "The Dig", at: "the Underdepths", after: ["y3-origin"], foes: () => QUEST.underdepths.foes, tier: 3, atCap: true, place: "underdepths", catches: true,
+    unlock: "underdepths", pre: "y3-dig", post: "y3-dig-after", doneNote: "Terapagos", say: () => "Something warm glows through the rock. Terapagos comes out of the dark, glowing with Stellar light." },
+  // The Darkest Day: your stolen Eternatus, forced into Eternamax. Win it back, bonded, at its old level. If Team
+  // Thaw never got it (you kept it), the Engine sends a Thaw-bound copy instead, and nothing comes back.
+  { id: "y3-darkest", year: 3, r: 7, type: "hunt", name: "Darkest Day", at: "the skies over Galar", after: ["y3-dig"], foes: () => [S.story.eternatusStolen ? ETERNAMAX_FOE : { ...ETERNAMAX_FOE, name: `Thaw-bound ${ETERNAMAX_FOE.name}`, bound3: true }],
+    tier: 0, atCap: true, place: "darkest", pre: "y3-darkest", post: () => S && S.story.eternatusStolen ? "y3-darkest-after" : "y3-darkest-copy", doneNote: "Eternatus",
+    won: () => { S.eternamax = 1; S.gfactor[ETERNATUS] = 1; const b = S.box[ETERNATUS]; if (b && b.stolen) { delete b.stolen; delete b.frozen; b.bond = 1; } },
+    say: B => `Team Thaw's last move: ${B.queue[0].name}, to wake every legend in the world at once.` },
+  { id: "y3-night", year: 3, r: 8, type: "scene", name: "The night before", at: "", after: ["y3-darkest"], pre: "y3-night", letter: "story-y3-seven", doneNote: "a letter" }
 ].map(c => ({ year: 1, ...c }));
 // The chapters of the year this save is in. Red stays on Johto's list after Year 1, for rematches (no second Shiny Charm).
 const chaptersNow = () => CHAPTERS.filter(c => (c.year || 1) === storyYear());
