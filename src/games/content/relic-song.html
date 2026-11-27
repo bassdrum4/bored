@@ -51,31 +51,48 @@
 
   /* ── The map ─────────────────────────────────────────────────────────── */
   #map h1 { font-size: 30px; font-weight: 300; letter-spacing: .06em }
-  .say { margin: 10px 0 16px; display: flex; gap: 14px; align-items: center; min-height: 72px }
+  .say { margin: 8px 0 12px; display: flex; gap: 14px; align-items: center; min-height: 64px }
   .say img { flex: none }
   .say p { max-width: 900px; color: var(--ink) }
   /* The song itself: four verses on one staff, filled in as they come back. */
-  .verses { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); height: 22px; margin-bottom: 18px; border-radius: 3px; overflow: hidden }
+  .verses { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); height: 22px; margin-bottom: 12px; border-radius: 3px; overflow: hidden }
   .verses span { border-right: 1px solid var(--rule); font-size: 11px; letter-spacing: .1em; text-align: center; line-height: 20px; color: var(--dim) }
   .verses span:last-child { border-right: 0 }
   .verses span.got { background: var(--accent); color: #fff }
   .gyms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px }
-  .gym { position: relative; border: 1px solid var(--rule); background: var(--panel); padding: 12px; border-radius: 4px; overflow: hidden; min-height: 250px }
-  .gym .top { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; min-height: 64px }
+  .gym { position: relative; border: 1px solid var(--rule); background: var(--panel); padding: 12px; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column }
+  /* Every card's top is the same height, so the song rows and the badge line up across cards. */
+  .gym .top { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; height: 80px }
+  .gym .top > div { min-width: 0 }
+  .gym .top .dim { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px }
+  .gym .pic { flex: none; width: 80px; height: 80px; display: grid; place-items: center }
   .gym h2 { font-size: 19px }
-  .gym .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; margin-top: 6px; padding: 7px 10px }
-  .gym .rank { font-weight: 600; min-width: 1.5em; text-align: right; color: var(--gold) }
-  .gym .rank.dim { color: var(--faint); font-weight: 400 }
-  .gym .badge { font-size: 12px; margin-top: 8px; color: var(--faint) }
-  .gym .badge.got { color: var(--ink) }
+  /* A song row: the title (play), then a difficulty picker and the best rank and score. */
+  .gym .row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 6px; padding: 5px 10px; border: 1px solid var(--rule); border-radius: 4px; background: rgba(255, 255, 255, .04) }
+  .gym .row:hover:not(.off) { background: rgba(255, 255, 255, .09) }
+  .gym .row .t { flex: 1 1 auto; text-align: left; border: 0; background: none; padding: 2px 0 }
+  .gyms .row .t { flex-basis: 100% }
+  .gym .row .meta { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex: 1 1 auto; font-size: 12px }
+  .gym .pick { display: flex; gap: 4px }
+  .gym .pick button { padding: 0 6px; font-size: 11px; letter-spacing: .06em; border-radius: 3px }
+  .gym .pick button.on { background: rgba(255, 255, 255, .85); color: var(--bg) }
+  .gym .best { color: var(--gold); font-variant-numeric: tabular-nums }
+  .gym .best { min-width: 90px; text-align: right }
+  .gym .best.dim { color: var(--dim) }
+  .finale .row .meta { flex: none; gap: 16px }
+  .gym .row.off .t { color: var(--faint) }
+  .gym .badge { font-size: 12px; margin-top: auto; padding-top: 8px; color: var(--faint) }
+  .gym .badge.got { color: var(--gold) }
   /* Frost over a gym whose verse is still missing; it thaws once the badge is won. */
   .gym::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; transition: opacity 1.2s;
                 background: repeating-linear-gradient(60deg, transparent 0 14px, rgba(200, 225, 240, .08) 14px 15px),
                             repeating-linear-gradient(-60deg, transparent 0 14px, rgba(200, 225, 240, .08) 14px 15px), rgba(170, 205, 225, .05) }
   .gym.thawed::after { opacity: 0 }
   .gym.locked > * { opacity: .4 }
-  .finale { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
+  .finale { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
   .finale .gym { min-height: 0 }
+  .finale .gym .row { margin-top: 4px }
+  .hidden-list h2 { font-size: 17px }
 
   /* ── Overlays: options, calibration, board, first launch, pause ──────── */
   .over { position: absolute; inset: 0; background: rgba(4, 6, 9, .66); display: grid; place-items: center; z-index: 20 }
@@ -112,13 +129,13 @@
   #guides { position: absolute; inset: 0; pointer-events: none; transition: opacity .9s; z-index: 1 }
   #guides.out { opacity: 0 }
   #guides i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .09) }
-  #guides .glow { position: absolute; top: 0; height: 600px; width: 240px; background: linear-gradient(to top, rgba(255, 255, 255, .09), transparent 70%); opacity: 0; transition: opacity .08s }
+  #guides .glow { position: absolute; top: 0; height: 540px; width: 240px; background: linear-gradient(to top, rgba(255, 255, 255, .09), transparent 70%); opacity: 0; transition: opacity .08s }
   #guides .glow.down { opacity: 1 }
-  #keys { position: absolute; left: 0; right: 0; top: 612px; height: 40px; z-index: 2; pointer-events: none; transition: opacity .9s }
+  #keys { position: absolute; left: 0; right: 0; top: 550px; height: 40px; z-index: 2; pointer-events: none; transition: opacity .9s }
   #keys.out { opacity: 0 }
   #keys div { position: absolute; width: 240px; margin-left: -120px; text-align: center; line-height: 1.2 }
-  #keys b { display: block; font-size: 15px; font-weight: 400; color: rgba(255, 255, 255, .6) }
-  #keys span { font-size: 12px; letter-spacing: .06em; color: rgba(255, 255, 255, .6) }
+  #keys b { display: block; font-size: 18px; font-weight: 400; color: rgba(255, 255, 255, .62) }
+  #keys span { font-size: 14px; letter-spacing: .04em; color: rgba(255, 255, 255, .6) }
 
   /* Notes fade in below the HUD band at the top, so nothing crowds the combo or the score. */
   #lines { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(to bottom, transparent 0 100px, #000 170px); mask-image: linear-gradient(to bottom, transparent 0 100px, #000 170px) }
@@ -140,6 +157,7 @@
   .nt .beam { position: absolute; left: 0; right: 0; bottom: 5px; background: linear-gradient(to top, rgba(160, 225, 255, .55), var(--beam));
               border: 1px solid rgba(255, 255, 255, .85); border-bottom: 0; border-top-width: 2px; border-radius: 5px 5px 0 0 }
   .nt.miss { opacity: 0; transition: opacity .25s }
+  .nt.morph { transition: left .7s ease-in-out, width .7s ease-in-out }
   .nt.done { display: none }
   .skin-charm .nt .head { background: radial-gradient(circle at 20% 40%, #fff 0 1.2px, transparent 2px) 0 0 / 14px 10px,
                 linear-gradient(90deg, #c9c2db, #fbf8ff 40%, #f0c9e6 60%, #bdb5d1) !important;
@@ -149,15 +167,11 @@
     clip-path: polygon(0 100%, 0 30%, 12% 62%, 25% 10%, 38% 62%, 50% 0, 62% 62%, 75% 10%, 88% 62%, 100% 30%, 100% 100%) }
   .skin-crown .nt .beam { background: linear-gradient(to top, rgba(120, 140, 220, .5), rgba(60, 80, 160, .25)) }
 
-  /* Hit bursts: an expanding square turning 45°, two quarter arcs, a few flying bits. */
+  /* Hit bursts: an expanding square turning 45° and a few small squares flying out. Nothing else. */
   .burst { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; color: var(--c) }
   .burst .sq { position: absolute; left: -32px; top: -32px; width: 64px; height: 64px; border: 2px solid currentColor; box-shadow: 0 0 12px currentColor; animation: bsq .42s ease-out forwards }
-  .burst .arc { position: absolute; left: -42px; top: -42px; width: 84px; height: 84px; border-radius: 50%; border: 3px solid transparent; border-top-color: currentColor; animation: barc .42s ease-out forwards }
-  .burst .arc + .arc { animation-name: barc2 }
   .burst .bit { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; background: currentColor; animation: bbit .42s ease-out forwards }
   @keyframes bsq { from { transform: scale(.45) rotate(0); opacity: 1 } to { transform: scale(1.35) rotate(45deg); opacity: 0 } }
-  @keyframes barc { from { transform: rotate(0) scale(.6); opacity: .9 } to { transform: rotate(120deg) scale(1.15); opacity: 0 } }
-  @keyframes barc2 { from { transform: rotate(180deg) scale(.6); opacity: .9 } to { transform: rotate(300deg) scale(1.15); opacity: 0 } }
   @keyframes bbit { from { transform: translate(0, 0) rotate(0); opacity: 1 } to { transform: translate(var(--dx), var(--dy)) rotate(90deg); opacity: 0 } }
 
   /* Muted mode: a ring on the line that pulses every beat. */
@@ -167,18 +181,19 @@
 
   /* The battle layer. The boss sits top right under the score (name, HP, sprite), your
      side bottom left (battle text, sprite, name, HP) above the song name; nothing over the lanes. */
-  #foecol { position: absolute; right: 28px; top: 58px; width: 300px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; z-index: 6 }
-  #mecol { position: absolute; left: 28px; bottom: 44px; width: 240px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; z-index: 6 }
-  .nm { font-size: 12px; letter-spacing: .08em; color: var(--dim) }
+  #foecol { position: absolute; right: 28px; top: 56px; width: 300px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; z-index: 6 }
+  #mecol { position: absolute; left: 28px; bottom: 40px; width: 240px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; z-index: 6 }
+  .nm { font-size: 13px; letter-spacing: .06em; color: var(--dim) }
+  #boss-name { font-size: 15px; color: rgba(255, 255, 255, .75) }
   .thin { width: 100%; height: 3px; background: rgba(255, 255, 255, .12); border-radius: 2px; overflow: hidden }
   .thin i { display: block; height: 100%; width: 100%; transition: width .2s; background: var(--hp, #fff); box-shadow: 0 0 8px var(--hp, #fff) }
   #foecol .spr { margin-top: 10px }
-  #mecol .spr { margin-bottom: 4px }
+  #mecol .spr { margin-bottom: 2px }
   /* Sprites: their own shape at a whole-number scale, a soft glow in the tint, a slow bob. */
   .spr { opacity: .85; filter: drop-shadow(0 0 6px var(--tint)) drop-shadow(0 0 16px var(--tint)); animation: bob 2.8s ease-in-out infinite }
   .spr.pir { filter: hue-rotate(-60deg) saturate(2) drop-shadow(0 0 6px var(--tint)) drop-shadow(0 0 16px var(--tint)) }
   @keyframes bob { 50% { transform: translateY(-3px) } }
-  #btext { min-height: 18px; font-size: 13px; color: var(--dim); transition: opacity .5s; opacity: 0 }
+  #btext { position: absolute; left: 50%; bottom: 44px; width: 600px; margin-left: -300px; text-align: center; font-size: 13px; color: var(--dim); transition: opacity .5s; opacity: 0; z-index: 6 }
   #btext.on { opacity: 1; transition: none }
   .hurt { animation: hurt .18s }
   @keyframes hurt { 50% { filter: brightness(2.5); transform: translateX(3px) } }
@@ -235,7 +250,8 @@
     <div id="score">0000000</div>
     <div id="beatdot" hidden></div>
     <div id="foecol" hidden><div class="nm" id="boss-name"></div><div class="thin"><i id="boss-hp"></i></div><img class="spr" id="boss-img" alt=""></div>
-    <div id="mecol" hidden><div id="btext"></div><img class="spr" id="me-img" alt=""><div class="nm" id="me-name"></div><div class="thin"><i id="me-hp"></i></div></div>
+    <div id="btext"></div>
+    <div id="mecol" hidden><img class="spr" id="me-img" alt=""><div class="nm" id="me-name"></div><div class="thin"><i id="me-hp"></i></div></div>
     <div id="songname"></div><div id="songlv"></div>
     <div id="relicfx"><img id="relic-img" alt=""><p id="relic-name">Relic Song</p><small id="relic-sub"></small></div>
     <div id="whiteflash"></div>
@@ -555,15 +571,15 @@ const VERSES = [
    line is the movement script for the judgment line, in beats from the break. */
 const SONGS = [
   // ── Brock, Pewter Gym (Rock) ──
-  { id: "pewter-steps", gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
+  { id: "pewter-steps", lv: { hd: 2 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
     parts: { A: { lead: "c5 - e5 - g5 - e5 - | f5 - a5 - g5 - - - | e5 - g5 - c6 - g5 - | f5 - e5 - d5 - - -", chords: "C F C G" },
              B: { lead: "a4 - c5 - e5 - - - | f5 - e5 - d5 - - - | g4 - b4 - d5 - g5 - | e5 - d5 - c5 - - -", chords: "Am F G C" } },
     form: "A A B B A A B A" },
-  { id: "boulder-march", gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
+  { id: "boulder-march", lv: { hd: 3 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
     parts: { A: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
              B: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D" } },
     form: "A A B A A B B A" },
-  { id: "onix-rising", gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
+  { id: "onix-rising", lv: { hd: 4 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
     parts: { A: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
@@ -573,15 +589,15 @@ const SONGS = [
            { at: 40, len: 1, kind: "fly", x: 640, y: 520, rot: 8 }, { at: 48, len: 2, kind: "fly", x: 640, y: 480, rot: 0 }] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
+  { id: "cerulean-current", lv: { hd: 4 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
     parts: { A: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
              B: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D" } },
     form: "A A B A B B A A" },
-  { id: "tidepool-waltz", gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
+  { id: "tidepool-waltz", lv: { hd: 5 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
     parts: { A: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
              B: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A" } },
     form: "A A B A A B B A A A B A A B B A" },
-  { id: "starmie-undertow", gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
+  { id: "starmie-undertow", lv: { hd: 6 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
     parts: { A: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
              B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
              C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
@@ -590,15 +606,15 @@ const SONGS = [
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 470, rot: 0 }, { at: 2, len: 62, kind: "tide", amp: 90, period: 8, tilt: 6 }] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
-  { id: "vermilion-voltage", gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
+  { id: "vermilion-voltage", lv: { hd: 7 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
              B: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "lightning-rod", gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
+  { id: "lightning-rod", lv: { hd: 8 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
     parts: { A: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
              B: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "raichu-overload", gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
+  { id: "raichu-overload", lv: { hd: 9 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
              B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
@@ -615,15 +631,15 @@ const SONGS = [
     split: [[24, 56]] },
 
   // ── Erika, Celadon Gym (Grass) ──
-  { id: "celadon-petals", gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
+  { id: "celadon-petals", lv: { hd: 7 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
     parts: { A: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
              B: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F" } },
     form: "A A B A B B A A" },
-  { id: "gloom-garden", gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
+  { id: "gloom-garden", lv: { hd: 8 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
     parts: { A: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
              B: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm" } },
     form: "A A B A B B A A" },
-  { id: "vileplume-drift", gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
+  { id: "vileplume-drift", lv: { hd: 10 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
     parts: { A: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
              B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
              C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
@@ -632,7 +648,7 @@ const SONGS = [
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 380, rot: 0 }, { at: 2, len: 62, kind: "drift", ampX: 220, period: 16, sway: 22, fall: 2.2 }] },
 
   // ── The finale: Meloetta ──
-  { id: "relic-song", gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
+  { id: "relic-song", lv: { hd: 12 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
     parts: { A: { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "Em C G D" },
              B: { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - - | g5 - a5 - b5 - d6 - | e6 - - - - - . .", chords: "Am Em G Em" },
              C: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | g5 a5 b5 c6 d6 c6 b5 a5 | b5 - - - - - - - | e5 - - - . . . .", chords: "Em D C B", burst: true },
@@ -644,7 +660,7 @@ const SONGS = [
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 }, { at: 2, len: 16, kind: "tide", amp: 70, period: 8, tilt: 5 },
            { at: 18, len: 16, kind: "zap", every: 2, spots: [[640, 460, 0], [480, 400, -20], [800, 520, 16], [640, 360, 0]] },
            { at: 34, len: 2, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 36, len: 26, kind: "drift", ampX: 200, period: 14, sway: 20, fall: 1.8 },
-           { at: 62, len: 2, kind: "fly", x: 640, y: 600, rot: 0 },
+           { at: 62, len: 2, kind: "fly", x: 640, y: 540, rot: 0 },
            { at: 104, len: 2, kind: "fly", x: 640, y: 480, rot: 0 }, { at: 106, len: 16, kind: "zap", every: 2, spots: [[640, 480, 0], [500, 420, 18], [780, 420, -18], [640, 540, 0]] },
            { at: 122, len: 16, kind: "tide", amp: 80, period: 8, tilt: 8 }, { at: 138, len: 18, kind: "spin", perBeat: 11.25 },
            { at: 106, len: 2, kind: "fly", x: 640, y: 220, rot: 0, line: 1 },
@@ -653,21 +669,23 @@ const SONGS = [
     split: [[106, 122]] },
 
   // ── Hidden tracks ──
-  { id: "the-dealer", hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007,
+  { id: "the-dealer", lv: { hd: 9 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007,
     parts: { A: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
              B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G" } },
     form: "A A B A B A", note: "Six beats a bar. The house always counts its own way." },
-  { id: "its-started-go", hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true,
+  { id: "its-started-go", lv: { hd: 1 }, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true,
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497,
+  { id: "sssssssnakes", lv: { hd: 10 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497,
     parts: { A: { lead: "e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - a4 - g4 - f#4 - - - . . . .", chords: "Em Em" },
              B: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" } },
     form: "A A B A A B B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
 ];
 // Every song ships one difficulty today; the chart builder already takes the rest.
+// lv is each chart's level, shown bottom right in play and on the map: gym 1 lowest, the finale highest.
 for (const s of SONGS) s.diffs = s.diffs || ["hd"];
+const levelOf = (song, diff) => (song.lv && song.lv[diff]) || 1;
 
 const GYMS = [
   { name: "Brock", place: "Pewter Gym", type: "Rock", badge: "Boulder Badge", ace: 95, aceName: "Onix", style: "rock",
@@ -803,7 +821,7 @@ const MOVES = {
   spin: (s, t, g) => { s.rot += g.perBeat * t; }
 };
 // The highway's line: horizontal, near the bottom. A boss's line starts here when it breaks free.
-const HOME = { x: 640, y: 600, rot: 0 };
+const HOME = { x: 640, y: 540, rot: 0 };
 // A segment with line: 1 moves the second line. It appears where the first one is at its
 // first segment and flies apart from it; song.split says when it is on screen.
 function lineAt(script, beat, which = 0) {
@@ -850,21 +868,29 @@ const rankIndex = r => ["C", "B", "A", "S"].indexOf(r);
 
 /* ── The map ───────────────────────────────────────────────────────────── */
 function say(text, num = MELOETTA, pir = false) {
-  pix($("#say-img"), sprite(num), 110); $("#say-img").className = pir ? "pir" : "";
+  pix($("#say-img"), sprite(num), 80); $("#say-img").className = pir ? "pir" : "";
   $("#say-text").textContent = text;
 }
+// The difficulty each song row has picked (this session). One per song ships today.
+const picked = {};
+const pickedDiff = song => song.diffs.includes(picked[song.id]) ? picked[song.id] : song.diffs[0];
 function songRow(song, label) {
-  const b = bestOf(song), ok = open(song);
-  const btn = el("button", "row");
-  btn.type = "button";
-  btn.disabled = !ok;
-  const t = el("span", "t", label || song.title);
-  const r = el("span", "rank", b ? b.rank : ok ? "" : "locked");
-  if (!ok) r.className = "rank dim";
-  btn.append(t, r);
-  btn.title = b ? fmt(b.score) + " · " + DIFF_NAME[song.diffs[0]] : song.title;
-  btn.onclick = () => start(song);
-  return btn;
+  const ok = open(song), diff = pickedDiff(song), b = bestOf(song, diff);
+  const row = el("div", "row" + (ok ? "" : " off"));
+  const t = el("button", "t", label || song.title);
+  t.type = "button"; t.disabled = !ok;
+  t.onclick = () => start(song, pickedDiff(song));
+  const meta = el("span", "meta");
+  const pick = el("span", "pick");
+  for (const d of song.diffs) {
+    const c = el("button", d === diff ? "on" : "", DIFF_NAME[d] + " " + levelOf(song, d));
+    c.type = "button"; c.disabled = !ok; c.title = DIFF_NAME[d] + " Lv." + levelOf(song, d);
+    c.onclick = () => { picked[song.id] = d; drawMap(); };
+    pick.append(c);
+  }
+  meta.append(pick, el("span", "best" + (b ? "" : " dim"), !ok ? "locked" : b ? b.rank + " · " + fmt(b.score) : "-"));
+  row.append(t, meta);
+  return row;
 }
 function drawMap() {
   showScreen("map");
@@ -879,27 +905,27 @@ function drawMap() {
   const gyms = $("#gyms"); gyms.replaceChildren();
   GYMS.forEach((g, i) => {
     const card = el("div", "gym" + (save.badges[i] ? " thawed" : "") + (open(gymSongs(i)[0]) ? "" : " locked"));
-    const top = el("div", "top"), img = el("img"); pix(img, sprite(g.ace), 80); img.alt = g.aceName;
+    const top = el("div", "top"), pic = el("span", "pic"), img = el("img"); pix(img, sprite(g.ace), 80); img.alt = g.aceName; pic.append(img);
     const who = el("div"); who.append(el("h2", "", g.name), el("div", "dim", g.place + " · " + g.type));
-    top.append(img, who);
+    top.append(pic, who);
     card.append(top);
     const [s1, s2, boss] = gymSongs(i);
     card.append(songRow(s1), songRow(s2), songRow(boss, "Boss: " + boss.title));
-    card.append(el("div", "badge" + (save.badges[i] ? " got" : ""), save.badges[i] ? g.badge + " · verse " + (i + 1) + " back" : g.badge));
+    card.append(el("div", "badge" + (save.badges[i] ? " got" : ""), save.badges[i] ? g.badge + " · earned · verse " + (i + 1) + " back" : g.badge + " · not earned"));
     gyms.append(card);
   });
   const fin = $("#finale"); fin.replaceChildren();
   const final = SONGS.find(s => s.final);
   const fc = el("div", "gym" + (save.badges[4] ? " thawed" : "") + (open(final) ? "" : " locked"));
-  const top = el("div", "top"), img = el("img"); pix(img, sprite(MELOETTA), 80); img.alt = "Meloetta";
+  const top = el("div", "top"), pic = el("span", "pic"), img = el("img"); pix(img, sprite(MELOETTA), 80); img.alt = "Meloetta"; pic.append(img);
   const who = el("div"); who.append(el("h2", "", "Meloetta"), el("div", "dim", "The whole song · Aria and Pirouette"));
-  top.append(img, who); fc.append(top, songRow(final, "Final: " + final.title));
+  top.append(pic, who); fc.append(top, songRow(final, "Final: " + final.title));
   fin.append(fc);
   const hc = el("div", "gym thawed hidden-list");
   hc.append(el("h2", "", "Hidden tracks"));
   for (const s of SONGS.filter(x => x.hidden)) {
     if (hiddenOpen(s)) hc.append(songRow(s));
-    else { const b = el("button", "row"); b.type = "button"; b.disabled = true; b.append(el("span", "t", "???"), el("span", "rank dim", "")); hc.append(b); }
+    else { const r = el("div", "row off"), t = el("button", "t", "???"); t.type = "button"; t.disabled = true; r.append(t, el("span", "meta", el("span", "best dim", "-"))); hc.append(r); }
   }
   fin.append(hc);
   const next = GYMS.findIndex((g, i) => !save.badges[i]);
@@ -1046,10 +1072,10 @@ const LANE = 240, laneX = lane => (lane - 1.5) * LANE;
 const songTint = song => song.boss ? TINT.aria : song.gym != null ? TINT[GYMS[song.gym].type] : TINT[song.style] || TINT.plain;
 const songArt = song => song.final ? MELOETTA : song.gym != null ? GYMS[song.gym].ace : song.art || MELOETTA;
 
-function start(song) {
+function start(song, diff = pickedDiff(song)) {
   if (!opts.asked) { $("#first").hidden = false; return; }
   const c = audio(); c.resume();
-  const B = built(song);
+  const B = built(song, diff);
   const boss = song.boss ? bossOf(song) : null;
   // The buddy's edge: super effective on the boss (either form in the finale) is +3% score.
   let edge = false;
@@ -1069,7 +1095,7 @@ function start(song) {
     const you = yourSide(song);
     const dmg = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 + BATTLE.charge : n.kind === "drag" ? 0.5 : 1), 0);
     P.battle = { you, youHp: BATTLE.youHp, bossMax: dmg * BATTLE.bossShare, bossHp: dmg * BATTLE.bossShare, hurt: song.final ? BATTLE.finalHurt : BATTLE.missHurt };
-    pix($("#me-img"), sprite(you.num, you.shiny)); $("#me-name").textContent = you.name;
+    pix($("#me-img"), sprite(you.num, you.shiny), 106); $("#me-name").textContent = you.name;
     pix($("#boss-img"), sprite(boss.num)); $("#boss-img").className = "spr"; $("#boss-name").textContent = boss.name + " · " + boss.types.join("/");
     $("#boss-hp").style.width = $("#me-hp").style.width = "100%";
     // Each HP line in its Pokémon's type colour (the buddy's first type, the boss's last).
@@ -1081,7 +1107,7 @@ function start(song) {
   $("#play").className = "screen skin-" + skin();
   backdrop(songArt(song), songTint(song));
   $("#songname").textContent = song.title + (P.test ? " · test" : "");
-  $("#songlv").textContent = DIFF_NAME[B.diff] + " Lv." + Math.max(1, Math.min(16, Math.round(B.chart.length / B.seconds * 4)));
+  $("#songlv").textContent = DIFF_NAME[B.diff] + " Lv." + levelOf(song, B.diff);
   $("#beatdot").hidden = !!opts.sound;
   // Lanes: three faint lines, a glow per lane while its key is down, and the keys under the line.
   const guides = $("#guides"); guides.replaceChildren(); guides.className = "";
@@ -1099,15 +1125,17 @@ function start(song) {
     const rel = n.b - B.verseAt;
     n.line = n.mode === "line" && splitAt(song, rel - 3) && splitAt(song, rel + 1) && n.lane >= 2 ? 1 : 0;
     n.side = n.line ? -1 : 1;
-    n.x = n.mode === "highway" ? laneX(n.lane) : (n.lane - 1.5) * 150 + ((n.i * 37) % 5 - 2) * 14;
-    const w = n.kind === "drag" ? 90 : n.mode === "highway" ? 200 : 150;
+    // Two layouts: the highway's (wide, on the lanes) and the line's (narrower). Every note starts
+    // on the highway's, and a line note narrows to its own while Meloetta sings (see frame).
+    n.hw = { x: laneX(n.lane), w: n.kind === "drag" ? 90 : 200 };
+    n.ln = n.mode === "line" ? { x: (n.lane - 1.5) * 150 + ((n.i * 37) % 5 - 2) * 14, w: n.kind === "drag" ? 90 : 150 } : n.hw;
     const d = el("div", "nt" + (n.dbl ? " dbl" : "") + (n.kind === "drag" ? " drag" : "") + (n.kind === "hold" ? " hold" : ""));
-    d.style.left = (n.x - w / 2) + "px"; d.style.width = w + "px";
     if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.len * pxBeat) + "px"; d.append(beam); }
     d.append(el("div", "head"));
     d.style.display = "none";
     P.lines[n.line].append(d);
     n.el = d;
+    layout(n, n.hw);
   }
   $("#relicfx").className = ""; $("#pausebox").hidden = true;
   showScreen("play");
@@ -1154,6 +1182,7 @@ function segmentAt(beat) {
   }
   return { mode, form, show };
 }
+const layout = (n, L) => { n.x = L.x; n.el.style.left = (L.x - L.w / 2) + "px"; n.el.style.width = L.w + "px"; };
 const place = (d, s) => { d.style.transform = "translate(" + s.x + "px," + s.y + "px) rotate(" + s.rot + "deg)"; };
 
 function frame() {
@@ -1174,7 +1203,11 @@ function frame() {
     $("#relic-name").textContent = at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
     $("#relic-sub").textContent = at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
     $("#relicfx").className = "on";
-    if (at.mode === "highway") { $("#guides").className = "out"; $("#keys").className = "out"; }
+    if (at.mode === "highway") {
+      $("#guides").className = "out"; $("#keys").className = "out";
+      // The notes still to come narrow to the line's layout during the flash, not all at once.
+      for (const n of P.notes) if (n.mode === "line" && n.state === 0 && !n.morphed) { n.morphed = true; n.el.classList.add("morph"); layout(n, n.ln); }
+    }
   }
   if (at.show && P.showing && !P.turned && (beat - at.show.from) / (at.show.to - at.show.from) > 0.55) {
     P.turned = true;
@@ -1219,7 +1252,7 @@ function frame() {
       const left = Math.max(0, (n.tEnd - t) * px);
       n.el.firstChild.style.height = left + "px";
       n.el.style.transform = n.side < 0 ? "scaleY(-1)" : "none";
-      if (t - (n.fx || 0) > 0.16) { n.fx = t; burst(n, n.hit, true); }
+      if (t - (n.fx || 0) > 0.22) { n.fx = t; burst(n, n.hit); }
       continue;
     }
     if (dy > 760) { n.el.style.display = "none"; if (n.t - t > 8) break; continue; }
@@ -1276,14 +1309,13 @@ function judgeTail(n, j) {
 }
 // A hit's burst, on the note's line where it landed: Perfect gold, Great light blue, Good faint white.
 const BURST = { Perfect: "var(--perfect)", Great: "var(--great)", Good: "var(--good)" };
-function burst(n, j, small) {
+function burst(n, j) {
   if (!BURST[j]) return;
   const b = el("div", "burst");
   b.style.left = n.x + "px";
   b.style.setProperty("--c", BURST[j]);
-  if (small) b.style.transform = "scale(.6)";
-  b.append(el("div", "sq"), el("div", "arc"), el("div", "arc"));
-  for (let k = 0; k < (small ? 2 : 5); k++) {
+  b.append(el("div", "sq"));
+  for (let k = 0; k < 5; k++) {
     const bit = el("div", "bit"), a = Math.random() * Math.PI * 2, r = 50 + Math.random() * 50;
     bit.style.setProperty("--dx", Math.cos(a) * r + "px"); bit.style.setProperty("--dy", Math.sin(a) * r + "px");
     b.append(bit);
@@ -1298,7 +1330,7 @@ function count(j) {
   if (opts.jtext) $("#jtext").textContent = j;
   hud();
 }
-// The battle's running commentary: small, bottom left, gone after a second and a half.
+// The battle's running commentary: small, centred under the lanes, gone after a second and a half.
 function say2(text) {
   const b = $("#btext");
   b.textContent = text; b.className = text ? "on" : "";
@@ -1356,7 +1388,7 @@ function stop() {
   master = ctx.createGain(); master.connect(ctx.destination); setVolume();
   if (ctx.state === "suspended") ctx.resume();
 }
-function retry() { const s = P && P.song; stop(); if (s) start(s); }
+function retry() { const s = P && P.song, d = P && P.B.diff; stop(); if (s) start(s, d); }
 
 /* ── Results, coins and the board ──────────────────────────────────────── */
 function finish(reachedEnd) {
@@ -1416,7 +1448,7 @@ function showResult({ song, diff, s, rank, won, why }) {
     if (better) G.submit(song.id, diff, save.best[key].score).catch(() => {});
   } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn coins and post scores.";
 }
-$("#r-retry").onclick = () => { if (P) start(P.song); };
+$("#r-retry").onclick = () => { if (P) start(P.song, P.B.diff); };
 $("#r-map").onclick = () => drawMap();
 $("#b-resume").onclick = () => pause(false);
 $("#pausebtn").onclick = e => { e.currentTarget.blur(); pause(true); };
