@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Duck Life 3: Evolution</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#1b292b;color:white;font:16px system-ui}#stage{display:grid;place-items:center;width:100%;height:100%}ruffle-player{display:block;width:100%;height:100%}#status{position:absolute;text-align:center;pointer-events:none}</style>
+<script src="ruffle/ruffle.js"></script></head><body><main id="stage"><div id="status" role="status">Loading Duck Life 3...</div></main>
+<script>
+(async()=>{const status=document.getElementById('status');try{
+const player=window.RufflePlayer.newest().createPlayer();
+document.getElementById('stage').appendChild(player);
+await player.ruffle().load({url:'game.swf',autoplay:'on',unmuteOverlay:'hidden',allowScriptAccess:false,allowNetworking:'internal',openUrlMode:'deny',letterbox:'on',splashScreen:false});
+status.remove();player.focus();
+}catch(error){status.textContent='Duck Life 3 could not load. Reopen the game to retry.';console.error(error)}})();
+</script></body></html>
