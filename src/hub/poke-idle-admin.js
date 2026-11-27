@@ -4,7 +4,7 @@ const $ = s => document.querySelector(s);
 let rows = [], epoch = 0;
 function node(tag, value) { const n = document.createElement(tag); if (value !== undefined) n.textContent = String(value); return n; }
 function party(save) {
-  return Array.isArray(save?.party) ? save.party.slice(0,6).map(p => '#' + p.num + ' Lv ' + p.lvl + (p.battleLvl != null && p.battleLvl !== p.lvl ? ' (battle ' + p.battleLvl + ')' : '') + (p.shiny ? ' shiny' : '') + (p.form ? ' · ' + p.form : '') + (p.mega ? ' · ' + p.mega : '')).join('; ') : '—';
+  return Array.isArray(save?.party) ? save.party.slice(0,6).filter(p => p && typeof p === 'object').map(p => '#' + p.num + ' Lv ' + p.lvl + (p.battleLvl != null && p.battleLvl !== p.lvl ? ' (battle ' + p.battleLvl + ')' : '') + (p.shiny ? ' shiny' : '') + (p.form ? ' · ' + p.form : '') + (p.mega ? ' · ' + p.mega : '')).join('; ') : '—';
 }
 function summary(s, story) {
   if (!s || typeof s !== 'object') return 'No save';
