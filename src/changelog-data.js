@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1022,
+  "count": 1024,
   "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3f1567f3","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5b: switch Year 3 on"},
+  {"sha":"fdbefe38","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5a: Replay Year 3, achievements, wiki and Mail"},
   {"sha":"6f4c3142","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 4: Sleet, Prof Penguin and the ending"},
   {"sha":"455972e0","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 3: the endgame, part 1"},
   {"sha":"c7931a96","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 2: the nine liberation fights"},
