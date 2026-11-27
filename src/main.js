@@ -880,7 +880,7 @@ window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); r
   claims,
   // Tower defense: battles, rewards and missions (src/hub/td.js).
   td: tdBridge({ onChange: () => requestCloudPush() }),
-  // Relic Song: song payouts, the buddy and the Roulette flag it reads, its board (src/hub/relic-song.js).
+  // Relic Song: song payouts, and the buddy and the Roulette flag it reads (src/hub/relic-song.js).
   relic: relicBridge({ onChange: () => requestCloudPush() }),
   // The Collector's way to chips: today's net at Shotgun Roulette against its cap, and a door to it.
   casino: {

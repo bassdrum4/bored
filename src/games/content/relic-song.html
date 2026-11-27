@@ -94,7 +94,7 @@
   .finale .gym .row { margin-top: 4px }
   .hidden-list h2 { font-size: 17px }
 
-  /* ── Overlays: options, calibration, board, first launch, pause ──────── */
+  /* ── Overlays: options, calibration, first launch, pause ─────────────── */
   .over { position: absolute; inset: 0; background: rgba(4, 6, 9, .66); display: grid; place-items: center; z-index: 20 }
   .card { width: 620px; max-height: 660px; overflow: auto; background: rgba(18, 21, 27, .95); border: 1px solid var(--rule); border-radius: 6px; padding: 22px 26px }
   .card h2 { font-size: 22px; font-weight: 400; margin-bottom: 10px }
@@ -105,12 +105,6 @@
   .card table { width: 100%; border-collapse: collapse }
   .card td { padding: 5px 4px; border-bottom: 1px solid var(--rule) }
   .card td:last-child { text-align: right }
-  .card td.rk { width: 2.4em; color: var(--dim); font-variant-numeric: tabular-nums }
-  .card td.who .wi { display: flex; gap: 10px; align-items: center }
-  /* A board picture: the buddy in a circle, or the player's initial. */
-  .av { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex: none; border: 1px solid var(--rule); background: rgba(255, 255, 255, .06) }
-  .av img { width: 100%; height: 100%; object-fit: cover }
-  .av.none { font-size: 12px; color: var(--dim) }
   .seg button.on { background: var(--ink); color: var(--bg) }
   .calib-dot { width: 90px; height: 90px; border: 2px solid var(--ink); border-radius: 50%; margin: 18px auto; transition: background .06s, box-shadow .06s }
   .calib-dot.on { background: var(--tap); box-shadow: 0 0 24px var(--tap) }
@@ -237,7 +231,7 @@
       <h1 style="text-transform:none;letter-spacing:0">Relic Song</h1><span class="grow"></span>
       <span>Coins <b id="m-coins">—</b></span><span>Badges <b id="m-badges">0/4</b></span><span>Total <b id="m-total">0</b></span>
       <span id="m-test" hidden><b>Test mode</b></span>
-      <button id="b-board" type="button">Board</button><button id="b-opts" type="button">Options</button>
+      <button id="b-opts" type="button">Options</button>
     </div>
     <div class="say"><img id="say-img" alt=""><p id="say-text"></p></div>
     <div class="verses" id="verses"></div>
@@ -292,7 +286,7 @@
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
     <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
-    <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
+    <div class="line"><span>Test mode <span class="dim">(every song open; no coins, nothing posted)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <p class="dim" id="o-skin-note" style="margin-top:8px"></p>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
 
@@ -302,10 +296,6 @@
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
 
-  <div class="over" id="board" hidden><div class="card"><h2>Board</h2>
-    <p class="dim">Sum of each player's best score on every song.</p>
-    <table><tbody id="bd-rows"></tbody></table>
-    <div class="btns"><button id="bd-close" type="button">Close (Esc)</button></div></div></div>
 
   <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys, D F J K. Open it on a computer.</p></div></div>
 </div>
@@ -326,8 +316,10 @@
 
    Coins go through the hub (parent.__boredGacha.relic, src/hub/relic-song.js)
    into the same ledger Poké Gacha uses. Sprites come from the shared Poké set
-   (pokedoku/sprites). Opened on its own, every song plays; coins and the board
-   wait for the arcade. */
+   (pokedoku/sprites). Opened on its own, every song plays; coins and the main
+   board wait for the arcade. The main board ranks the sum of your best score on
+   every song and difficulty, posted by the hub from __boredSnapshot like every
+   other game. */
 {
 /* ── Coins: tune these ─────────────────────────────────────────────────── */
 // Shotgun Roulette's rate, worked out from its code (shotgun-roulette.html and
@@ -1006,42 +998,6 @@ function calTap() {
 function endCal() { if (cal) cancelAnimationFrame(cal.raf); cal = null; $("#calib").hidden = true; }
 $("#c-close").onclick = endCal;
 
-// A player's picture on the board: their buddy in a circle (the same art as the
-// arcade's board), or their initial when they have none or it fails to load.
-function avatarOf(name, buddy) {
-  const box = el("span", "av");
-  const initial = () => { box.replaceChildren(); box.classList.add("none"); box.textContent = (Array.from(String(name || "?"))[0] || "?").toUpperCase(); };
-  if (!buddy) { initial(); return box; }
-  const plain = SPRITE_DIR + (buddy.shiny ? "shiny/" : "") + buddy.species + ".png";
-  const img = el("img"); img.alt = "";
-  img.src = buddy.skin ? CONTENT_DIR + "poke-gacha/sp/" + buddy.skin + "-" + buddy.species + ".png" : plain;
-  img.onerror = () => { if (buddy.skin && img.getAttribute("src") !== plain) img.src = plain; else initial(); };
-  box.append(img);
-  return box;
-}
-// The board: rank, picture, name, total (the sum of each best), badges.
-async function drawBoard() {
-  $("#board").hidden = false;
-  const rows = $("#bd-rows"); rows.replaceChildren();
-  const note = (text, cls = "dim") => { const r = el("tr"); const td = el("td", cls, text); td.colSpan = 4; r.append(td); rows.append(r); };
-  note("Loading...");
-  const list = G ? await G.board() : null;
-  rows.replaceChildren();
-  if (!list) note(G ? "The board isn't available right now." : "Open Relic Song from the arcade to see the board.");
-  else if (!list.length) note("No scores yet. Be the first.");
-  else list.forEach((row, i) => {
-    const r = el("tr"), who = el("td", "who"), wi = el("span", "wi");
-    wi.append(avatarOf(row.handle, row.buddy), el("span", "", row.handle)); who.append(wi);
-    r.append(el("td", "rk", String(i + 1).padStart(2, "0")), who, el("td", "dim", "badges " + row.badges + "/4"), el("td", "", fmt(row.total)));
-    rows.append(r);
-  });
-  const h = hub(), mine = el("tr"), who = el("td", "who"), wi = el("span", "wi");
-  wi.append(avatarOf("?", h && h.buddy), el("span", "dim", opts.test ? "Yours (test mode, not posted)" : "Yours, in this browser")); who.append(wi);
-  mine.append(el("td", "rk", ""), who, el("td", "dim", "badges " + badges() + "/4"), el("td", "", fmt(total())));
-  rows.append(mine);
-}
-$("#b-board").onclick = drawBoard;
-$("#bd-close").onclick = () => { $("#board").hidden = true; };
 $("#f-sound").onclick = () => { opts.sound = 1; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
 $("#f-muted").onclick = () => { opts.sound = 0; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
 
@@ -1419,7 +1375,7 @@ function stop() {
 }
 function retry() { const s = P && P.song, d = P && P.B.diff; stop(); if (s) start(s, d); }
 
-/* ── Results, coins and the board ──────────────────────────────────────── */
+/* ── Results and coins ─────────────────────────────────────────────────── */
 function finish(reachedEnd) {
   if (P.finished) return;
   P.finished = true;
@@ -1442,7 +1398,7 @@ function showResult({ song, diff, s, rank, won, why }) {
   showScreen("result");
   const key = song.id + ":" + diff, old = save.best[key] || null;
   $("#r-title").textContent = song.title + " · " + DIFF_NAME[diff];
-  $("#r-sub").textContent = P.test ? "Test mode: no coins, no board" : "";
+  $("#r-sub").textContent = P.test ? "Test mode: no coins, nothing posted" : "";
   $("#r-rank").textContent = won ? rank : "—";
   $("#r-clear").textContent = won ? (song.boss ? (song.final ? "Meloetta's whole song." : GYMS[song.gym].badge + "!") : "Cleared.") : "Not cleared. " + why;
   const rows = $("#r-table"); rows.replaceChildren();
@@ -1474,7 +1430,6 @@ function showResult({ song, diff, s, rank, won, why }) {
     if (paid && paid.ok && paid.paid.total > 0)
       $("#r-pay").textContent = "+" + paid.paid.total + " coins (" + [paid.paid.clear && "first clear " + paid.paid.clear, paid.paid.rank && "rank up " + paid.paid.rank].filter(Boolean).join(", ") + "). You have " + fmt(paid.coins) + ".";
     else $("#r-pay").textContent = "No coins this time: this song and rank have already paid.";
-    if (better || song.boss) G.submit(song.id, diff, save.best[key].score, badges()).catch(() => {});
   } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn coins and post scores.";
 }
 $("#r-retry").onclick = () => { if (P) start(P.song, P.B.diff); };
@@ -1491,7 +1446,6 @@ addEventListener("keydown", e => {
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
   if (!$("#opts").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#o-close").click(); } return; }
-  if (!$("#board").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#board").hidden = true; } return; }
   if (!$("#play").hidden && P && !P.done) {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
     if (P.paused) { if (k === "r" && !e.shiftKey) retry(); return; }

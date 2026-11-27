@@ -209,9 +209,7 @@ function renderLeaderboard() {
           const mine = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 0;
           const score = mine ? element('span', 'lb-line-score', formatScore(mine, spec))
             : element('span', 'lb-line-score empty', 'no score');
-          // Relic Song's line also says how many gym badges the player holds.
-          const badges = spec.id === 'relic-song' ? state.relicBadges?.map.get(key) : undefined;
-          line.append(element('span', 'lb-line-name', spec.name + (badges === undefined ? '' : ' · badges ' + badges + '/4')), score);
+          line.append(element('span', 'lb-line-name', spec.name), score);
           if (key !== mineKey) {
             const verdict = !mine ? ''
               : mine === value ? ' · tied'
@@ -308,29 +306,6 @@ async function loadBuddies(force, handles = []) {
     } catch {}
   }
   state.buddies = { map, at: Date.now(), stamp };
-}
-
-// Relic Song's gym badges (0-4) for the names on the board, from
-// relic_song_badges (sql/relic-song-leaderboard.sql). Until that is run, the
-// read fails once, says so in the console, and the board shows no badge count.
-let relicBadgesMissing = false;
-async function loadRelicBadges(force, handles = []) {
-  const stamp = handles.join('|').toLowerCase();
-  if (relicBadgesMissing || (!force && state.relicBadges && state.relicBadges.stamp === stamp && Date.now() - state.relicBadges.at < 60000)) return;
-  const map = new Map();
-  if (handles.length) {
-    try {
-      const rows = await request('/rest/v1/rpc/relic_song_badges', { method: 'POST', token: ANON_TOKEN, body: { p_handles: handles } });
-      for (const row of Array.isArray(rows) ? rows : []) {
-        const badges = Math.trunc(Number(row.badges));
-        if (row.handle && badges >= 0 && badges <= 4) map.set(String(row.handle).toLowerCase(), badges);
-      }
-    } catch (error) {
-      if (error?.status === 404) relicBadgesMissing = true;
-      console.log('Relic Song: badges not on the board (' + (error?.status === 404 ? 'relic_song_badges is not set up yet: run sql/relic-song-leaderboard.sql' : error?.message || 'unavailable') + ').');
-    }
-  }
-  state.relicBadges = { map, at: Date.now(), stamp };
 }
 
 // A PostgREST in-list of handles. Handles may hold commas, dots, colons and
@@ -437,9 +412,6 @@ async function loadLeaderboard(force = false, full = false) {
     const displayed = shownHandles();
     await loadStreaks(force, displayed);
     await loadBuddies(force, displayed);
-    // Badges are only read when one of the names shown has a Relic Song score.
-    const relic = new Set((state.lbCache.get('overall')?.rows || []).filter(row => row.game === 'relic-song').map(row => String(row.handle || '').toLowerCase()));
-    await loadRelicBadges(force, displayed.filter(handle => relic.has(handle.toLowerCase())));
   }
   renderLeaderboard();
   // The library cards read the top of each board, so they redraw once it lands.
