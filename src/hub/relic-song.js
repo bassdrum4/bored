@@ -66,18 +66,20 @@ export function typeEdge(species, defend) {
 }
 
 /* ── The board ─────────────────────────────────────────────────────────────── */
-// sql/relic-song.sql (not applied yet). Until it is, every call here logs one
-// line and gives up: a missing table never blocks a song or a payout.
+// sql/relic-song-leaderboard.sql (not applied yet). Until it is, every call here
+// logs one line and gives up: a missing table never blocks a song or a payout.
 const quiet = (what, error) => console.log('Relic Song: ' + what + ' (' + (error && (error.status === 404 || /does not exist|schema cache/i.test(error.message || ''))
-  ? 'the relic_song table is not set up yet: run sql/relic-song.sql' : (error && error.message) || 'unavailable') + ').');
+  ? 'the relic_song tables are not set up yet: run sql/relic-song-leaderboard.sql' : (error && error.message) || 'unavailable') + ').');
 
-export async function submitRelicScore(song, diff, score) {
+// One song's best, and the gym badges held (0-4); the server keeps the higher of each.
+export async function submitRelicScore(song, diff, score, badges = null) {
   if (!hasIdentity()) return { ok: false, reason: 'signin' };
   try {
     const session = await freshSession();
     if (!session) return { ok: false, reason: 'signin' };
     await request('/rest/v1/rpc/submit_relic_song', { method: 'POST', token: session.access_token,
-      body: { p_song: song, p_diff: diff, p_score: Math.max(0, Math.floor(score)) } });
+      body: { p_song: song, p_diff: diff, p_score: Math.max(0, Math.floor(score)),
+        p_badges: Number.isInteger(badges) && badges >= 0 && badges <= 4 ? badges : null } });
     return { ok: true };
   } catch (error) {
     quiet('score not posted', error);
@@ -85,19 +87,41 @@ export async function submitRelicScore(song, diff, score) {
   }
 }
 
-/** Top 10 by the sum of each player's best score on every song. */
+/**
+ * Top 10 by the sum of each player's best score on every song, with their gym
+ * badges and their Poké Gacha buddy for the picture (from the public buddy_board,
+ * like the main board; null when they have none).
+ */
 export async function relicBoard() {
+  let list;
   try {
     const rows = await request('/rest/v1/rpc/relic_song_top', { method: 'POST', token: ANON_TOKEN, body: {} });
-    return (Array.isArray(rows) ? rows : []).slice(0, 10).map(row => ({
+    list = (Array.isArray(rows) ? rows : []).slice(0, 10).map(row => ({
       handle: String(row.handle || '').slice(0, 40),
       total: Math.max(0, Math.trunc(Number(row.total)) || 0),
-      songs: Math.max(0, Math.trunc(Number(row.songs)) || 0)
+      songs: Math.max(0, Math.trunc(Number(row.songs)) || 0),
+      badges: Math.max(0, Math.min(4, Math.trunc(Number(row.badges)) || 0)),
+      buddy: null
     }));
   } catch (error) {
     quiet('board unavailable', error);
     return null;
   }
+  const names = list.map(row => row.handle).filter(Boolean);
+  if (names.length) {
+    try {
+      // Quoted: a handle may hold commas, dots or brackets.
+      const inList = 'in.(' + names.map(h => '"' + h.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(',') + ')';
+      const rows = await request('/rest/v1/buddy_board?' + new URLSearchParams({ select: 'handle,species,shiny,skin', handle: inList }), { token: ANON_TOKEN });
+      const byName = new Map((Array.isArray(rows) ? rows : []).map(row => [String(row.handle).toLowerCase(), row]));
+      for (const row of list) {
+        const b = byName.get(row.handle.toLowerCase()), species = b && Math.trunc(Number(b.species));
+        if (species >= 1 && species <= 1025) row.buddy = { species, shiny: b.shiny === true,
+          skin: typeof b.skin === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(b.skin) ? b.skin : null };
+      }
+    } catch {}
+  }
+  return list;
 }
 
 /* ── The bridge ────────────────────────────────────────────────────────────── */
@@ -119,7 +143,7 @@ export function relicBridge({ onChange = () => {} } = {}) {
       if (result.ok && result.paid.total > 0) { writeWallet(result.wallet); try { onChange(); } catch {} }
       return { ok: result.ok, reason: result.reason, paid: result.paid, coins: walletBalance(readWallet()).coins || 0 };
     },
-    submit: (song, diff, score) => submitRelicScore(song, diff, score),
+    submit: (song, diff, score, badges) => submitRelicScore(song, diff, score, badges),
     board: () => relicBoard()
   };
 }

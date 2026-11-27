@@ -154,8 +154,7 @@ function renderLeaderboard() {
     const rank = element('span', 'lb-rank', String(index + 1).padStart(2, '0'));
     const label = element('span', 'lb-name', name + (mine ? ' (you)' : ''));
     addMedal(label, name);
-    const buddy = buddyImage(key);
-    if (buddy) label.prepend(buddy);
+    label.prepend(avatar(key, name));
     const score = element('span', 'lb-score');
 
     label.appendChild(element('small', 'lb-player-meta', row.gamesRanked + ' of ' + row.gamesPlayed + ' games scoring'));
@@ -210,7 +209,9 @@ function renderLeaderboard() {
           const mine = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 0;
           const score = mine ? element('span', 'lb-line-score', formatScore(mine, spec))
             : element('span', 'lb-line-score empty', 'no score');
-          line.append(element('span', 'lb-line-name', spec.name), score);
+          // Relic Song's line also says how many gym badges the player holds.
+          const badges = spec.id === 'relic-song' ? state.relicBadges?.map.get(key) : undefined;
+          line.append(element('span', 'lb-line-name', spec.name + (badges === undefined ? '' : ' · badges ' + badges + '/4')), score);
           if (key !== mineKey) {
             const verdict = !mine ? ''
               : mine === value ? ' · tied'
@@ -270,7 +271,7 @@ async function loadStreaks(force, handles = []) {
     for (let offset = 0; offset < 20000; offset += pageSize) {
       const query = new URLSearchParams({
         select: 'challenge_id,handle',
-        handle: 'in.(' + handles.join(',') + ')',
+        handle: inList(handles),
         order: 'challenge_id.asc',
         limit: String(pageSize),
         offset: String(offset)
@@ -296,7 +297,7 @@ async function loadBuddies(force, handles = []) {
     try {
       // A sprite is printed beside those ten names only, so the whole gacha board
       // is not read to find them.
-      const query = new URLSearchParams({ select: 'handle,species,shiny,skin', handle: 'in.(' + handles.join(',') + ')' });
+      const query = new URLSearchParams({ select: 'handle,species,shiny,skin', handle: inList(handles) });
       const rows = await request('/rest/v1/buddy_board?' + query, { token: ANON_TOKEN });
       for (const row of Array.isArray(rows) ? rows : []) {
         const species = Number(row.species);
@@ -309,18 +310,57 @@ async function loadBuddies(force, handles = []) {
   state.buddies = { map, at: Date.now(), stamp };
 }
 
-function buddyImage(key) {
+// Relic Song's gym badges (0-4) for the names on the board, from
+// relic_song_badges (sql/relic-song-leaderboard.sql). Until that is run, the
+// read fails once, says so in the console, and the board shows no badge count.
+let relicBadgesMissing = false;
+async function loadRelicBadges(force, handles = []) {
+  const stamp = handles.join('|').toLowerCase();
+  if (relicBadgesMissing || (!force && state.relicBadges && state.relicBadges.stamp === stamp && Date.now() - state.relicBadges.at < 60000)) return;
+  const map = new Map();
+  if (handles.length) {
+    try {
+      const rows = await request('/rest/v1/rpc/relic_song_badges', { method: 'POST', token: ANON_TOKEN, body: { p_handles: handles } });
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const badges = Math.trunc(Number(row.badges));
+        if (row.handle && badges >= 0 && badges <= 4) map.set(String(row.handle).toLowerCase(), badges);
+      }
+    } catch (error) {
+      if (error?.status === 404) relicBadgesMissing = true;
+      console.log('Relic Song: badges not on the board (' + (error?.status === 404 ? 'relic_song_badges is not set up yet: run sql/relic-song-leaderboard.sql' : error?.message || 'unavailable') + ').');
+    }
+  }
+  state.relicBadges = { map, at: Date.now(), stamp };
+}
+
+// A PostgREST in-list of handles. Handles may hold commas, dots, colons and
+// brackets, which end an unquoted value, so one such name used to fail the whole
+// read and leave every row on the board without a sprite or streak. Each name
+// is quoted, with backslashes and quotes escaped.
+function inList(handles) {
+  return 'in.(' + handles.map(h => '"' + String(h).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(',') + ')';
+}
+
+// The player's picture: their Poké Gacha buddy, the same art as the header's,
+// in a circle. A player with no buddy, or a sprite that fails to load (an SP
+// skin the species no longer wears falls back to the plain sprite first), gets
+// the default: their initial in an empty circle.
+function avatar(key, name) {
+  const box = document.createElement('span');
+  box.className = 'lb-avatar';
+  box.setAttribute('aria-hidden', 'true');
+  const initial = () => { box.replaceChildren(); box.classList.add('none'); box.textContent = (Array.from(String(name || '?').trim())[0] || '?').toUpperCase(); };
   const buddy = state.buddies?.map.get(key);
-  if (!buddy) return null;
+  if (!buddy) { initial(); return box; }
+  const plain = './games/content/pokedoku/sprites/' + (buddy.shiny ? 'shiny/' : '') + buddy.species + '.png';
   const img = document.createElement('img');
-  img.className = 'lb-buddy';
-  // SP art is one file per skin and form: sp/<skin>-<species>.png (gacha.js skinFile).
-  img.src = buddy.skin ? './games/content/poke-gacha/sp/' + buddy.skin + '-' + buddy.species + '.png'
-    : './games/content/pokedoku/sprites/' + (buddy.shiny ? 'shiny/' : '') + buddy.species + '.png';
   img.alt = '';
-  img.width = 24; img.height = 24;
-  img.loading = 'lazy';
-  return img;
+  img.decoding = 'async';
+  // SP art is one file per skin and form: sp/<skin>-<species>.png (gacha.js skinFile).
+  img.src = buddy.skin ? './games/content/poke-gacha/sp/' + buddy.skin + '-' + buddy.species + '.png' : plain;
+  img.onerror = () => { if (buddy.skin && !img.src.endsWith(plain.slice(1))) img.src = plain; else initial(); };
+  box.append(img);
+  return box;
 }
 
 // A full read is in flight only when the board is actually open; the hub's own
@@ -397,6 +437,7 @@ async function loadLeaderboard(force = false, full = false) {
     const displayed = shownHandles();
     await loadStreaks(force, displayed);
     await loadBuddies(force, displayed);
+    await loadRelicBadges(force, displayed);
   }
   renderLeaderboard();
   // The library cards read the top of each board, so they redraw once it lands.
