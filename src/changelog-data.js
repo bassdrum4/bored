@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1027,
+  "count": 1028,
   "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"123772c6","date":"2026-11-27","author":"Vettel Xu","subject":"Relic Song: round 3 polish","pr":378},
   {"sha":"11ed6152","date":"2026-11-27","author":"Claude","subject":"Relic Song: sprite, hold and HP layout fixes"},
   {"sha":"ba1afe3c","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros-style look"},
   {"sha":"3f1567f3","date":"2026-11-27","author":"Claude","subject":"Poké Idle Story Year 3, part 5b: switch Year 3 on"},
