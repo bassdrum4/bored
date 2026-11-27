@@ -1238,3 +1238,69 @@ test('Year 2 finale, the Crown Shrine: a League-legal team built on Sssssssnakes
   assert.ok(got.crown < got.hof, 'the Hall of Fame stays the hardest fight');
   assert.deepEqual(errors, []);
 });
+
+test('the admin block in the snapshot: both real saves (party and counts only), never the test account, null when missing or broken, and the board fields unchanged', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const BOARD = ['slug', 'caught', 'shinies', 'score', 'lifeDex', 'badges', 'tower', 'prestige', 'ranked', 'boss', 'finished', 'story'];
+    const snap = () => JSON.parse(JSON.stringify(window.__boredSnapshot()));
+    const board = s => { const { admin, ...rest } = s; return rest; };
+    localStorage.clear();
+    // A Classic save: prestige 1, two badges, Kanto's Champion, a shiny in the party, a Mega on.
+    const c = fresh(); c.prestige = 1; c.box = { 6: { xp: 30 ** 3, shiny: true }, 25: { xp: 20 ** 3 }, 1: { xp: 125 } }; c.party = [6, 25]; c.badges = { '0-0': 1, '0-1': 1 }; c.champs = { 0: 1 };
+    c.lifeDex = { 1: 1, 6: 1, 25: 1, 150: 1 }; c.key = 1; c.stones = { 10034: 1 }; c.mega = { n: 6, f: 10034 };
+    // A Story save: Year 1 cleared, picks, two bonded of three, one above the cap.
+    const st = fresh(); st.mode = 'story'; st.story = { ...freshStory(), epilogue: 1, picks: { 1: 249, 2: 383 }, ch: { 'kanto-admin': 1 } };
+    st.box = { 7: { xp: 90 ** 3, bond: 1 }, 249: { xp: 40 ** 3, bond: 1 }, 10: { xp: 125 } }; st.party = [7, 249];
+    // 1. Only Classic.
+    localStorage.setItem(KEY, JSON.stringify(c)); slot = KEY; S = readSlot(KEY); boot();
+    const onlyClassic = snap();
+    // 2. Both: Classic open, Story from storage.
+    localStorage.setItem(STORY_KEY, JSON.stringify(st));
+    const both = snap();
+    // 3. Only Story: Story open, no Classic save.
+    useSlot(STORY_KEY); localStorage.removeItem(KEY);
+    const onlyStory = snap();
+    // A Replay open: the real Story save, not the replay copy.
+    localStorage.setItem(KEY, JSON.stringify(c));
+    useSlot(STORY_KEY); startReplay(); S.box[999] = { xp: 125 }; const replay = snap(); go('endreplay');
+    // 4. The test account, Classic and Story: the real saves only.
+    useSlot(TEST_KEY, testAccount()); const testOpen = snap();
+    useSlot(TEST_STORY_KEY, testStoryAccount()); const testStoryOpen = snap();
+    // A broken Story save, and a test save written into a real slot by mistake.
+    localStorage.setItem(STORY_KEY, '{nope'); useSlot(KEY); const broken = snap();
+    const t2 = testAccount(); localStorage.setItem(STORY_KEY, JSON.stringify({ ...t2, mode: 'story', story: freshStory() })); const flagged = snap();
+    // Size with a full Box: still small.
+    const big = fresh(); for (let n = 1; n <= 1025; n++) big.box[n] = { xp: 125 }; big.party = [1, 2, 3, 4, 5, 6, 7]; slot = KEY; S = big; save();
+    const size = JSON.stringify(window.__boredSnapshot().admin).length, bigParty = window.__boredSnapshot().admin.classic.party.length;
+    return { BOARD, onlyClassic, both, onlyStory, replay, testOpen, testStoryOpen, broken, flagged, size, bigParty,
+      keys: [onlyClassic, both, onlyStory, replay].map(s => Object.keys(board(s))), testKeys: Object.keys(board(testOpen)), testBoard: board(testOpen), bondUi: document.body.innerText.includes('Bonded') };
+  });
+  // The board fields: the same keys as before, and the test account's still zeroed.
+  for (const k of got.keys) assert.deepEqual(k, got.BOARD);
+  assert.deepEqual(got.testKeys, got.BOARD.filter(k => k !== 'story'), 'the test account\u2019s zeroed fields, as before');
+  assert.deepEqual([got.onlyClassic.prestige, got.onlyClassic.lifeDex, got.onlyClassic.ranked, got.onlyClassic.caught, got.onlyClassic.shinies], [1, 4, 2051 + 4, 3, 1], 'the Classic board numbers are unchanged');
+  assert.deepEqual([got.testBoard.caught, got.testBoard.ranked, got.testBoard.finished], [0, 0, false]);
+  const C = got.onlyClassic.admin;
+  assert.equal(C.v, 1);
+  assert.deepEqual(C.classic, { prestige: 1, dex: 4, shinies: 1, badges: 2, champs: 1, region: 'Johto', boxCount: 3,
+    party: [{ num: 6, lvl: C.classic.party[0].lvl, shiny: true, form: null, mega: 'Mega Charizard X' }, { num: 25, lvl: C.classic.party[1].lvl, shiny: false, form: null, mega: null }] });
+  assert.ok(C.classic.party.every(p => p.lvl >= 1 && p.lvl <= 20), 'Classic levels are the ones the game shows (held to the cap)');
+  assert.equal(C.story, null, 'only Classic: no Story');
+  assert.deepEqual(got.both.admin.classic, C.classic);
+  const Y = got.both.admin.story;
+  assert.deepEqual({ ...Y, party: undefined }, { year: 1, chapter: 1, liberated: 0, lifeDex: 3, boxCount: 3, party: undefined, bonded: 2, unbonded: 1, picks: { 1: 249, 2: 383 }, cleared: [1] });
+  assert.deepEqual(Y.party.map(p => [p.num, p.lvl, p.shiny, p.form, p.mega]), [[7, 90, false, null, null], [249, 40, false, null, null]]);
+  assert.ok(Y.party.every(p => p.battleLvl <= p.lvl) && Y.party[0].battleLvl < 90, 'battle level is the synced one');
+  assert.equal(got.onlyStory.admin.classic, null, 'only Story: no Classic');
+  assert.deepEqual(got.onlyStory.admin.story, Y);
+  assert.equal(got.replay.admin.story.boxCount, 3, 'a replay reports the real Story save');
+  assert.deepEqual(got.testOpen.admin.classic, C.classic, 'the test account open: the real Classic save, never the test one');
+  assert.equal(got.testOpen.admin.story.boxCount, 3);
+  assert.deepEqual(got.testStoryOpen.admin, got.testOpen.admin);
+  assert.equal(got.broken.admin.story, null, 'a broken save is null');
+  assert.equal(got.flagged.admin.story, null, 'a save marked as a test is left out');
+  assert.ok(got.size < 1500 && got.bigParty === 6, `party only, never the Box (${got.size} bytes with a full Box)`);
+  assert.equal(got.bondUi, false, 'nothing about bonds shows to players');
+  assert.deepEqual(errors, []);
+});
