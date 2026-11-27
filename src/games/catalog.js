@@ -13,7 +13,7 @@
 // four native arcade.js games came after the initial documents but before DEEP.
 // Keep their original NEW-badge chronology (Aim Lab, Connect Four, Memory,
 // 2048) between DEEP and SUMO; NEW_GAMES identifies the implementation type.
-export const ORDER = [["relic-song", "Relic Song"], ["battleship", "Battleship"], ["squaretato", "Squaretato"], ["ballistic-chickens", "Ballistic Chickens"], ["getaway-shootout", "Getaway Shootout"], ["shotgun-roulette", "Shotgun Roulette"], ["crossword", "Crossword"], ["imposter", "Among Us"], ["sudoku", "Sudoku"], ["photo-puzzle", "Photo Puzzle"], ["poke-gacha", "Poké Gacha"], ["poke-idle", "Poké Idle"], ["air-hockey", "Air Hockey"], ["pokedoku", "Pokédoku"], ["krillion","Krillion"],["quickdraw","Quickdraw"],["clicker", "Clicker"], ["downhill-mayhem","Downhill Mayhem"],["corner","Corner"],["ticket-to-ride","Ticket to Ride"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Civ Lite"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
+export const ORDER = [["duck-life-3", "Duck Life 3: Evolution"], ["relic-song", "Relic Song"], ["battleship", "Battleship"], ["squaretato", "Squaretato"], ["ballistic-chickens", "Ballistic Chickens"], ["getaway-shootout", "Getaway Shootout"], ["shotgun-roulette", "Shotgun Roulette"], ["crossword", "Crossword"], ["imposter", "Among Us"], ["sudoku", "Sudoku"], ["photo-puzzle", "Photo Puzzle"], ["poke-gacha", "Poké Gacha"], ["poke-idle", "Poké Idle"], ["air-hockey", "Air Hockey"], ["pokedoku", "Pokédoku"], ["krillion","Krillion"],["quickdraw","Quickdraw"],["clicker", "Clicker"], ["downhill-mayhem","Downhill Mayhem"],["corner","Corner"],["ticket-to-ride","Ticket to Ride"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Civ Lite"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
 // Hidden development games are intentionally excluded from every public catalog surface.
 // Access is checked through the existing Supabase admin role before launch.
 export const ADMIN_PREVIEWS = Object.freeze({ geopeaks: 'GeoPeaks' });
@@ -28,17 +28,18 @@ export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": 
 // Rooftop Snipers is the compiled original Unity export: it exposes no score API.
 // Krillion's dive total proved too easy to game from the client, so it keeps no
 // board here even though the game still shows the score it just earned.
-export const UNSCORED_GAMES = ["battleship", "getaway-shootout", "imposter", "prism-duel", "fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand", "krillion"];
+export const UNSCORED_GAMES = ["duck-life-3", "battleship", "getaway-shootout", "imposter", "prism-duel", "fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand", "krillion"];
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["relic-song", "battleship", "squaretato", "ballistic-chickens"];
+export const FRESH_GAMES = ["duck-life-3", "relic-song", "battleship", "squaretato"];
 // When each game first arrived. `games:add` stamps each release here.
 // Popular promotes the FRESH_GAMES list above its weekly rankings.
 // Temporary editorial pin, expiring at midnight Detroit time November 25.
 export const FEATURED_UNTIL = Object.freeze({ crossword: '2026-11-25T05:00:00Z' });
 export const LAUNCHED = {
+  "duck-life-3": "2026-11-27",
   "relic-song": "2026-11-27",
   "battleship": "2026-11-25",
   "squaretato": "2026-11-24",
@@ -81,6 +82,7 @@ export const LAUNCHED = {
   "deep": "2026-10-20"
 };
 export const META = {
+  "duck-life-3": ["Arcade", "Train your duck in running, flying, swimming and climbing, then race and evolve through three leagues."],
   "relic-song": ["Arcade", "Meloetta\'s song split into four verses and Kanto\'s gym leaders each kept one. Win them back on a four-lane note highway, then dodge a spinning judgment line in the boss fights."],
   "battleship": ["Strategy", "Deploy five ships and sink the enemy fleet. Play solo or take turns with a friend."],
   "squaretato": ["Arcade", "Survive waves of enemies, stack weapons and upgrades, and build your way to the final boss."],
