@@ -887,7 +887,7 @@ test('Prof Penguin\'s text box never moves the page: the tip slot keeps one heig
   assert.equal(behind.taps, 0);
   // Speakers with no art yet get a placeholder frame with their initials.
   const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Sssssssnakes'); return d.textContent; });
-  assert.equal(face, 'SS');
+  assert.equal(face, 'S'); // Single-word speaker: one initial.
   // Team Thaw has portraits: one each for Sleet and the admins, and four grunts picked by the line, the same every time.
   const thaw = await tab.evaluate(() => { const pic = (w, k) => { const d = document.createElement('div'); d.innerHTML = dlgFace(w, k); const i = d.querySelector('img'); return i ? i.getAttribute('src').split('/').pop() : null; };
     const grunts = new Set(Array.from({ length: 40 }, (_, i) => pic('Team Thaw grunt', 'line' + i)));
