@@ -177,6 +177,7 @@ function element(tag, className, text) {
 /* ── State ────────────────────────────────────────────────────────────────── */
 
 let activeSlug = null;
+let idleFrameOwner = null;
 // Validated via the existing Supabase analytics_admins role; never inferred from a handle.
 let adminPreviewAccess = false;
 window.__boredAdminPreviewAllowed = slug => adminPreviewAccess && hasIdentity() && Object.hasOwn(ADMIN_PREVIEWS, slug);
@@ -379,6 +380,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (sandboxed) gameFrame.setAttribute('sandbox', 'allow-scripts');
   else gameFrame.removeAttribute('sandbox');
   activeSlug = previousSlug = slug;
+  idleFrameOwner = slug === 'poke-idle' ? activePlayerId() : null;
   const token = ++loadToken;
   // Opening a game is what "played today" means for invite credit. One write a
   // day, and one sync so a pending recruit moves to 2 of 2 without waiting.
@@ -642,7 +644,7 @@ let idleAdminSync = { owner: null, at: 0, sent: '', busy: false };
 function syncIdleAdmin(snapshot) {
   const admin = snapshot?.admin;
   const session = getSession(), owner = session?.user?.id;
-  if (!owner || !hasIdentity() || snapshot?.slug !== 'poke-idle' ||
+  if (!owner || owner !== idleFrameOwner || !hasIdentity() || snapshot?.slug !== 'poke-idle' ||
       admin?.v !== 1 || (!admin.classic && !admin.story) ||
       readStored('bored.analytics.enabled', true) === false ||
       !isProductionTelemetryUrl(location.href, qaSession())) return;
@@ -650,8 +652,9 @@ function syncIdleAdmin(snapshot) {
   const state = idleAdminSync, now = Date.now();
   if (state.busy || now - state.at < 60000) return;
   const encoded = JSON.stringify(admin);
+  state.at = now;
   if (encoded === state.sent || encoded.length > 4096) return;
-  state.at = now; state.busy = true;
+  state.busy = true;
   void (async () => {
     try {
       const current = await freshSession();
