@@ -1755,3 +1755,28 @@ test('Shotgun Roulette reads and writes the shared Poké Idle flags: the hat not
   const merged = await tab.evaluate(() => { localStorage.setItem('bored.poke-idle.roulette.v1', '{nope'); penguinMark('beatOrigin'); return localStorage.getItem('bored.poke-idle.roulette.v1'); });
   assert.equal(merged, '{"beatOrigin":1}', 'a broken key is replaced, not thrown on');
 });
+
+test('Year 3 achievements, wiki and letter: every ID from the file, hidden ones "???", secret ones unlisted, and nothing that spoils the story or the bond', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    checkAch(true); openTab('ach');
+    const ach = $('#t-ach').textContent;
+    const y3 = ACH.filter(a => a.story && a.year === 3).map(a => [a.id, a.type, !!a.replayOk]);
+    const wiki = wikiSections().find(p => p.id === 'story3');
+    const letter = MAIL.find(m => m.id === 'update-story-year3').body;
+    return { achSnip: ach.slice(ach.indexOf('Story'), ach.indexOf('Story') + 600), ach, y3, wiki: wiki && wiki.html, letter, earned: Object.keys(S.ach).filter(k => /^(st|sc)_/.test(k) && ACH.find(a => a.id === k && a.year === 3)), replay: [...REPLAY_REWARDS] };
+  })()`);
+  const ids = got.y3.map(x => x[0]);
+  assert.deepEqual(ids, ['st_stays', 'st_remember', 'st_hissing', 'st_backroom', 'st_orbs', 'st_p', 'st_draft', 'st_slot', 'st_everyone', 'st_firstfreeze', 'st_dig', 'st_giveback', 'st_other', 'st_taught', 'st_wake', 'st_fr', 'st_clues',
+    'sc_table', 'sc_reflection', 'sc_paid', 'sc_seven', 'sc_bonded'], 'section 4, with First Graduate held back by HOF_READY');
+  assert.deepEqual(got.y3.filter(x => x[1] === 'secret').map(x => x[0]), ['sc_table', 'sc_reflection', 'sc_paid', 'sc_seven', 'sc_bonded']);
+  assert.deepEqual(got.y3.filter(x => x[2]).map(x => x[0]), ['sc_reflection'], 'only You Went There Too is Replay OK');
+  assert.deepEqual(got.replay, ['sc_reflection']);
+  assert.ok(!got.ach.includes('Wake It Up') && /\?\?\? · Keep playing\./.test(got.ach), 'hidden ones are "???" until earned: ' + got.achSnip);
+  assert.ok(got.earned.includes('sc_seven') && /Seven · /.test(got.ach), 'an earned secret is listed');
+  assert.ok(!/Nobody Left Behind|You Went There Too|Paid in Full|Own Table/.test(got.ach) && /\+\d+ secret/.test(got.ach), "the others are not, and the group counts them");
+  assert.ok(got.wiki, 'the Year 3 wiki page');
+  assert.match(got.wiki, /This One Stays With Me/); assert.match(got.wiki, /There are hidden achievements\./);
+  for (const text of [got.wiki, got.letter]) assert.doesNotMatch(text, /bond|fought beside|half their|weaker|Sleet|Rime|Hail|Slush|Giratina|Eternatus|Terapagos|Arceus|Necrozma|Kyurem|Wake It Up|Who Taught Us|Field Researcher|dealer|core|Engine/i, 'no spoilers, nothing about the bond');
+  assert.deepEqual(errors, []);
+});
