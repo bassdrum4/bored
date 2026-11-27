@@ -8,6 +8,9 @@ const allowedExact = new Set([
   'src/games/content/pokedoku.html',
   'src/games/content/poke-idle.html',
   'src/games/content/poke-gacha.html',
+  'src/games/content/relic-song.html',
+  'src/games/previews/relic-song.svg',
+  'tests/relic-song.test.cjs',
   // Shotgun Roulette is sandboxed as an admin-only preview. Contributor changes
   // to its document, preview art and own tests require the normal test job;
   // public catalog, hub permissions and SQL are deliberately NOT allowlisted.
@@ -39,7 +42,8 @@ const allowedSprite = /^src\/games\/content\/pokedoku\/sprites\/(?:[a-zA-Z0-9_-]
 
 export function isAllowedGameFile(filename) {
   return allowedExact.has(filename) || allowedSprite.test(filename) ||
-    allowedGachaContent.test(filename) || allowedGachaDocs.test(filename);
+    allowedGachaContent.test(filename) || allowedGachaDocs.test(filename) ||
+    /^docs\/relic-song-[^/]+\.md$/.test(filename);
 }
 
 const log = message => console.log(message);

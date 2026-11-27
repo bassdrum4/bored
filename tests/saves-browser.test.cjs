@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const puppeteer = require('puppeteer-core');
 const { serve } = require('./serve.cjs');
+const { watch, capture } = require('./browser-diagnostics.cjs');
 const { pgliteEnv, nativeEnv, url, ids } = require('./together-live-env.cjs');
 
 const [A, B] = ids;
@@ -29,14 +30,14 @@ async function lab(t) {
   const site = await serve(path.join(__dirname, '../src'));
   const browser = await puppeteer.launch({ executablePath, headless: true });
   const errors = [], unexpected = [];
-  t.after(async () => { await browser.close(); await site.close(); await env.close(); });
+  t.after(async () => { for (const page of await browser.pages()) await capture(page,'saves-browser'); await browser.close(); await site.close(); await env.close(); });
   await env.admin('delete from public.game_saves');
   await env.admin('delete from bored_together.limits');
 
   // One device: its own storage, signed in as `user` (a token the hub would hold) or a guest.
   async function device(user, name) {
     const context = await browser.createBrowserContext();
-    const page = await context.newPage();
+    const page = await context.newPage(); watch(page);
     page.setDefaultTimeout(15000);
     await page.setViewport({ width: 1100, height: 800, deviceScaleFactor: 1 });
     page.on('pageerror', e => errors.push(name + ': ' + e.message));
@@ -51,6 +52,7 @@ async function lab(t) {
       if (address.hostname !== 'djdpttltfmwkofdrvkem.supabase.co') { unexpected.push(req.url()); return req.abort(); }
       const token = (req.headers().authorization || '').replace('Bearer ', '');
       const as = ids.find(id => 'tok-' + id === token) || null;
+      if (address.pathname === '/rest/v1/rpc/my_analytics_access') return reply({ admin: false, games: [] });
       if (address.pathname === '/rest/v1/rpc/bored_popular_games') return reply([{ game: 'trackbound', ranking: 1 }]);
       const save = /^\/rest\/v1\/rpc\/(save_(?:list|get|put|delete))$/.exec(address.pathname);
       if (save) {
@@ -320,6 +322,8 @@ test('offline, a save stays "On this device only" and goes up when the connectio
   assert.equal(await ann.run(`slotHead('m4').name`), 'Saved on a train', 'play was never blocked');
   assert.ok(await ann.run(`SYNC.timers.m4 !== undefined`), 'a retry is scheduled, with backoff');
   ann.net.offline = false;
+  // The real browser emits online on both the hub and its iframe.
+  await ann.page.evaluate(() => window.dispatchEvent(new Event('online')));
   await ann.run(`window.dispatchEvent(new Event('online'))`);
   await ann.until(() => syncNote('m4'), undefined, 20000);
   assert.deepEqual((await L.saves(A)).map(r => [r.slot, r.name]).filter(r => r[0] === 'm4'), [['m4', 'Saved on a train']]);

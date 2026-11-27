@@ -5,6 +5,7 @@ const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const puppeteer=require('puppeteer-core');
 const {serve}=require('./serve.cjs');
+const {watch,capture}=require('./browser-diagnostics.cjs');
 const {database,call,as,ids,poolHandler,inviteCall}=require('./together-db.cjs');
 
 test('two embedded browser accounts play, save, auto-return, resume and rematch using production SQL',async t=>{
@@ -12,7 +13,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   assert.ok(executablePath,'Set CHROME_PATH to run browser verification');
   const db=await database(), site=await serve(path.join(__dirname,'../src'));
   const browser=await puppeteer.launch({executablePath,headless:true});
-  t.after(async()=>{await browser.close();await site.close();await db.close();});
+  t.after(async()=>{for(const page of await browser.pages()) await capture(page,'together-browser');await browser.close();await site.close();await db.close();});
   let serial=Promise.resolve();
   const enqueue=fn=>{const pending=serial.then(fn);serial=pending.catch(()=>{});return pending;};
   const pool=await poolHandler(db,enqueue);
@@ -20,7 +21,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   const handles=['WackyPenguin','BananaWizard','QuietOwl','NeverJoined','FourthPlayer','FifthPlayer','Anonymous'];
   const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'};
   async function player(user) {
-    const context=await browser.createBrowserContext();const page=await context.newPage();page.setDefaultTimeout(10000);
+    const context=await browser.createBrowserContext();const page=await context.newPage();watch(page);page.setDefaultTimeout(10000);
     page.on('pageerror',e=>errors.push(e.message));
     await page.setRequestInterception(true);
     page.on('request',async req=>{
@@ -368,7 +369,9 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   // Ordinary single-player still launches with its CPU/local selector.
   await a.click('#together-back');await a.evaluate(()=>openGame('connect-four'));
   game=await frame(a,'.connect');assert.equal(await game.$eval('#actions',e=>e.hidden),false);
-  await game.select('select[aria-label="Opponent"]','friend');await game.click('.columns button');
+  await game.select('select[aria-label="Opponent"]','friend');
+  await game.locator('button[aria-label="Drop in column 1"]').click();
+  await game.waitForFunction(() => document.querySelectorAll('.disc.p1').length === 1);
   assert.equal(await game.$$eval('.disc.p1',x=>x.length),1);
   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
 });

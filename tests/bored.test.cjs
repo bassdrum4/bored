@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const puppeteer = require('puppeteer-core');
 const { serve } = require('./serve.cjs');
+const { watch, capture } = require('./browser-diagnostics.cjs');
 
 const root = path.resolve(__dirname, '..');
 // GitHub Pages publishes src/ as the site root, so the suite serves that folder
@@ -324,11 +325,11 @@ test('browser regressions', async t => {
   // Register cleanup before launching Chrome. If launch times out, the static
   // server must not keep the Node test process open indefinitely.
   t.after(async () => {
-    try { await browser?.close(); } finally { await site.close(); }
+    try { if (page) await capture(page,'hub-regressions'); await browser?.close(); } finally { await site.close(); }
   });
   ({ origin, url } = site);
   browser = await puppeteer.launch({ executablePath, headless: true });
-  page = await browser.newPage();
+  page = await browser.newPage(); watch(page);
   page.on('pageerror', err => errors.push(err.message));
   await page.setRequestInterception(true);
   // The leaderboard is the only server this page is allowed to reach; the loopback
@@ -2010,11 +2011,16 @@ test('browser regressions', async t => {
     assert.equal(await page.$eval('#claim-dialog', dialog => dialog.open), false,
       'later games should never interrupt with an account offer');
     // The board is now on its own page and still keeps not pointing at them.
-    await page.click('#leaderboard-nav');
-    await page.click('#lb-refresh');
-    await page.click('#home-nav');
+    // The previous mobile-layout test can leave a narrow viewport; use the actual visible route.
+    const mobile = await page.$eval('#mobile-more-nav', el => el.getBoundingClientRect().width > 0);
+    if (mobile) {
+      await page.locator('#mobile-more-nav summary').click();
+      await page.locator('#mobile-more-nav a[href="#leaderboard"]').click();
+    } else await page.locator('#leaderboard-nav').click();
+    await page.locator('#lb-refresh').click();
     await page.waitForFunction(() => document.querySelector('#lb-note').textContent.includes('Players ranked'));
     assert.doesNotMatch(await text(page, '#lb-mine'), /Your account/);
     assert.doesNotMatch(await text(page, '#lb-list'), /\(you\)/);
+    await page.locator('#home-nav').click();
   });
 });

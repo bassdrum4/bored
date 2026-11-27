@@ -242,7 +242,11 @@ section[id]{scroll-margin-top:20px}
 #account-state{flex:1;min-width:190px}
 /* The Poké Gacha buddy. */
 #account-buddy{width:32px;height:32px;object-fit:contain;image-rendering:pixelated;margin-right:-4px}
-.lb-buddy{width:24px;height:24px;object-fit:contain;image-rendering:pixelated;vertical-align:middle;margin:-4px 4px -4px 0}
+/* A player's picture on the board: their buddy in a circle, or their initial when there is none. */
+.lb-avatar{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;overflow:hidden;flex:none;
+  vertical-align:middle;margin:-5px 8px -5px 0;border:1px solid var(--rule);background:var(--surface-sunk)}
+.lb-avatar img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.lb-avatar.none{font:11px/1 var(--mono);color:var(--dim)}
 #account-state b{color:var(--ink);font-weight:600}
 #account button{background:none;border:1px solid var(--rule);color:var(--ink);min-height:38px;
   padding:8px 12px;font:11px var(--mono);cursor:pointer}
