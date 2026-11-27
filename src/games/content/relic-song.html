@@ -627,14 +627,19 @@ const SONGS = [
     parts: { A: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
              B: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D" } },
     form: "A A B A A B B A" },
-  { id: "onix-rising", heat: { ez: 0.14, hd: 0.1, in: 0.26 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
+  { id: "onix-rising", heat: { ez: 0.12, hd: 0.08, in: 0.26 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
     parts: { A: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
     form: "A A B A relic C C B C",
-    // Tutorial boss: the line steps between a few spots, like blocks set down.
-    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 520, rot: 0 }, { at: 16, len: 1, kind: "fly", x: 640, y: 440, rot: 0 }, { at: 32, len: 1, kind: "fly", x: 640, y: 520, rot: -8 },
-           { at: 40, len: 1, kind: "fly", x: 640, y: 520, rot: 8 }, { at: 48, len: 2, kind: "fly", x: 640, y: 480, rot: 0 }] },
+    // Tutorial boss, the first moving line: slow tilts up to 20 degrees, a few moves, and one slow
+    // full turn near the end, set down like blocks.
+    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 }, { at: 2, len: 6, kind: "fly", x: 640, y: 500, rot: -12 },
+           { at: 8, len: 8, kind: "fly", x: 640, y: 480, rot: 12 }, { at: 16, len: 4, kind: "fly", x: 520, y: 460, rot: -20 },
+           { at: 20, len: 4, kind: "fly", x: 760, y: 460, rot: 20 }, { at: 24, len: 8, kind: "tide", amp: 50, period: 8, tilt: 10 },
+           { at: 32, len: 4, kind: "fly", x: 640, y: 420, rot: -20 }, { at: 36, len: 4, kind: "fly", x: 640, y: 520, rot: 16 },
+           { at: 40, len: 4, kind: "fly", x: 560, y: 480, rot: 0 }, { at: 44, len: 4, kind: "fly", x: 640, y: 460, rot: 0 },
+           { at: 48, len: 12, kind: "spin", perBeat: 30 }, { at: 60, len: 4, kind: "fly", x: 640, y: 520, rot: 360 }] },
 
   // ── Misty, Cerulean Gym (Water) ──
   { id: "cerulean-current", heat: { ez: 0.46, hd: 0.38 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
@@ -645,7 +650,7 @@ const SONGS = [
     parts: { A: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
              B: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A" } },
     form: "A A B A A B B A A A B A A B B A" },
-  { id: "starmie-undertow", heat: { ez: 0.54, hd: 0.44, in: 0.5 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
+  { id: "starmie-undertow", heat: { ez: 0.58, hd: 0.44, in: 0.5 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
     parts: { A: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
              B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
              C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
@@ -662,7 +667,7 @@ const SONGS = [
     parts: { A: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
              B: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "raichu-overload", heat: { ez: 0.56, hd: 0.22, in: 0.4 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
+  { id: "raichu-overload", heat: { ez: 0.62, hd: 0.22, in: 0.38 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
              B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
@@ -687,7 +692,7 @@ const SONGS = [
     parts: { A: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
              B: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm" } },
     form: "A A B A B B A A" },
-  { id: "vileplume-drift", heat: { ez: 1, hd: 0.48, in: 0.6 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
+  { id: "vileplume-drift", heat: { ez: 0.98, hd: 0.48, in: 0.58 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
     parts: { A: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
              B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
              C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
@@ -696,7 +701,7 @@ const SONGS = [
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 380, rot: 0 }, { at: 2, len: 62, kind: "drift", ampX: 220, period: 16, sway: 22, fall: 2.2 }] },
 
   // ── The finale: Meloetta ──
-  { id: "relic-song", heat: { ez: 0.48, hd: 0.36, in: 0.36, at: 0.34 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
+  { id: "relic-song", heat: { ez: 0.52, hd: 0.36, in: 0.36, at: 0.34 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
     parts: { A: { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "Em C G D" },
              B: { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - - | g5 - a5 - b5 - d6 - | e6 - - - - - . .", chords: "Am Em G Em" },
              C: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | g5 a5 b5 c6 d6 c6 b5 a5 | b5 - - - - - - - | e5 - - - . . . .", chords: "Em D C B", burst: true },
@@ -719,19 +724,25 @@ const SONGS = [
   // ── Hidden tracks ──
   // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
   // land on beats 1 and 4 every bar, and the B part fires a fast burst.
-  { id: "the-dealer", heat: { ez: 0.76, hd: 0.46, in: 0.48, at: 0.44 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007, at: true,
+  { id: "the-dealer", heat: { ez: 0.84, hd: 0.48, in: 0.5, at: 0.44 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007, at: true,
     sync: true, chordAt: [0, 6], chordsAlways: true,
+    // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
+    verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
+    loose: true, line: [{ at: 0, len: 6, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 6, len: 999, kind: "chamber", every: 6, step: 60, snap: 0.35 }],
     parts: { A: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
              B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G", burst: true } },
-    form: "A A B A B A", note: "Six beats a bar. The house always counts its own way." },
+    form: "A A B relic A B A", note: "Six beats a bar. The house always counts its own way." },
   { id: "its-started-go", heat: 0, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true, diffs: ["hd"],
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", heat: { ez: 0.9, hd: 0.44, in: 0.5, at: 0.48 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+  { id: "sssssssnakes", heat: { ez: 0.88, hd: 0.42, in: 0.46, at: 0.46 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+    // The break: a long hiss, and then the line slithers in an S for the rest of the song.
+    verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
+    loose: true, line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 430, rot: 0 }, { at: 4, len: 999, kind: "slither", ampX: 240, ampY: 60, period: 8, tilt: 24 }],
     parts: { A: { lead: "e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - a4 - g4 - f#4 - - - . . . .", chords: "Em Em" },
              B: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" } },
-    form: "A A B A A B B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
+    form: "A A B A A B relic B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
 ];
 // heat is how much of the filler layer a song takes: gym 1 lowest, the finale and the hidden
 // tracks highest. The level shown on the map and in play is measured from the built chart (rate()).
@@ -772,7 +783,7 @@ function build(song, diff = "hd") {
     s.pri += pri; spots.set(k, s);
   };
   let beat = 0, mode = "highway", form = "aria";
-  const tokens = song.form.split(/\s+/);
+  const { tokens, moved } = formFor(song, diff);
   const addPart = (name, part, chartOn, verse) => {
     const lead = parseLine(part.lead, steps, song.id + " " + name);
     const bars = lead.length / steps;
@@ -786,7 +797,7 @@ function build(song, diff = "hd") {
       let len = 1;
       while (i + len < lead.length && lead[i + len] === "-") len++;
       const b = at + i / 2;
-      ev.push({ b, kind: "tone", inst: verse ? "voice" : style.lead, midi: m, dur: len / 2 });
+      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : style.lead, midi: m, dur: len / 2 });
       if (!chartOn) continue;
       if (lastPitch != null) lane += m > lastPitch ? 1 : m < lastPitch ? -1 : (b - lastBeat < 0.75 ? (lane >= 2 ? -1 : 1) : 0);
       if (lane > L - 1) lane = L - 2; if (lane < 0) lane = 1;
@@ -844,7 +855,7 @@ function build(song, diff = "hd") {
   for (const tok of tokens) {
     if (tok === "relic") {
       const start = beat;
-      const sung = song.final ? VERSES : [VERSES[song.gym]];
+      const sung = song.verse ? [song.verse] : song.final ? VERSES : [VERSES[song.gym]];
       for (const v of sung) addPart("verse", v, false, true);
       segments.push({ from: start, to: beat, kind: "relic" });
       mode = "line"; form = "pirouette"; verseAt = beat;
@@ -949,7 +960,7 @@ function build(song, diff = "hd") {
   for (const n of chart) n.kind = n.mode === "line" ? (n.len ? "hold" : n.run ? "drag" : "tap") : (n.len ? "hold" : "tap");
   ev.sort((a, b) => a.b - b.b);
   const end = beat;
-  const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb };
+  const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb, ...lineFor(song, diff, moved, end - verseAt) };
   Object.assign(B, rate(B));
   return B;
 }
@@ -981,9 +992,9 @@ function rate(B) {
   // The line: px (and degrees, x4) it covers in the half beat before each of its notes, per second.
   const onLine = ns.filter(n => n.mode === "line");
   let move = 0;
-  if (song.line && onLine.length) {
+  if (B.line && onLine.length) {
     for (const n of onLine) {
-      const r = n.b - B.verseAt, a = lineAt(song.line, r - 0.5), c = lineAt(song.line, r);
+      const r = n.b - B.verseAt, a = lineAt(B.line, r - 0.5), c = lineAt(B.line, r);
       move += Math.hypot(c.x - a.x, c.y - a.y) + 4 * Math.abs(c.rot - a.rot);
     }
     move /= onLine.length * 0.5 * spb;
@@ -1010,8 +1021,62 @@ const MOVES = {
   tide: (s, t, g) => { const p = Math.sin(2 * Math.PI * t / g.period); s.y += g.amp * p; s.rot += g.tilt * Math.cos(2 * Math.PI * t / g.period); },
   zap: (s, t, g) => { const i = Math.floor(t / g.every) % g.spots.length, [x, y, r] = g.spots[i]; s.x = x; s.y = y; s.rot = r; s.zap = t % g.every < 0.18; },
   drift: (s, t, g) => { s.x += g.ampX * Math.sin(2 * Math.PI * t / g.period); s.rot += g.sway * Math.sin(2 * Math.PI * t / (g.period / 2)); s.y += g.fall * t; },
-  spin: (s, t, g) => { s.rot += g.perBeat * t; }
+  spin: (s, t, g) => { s.rot += g.perBeat * t; },
+  // The Dealer's cylinder: at every bar after the first it snaps a chamber round (step degrees), with a flash.
+  chamber: (s, t, g) => { const i = Math.floor(t / g.every), f = t - i * g.every; s.rot += i ? g.step * (i - 1 + ease(Math.min(1, f / g.snap))) : 0; s.zap = i > 0 && f < 0.2; },
+  // Sssssssnakes: an S-wave. Side to side, up and down twice as fast, tilted along the curve.
+  slither: (s, t, g) => { const a = 2 * Math.PI * t / g.period; s.x += g.ampX * Math.sin(a); s.y += g.ampY * Math.sin(2 * a); s.rot += g.tilt * Math.cos(a); }
 };
+// The form a difficulty plays. On IN and AT the break comes about a third of the way in, not halfway:
+// the parts it jumps ahead of are played on the line instead (`moved` beats of them).
+function formFor(song, diff) {
+  const tokens = song.form.split(/\s+/), r = tokens.indexOf("relic");
+  if (r < 0 || (diff !== "in" && diff !== "at")) return { tokens, moved: 0 };
+  const beats = t => t === "flip" ? song.bar : t === "relic" ? 0 : song.parts[t].lead.split("|").length * song.bar;
+  const total = tokens.reduce((n, t) => n + beats(t), 0);
+  let j = r, best = Infinity;
+  for (let k = 1, at = beats(tokens[0]); k <= r; at += beats(tokens[k]), k++) if (Math.abs(at - total / 3) < best) { best = Math.abs(at - total / 3); j = k; }
+  const moved = tokens.slice(j, r).reduce((n, t) => n + beats(t), 0);
+  return { tokens: [...tokens.slice(0, j), "relic", ...tokens.slice(j, r), ...tokens.slice(r + 1)], moved };
+}
+// The line's script for a difficulty. HD plays it as written. EZ is gentle: half the swing, slower,
+// no spins, one line. IN and AT swing wider and faster, run the script's own moves through the parts
+// the break jumped ahead of, and split into two lines for a stretch if the song never does.
+// A loose script (the hidden tracks) is the same move all the way, so it only scales.
+function lineFor(song, diff, moved, length) {
+  if (!song.line) return { line: null, split: [] };
+  const gentle = diff === "ez", hard = diff === "in" || diff === "at";
+  const k = gentle ? 0.5 : diff === "at" ? 1.5 : diff === "in" ? 1.3 : 1, pace = gentle ? 1.5 : diff === "at" ? 0.7 : diff === "in" ? 0.8 : 1;
+  const tune = g => {
+    const o = { ...g };
+    for (const f of ["amp", "ampX", "ampY", "tilt", "sway"]) if (o[f] != null) o[f] *= k;
+    if (o.period) o.period *= pace;
+    if (o.kind === "fly" && Math.abs(o.rot) < 90) o.rot = Math.max(-35, Math.min(35, o.rot * k));
+    else if (o.kind === "fly" && gentle) o.rot %= 360;   // EZ has no spins, so nothing to come out of
+    if (o.kind === "zap") { o.spots = o.spots.map(([x, y, r]) => [640 + (x - 640) * Math.min(1.2, k), y, r * k]); if (gentle) o.every *= 2; }
+    if (o.kind === "spin" && gentle) o.perBeat = 0;
+    if (o.kind === "chamber" && gentle) { o.snap *= 3; o.every *= 2; }
+    return o;
+  };
+  let line = song.line.map(tune), split = (song.split || []).map(w => w.slice());
+  if (gentle) { line = line.filter(g => !g.line); split = []; }
+  if (moved && !song.loose) {
+    // The moved parts come first: fly in, then the script's own moves back to back (no spins).
+    const own = line.filter(g => !g.line && g.at > 0 && g.kind !== "spin" && g.kind !== "fly");
+    const pre = [{ ...line[0], at: 0 }];
+    for (let at = line[0].len; own.length && at < moved;) for (const g of own) { if (at >= moved) break; const len = Math.min(g.len, moved - at); pre.push({ ...g, at, len }); at += len; }
+    line = pre.concat(line.map(g => ({ ...g, at: g.at + moved })));
+    split = split.map(([a, b]) => [a + moved, b + moved]);
+  }
+  if (hard && !split.length) {
+    // Two lines at once: a second one rises to the top for sixteen beats, rocking, then drops back.
+    const a = Math.round(moved + (length - moved) * 0.45), w = 16;
+    line.push({ at: a, len: 2, kind: "fly", x: 640, y: 220, rot: 0, line: 1 }, { at: a + 2, len: w - 4, kind: "tide", amp: 40, period: 4, tilt: 10, line: 1 },
+      { at: a + w - 2, len: 2, kind: "fly", x: 640, y: 480, rot: 0, line: 1 });
+    split.push([a, a + w]);
+  }
+  return { line, split };
+}
 // The highway's line: horizontal, near the bottom. A boss's line starts here when it breaks free.
 const HOME = { x: 640, y: 540, rot: 0 };
 // A segment with line: 1 moves the second line. It appears where the first one is at its
@@ -1033,7 +1098,7 @@ function lineAt(script, beat, which = 0) {
   }
   return s;
 }
-const splitAt = (song, rel) => (song.split || []).some(([a, b]) => rel >= a && rel < b);
+const splitAt = (B, rel) => (B.split || []).some(([a, b]) => rel >= a && rel < b);
 
 /* ── Unlocks and bests ─────────────────────────────────────────────────── */
 const bestOf = (song, diff = song.diffs[0]) => save.best[song.id + ":" + diff] || null;
@@ -1385,7 +1450,7 @@ function start(song, diff = pickedDiff(song)) {
   const pxBeat = pxPerSec() * B.spb;
   for (const n of notes) {
     const rel = n.b - B.verseAt;
-    n.line = n.mode === "line" && splitAt(song, rel - 3) && splitAt(song, rel + 1) && n.lane >= L / 2 ? 1 : 0;
+    n.line = n.mode === "line" && splitAt(B, rel - 3) && splitAt(B, rel + 1) && n.lane >= L / 2 ? 1 : 0;
     n.side = n.line ? -1 : 1;
     // Two layouts: the highway's (wide, on the lanes) and the line's (narrower). Every note starts
     // on the highway's, and a line note narrows to its own while Meloetta sings (see frame).
@@ -1460,10 +1525,12 @@ function frame() {
     P.showing = at.show;
     P.nextForm = at.show.kind === "relic" ? "pirouette" : P.form === "aria" ? "pirouette" : "aria";
     const wf = $("#whiteflash"); wf.classList.remove("go"); void wf.offsetWidth; wf.classList.add("go");
-    pix($("#relic-img"), sprite(MELOETTA), 680, 20);
-    $("#relic-img").className = P.form === "pirouette" ? "pir" : "";
-    $("#relic-name").textContent = at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
-    $("#relic-sub").textContent = at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
+    // A hidden track's break is its own: its art, its name for it.
+    const own = P.song.breakName && at.show.kind === "relic";
+    pix($("#relic-img"), sprite(own ? songArt(P.song) : MELOETTA), 680, 20);
+    $("#relic-img").className = !own && P.form === "pirouette" ? "pir" : "";
+    $("#relic-name").textContent = own ? P.song.breakName : at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
+    $("#relic-sub").textContent = own ? P.song.breakSub : at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
     $("#relicfx").className = "on";
     if (at.mode === "highway") {
       $("#guides").className = "out"; $("#keys").className = "out";
@@ -1483,10 +1550,10 @@ function frame() {
     $("#guides").className = $("#keys").className = P.mode === "highway" ? "" : "out";
   }
   // The lines' places: the highway's spot, or the song's script.
-  const line = P.mode === "line" && P.song.line;
-  const s0 = line ? lineAt(P.song.line, rel, 0) : HOME;
+  const line = P.mode === "line" && B.line;
+  const s0 = line ? lineAt(B.line, rel, 0) : HOME;
   place(P.lines[0], s0); P.lines[0].classList.toggle("zap", !!s0.zap);
-  const s1 = line && splitAt(P.song, rel) ? lineAt(P.song.line, rel, 1) : null;
+  const s1 = line && splitAt(B, rel) ? lineAt(B.line, rel, 1) : null;
   P.lines[1].classList.toggle("off", !s1);
   if (s1) { place(P.lines[1], s1); P.lines[1].classList.toggle("zap", !!s1.zap); }
   // Every beat: the muted ring and dot.
