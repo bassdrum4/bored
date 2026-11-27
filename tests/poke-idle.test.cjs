@@ -748,7 +748,7 @@ test('the test account\'s Story tools: jump with version picks, reset a chapter,
     return { labels, j, tools, reset, blocked, off, winBtn, won, gates: [gate, met, ign], roulette: S.story.roulette, all, none, y2, epi: S.story.epilogue, real: localStorage.getItem(STORY_KEY) };
   });
   assert.deepEqual(got.labels.slice(0, 4), ['Prologue: starter picked', 'Kanto: gyms', 'Kanto: Champion Blue', 'Kanto: Team Thaw: Rime']);
-  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.some(l => l.startsWith('Year 2 Paldea')) && got.labels.at(-1) === 'Year 3 Paldea: Liberate Paldea');
+  assert.ok(got.labels.includes('Alola: The Mask (optional)') && got.labels[got.labels.indexOf('Epilogue: Mt. Silver') + 1].startsWith('Year 1 cleared') && got.labels.some(l => l.startsWith('Year 2 Paldea')) && got.labels.includes('Year 3 Paldea: Liberate Paldea'));
   assert.deepEqual(got.j.champs, [0, 1, 2, 3, 4]);
   assert.equal(got.j.badges, 20);
   assert.deepEqual(got.j.picks, { 0: 150, 1: 249, 2: 382, 3: got.j.picks[3] }, 'the picks asked for, and random where none was');
@@ -1516,8 +1516,86 @@ test('Year 3, the nine liberations (test save): admins and Thaw-bound projection
   assert.deepEqual(L[7].post, ['y3-galar-after']);
   assert.ok(L.every((x, r) => x.frozenLeft === (r === 7 ? 1 : 0)), 'each thaw returns everything from its region (but the stolen Eternatus)');
   assert.deepEqual(L[8].post, ['y3-paldea-after', 'y3-maps']);
-  assert.deepEqual([got.end.next, got.end.frozen, got.end.slot, got.end.cap, got.end.lib, got.end.bodyBond], ['Every region is free.', [890], true, 100, 9, false]);
+  assert.deepEqual([got.end.next, got.end.frozen, got.end.slot, got.end.cap, got.end.lib, got.end.bodyBond], ['Next: Cerulean Cave at deep under Cerulean, in Kanto.', [890], true, 100, 9, false]);
   assert.deepEqual(got.kept, { post: ['y3-galar-kept'], frozen: 0, slot: false }, 'keeping Eternatus: Galar thaws in full');
   assert.ok(got.slush.every(b => b.endsWith('<p>— Slush</p>')));
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, the endgame (test save): the inner circle, Necrozma before Ultra, Arceus with every Plate, Terminus, the Dig, the Darkest Day both ways, and the night before', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    const play = id => { const c = CHAPTER[id]; const open = chapterOpen(c); startLoc({ kind: 'chapter', r: c.r, x: id }); const pre = skip(); const q = B && B.kind === 'story' ? B.queue.map(f => f.name) : null, L = B && B.L; if (q) win(); const post = skip(); return { open, pre, q, L, post, done: chDone(id) }; };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    const begin = stolen => {
+      storyJump(to('ch-y2-crown') + 1); skip(); overlay('#scene', false);
+      for (const n of [800, 493, 1024, 718]) delete S.box[n];
+      for (const k of ['megalo', 'necrozma', 'origin', 'cerulean', 'sky', 'terminus', 'underdepths']) delete S.won[k]; S.eternamax = 0; S.plates = 0; for (const id of [...MEWTWONITES, MEGA_RAYQUAZA, 10301]) delete S.stones[id];
+      year3Reset(stolen ? 150 : 890); S.debug.league = 0; S.balls.master = 50; S.set.manual = 0;
+      for (let r = 0; r < 9; r++) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; const c = CHAPTER[CHAPTERS.find(x => x.type === 'liberate' && x.r === r).id]; S.story.ch[c.id] = 1; thawRegion(r); }
+      for (const id of ['y3-cave', 'y3-distortion']) S.story.ch[id] = 1;
+    };
+    begin(true);
+    const next0 = storyNext().text, originShut = chapterOpen(CHAPTER['y3-origin']);
+    const cer = play('y3-cerulean'), sky = play('y3-sky');
+    const originStill = chapterOpen(CHAPTER['y3-origin']);
+    const meg = play('y3-megalo');
+    const nec = S.box[800] && { lv: realLevel(800), cap: levelCap(), from: S.box[800].from, frozen: isFrozen(800) };
+    S.box[800].forme = 'dusk'; const dusk = !!qforme(800); S.box[800].forme = 'ultra'; const ultraBefore = !!qforme(800); S.box[800].forme = '';
+    const ult = play('y3-ultra'); S.box[800].forme = 'ultra'; const ultraAfter = !!qforme(800); S.box[800].forme = '';
+    const ori = play('y3-origin');
+    const arceus = S.box[493] && { lv: realLevel(493), plates: S.plates, won: !!S.won.origin }; S.box[493].forme = 't:Fire'; const fire = qforme(493) && qforme(493).types[0]; S.box[493].forme = '';
+    const termRow = chapterRows(5).find(x => x.x === 'y3-terminus').note;
+    S.box[718] = { xp: 125, shiny: false, forme: '10', from: 5 }; S.cells = 40; const termCells = chapterRows(5).find(x => x.x === 'y3-terminus').note;
+    S.cells = 100; const term = play('y3-terminus');
+    const dig = play('y3-dig'); const tera = S.box[1024] && { lv: realLevel(1024), from: S.box[1024].from, stellar: !!S.won.underdepths };
+    const etBefore = { stolen: !!S.box[890].stolen, slot: emptySlot(890) };
+    const dark = play('y3-darkest'); const et = { frozen: isFrozen(890), stolen: !!S.box[890].stolen, bond: S.box[890].bond, slot: emptySlot(890), eternamax: S.eternamax };
+    const night = play('y3-night');
+    const letter = MAIL.find(m => m.id === 'story-y3-seven').body, clues = ['notes', 'photo'].map(k => !!S.story.clues[k]);
+    const nextEnd = storyNext().text, stonesWon = [...MEWTWONITES, MEGA_RAYQUAZA, 10301].map(id => !!S.stones[id]);
+    // Keeping Eternatus: the Darkest Day is a Thaw-bound copy, and nothing comes back.
+    begin(false);
+    for (const id of ['y3-cerulean', 'y3-sky', 'y3-megalo', 'y3-origin', 'y3-dig']) S.story.ch[id] = 1;
+    const box = Object.keys(S.box).length, copy = play('y3-darkest');
+    const keptPath = { q: copy.q, post: copy.post, box: Object.keys(S.box).length === box };
+    // Classic: Megalo's one flag still opens all three forms, and Story's fusion flag means nothing there.
+    useSlot(KEY); S = fresh(); S.box[800] = { xp: 125, forme: 'dusk' }; S.won = { necrozma: 1 }; const classicDusk = !!qforme(800);
+    const stones = [...MEWTWONITES, MEGA_RAYQUAZA, 10301].map(id => !!S.stones[id]);
+    return { stones, stonesWon, next0, originShut, originStill, cer, sky, meg, nec, dusk, ultraBefore, ult, ultraAfter, ori, arceus, fire, termRow, termCells, term, dig, tera, etBefore, dark, et, night, letter, clues, nextEnd, keptPath, classicDusk };
+  });
+  assert.equal(got.next0, 'Next: Cerulean Cave at deep under Cerulean, in Kanto.');
+  assert.deepEqual([got.originShut, got.originStill], [false, false], 'the Hall of Origin waits for all three of the inner circle');
+  assert.ok(got.cer.open && got.cer.done && got.sky.done && got.meg.done);
+  assert.deepEqual(got.cer.q, ['Mega Mewtwo X', 'Mega Mewtwo Y']);
+  assert.equal(got.sky.q.length, 4, 'Deoxys in four Formes');
+  assert.deepEqual(got.meg.q, ['Necrozma']);
+  assert.deepEqual(got.nec, { lv: got.nec.cap, cap: got.nec.cap, from: 6, frozen: false }, 'Necrozma joins at the cap, from Alola, never frozen');
+  assert.deepEqual([got.dusk, got.ultraBefore, got.ultraAfter], [true, false, true], 'the fusions first, Ultra Necrozma after the summit');
+  assert.ok(got.ult.open);
+  assert.deepEqual(got.ori.q, ['Arceus'], 'a short trial');
+  assert.equal(got.ori.pre[0], 'y3-origin');
+  assert.deepEqual(got.arceus, { lv: got.nec.cap, plates: 17, won: true }, 'Arceus at the cap, with all 17 Plates');
+  assert.equal(got.fire, 'Fire');
+  assert.equal(got.termRow, 'needs a Zygarde (the Kalos dungeon)');
+  assert.equal(got.termCells, 'Zygarde Cells 40/100');
+  assert.ok(got.term.open && got.term.done);
+  assert.ok(got.dig.done && got.tera && got.tera.stellar && got.tera.from === 8, 'Terapagos caught, from Paldea');
+  assert.deepEqual(got.dig.post, ['y3-dig-after']);
+  assert.deepEqual(got.etBefore, { stolen: true, slot: true });
+  assert.deepEqual(got.dark.q, ['Eternamax Eternatus']);
+  assert.deepEqual(got.et, { frozen: false, stolen: false, bond: 1, slot: false, eternamax: 1 }, 'Eternatus comes back, bonded, and the slot is filled');
+  assert.deepEqual(got.dark.post, ['y3-darkest-after']);
+  assert.ok(got.night.done);
+  assert.match(got.letter, /<p>— Sssssssnakes<\/p>$/);
+  assert.equal('Sssssssnakes'.match(/^S(s*)nakes$/)[1].length + 1, 7, 'exactly seven s\'s');
+  assert.deepEqual(got.clues, [true, true], 'the founder\'s notes and the photo');
+  assert.deepEqual(got.keptPath, { q: ['Thaw-bound Eternamax Eternatus'], post: ['y3-darkest-copy'], box: true });
+  assert.deepEqual(got.stonesWon, [true, true, true, true], 'both Mewtwonites, Mega Rayquaza and the Zygardite');
+  assert.deepEqual(got.stones, [false, false, false, false], 'the second run (kept Eternatus) starts clean');
+  assert.equal(got.classicDusk, false, 'Classic ignores Story\'s fusion flag');
   assert.deepEqual(errors, []);
 });
