@@ -6,6 +6,12 @@ const { serve } = require('./serve.cjs');
 const { watch, capture } = require('./browser-diagnostics.cjs');
 const puppeteer = require('puppeteer-core');
 const root = path.join(__dirname, '../src');
+// The moving line's readability rules, checked from a built chart and its line script at 1.0x:
+//  R1 every note is on screen (below the HUD) and its line solid for the 0.6 s before its hit, at its line's real place;
+//  R2 its line never turns faster than 180 degrees a beat in the beat before it;
+//  R3 its line doesn't jump (60 px in a 32nd of a beat) in the half beat before it, unless the jump lands on a hit;
+//  R4 its line is up a whole bar before it.
+const READABLE = '// The readability rules, checked from the built chart and its line script (1.0x scroll speed).\n// Returns a list of problems for one chart.\nfunction readable(R, B) {\n  const out = [], song = B.song, spb = B.spb, px = 520, L = B.lanes;\n  if (!B.lines) return out;\n  const laneW = L === 6 ? 180 : 240, laneX = l => (l - (L - 1) / 2) * laneW;\n  const state = (k, rel) => rel < 0 ? (k ? null : { x: 640, y: 540, rot: 0, a: 1 }) : R.lineAt(B.lines[k], rel, k);\n  const byLine = [0, 1, 2, 3].map(k => B.chart.filter(n => n.rel >= 0 && n.line === k).map(n => n.rel));\n  for (const n of B.chart) {\n    if (n.rel < 0) continue;\n    const k = n.line, fl = B.floors[k], tag = song.id + " " + B.diff + " beat " + n.rel.toFixed(2) + " line " + k + ": ";\n    // R1: on screen and solid for 0.6 s before the hit, at the line\'s real place.\n    for (let dt = 0; dt <= 0.6001; dt += 0.04) {\n      const rel = n.rel - dt / spb, s = state(k, rel);\n      if (!s || s.a < 0.25) { out.push(tag + "R1 line not there " + dt.toFixed(2) + "s before"); break; }\n      const d = (n.mode === "line" ? R.floorAt(fl, n.rel) - R.floorAt(fl, rel) : n.rel - rel) * spb * px;\n      const lx = n.mode === "line" ? n.lx : laneX(n.lane), ly = -n.side * d, th = s.rot * Math.PI / 180;\n      const x = s.x + lx * Math.cos(th) - ly * Math.sin(th), y = s.y + lx * Math.sin(th) + ly * Math.cos(th);\n      if (x < 10 || x > 1270 || y < 160 || y > 712) { out.push(tag + "R1 off screen " + dt.toFixed(2) + "s before at " + Math.round(x) + "," + Math.round(y)); break; }\n    }\n    // R2 and R3, over the beat before the hit, in 32nds.\n    let prev = state(k, n.rel - 1);\n    for (let j = 1; j <= 32; j++) {\n      const rel = n.rel - 1 + j / 32 - (j === 32 ? 1e-3 : 0), s = state(k, rel);\n      if (prev && s) {\n        if (Math.abs(s.rot - prev.rot) > 180 / 32 + 0.6) { out.push(tag + "R2 turns " + Math.round(Math.abs(s.rot - prev.rot) * 32) + " deg/beat at " + rel.toFixed(2)); break; }\n        const jump = Math.hypot(s.x - prev.x, s.y - prev.y);\n        if (j > 16 && jump > 60 && !byLine[k].some(x => x >= rel - 1 / 32 - 1e-3 && x <= rel + 1e-3)) { out.push(tag + "R3 jumps " + Math.round(jump) + "px at " + rel.toFixed(2)); break; }\n      }\n      prev = s;\n    }\n    // R4: its line is up for a bar before it.\n    for (let b = n.rel - song.bar; b <= n.rel; b += 0.125) { const s = state(k, b); if (!s || s.a < 0.25) { out.push(tag + "R4 line not up at " + b.toFixed(2)); break; } }\n  }\n  return out;\n}';
 test('Relic Song boots, has playable charts and uses the shared leaderboard contract', async t => {
   const html = fs.readFileSync(path.join(root,'games/content/relic-song.html'),'utf8');
   assert.doesNotThrow(() => new Function(html.match(/<script>([\s\S]*?)<\/script>/)[1]));
@@ -45,6 +51,12 @@ test('Relic Song boots, has playable charts and uses the shared leaderboard cont
   }
   for(const id of new Set(charts.map(c=>c.id))){const lv=charts.filter(c=>c.id===id).map(c=>c.level);assert.ok(lv.every((v,i)=>!i||v>lv[i-1]),id+' '+lv);}
   assert.equal(charts.find(c=>c.id==='its-started-go'&&c.diff==='hd').level,1);
+  // The moving line's readability rules, chart by chart (see readable() below).
+  const unreadable=await page.evaluate(src=>{eval(src);const R=window.__relicSong;return R.SONGS.filter(s=>s.line).flatMap(s=>s.diffs.flatMap(d=>readable(R,R.built(s,d))));},READABLE);
+  assert.deepEqual(unreadable.slice(0,5),[]);
+  // EZ stays tame: one line, no flips, spins, speed changes or shakes.
+  const ez=await page.evaluate(()=>{const R=window.__relicSong;return R.SONGS.filter(s=>s.line).map(s=>{const B=R.built(s,'ez');return {id:s.id,lines:B.lines.slice(1).filter(l=>l.length).length,turns:B.lines[0].filter(g=>g.kind==='flip'||g.kind==='spin').length,speeds:B.floors.flat().length-4,shakes:B.fx.filter(f=>f.kind==='shake').length};});});
+  for(const c of ez) assert.deepEqual([c.lines,c.turns,c.speeds,c.shakes],[0,0,0,0],c.id);
   assert.deepEqual(errors,[]);
 });
 

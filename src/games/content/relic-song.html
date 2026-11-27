@@ -153,11 +153,17 @@
   #lines { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(to bottom, transparent 0 100px, #000 170px); mask-image: linear-gradient(to bottom, transparent 0 100px, #000 170px) }
   /* Judgment lines. Each is a point the script places and turns; its bar runs
      edge to edge, and its notes ride inside it, travelling straight at it. */
-  .jl { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; z-index: 3; transition: opacity .3s }
+  .jl { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform, opacity; z-index: 3 }
   .jl .bar { position: absolute; left: -1600px; width: 3200px; top: -1px; height: 2px; background: #fff;
              box-shadow: 0 0 6px rgba(255, 255, 255, .9), 0 0 18px rgba(255, 255, 255, .35) }
   .jl.zap .bar { box-shadow: 0 0 10px #fff, 0 0 30px var(--gold) }
-  .jl.off { opacity: 0 }
+  .jl.off { display: none }
+  /* Big hits: a soft white wash, or the lines jolting a few px. Reduce motion turns both off. */
+  #hitflash { position: absolute; inset: 0; background: #fff; z-index: 7; pointer-events: none; opacity: 0 }
+  #hitflash.flash { animation: hflash .22s ease-out }
+  @keyframes hflash { from { opacity: .22 } to { opacity: 0 } }
+  #lines.shake { animation: shake .16s linear }
+  @keyframes shake { 25% { transform: translate(4px, -3px) } 50% { transform: translate(-3px, 3px) } 75% { transform: translate(2px, 2px) } }
 
   /* Notes: thin flat glowing bars. tap cyan, double gold, hold a cyan head and a beam, drag short and yellow. */
   .nt { position: absolute; bottom: -5px; height: 10px; transform-origin: 50% calc(100% - 5px); will-change: transform }
@@ -272,7 +278,7 @@
     <div id="mecol" hidden><img class="spr" id="me-img" alt=""><div class="nm" id="me-name"></div><div class="thin"><i id="me-hp"></i></div></div>
     <div id="songname"></div><div id="songlv"></div>
     <div id="relicfx"><img id="relic-img" alt=""><p id="relic-name">Relic Song</p><small id="relic-sub"></small></div>
-    <div id="whiteflash"></div>
+    <div id="whiteflash"></div><div id="hitflash"></div>
     <div class="over" id="pausebox" hidden><div class="card"><h2>Paused</h2><p class="dim">The music waits with you.</p>
       <div class="btns"><button id="b-quit" type="button">Back to the map</button><button id="b-retry" type="button">Retry (R)</button><button id="b-resume" type="button">Resume (Esc)</button></div></div></div>
   </section>
@@ -303,6 +309,7 @@
     <div class="line"><span class="dim">Notes late? Raise it. Early? Lower it.</span><button id="o-cal" type="button">Tap to calibrate</button></div>
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
     <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
+    <div class="line"><span>Reduce motion <span class="dim">(no shakes or flashes)</span></span><span class="seg" id="o-calm"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
     <div class="line"><span>Keybinds <span class="dim">(click a key, then press the new one)</span></span><span class="dim" id="o-bind-note"></span></div>
     <div class="line"><span>4 lanes <span class="dim">(EZ, HD)</span></span><span class="binds" id="o-bind4"></span></div>
@@ -445,7 +452,9 @@ const EGG_KEY = "bored.relic-song.eggs.v1";
 const STORY_KEY = "bored.poke-idle.story";
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0 }, readJSON(OPTS_KEY) || {});
+// Reduce motion starts on when the system asks for less motion.
+const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0,
+  calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
 {
   const saved = opts.binds || {}, ok = (row, n) => Array.isArray(row) && row.length === n && new Set(row).size === n
@@ -617,6 +626,25 @@ const VERSES = [
    parts; "relic" is where Meloetta sings and the highway breaks into the line,
    "flip" (the finale) is one bar where she changes form and the mode swaps back.
    line is the movement script for the judgment line, in beats from the break. */
+// Choreography helpers for the line scripts (see "The line's movement scripts" below).
+// every(from, to, step, make): make(beat, i) for each beat, its steps flattened.
+const every = (from, to, step, make) => { const out = []; for (let b = from, i = 0; b < to - 1e-9; b += step, i++) out.push(...[].concat(make(b, i))); return out; };
+// Starmie's riptide, eight beats from b: the line drops low (turned to rot), its notes crawl, then
+// rush in, twice; then it rises for the next spin.
+const riptide = (b, rot) => [{ at: b, len: 1, kind: "fly", x: 640, y: 585, rot }, { at: b + 1, len: 1, kind: "width", w: 0.75 },
+  ...[1, 5].flatMap(k => [{ at: b + k, kind: "speed", to: 0.45 }, { at: b + k + 2, kind: "speed", to: 1.3 }, { at: b + k + 2, kind: "shake" }]),
+  { at: b + 8, kind: "speed", to: 0.65 }, { at: b + 8, len: 1, kind: "width", w: 0.5 }];
+// Pirouette: a teleport every bar and a sharp snap (a tilt and a shove) on the beats between.
+const pirouette = (from, to) => every(from, to, 2, (b, i) => i % 2
+  ? [{ at: b, len: 0.2, kind: "snap", rot: i % 4 === 1 ? 16 : -16, dx: i % 4 === 1 ? -70 : 70 }]
+  : [{ at: b - 0.25, len: 0.5, kind: "teleport", x: [520, 760, 640, 580, 700][(i / 2) % 5], y: [560, 580, 540, 600, 560][(i / 2) % 5] }, { at: b, len: 0.17, kind: "snap", rot: 0 }]);
+// A surge: the line sits low; every four beats its notes crawl for two, then rush in, with a jolt.
+const surge = (from, to) => [{ at: from, len: 0.5, kind: "fly", x: 640, y: 620, rot: 0 }, { at: from, len: 0.5, kind: "width", w: 0.7 },
+  ...every(from, to, 4, (b, i) => [{ at: b, kind: "speed", to: 0.5 }, { at: b + 2, kind: "speed", to: 1.3 }, { at: b + 2, len: 0.12, kind: "snap", rot: i % 2 ? 10 : -10 }, { at: b + 2, kind: "shake" }]),
+  { at: to, kind: "speed", to: 1 }];
+// Where Vileplume's petals scatter to.
+const PETALS = [[380, 520], [640, 480], [900, 540], [520, 600], [780, 600], [300, 580], [980, 560], [640, 560]];
+
 const SONGS = [
   // ── Brock, Pewter Gym (Rock) ──
   { id: "pewter-steps", heat: { ez: 0, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
@@ -632,14 +660,20 @@ const SONGS = [
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
     form: "A A B A relic C C B C",
-    // Tutorial boss, the first moving line: slow tilts up to 20 degrees, a few moves, and one slow
-    // full turn near the end, set down like blocks.
-    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 }, { at: 2, len: 6, kind: "fly", x: 640, y: 500, rot: -12 },
-           { at: 8, len: 8, kind: "fly", x: 640, y: 480, rot: 12 }, { at: 16, len: 4, kind: "fly", x: 520, y: 460, rot: -20 },
-           { at: 20, len: 4, kind: "fly", x: 760, y: 460, rot: 20 }, { at: 24, len: 8, kind: "tide", amp: 50, period: 8, tilt: 10 },
-           { at: 32, len: 4, kind: "fly", x: 640, y: 420, rot: -20 }, { at: 36, len: 4, kind: "fly", x: 640, y: 520, rot: 16 },
-           { at: 40, len: 4, kind: "fly", x: 560, y: 480, rot: 0 }, { at: 44, len: 4, kind: "fly", x: 640, y: 460, rot: 0 },
-           { at: 48, len: 12, kind: "spin", perBeat: 30 }, { at: 60, len: 4, kind: "fly", x: 640, y: 520, rot: 360 }] },
+    // Onix stomps: on each bar's kick the line slams down and jolts, then climbs back somewhere else.
+    // Halfway it starts tilting (up to 20 degrees); near the end it rises and flips, so the last notes
+    // come up from below and the stomps go up. EZ keeps stomping on the ground.
+    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 },
+           ...every(4, 32, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 44, drot: i % 2 ? 6 : -6 }, { at: b, kind: "shake" },
+             { at: b + 0.5, len: 3, kind: "fly", x: [560, 720, 640, 520, 760, 640, 600][i], y: 500, rot: 0 }]),
+           { at: 30, len: 2, kind: "width", w: 0.7 },
+           ...every(32, 48, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 40 }, { at: b, kind: "shake" },
+             { at: b + 0.5, len: 3, kind: "fly", x: i % 2 ? 740 : 540, y: 540, rot: i % 2 ? 20 : -20 }]),
+           { at: 47, kind: "speed", to: 0.55 }, { at: 48, len: 3, kind: "fly", x: 640, y: 330, rot: 0, ez: false }, { at: 48, len: 3, kind: "width", w: 1, ez: false },
+           { at: 51, len: 1, kind: "flip", ez: false }, { at: 51, kind: "flash", ez: false }, { at: 53, kind: "speed", to: 1 },
+           ...every(52, 64, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: -40, drot: i % 2 ? 6 : -6, ez: false }, { at: b, kind: "shake" },
+             { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i], y: 330, rot: 180, ez: false }]),
+           ...every(48, 64, 4, b => [{ at: b, len: 0.08, kind: "snap", dy: 40, only: "ez" }, { at: b + 0.5, len: 3, kind: "fly", x: 640, y: 500, rot: 0, only: "ez" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
   { id: "cerulean-current", heat: { ez: 0.46, hd: 0.38 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
@@ -655,8 +689,18 @@ const SONGS = [
              B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
              C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
     form: "A A B A relic C C B C",
-    // The tide: the line rises and falls, tilting a little with the swell.
-    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 470, rot: 0 }, { at: 2, len: 62, kind: "tide", amp: 90, period: 8, tilt: 6 }] },
+    // Starmie: in the calm it spins (a turn every eight beats, back the other way the next time),
+    // slowed so the notes stay on screen; then a riptide: it drops low and the notes crawl, then
+    // rush in on the beat. In the B part a second line faces it from above.
+    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.5 }, { at: 0, kind: "speed", to: 0.65 },
+           { at: 0, len: 2, kind: "fly", x: 640, y: 540, only: "ez" },
+           { at: 2, len: 6, kind: "spin", perBeat: 60 }, ...riptide(8, 360),
+           { at: 16, len: 1, kind: "fly", x: 640, y: 432, rot: 360 }, { at: 17, len: 7, kind: "spin", perBeat: -360 / 7 }, ...riptide(24, 0),
+           { at: 24, kind: "snap", x: 640, y: 300, rot: 180, line: 1 }, { at: 25, len: 2, kind: "fade", to: 1, line: 1 }, { at: 24, kind: "speed", to: 0.65, line: 1 },
+           { at: 24, len: 2, kind: "width", w: 0.6, line: 1 },
+           { at: 32, len: 16, kind: "notes", lines: [0, 1] }, { at: 32, len: 16, kind: "tide", amp: 26, period: 8, tilt: 6 },
+           { at: 36, len: 12, kind: "tide", amp: 26, period: 8, tilt: 6, line: 1 }, { at: 48, len: 2, kind: "fade", to: 0, line: 1 },
+           { at: 48, len: 1, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 48, kind: "speed", to: 0.65 }, { at: 49, len: 7, kind: "spin", perBeat: 360 / 7 }, ...riptide(56, 360)] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
   { id: "vermilion-voltage", heat: { ez: 0.9, hd: 0.24 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
@@ -672,16 +716,16 @@ const SONGS = [
              B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
     form: "A A B A B relic C B C B C",
-    // The zap: the line snaps between spots every two beats, turned a new way each time.
-    // Halfway through it splits in two: one line zaps along the bottom, the other along the top, notes coming up at it.
-    line: [{ at: 0, len: 1, kind: "fly", x: 640, y: 480, rot: 0 },
-           { at: 1, len: 23, kind: "zap", every: 2, spots: [[640, 480, 0], [470, 420, -18], [810, 520, 14], [640, 380, 0], [520, 540, 10], [760, 420, -12]] },
-           { at: 24, len: 32, kind: "zap", every: 2, spots: [[640, 560, 0], [480, 540, -10], [800, 580, 8], [640, 600, 0]] },
-           { at: 24, len: 2, kind: "fly", x: 640, y: 230, rot: 0, line: 1 },
-           { at: 26, len: 28, kind: "zap", every: 2, spots: [[640, 220, 0], [820, 180, 12], [460, 200, -12], [640, 250, 0]], line: 1 },
-           { at: 54, len: 2, kind: "fly", x: 640, y: 560, rot: 0, line: 1 },
-           { at: 56, len: 25, kind: "zap", every: 2, spots: [[640, 480, 0], [470, 420, -18], [810, 520, 14], [640, 380, 0], [520, 540, 10], [760, 420, -12]] }],
-    split: [[24, 56]] },
+    // Raichu: every bar the line teleports somewhere new; mid-bar it zig-zags the other way. Every
+    // chord flashes. In the last part two more lines cross it like lightning, swapping angles.
+    line: [{ at: 0, len: 1, kind: "fly", x: 640, y: 560, rot: 0 }, { at: 0, len: 1, kind: "width", w: 0.8 }, { at: 0, len: 80, kind: "flash", on: "chords" },
+           ...every(4, 80, 4, (b, i) => { const [x, y, r] = [[470, 540, 12], [810, 580, -12], [560, 600, 10], [740, 550, -10], [640, 560, 8]][i % 5];
+             return [{ at: b - 0.25, len: 0.5, kind: "teleport", x, y }, { at: b, len: 0.16, kind: "snap", rot: r }, { at: b + 2, len: 0.16, kind: "snap", rot: -r, dx: r > 0 ? 40 : -40 }]; }),
+           { at: 56, kind: "snap", x: 500, y: 470, rot: 32, line: 1 }, { at: 56, kind: "snap", x: 780, y: 470, rot: -32, line: 2 },
+           { at: 56, len: 1, kind: "width", w: 0.5, line: 1 }, { at: 56, len: 1, kind: "width", w: 0.5, line: 2 },
+           { at: 56, kind: "speed", to: 0.7, line: 1 }, { at: 56, kind: "speed", to: 0.7, line: 2 },
+           { at: 57, len: 2, kind: "fade", to: 1, line: 1 }, { at: 57, len: 2, kind: "fade", to: 1, line: 2 }, { at: 64, len: 16, kind: "notes", lines: [0, 1, 2], by: "turn" },
+           ...every(64, 80, 2, (b, i) => [{ at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? 32 : -32, line: 1 }, { at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? -32 : 32, line: 2 }])] },
 
   // ── Erika, Celadon Gym (Grass) ──
   { id: "celadon-petals", heat: { ez: 0.98, hd: 0.46 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
@@ -697,8 +741,22 @@ const SONGS = [
              B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
              C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
     form: "A A B A relic C B C C",
-    // The leaf: the line drifts side to side, swaying, and slowly sinks.
-    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 380, rot: 0 }, { at: 2, len: 62, kind: "drift", ampX: 220, period: 16, sway: 22, fall: 2.2 }] },
+    // Vileplume: the line falls slowly and sways like a leaf; then petals: it shrinks and three more
+    // short lines fade in beside it, scatter across the screen and fade out again.
+    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 510, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.8 }, { at: 0, kind: "speed", to: 0.9 },
+           { at: 2, len: 28, kind: "drift", ampX: 180, period: 16, sway: 14, fall: 1.5 },
+           ...[[1, 420, 530, -25], [2, 860, 530, 25], [3, 640, 470, 12]].flatMap(([k, x, y, r]) => [{ at: 26, kind: "snap", x, y, rot: r, line: k },
+             { at: 26, kind: "width", l: 360, w: 0.4, line: k }, { at: 26, kind: "speed", to: 0.75, line: k }, { at: 26, len: 2, kind: "fade", to: 1, line: k }]),
+           { at: 30, len: 2, kind: "fly", x: 640, y: 600, rot: 0 }, { at: 30, len: 2, kind: "width", l: 360, w: 0.4 }, { at: 30, kind: "speed", to: 0.75 },
+           { at: 32, len: 24, kind: "notes", lines: [0, 1, 2, 3] },
+           // They drift to new spots every four beats; on IN and AT every two.
+           ...every(32, 56, 4, (b, i) => [0, 1, 2, 3].map(k => { const [x, y] = PETALS[(i + k * 2) % PETALS.length];
+             return { at: b, len: 4, kind: "fly", x, y, rot: ((i + k) % 3 - 1) * 24, line: k, hard: false }; })),
+           ...every(32, 56, 2, (b, i) => [0, 1, 2, 3].map(k => { const [x, y] = PETALS[(i + k * 2) % PETALS.length];
+             return { at: b, len: 2, kind: "fly", x, y, rot: ((i + k) % 3 - 1) * 24, line: k, only: "hard" }; })),
+           ...[1, 2, 3].map(k => ({ at: 56, len: 2, kind: "fade", to: 0, line: k })),
+           { at: 56, len: 2, kind: "fly", x: 640, y: 510, rot: 0 }, { at: 56, len: 2, kind: "width", l: 3200, w: 0.8 }, { at: 56, kind: "speed", to: 0.9 },
+           { at: 58, len: 6, kind: "drift", ampX: 140, period: 12, sway: 12, fall: 1 }] },
 
   // ── The finale: Meloetta ──
   { id: "relic-song", heat: { ez: 0.52, hd: 0.36, in: 0.36, at: 0.34 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
@@ -708,18 +766,31 @@ const SONGS = [
              D: { lead: ". e5 - g5 . b5 - a5 | . g5 - e5 . d5 - - | . c5 - e5 . g5 - b5 | . a5 - - . . . .", chords: "C Em Am D" },
              E: { lead: "e5 - - - - - - - | g5 - - - - - - - | f#5 - - - - - - - | b5 - - - - - . .", chords: "Em G D B" } },
     form: "A A B B relic C D C D flip E B flip C D E A",
-    // Every trick at once: blocks, tide, zaps, the leaf, then a spin to finish.
+    // Everything at once. Meloetta is in Pirouette on the line: sharp snaps, teleports, the notes
+    // rushing in. At each flip point she spins and flips, and lands back on the highway, where Aria's
+    // line flows. The last section has four lines that end by merging into one.
     // The line is out for beats 0-64 and 104-168 from the break (the highway has 68-100).
-    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 }, { at: 2, len: 16, kind: "tide", amp: 70, period: 8, tilt: 5 },
-           { at: 18, len: 16, kind: "zap", every: 2, spots: [[640, 460, 0], [480, 400, -20], [800, 520, 16], [640, 360, 0]] },
-           { at: 34, len: 2, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 36, len: 26, kind: "drift", ampX: 200, period: 14, sway: 20, fall: 1.8 },
-           { at: 62, len: 2, kind: "fly", x: 640, y: 540, rot: 0 },
-           { at: 104, len: 2, kind: "fly", x: 640, y: 480, rot: 0 }, { at: 106, len: 16, kind: "zap", every: 2, spots: [[640, 480, 0], [500, 420, 18], [780, 420, -18], [640, 540, 0]] },
-           { at: 122, len: 16, kind: "tide", amp: 80, period: 8, tilt: 8 }, { at: 138, len: 18, kind: "spin", perBeat: 11.25 },
-           { at: 106, len: 2, kind: "fly", x: 640, y: 220, rot: 0, line: 1 },
-           { at: 108, len: 12, kind: "tide", amp: 40, period: 4, tilt: 10, line: 1 }, { at: 120, len: 2, kind: "fly", x: 640, y: 480, rot: 0, line: 1 },
-           { at: 156, len: 4, kind: "fly", x: 640, y: 480, rot: 0 }],
-    split: [[106, 122]] },
+    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 540, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.8 }, { at: 0, len: 64, kind: "flash", on: "chords" },
+           ...pirouette(2, 16), ...surge(16, 32), ...pirouette(32, 48), ...surge(48, 64),
+           // Flip point: up, two turns and a flip, back down onto the highway at exactly 0 degrees.
+           // It has to be done a beat and a half early: the highway's first notes are already coming.
+           { at: 64, len: 0.5, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 64, kind: "flash" }, { at: 64.5, len: 1, kind: "spin", perBeat: 540 },
+           { at: 65.5, len: 0.5, kind: "flip" }, { at: 66, len: 0.5, kind: "fly", x: 640, y: 540, rot: 720 }, { at: 66, len: 0.5, kind: "width", w: 1 },
+           // Aria: the highway's line flows, gently enough to stay with the lanes.
+           { at: 68, len: 32, kind: "tide", amp: 10, period: 8, tilt: 1.2 },
+           { at: 100, len: 0.5, kind: "fly", x: 640, y: 400, rot: 720 }, { at: 100, kind: "flash" }, { at: 100.5, len: 1, kind: "spin", perBeat: -540 },
+           { at: 101.5, len: 0.5, kind: "flip", dir: -1 }, { at: 102, len: 0.5, kind: "fly", x: 640, y: 540, rot: 0 }, { at: 102, len: 0.5, kind: "width", w: 0.8 },
+           { at: 104, len: 32, kind: "flash", on: "chords" }, ...pirouette(104, 120), ...surge(120, 136),
+           // Four lines: a fan around the first, the top one upside down, each rocking in its own time.
+           ...[[1, 380, 520, -25], [2, 900, 520, 25], [3, 640, 340, 180]].flatMap(([k, x, y, r]) => [{ at: 128, kind: "snap", x, y, rot: r, line: k },
+             { at: 128, kind: "width", w: 0.55, line: k }, { at: 128, kind: "speed", to: 0.7, line: k }, { at: 129, len: 2, kind: "fade", to: 1, line: k },
+             { at: 136 + k, len: 22 - k, kind: "tide", amp: 22, period: 6, tilt: 5, line: k }]),
+           { at: 134, len: 2, kind: "fly", x: 640, y: 600, rot: 0 }, { at: 134, kind: "speed", to: 1 }, { at: 136, len: 24, kind: "notes", lines: [0, 1, 2, 3] },
+           { at: 136, len: 22, kind: "tide", amp: 18, period: 8, tilt: 4 },
+           // The merge: every line glides onto the first, then the others fade into it.
+           ...[1, 2, 3].flatMap(k => [{ at: 160, len: 4, kind: "fly", x: 640, y: 560, rot: k === 3 ? 360 : 0, line: k }, { at: 160, len: 4, kind: "width", w: 1, line: k },
+             { at: 164, len: 2, kind: "fade", to: 0, line: k }]),
+           { at: 160, len: 4, kind: "fly", x: 640, y: 560, rot: 0 }, { at: 160, len: 4, kind: "width", w: 1 }, { at: 164, kind: "flash" }] },
 
   // ── Hidden tracks ──
   // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
@@ -728,7 +799,24 @@ const SONGS = [
     sync: true, chordAt: [0, 6], chordsAlways: true,
     // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
     verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
-    loose: true, line: [{ at: 0, len: 6, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 6, len: 999, kind: "chamber", every: 6, step: 60, snap: 0.35 }],
+    line: [{ at: 0, len: 6, kind: "fly", x: 640, y: 440, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.6 }, { at: 0, kind: "speed", to: 0.65 },
+           { at: 0, len: 6, kind: "fly", x: 640, y: 540, only: "ez" },
+           // The cylinder: a chamber round (60 degrees) every bar, all song.
+           { at: 0, len: 48, kind: "chamber", every: 6, step: 60, snap: 0.35, diffs: ["ez", "hd"] },
+           { at: 0, len: 48, kind: "chamber", every: 6, step: 60, snap: 0.6, diffs: ["in", "at"] },
+           // B: notes from both sides, and on beat 6 of every bar the cylinder flips over. IN flips every other
+           // bar and AT not at all: their charts are already at their levels without it.
+           { at: 24, len: 24, kind: "sides" }, { at: 24, len: 24, kind: "flash", on: "chords" },
+           ...every(24, 48, 6, (b, i) => [{ at: b + 5, len: 1, kind: "flip", diffs: i % 2 ? ["hd"] : ["hd", "in"] }, { at: b + 5, kind: "shake", diffs: i % 2 ? ["hd"] : ["hd", "in"] }]),
+           // The barrel: two lines on opposite sides of the cylinder, turning together a chamber a bar.
+           // The second line rides opposite the first through the barrel's middle: hidden on top of it until
+           // the barrel opens out to its radius.
+           { at: 37, len: 35, kind: "mirror", of: 0, cx: 640, cy: 440, line: 1 }, { at: 37, kind: "width", w: 0.5, line: 1 }, { at: 37, kind: "speed", to: 0.55, line: 1 },
+           { at: 38, len: 2, kind: "fade", to: 1, line: 1 },
+           { at: 46, len: 2, kind: "width", w: 0.5 }, { at: 48, kind: "speed", to: 0.55 },
+           { at: 48, len: 24, kind: "orbit", cx: 640, cy: 440, r: 60, every: 6, step: 60, snap: 0.35, diffs: ["hd"] },
+           { at: 48, len: 24, kind: "orbit", cx: 640, cy: 440, r: 60, every: 6, step: 60, snap: 0.6, diffs: ["in", "at"] },
+           { at: 48, len: 24, kind: "notes", lines: [0, 1] }],
     parts: { A: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
              B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G", burst: true } },
     form: "A A B relic A B A", note: "Six beats a bar. The house always counts its own way." },
@@ -739,7 +827,14 @@ const SONGS = [
   { id: "sssssssnakes", heat: { ez: 0.88, hd: 0.42, in: 0.46, at: 0.46 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
     // The break: a long hiss, and then the line slithers in an S for the rest of the song.
     verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
-    loose: true, line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 430, rot: 0 }, { at: 4, len: 999, kind: "slither", ampX: 240, ampY: 60, period: 8, tilt: 24 }],
+    line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 580, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.55 }, { at: 0, kind: "speed", to: 0.9 },
+           { at: 4, len: 92, kind: "slither", ampX: 220, ampY: 40, period: 8, tilt: 14 },
+           // The strike, every two bars: it coils (the notes crawl), then lunges (they rush in).
+           ...every(0, 96, 16, b => [{ at: b + 12, kind: "speed", to: 0.55 }, { at: b + 14, kind: "speed", to: 1.3 }, { at: b + 14, kind: "shake" }, { at: b + 15, kind: "speed", to: 0.9 }]),
+           // A second snake from above, half a wave behind the first, for the middle two B parts.
+           { at: 36, kind: "snap", x: 640, y: 320, rot: 180, line: 1 }, { at: 36, kind: "width", w: 0.55, line: 1 }, { at: 36, kind: "speed", to: 0.8, line: 1 },
+           { at: 37, len: 2, kind: "fade", to: 1, line: 1 }, { at: 40, len: 44, kind: "slither", ampX: 220, ampY: 40, period: 8, tilt: 14, line: 1 },
+           { at: 48, len: 32, kind: "notes", lines: [0, 1] }, { at: 80, len: 2, kind: "fade", to: 0, line: 1 }],
     parts: { A: { lead: "e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - a4 - g4 - f#4 - - - . . . .", chords: "Em Em" },
              B: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" } },
     form: "A A B A A B relic B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
@@ -960,9 +1055,40 @@ function build(song, diff = "hd") {
   for (const n of chart) n.kind = n.mode === "line" ? (n.len ? "hold" : n.run ? "drag" : "tap") : (n.len ? "hold" : "tap");
   ev.sort((a, b) => a.b - b.b);
   const end = beat;
-  const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb, ...lineFor(song, diff, moved, end - verseAt) };
+  const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb };
+  choreograph(B, lineFor(song, diff, moved));
   Object.assign(B, rate(B));
   return B;
+}
+
+// Put a line script to work on a built chart: the line (and side) each note rides, the script made
+// fair for those notes, each note's place across its line, the lines' scroll floors, and the
+// flashes and shakes, on the beat.
+function choreograph(B, script) {
+  const L = B.lanes, ns = B.chart;
+  ns.forEach((n, i) => { n.i = i; n.rel = n.b - B.verseAt; n.line = 0; n.side = 1; n.w = 1; });
+  B.lines = B.floors = null; B.fx = [];
+  const inSpan = (g, r) => r >= g.at - 1e-6 && r < g.at + (g.len || 0) - 1e-6;
+  // Each moment in a span, in order: notes by lane, or one moment to each line in turn.
+  const walk = (g, test, use) => { let count = -1, last = null; for (const n of ns) if (n.mode === "line" && inSpan(g, n.rel) && test(n)) { if (last == null || n.b - last > 1e-6) { count++; last = n.b; } use(n, count); } };
+  if (script) {
+    for (const g of script.filter(g => g.kind === "notes"))
+      walk(g, () => true, (n, c) => { n.line = g.lines[g.by === "turn" ? c % g.lines.length : Math.min(g.lines.length - 1, Math.floor(n.lane * g.lines.length / L))]; });
+    for (const g of script.filter(g => g.kind === "sides"))
+      walk(g, n => g.line == null || n.line === g.line, (n, c) => { n.side = (g.by === "turn" ? c % 2 : n.lane >= L / 2) ? -1 : 1; });
+    B.softened = fair(script, [0, 1, 2, 3].map(k => ns.filter(n => n.rel >= 0 && n.line === k).map(n => n.rel)));
+    B.lines = lines(script); B.floors = floorsOf(script);
+    for (const n of ns) if (n.rel >= 0) n.w = lineAt(B.lines[n.line], n.rel, n.line).w;
+    for (const g of script.filter(g => g.kind === "flash" || g.kind === "shake")) {
+      if (!g.on) { B.fx.push({ b: B.verseAt + g.at, kind: g.kind }); continue; }
+      const at = new Map();
+      for (const n of ns) if (n.kind !== "drag" && inSpan(g, n.rel)) at.set(n.b, (at.get(n.b) || 0) + 1);
+      for (const [b, c] of at) if (g.on === "hits" || c > 1) B.fx.push({ b, kind: g.kind });
+    }
+    B.fx.sort((a, b) => a.b - b.b);
+  }
+  // Where a note sits across its line: its lane, a little jitter, times the line's spread.
+  for (const n of ns) n.lx = ((n.lane - (L - 1) / 2) * (L === 6 ? 115 : 150) + ((n.i * 37) % 5 - 2) * 14) * n.w;
 }
 
 /* ── A chart's level, measured from the chart ──────────────────────────── */
@@ -989,13 +1115,15 @@ function rate(B) {
   const holds = presses.filter(n => n.kind === "hold");
   const under = presses.filter(n => holds.some(h => h !== n && h.b < n.b - 1e-6 && h.b + h.len > n.b)).length / Math.max(1, presses.length);
   const drags = (ns.length - presses.length) / Math.max(1, ns.length);
-  // The line: px (and degrees, x4) it covers in the half beat before each of its notes, per second.
+  // The line: px (and degrees, x4) each note's line covers in the half beat before it, per second,
+  // and how much its scroll speed changes (a note that crawls and then rushes in is harder to read).
   const onLine = ns.filter(n => n.mode === "line");
   let move = 0;
-  if (B.line && onLine.length) {
+  if (B.lines && onLine.length) {
     for (const n of onLine) {
-      const r = n.b - B.verseAt, a = lineAt(B.line, r - 0.5), c = lineAt(B.line, r);
-      move += Math.hypot(c.x - a.x, c.y - a.y) + 4 * Math.abs(c.rot - a.rot);
+      const steps = B.lines[n.line], a = lineAt(steps, n.rel - 0.5, n.line), c = lineAt(steps, n.rel, n.line), fl = B.floors[n.line];
+      const v = (floorAt(fl, n.rel) - floorAt(fl, n.rel - 0.5)) / 0.5, was = (floorAt(fl, n.rel - 0.5) - floorAt(fl, n.rel - 1)) / 0.5;
+      move += Math.hypot(c.x - a.x, c.y - a.y) + 4 * Math.abs(c.rot - a.rot) + 200 * Math.abs(v - was) * 0.5 * spb;
     }
     move /= onLine.length * 0.5 * spb;
   }
@@ -1013,20 +1141,82 @@ const BUILT = {};
 const built = (song, diff = song.diffs[0]) => BUILT[song.id + ":" + diff] || (BUILT[song.id + ":" + diff] = build(song, diff));
 
 /* ── The line's movement scripts ───────────────────────────────────────── */
-// A script is a list of segments in beats from the break. Each kind moves the
-// state it is handed (x, y, rot); a segment holds its end state afterwards.
+// A script is a list of steps in beats from the break. Up to four lines (step.line, 0-3), each with
+// its own place (x, y, rot), alpha (a), bar length (l, px), note spread (w) and scroll speed. Line 0
+// starts as the highway's line; the others start hidden. A step moves the state it is handed while
+// it runs and holds its end state afterwards, so steps stack in order. Moves:
+//   fly       ease to x, y, rot (absolute) and/or by dx, dy, drot, over len beats
+//   snap      the same, instantly (len 0) or at a steady clip over a very short len (0.08-0.17: 30-80 ms here)
+//   spin      turn perBeat degrees a beat for len beats (negative turns back)
+//   flip      turn 180 degrees at a steady rate over len beats (dir -1: the other way): notes come from the other side
+//   teleport  fade out, jump to x, y (rot) on the step's middle beat, fade back in (len 0.5)
+//   fade      ease alpha to `to`: a line at alpha 0 isn't there
+//   width     ease the bar's length l (px) and the notes' spread w across it: petals are short lines
+//   tide, drift, slither   waves around where the line is, a falling leaf, an S-wave
+//   chamber, orbit         The Dealer's cylinder: snap `step` degrees every `every` beats (orbit also
+//                          circles a centre at radius r)
+//   mirror    be line `of` turned half round the point cx, cy: its partner on the other side of a barrel
+// Not moves, read by build(): speed (the line's scroll speed from `at` on), notes (which lines notes
+// land on for len beats: by lane, or one moment to each line in turn), sides (notes from below as
+// well as above), flash and shake (once, or on every chord or hit in a span). A step marked ez: false
+// is left out of EZ, hard: false out of IN and AT; one marked only: "ez" (or "hard") is theirs alone,
+// and diffs: [...] names exactly the difficulties a step plays on.
 const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-const MOVES = {
-  fly: (s, t, g) => { const k = ease(Math.min(1, t / Math.max(0.01, g.len))); s.x += (g.x - s.x) * k; s.y += (g.y - s.y) * k; s.rot += (g.rot - s.rot) * k; },
-  tide: (s, t, g) => { const p = Math.sin(2 * Math.PI * t / g.period); s.y += g.amp * p; s.rot += g.tilt * Math.cos(2 * Math.PI * t / g.period); },
-  zap: (s, t, g) => { const i = Math.floor(t / g.every) % g.spots.length, [x, y, r] = g.spots[i]; s.x = x; s.y = y; s.rot = r; s.zap = t % g.every < 0.18; },
-  drift: (s, t, g) => { s.x += g.ampX * Math.sin(2 * Math.PI * t / g.period); s.rot += g.sway * Math.sin(2 * Math.PI * t / (g.period / 2)); s.y += g.fall * t; },
-  spin: (s, t, g) => { s.rot += g.perBeat * t; },
-  // The Dealer's cylinder: at every bar after the first it snaps a chamber round (step degrees), with a flash.
-  chamber: (s, t, g) => { const i = Math.floor(t / g.every), f = t - i * g.every; s.rot += i ? g.step * (i - 1 + ease(Math.min(1, f / g.snap))) : 0; s.zap = i > 0 && f < 0.2; },
-  // Sssssssnakes: an S-wave. Side to side, up and down twice as fast, tilted along the curve.
-  slither: (s, t, g) => { const a = 2 * Math.PI * t / g.period; s.x += g.ampX * Math.sin(a); s.y += g.ampY * Math.sin(2 * a); s.rot += g.tilt * Math.cos(a); }
+const LINE0 = { x: 640, y: 540, rot: 0, a: 1, l: 3200, w: 1 }, LINEN = { x: 640, y: 360, rot: 0, a: 0, l: 3200, w: 1 };
+// An absolute angle means whichever turn of it is nearest: a fly never unwinds a whole turn (spins do turns).
+const toward = (s, g, k) => {
+  if (g.x != null) s.x += (g.x - s.x) * k; if (g.y != null) s.y += (g.y - s.y) * k;
+  if (g.rot != null) { const to = g.rot + 360 * Math.round((s.rot - g.rot) / 360); s.rot += (to - s.rot) * k; }
+  s.x += (g.dx || 0) * k; s.y += (g.dy || 0) * k; s.rot += (g.drot || 0) * k;
 };
+const part = (t, len) => len > 0 ? Math.min(1, t / len) : 1;
+const swell = (t, len) => Math.max(0, Math.min(1, t, len - t));
+// Each move changes s for t beats into the step (held at len); e is the real time since it began,
+// and a move returns true while the line should glow from a snap.
+const MOVES = {
+  fly: (s, t, g) => { toward(s, g, ease(part(t, g.len))); },
+  snap: (s, t, g, e) => { toward(s, g, part(t, g.len)); return e < 0.15; },
+  spin: (s, t, g) => { s.rot += g.perBeat * t; },
+  flip: (s, t, g) => { s.rot += 180 * (g.dir || 1) * part(t, g.len || 1); },
+  teleport: (s, t, g, e) => { const m = (g.len || 0.5) / 2, a0 = s.a; if (t < m) { s.a = a0 * (1 - 0.75 * t / m); return false; }
+    toward(s, g, 1); s.a = a0 * (0.25 + 0.75 * part(t - m, m)); return e - m < 0.15; },
+  fade: (s, t, g) => { s.a += (g.to - s.a) * ease(part(t, g.len)); },
+  width: (s, t, g) => { const k = ease(part(t, g.len)); if (g.l != null) s.l += (g.l - s.l) * k; if (g.w != null) s.w += (g.w - s.w) * k; },
+  // Waves swell in over their first beat and settle over their last, so they start and end where the line is.
+  tide: (s, t, g) => { const v = swell(t, g.len), a = 2 * Math.PI * t / g.period; s.y += v * g.amp * Math.sin(a); s.rot += v * g.tilt * Math.sin(a + Math.PI / 2); },
+  drift: (s, t, g) => { const v = swell(t, g.len); s.x += v * g.ampX * Math.sin(2 * Math.PI * t / g.period); s.rot += v * g.sway * Math.sin(2 * Math.PI * t / (g.period / 2)); s.y += g.fall * t; },
+  slither: (s, t, g) => { const v = swell(t, g.len), a = 2 * Math.PI * t / g.period; s.x += v * g.ampX * Math.sin(a); s.y += v * g.ampY * Math.sin(2 * a); s.rot += v * g.tilt * Math.sin(a); },
+  chamber: (s, t, g, e) => { const i = Math.floor(t / g.every), f = t - i * g.every; s.rot += i ? g.step * (i - 1 + part(f, g.snap)) : 0; return i > 0 && f < 0.2 && e < g.len; },
+  // Turns from wherever the line has turned to, and eases out to its radius over the first beat.
+  orbit: (s, t, g, e) => { const i = Math.floor(t / g.every), f = t - i * g.every, th = s.rot + (i ? g.step * (i - 1 + part(f, g.snap)) : 0), r = th * Math.PI / 180, R = g.r * ease(part(t, 1));
+    s.x = g.cx + R * Math.sin(r); s.y = g.cy - R * Math.cos(r); s.rot = th; return i > 0 && f < 0.2 && e < g.len; },
+  mirror: () => {}   // lineAt() does this one: it needs the other line
+};
+// Where line k is at `beat` (from the break), from its own steps (lines(script)[k]).
+function lineAt(steps, beat, k = 0) {
+  const s = { ...(k ? LINEN : LINE0), zap: false };
+  for (const g of steps) {
+    if (beat < g.at) break;
+    if (g.kind === "mirror") { const o = lineAt(steps.all[g.of], Math.min(beat, g.at + g.len), g.of); Object.assign(s, { x: 2 * g.cx - o.x, y: 2 * g.cy - o.y, rot: o.rot + 180, zap: o.zap }); continue; }
+    if (MOVES[g.kind](s, Math.min(beat - g.at, g.len || 0), g, beat - g.at)) s.zap = true;
+  }
+  return s;
+}
+const lines = script => { const all = [0, 1, 2, 3].map(k => script.filter(g => (g.line || 0) === k && MOVES[g.kind]).sort((a, b) => a.at - b.at)); for (const l of all) l.all = all; return all; };
+// A line's scroll: speed steps make a floor position, so a note's distance from its line is the
+// floor still to cover (notes slow down, then rush in, at their real places). Speed 1 before any.
+function floorsOf(script) {
+  return [0, 1, 2, 3].map(k => {
+    const out = [{ at: 0, v: 1, f: 0 }];
+    for (const g of script.filter(g => g.kind === "speed" && (g.line || 0) === k).sort((a, b) => a.at - b.at)) {
+      const p = out[out.length - 1];
+      out.push({ at: g.at, v: g.to, f: p.f + p.v * (g.at - p.at) });
+    }
+    return out;
+  });
+}
+const floorAt = (fl, beat) => { if (beat <= 0) return beat; let p = fl[0]; for (const q of fl) { if (q.at > beat) break; p = q; } return p.f + p.v * (beat - p.at); };
+
 // The form a difficulty plays. On IN and AT the break comes about a third of the way in, not halfway:
 // the parts it jumps ahead of are played on the line instead (`moved` beats of them).
 function formFor(song, diff) {
@@ -1039,66 +1229,79 @@ function formFor(song, diff) {
   const moved = tokens.slice(j, r).reduce((n, t) => n + beats(t), 0);
   return { tokens: [...tokens.slice(0, j), "relic", ...tokens.slice(j, r), ...tokens.slice(r + 1)], moved };
 }
-// The line's script for a difficulty. HD plays it as written. EZ is gentle: half the swing, slower,
-// no spins, one line. IN and AT swing wider and faster, run the script's own moves through the parts
-// the break jumped ahead of, and split into two lines for a stretch if the song never does.
-// A loose script (the hidden tracks) is the same move all the way, so it only scales.
-function lineFor(song, diff, moved, length) {
-  if (!song.line) return { line: null, split: [] };
+// The script a difficulty plays. HD plays it as written. EZ is tame: half the swing, slower, no
+// spins, flips, extra lines, speed changes or shakes, and snaps become short glides. IN and AT swing
+// and tilt wider and faster, and play the script's opening over the parts the break jumped ahead of.
+function lineFor(song, diff, moved) {
+  if (!song.line) return null;
   const gentle = diff === "ez", hard = diff === "in" || diff === "at";
   const k = gentle ? 0.5 : diff === "at" ? 1.5 : diff === "in" ? 1.3 : 1, pace = gentle ? 1.5 : diff === "at" ? 0.7 : diff === "in" ? 0.8 : 1;
   const tune = g => {
     const o = { ...g };
     for (const f of ["amp", "ampX", "ampY", "tilt", "sway"]) if (o[f] != null) o[f] *= k;
     if (o.period) o.period *= pace;
-    if (o.kind === "fly" && Math.abs(o.rot) < 90) o.rot = Math.max(-35, Math.min(35, o.rot * k));
-    else if (o.kind === "fly" && gentle) o.rot %= 360;   // EZ has no spins, so nothing to come out of
-    if (o.kind === "zap") { o.spots = o.spots.map(([x, y, r]) => [640 + (x - 640) * Math.min(1.2, k), y, r * k]); if (gentle) o.every *= 2; }
-    if (o.kind === "spin" && gentle) o.perBeat = 0;
-    if (o.kind === "chamber" && gentle) { o.snap *= 3; o.every *= 2; }
+    if (o.rot != null && Math.abs(o.rot) < 90) o.rot = Math.max(-35, Math.min(35, o.rot * k));
+    if (o.drot && Math.abs(o.drot) < 90) o.drot = Math.max(-35, Math.min(35, o.drot * k));
+    if (gentle) {
+      // EZ notes all come from above at plain speed, so the line stays in the lower half.
+      if (o.kind === "snap" || o.kind === "teleport") { o.kind = "fly"; o.len = Math.max(0.5, o.len || 0); }
+      if (o.rot != null && Math.abs(o.rot) >= 90) o.rot %= 360;
+      if (o.kind === "chamber") Object.assign(o, { kind: "tide", amp: 0, tilt: 12, period: o.every * 2 });
+      if (o.x != null) o.x = 640 + (o.x - 640) * 0.6;
+      if (o.y != null) o.y = Math.max(500, 480 + (o.y - 480) * 0.6);
+    }
     return o;
   };
-  let line = song.line.map(tune), split = (song.split || []).map(w => w.slice());
-  if (gentle) { line = line.filter(g => !g.line); split = []; }
-  if (moved && !song.loose) {
-    // The moved parts come first: fly in, then the script's own moves back to back (no spins).
-    const own = line.filter(g => !g.line && g.at > 0 && g.kind !== "spin" && g.kind !== "fly");
-    const pre = [{ ...line[0], at: 0 }];
-    for (let at = line[0].len; own.length && at < moved;) for (const g of own) { if (at >= moved) break; const len = Math.min(g.len, moved - at); pre.push({ ...g, at, len }); at += len; }
+  const keep = g => g.diffs && !g.diffs.includes(diff) ? false : gentle ? g.ez !== false && !g.line && !["spin", "flip", "speed", "notes", "sides", "shake", "orbit"].includes(g.kind) && (!g.only || g.only === "ez")
+    : hard ? g.only !== "ez" && g.hard !== false : !g.only;
+  let line = song.line.filter(keep).map(tune);
+  if (moved) {
+    // The moved parts come first: the script's opening (song.loop, or its first four bars) played
+    // over and over on line 0, speeds and all, until the script itself starts.
+    const [a, b] = song.loop || [0, 4 * song.bar];
+    const open = line.filter(g => !g.line && g.at >= a && g.at < b && g.kind !== "notes" && g.kind !== "sides");
+    const pre = [];
+    for (let at = 0; at < moved; at += b - a) for (const g of open) if (g.at - a + at < moved) pre.push({ ...g, at: g.at - a + at, len: Math.min(g.len || 0, moved - (g.at - a + at)) });
     line = pre.concat(line.map(g => ({ ...g, at: g.at + moved })));
-    split = split.map(([a, b]) => [a + moved, b + moved]);
   }
-  if (hard && !split.length) {
-    // Two lines at once: a second one rises to the top for sixteen beats, rocking, then drops back.
-    const a = Math.round(moved + (length - moved) * 0.45), w = 16;
-    line.push({ at: a, len: 2, kind: "fly", x: 640, y: 220, rot: 0, line: 1 }, { at: a + 2, len: w - 4, kind: "tide", amp: 40, period: 4, tilt: 10, line: 1 },
-      { at: a + w - 2, len: 2, kind: "fly", x: 640, y: 480, rot: 0, line: 1 });
-    split.push([a, a + w]);
-  }
-  return { line, split };
+  return line;
 }
-// The highway's line: horizontal, near the bottom. A boss's line starts here when it breaks free.
-const HOME = { x: 640, y: 540, rot: 0 };
-// A segment with line: 1 moves the second line. It appears where the first one is at its
-// first segment and flies apart from it; song.split says when it is on screen.
-function lineAt(script, beat, which = 0) {
-  const mine = script.filter(g => (g.line || 0) === which);
-  let s;
-  if (which) { if (!mine.length || beat < mine[0].at) return null; s = { ...lineAt(script, mine[0].at, 0) }; }
-  else s = { ...HOME };
-  s.zap = false;
-  for (const g of mine) {
-    if (beat < g.at) break;
-    const t = Math.min(beat - g.at, g.len);
-    const base = { ...s };
-    MOVES[g.kind](s, t, g);
-    // Kinds that wave around a centre leave it where it started once they end.
-    if (beat >= g.at + g.len && (g.kind === "tide" || g.kind === "drift")) { s.x = base.x; s.rot = base.rot; s.y = g.kind === "drift" ? base.y + g.fall * g.len : base.y; }
-    if (g.kind !== "zap") s.zap = false;
+// Keep it fair (the readability rules), on each line, for its own notes:
+//  - no turn faster than 180 degrees a beat while one of its notes is due within a beat: a turn that
+//    breaks it is slowed down (len stretched, a spin's speed capped), a teleport keeps its angle;
+//  - no jump (a move of more than 60 px in a 32nd of a beat) in the half beat before one of its notes,
+//    unless it lands on a hit: it is moved back onto the last hit before it, or else becomes a glide.
+// Notes stay visible for 0.6 s at their line's real place and lines fade in a bar before their first
+// note: those depend on where the script puts things, so the tests check them, chart by chart.
+function fair(script, due) {
+  let fixed = 0;
+  const near = (k, a, b) => due[k].some(x => x > a + 1e-6 && x <= b + 1e-6);
+  const hit = (k, s) => due[k].some(x => Math.abs(x - s) < 1e-3);
+  for (let k = 0; k < 4; k++) {
+    for (const g of script.filter(g => (g.line || 0) === k && MOVES[g.kind])) {
+      const steps = lines(script)[k], len = g.len || 0;
+      if (g.kind === "spin" && Math.abs(g.perBeat) > 180 && near(k, g.at, g.at + len + 1)) { g.perBeat = Math.sign(g.perBeat) * 180; fixed++; }
+      if (!["fly", "snap", "flip", "teleport"].includes(g.kind)) continue;
+      const before = lineAt(steps, g.at - 1e-4, k), after = lineAt(steps, g.at + len + 1e-4, k);
+      const turn = Math.abs(after.rot - before.rot);
+      // A fly eases in and out, so at its middle it turns twice as fast as on average.
+      const most = (g.kind === "fly" ? 2 : 1) * turn;
+      if (most > 180 * len + 1 && near(k, g.at, g.at + len + 1)) {
+        if (g.kind === "teleport") { delete g.rot; delete g.drot; } else g.len = most / 180;
+        fixed++;
+      }
+      const jump = Math.hypot(after.x - before.x, after.y - before.y), s = g.kind === "teleport" ? g.at + len / 2 : g.at;
+      if (jump > 60 && (g.kind === "teleport" || (g.len || 0) < 0.25) && near(k, s, s + 0.5) && !hit(k, s)) {
+        fixed++;
+        const back = due[k].filter(x => x < s && x >= s - 2).pop();
+        if (back != null) g.at += back - s;
+        else if (g.kind === "teleport") { g.kind = "fly"; g.at = s; g.len = 0.5; }
+        else g.len = Math.max(g.len || 0, 0.5);
+      }
+    }
   }
-  return s;
+  return fixed;
 }
-const splitAt = (B, rel) => (B.split || []).some(([a, b]) => rel >= a && rel < b);
 
 /* ── Unlocks and bests ─────────────────────────────────────────────────── */
 const bestOf = (song, diff = song.diffs[0]) => save.best[song.id + ":" + diff] || null;
@@ -1210,6 +1413,7 @@ function drawOpts() {
   $("#opts").hidden = false;
   seg($("#o-sound"), opts.sound, v => { opts.sound = Number(v); setVolume(); keepOpts(); });
   seg($("#o-jtext"), opts.jtext, v => { opts.jtext = Number(v); keepOpts(); });
+  seg($("#o-calm"), opts.calm, v => { opts.calm = Number(v); keepOpts(); });
   seg($("#o-test"), opts.test, v => { opts.test = Number(v); keepOpts(); loadSave(); });
   $("#o-vol").value = opts.vol; $("#o-vol").oninput = e => { opts.vol = Number(e.target.value); setVolume(); keepOpts(); };
   $("#o-off").value = opts.offset; $("#o-off-v").textContent = (opts.offset > 0 ? "+" : "") + opts.offset + " ms";
@@ -1442,22 +1646,20 @@ function start(song, diff = pickedDiff(song)) {
     if (P.battle && m >= 0 && m < 4) d.append(el("span", "", P.battle.you.moves[m]));
     keys.append(d);
   });
-  // Lines: 0 is the highway's and the boss's; 1 only shows while the line is split.
+  // Lines: 0 is the highway's and the boss's; the script brings in up to three more.
   const box = $("#lines"); box.replaceChildren();
-  P.lines = [0, 1].map(k => { const d = el("div", "jl" + (k ? " off" : "")); d.append(el("div", "bar")); if (!k) d.append(el("div", "ring")); box.append(d); return d; });
-  // Note elements, made once; each frame only moves the ones in view. Every note rides a
-  // line and travels straight at it: from above, or from below on the split line.
+  P.lines = [0, 1, 2, 3].map(k => { const d = el("div", "jl" + (k ? " off" : "")); d.append(el("div", "bar")); if (!k) d.append(el("div", "ring")); box.append(d); return d; });
+  P.fx = 0;
+  // Note elements, made once; each frame only moves the ones in view. Every note rides its line
+  // (build() picked it) and travels straight at it, from above, or from below (side -1).
   const pxBeat = pxPerSec() * B.spb;
   for (const n of notes) {
-    const rel = n.b - B.verseAt;
-    n.line = n.mode === "line" && splitAt(B, rel - 3) && splitAt(B, rel + 1) && n.lane >= L / 2 ? 1 : 0;
-    n.side = n.line ? -1 : 1;
     // Two layouts: the highway's (wide, on the lanes) and the line's (narrower). Every note starts
     // on the highway's, and a line note narrows to its own while Meloetta sings (see frame).
     n.hw = { x: laneX(n.lane, L), w: n.kind === "drag" ? 90 : W - 40 };
-    n.ln = n.mode === "line" ? { x: (n.lane - (L - 1) / 2) * (L === 6 ? 115 : 150) + ((n.i * 37) % 5 - 2) * 14, w: n.kind === "drag" ? 90 : L === 6 ? 110 : 150 } : n.hw;
+    n.ln = n.mode === "line" ? { x: n.lx, w: n.kind === "drag" ? 90 : (L === 6 ? 110 : 150) * Math.max(0.5, n.w) } : n.hw;
     const d = el("div", "nt" + (n.dbl ? " dbl" : "") + (n.kind === "drag" ? " drag" : "") + (n.kind === "hold" ? " hold" : ""));
-    if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.len * pxBeat) + "px"; d.append(beam); }
+    if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.mode === "line" && B.floors ? floorAt(B.floors[n.line], n.rel + n.len) - floorAt(B.floors[n.line], n.rel) : n.len) * pxBeat + "px"; d.append(beam); }
     d.append(el("div", "head"));
     d.style.display = "none";
     P.lines[n.line].append(d);
@@ -1524,7 +1726,7 @@ function frame() {
   if (at.show && !P.showing) {
     P.showing = at.show;
     P.nextForm = at.show.kind === "relic" ? "pirouette" : P.form === "aria" ? "pirouette" : "aria";
-    const wf = $("#whiteflash"); wf.classList.remove("go"); void wf.offsetWidth; wf.classList.add("go");
+    const wf = $("#whiteflash"); wf.classList.remove("go"); void wf.offsetWidth; if (!opts.calm) wf.classList.add("go");
     // A hidden track's break is its own: its art, its name for it.
     const own = P.song.breakName && at.show.kind === "relic";
     pix($("#relic-img"), sprite(own ? songArt(P.song) : MELOETTA), 680, 20);
@@ -1549,13 +1751,17 @@ function frame() {
     P.mode = at.mode;
     $("#guides").className = $("#keys").className = P.mode === "highway" ? "" : "out";
   }
-  // The lines' places: the highway's spot, or the song's script.
-  const line = P.mode === "line" && B.line;
-  const s0 = line ? lineAt(B.line, rel, 0) : HOME;
-  place(P.lines[0], s0); P.lines[0].classList.toggle("zap", !!s0.zap);
-  const s1 = line && splitAt(B, rel) ? lineAt(B.line, rel, 1) : null;
-  P.lines[1].classList.toggle("off", !s1);
-  if (s1) { place(P.lines[1], s1); P.lines[1].classList.toggle("zap", !!s1.zap); }
+  // The lines: the highway's spot until the break, then the song's script. A line's alpha fades its
+  // bar; its notes stay solid down to half of it (a teleport's dip never hides them).
+  for (let k = 0; k < 4; k++) {
+    const s = B.lines && rel >= 0 ? lineAt(B.lines[k], rel, k) : k ? null : LINE0, d = P.lines[k];
+    if (!s || s.a < 0.02) { d.classList.add("off"); continue; }
+    d.classList.remove("off"); place(d, s); d.classList.toggle("zap", !!s.zap);
+    const o = Math.min(1, s.a * 2); d.style.opacity = o; d.firstChild.style.opacity = s.a / o;
+    if (d._l !== s.l) { d._l = s.l; d.firstChild.style.width = s.l + "px"; d.firstChild.style.left = -s.l / 2 + "px"; }
+  }
+  // Flashes and shakes, on their beats (not in Reduce motion).
+  while (P.fx < B.fx.length && B.fx[P.fx].b <= beat) { const f = B.fx[P.fx++]; if (!opts.calm && beat - f.b < 0.25) jolt(f.kind); }
   // Every beat: the muted ring and dot.
   const whole = Math.floor(beat);
   if (whole !== P.lastBeat && beat >= -4) {
@@ -1573,12 +1779,15 @@ function frame() {
   // Notes: place the ones in view, miss the ones that passed.
   for (const n of P.notes) {
     if (n.state === 2) continue;
-    const dy = (n.t - t) * px;
+    // Distance to the line: plain time on the highway, the line's floor still to cover on the line.
+    const fl = n.mode === "line" && B.floors && B.floors[n.line];
+    const ahead = b => fl ? (floorAt(fl, b) - floorAt(fl, rel)) * B.spb * px : (b - rel) * B.spb * px;
+    const dy = ahead(n.rel);
     if (n.state === 0 && t - n.t > WIN.good) { judge(n, "Miss"); if (n.kind === "hold") judgeTail(n, "Miss"); continue; }
     if (n.kind === "drag" && n.state === 0 && t >= n.t - 0.01 && P.held.size) { judge(n, "Perfect"); continue; }
     if (n.state === 1) {   // a hold being held: the head sits on the line and the beam drains into it
       if (t >= n.tEnd) { judgeTail(n, "Perfect"); continue; }
-      const left = Math.max(0, (n.tEnd - t) * px);
+      const left = Math.max(0, ahead(n.rel + n.len));
       n.el.firstChild.style.height = left + "px";
       n.el.style.transform = n.side < 0 ? "scaleY(-1)" : "none";
       if (t - (n.fx || 0) > 0.22) { n.fx = t; burst(n, n.hit); }
@@ -1591,6 +1800,11 @@ function frame() {
   if (t > B.seconds + 1.2 && !P.finished) finish(true);
 }
 
+// A flash (a soft white wash) or a shake (the lines jolt a few px): restarted each time.
+function jolt(kind) {
+  const d = kind === "flash" ? $("#hitflash") : $("#lines");
+  d.classList.remove(kind); void d.offsetWidth; d.classList.add(kind);
+}
 function hitWindow(dt) {
   const a = Math.abs(dt);
   return a <= WIN.perfect ? "Perfect" : a <= WIN.great ? "Great" : a <= WIN.good ? "Good" : null;
@@ -1834,7 +2048,7 @@ drawMap();
 window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Object.values((readJSON(SAVE_KEY) || {}).best || {}).reduce((t, b) => t + (b.score || 0), 0),
   finished: !!(P && P.finished), real: !opts.test, badges: badges() });
 // For the console and tests: every song's length, note count and payout.
-window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt,
+window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
   songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length, clearPay: clearPayOf(b) }; }),
   // Every chart: lanes, notes, length, level and what the level was measured from.
   charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
