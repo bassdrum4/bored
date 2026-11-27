@@ -35,7 +35,7 @@ import { createLivePlayer } from './hub/together-live.js';
 import { createLobbyBridge } from './hub/together-lobby.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
-import { createAnalytics, ANALYTICS_BRIDGE, ANALYTICS_FRAME_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
+import { createAnalytics, ANALYTICS_BRIDGE, ANALYTICS_FRAME_BRIDGE, runtimeErrorMetadata, isProductionTelemetryUrl, qaSession } from './hub/analytics.js';
 import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -621,7 +621,7 @@ function showHint(message) {
 
 /* ── Best scores ──────────────────────────────────────────────────────────── */
 
-function snapshotFor() {
+function rawGameSnapshot() {
   try {
     return gameFrame.contentWindow.__boredSnapshot?.() || null;
   } catch {
@@ -629,10 +629,46 @@ function snapshotFor() {
   }
 }
 
+function publicSnapshot(snapshot) {
+  if (!snapshot || !Object.prototype.hasOwnProperty.call(snapshot, 'admin')) return snapshot;
+  const { admin, ...safe } = snapshot;
+  return safe;
+}
+function snapshotFor() { return publicSnapshot(rawGameSnapshot()); }
+
+// Account-scoped private progress; never include it in scores, daily results,
+// analytics, or cloud state. One changed snapshot at most per minute.
+let idleAdminSync = { owner: null, at: 0, sent: '', busy: false };
+function syncIdleAdmin(snapshot) {
+  const admin = snapshot?.admin;
+  const session = getSession(), owner = session?.user?.id;
+  if (!owner || !hasIdentity() || snapshot?.slug !== 'poke-idle' ||
+      admin?.v !== 1 || (!admin.classic && !admin.story) ||
+      readStored('bored.analytics.enabled', true) === false ||
+      !isProductionTelemetryUrl(location.href, qaSession())) return;
+  if (idleAdminSync.owner !== owner) idleAdminSync = { owner, at: 0, sent: '', busy: false };
+  const state = idleAdminSync, now = Date.now();
+  if (state.busy || now - state.at < 60000) return;
+  const encoded = JSON.stringify(admin);
+  if (encoded === state.sent || encoded.length > 4096) return;
+  state.at = now; state.busy = true;
+  void (async () => {
+    try {
+      const current = await freshSession();
+      if (!current || current.user?.id !== owner || getSession()?.user?.id !== owner) return;
+      await request('/rest/v1/rpc/save_poke_idle_admin_snapshot', { method: 'POST', body: { p_snapshot: admin }, token: current.access_token, keepalive: true });
+      state.sent = encoded;
+    } catch { /* Retry on the next eligible tick; gameplay never waits. */ }
+    finally { state.busy = false; }
+  })();
+}
+
 function captureBest({ leaving = false } = {}) {
   if (activeTogether) return false;
   if (!activeSlug || playerPanel.hidden) return false;
-  const snapshot = snapshotFor(activeSlug);
+  const raw = rawGameSnapshot();
+  if (activeSlug === 'poke-idle') syncIdleAdmin(raw);
+  const snapshot = publicSnapshot(raw);
   if (!snapshot) return false;
   // Campaign records are separate from the ordinary (small) snapshot; do not
   // send ghosts, course layouts or fifteen records through analytics/dailies.
@@ -1126,7 +1162,7 @@ function renderStreak() {
 function pollDaily() {
   if (!activeChallenge || playerPanel.hidden) return;
   try {
-    const snapshot = gameFrame.contentWindow.__boredSnapshot?.();
+    const snapshot = snapshotFor();
     if (!snapshot) return;
     const check = dailyCheck(activeChallenge, snapshot);
     let result = readDaily(activeChallenge);
