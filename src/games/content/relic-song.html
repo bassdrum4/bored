@@ -6,177 +6,205 @@
 <title>Relic Song</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600&amp;display=swap" media="print" onload="this.media='all'">
 <style>
   /* Relic Song. The game is a fixed 1280x720 stage scaled to the frame, like
-     Shotgun Roulette. Paper, ink, and one accent: Meloetta's green in Aria
-     Forme, orange in Pirouette. Each gym tints the stage with its own pattern. */
-  :root { --paper: #f2eee4; --sheet: #fbf9f3; --ink: #1d1b17; --dim: #6f695d; --rule: #d6cfbf;
-          --aria: #3f8f58; --pirouette: #d0702c; --accent: var(--aria); --tint: #e7e2d4;
-          --perfect: #2d6fb0; --great: #3f8f58; --good: #9a7a2a; --miss: #a33a32;
-          --mono: ui-monospace, SFMono-Regular, Menlo, monospace; --display: "Fraunces", Georgia, "Times New Roman", serif }
+     Shotgun Roulette. The look is a dark rhythm-game stage: the boss (or
+     Meloetta) huge and blurred behind everything, tinted by the song (Aria
+     green-teal, Pirouette orange-brown, or the gym's type), one thin glowing
+     judgment line, and flat glowing note bars. One thin sans font throughout. */
+  :root { --bg: #0b0d11; --ink: #eef2f6; --dim: rgba(238, 242, 246, .55); --faint: rgba(238, 242, 246, .3); --rule: rgba(255, 255, 255, .14);
+          --panel: rgba(16, 19, 25, .82); --aria: #2fb39a; --pirouette: #e28a3e; --accent: var(--aria);
+          --tap: #4fd4ff; --gold: #ffd866; --beam: rgba(140, 215, 255, .30);
+          --perfect: #ffd866; --great: #9fdcff; --good: rgba(255, 255, 255, .55);
+          --sans: "Saira", "Exo 2", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif }
   * { margin: 0; padding: 0; box-sizing: border-box }
   [hidden] { display: none !important }
-  html, body { height: 100%; overflow: hidden; background: var(--paper) }
-  body { color: var(--ink); font: 15px/1.45 var(--mono) }
-  button { font: inherit; color: inherit; background: var(--sheet); border: 1px solid var(--ink); border-radius: 2px; padding: 6px 12px; cursor: pointer }
-  button:hover:not(:disabled) { background: var(--tint) }
-  button:disabled { color: var(--dim); border-color: var(--rule); cursor: default }
-  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  html, body { height: 100%; overflow: hidden; background: #000 }
+  body { color: var(--ink); font: 400 15px/1.45 var(--sans) }
+  button { font: inherit; color: inherit; background: rgba(255, 255, 255, .06); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 14px; cursor: pointer }
+  button:hover:not(:disabled) { background: rgba(255, 255, 255, .13) }
+  button:disabled { color: var(--faint); cursor: default }
+  button:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px }
   img { image-rendering: pixelated }
-  h1, h2 { font-family: var(--display); font-weight: 700; letter-spacing: -.01em }
+  h1, h2 { font-weight: 500; letter-spacing: .02em }
+  b { font-weight: 600 }
   .dim { color: var(--dim) }
-  .caps { font-size: 12px; letter-spacing: .08em; text-transform: uppercase }
+  .caps { font-size: 12px; letter-spacing: .14em; text-transform: uppercase }
 
-  .stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; background: var(--paper) }
-  .screen { position: absolute; inset: 0; padding: 28px 40px }
+  .stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; background: var(--bg) }
+  .screen { position: absolute; inset: 0; padding: 28px 40px; z-index: 2 }
   /* The arcade's menu button sits over the top-left corner: keep the HUD clear of it. */
   #map .hud, #result .hud { padding-left: 44px }
   .hud { display: flex; gap: 18px; align-items: baseline; border-bottom: 1px solid var(--rule); padding-bottom: 8px }
   .hud .grow { flex: 1 }
-  .hud b { font-weight: 700 }
+
+  /* ── The backdrop, behind every screen ───────────────────────────────── */
+  #bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; background: var(--bg) }
+  #bg-img { position: absolute; left: 50%; top: 50%; width: 1500px; height: 1500px; margin: -750px 0 0 -750px; object-fit: contain;
+            filter: blur(26px) brightness(.48) saturate(1.3); opacity: .9; transition: opacity .8s }
+  #bg-img.pir { filter: blur(26px) brightness(.48) saturate(2) hue-rotate(-60deg) }
+  #bg-tint { position: absolute; inset: 0; background: var(--tint, #2a6f68); mix-blend-mode: color; opacity: .78; transition: background-color 1.6s }
+  #bg-shade { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 70% at 50% 45%, rgba(0, 0, 0, .15), rgba(0, 0, 0, .72)) }
+  .float { position: absolute; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .06); animation: drift linear infinite }
+  @keyframes drift { from { transform: translate(0, 40px) rotate(0) } to { transform: translate(var(--dx), -760px) rotate(var(--r)) } }
 
   /* ── The map ─────────────────────────────────────────────────────────── */
-  #map h1 { font-size: 30px }
+  #map h1 { font-size: 30px; font-weight: 300; letter-spacing: .06em }
   .say { margin: 10px 0 16px; display: flex; gap: 14px; align-items: center; min-height: 72px }
   .say img { width: 72px; height: 72px; flex: none }
-  .say p { max-width: 900px }
+  .say p { max-width: 900px; color: var(--ink) }
   /* The song itself: four verses on one staff, filled in as they come back. */
-  .verses { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--ink); height: 22px; margin-bottom: 18px;
-            background: repeating-linear-gradient(to bottom, transparent 0 4px, var(--rule) 4px 5px) }
-  .verses span { border-right: 1px solid var(--ink); font-size: 11px; text-align: center; line-height: 20px; color: var(--dim) }
+  .verses { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); height: 22px; margin-bottom: 18px; border-radius: 3px; overflow: hidden }
+  .verses span { border-right: 1px solid var(--rule); font-size: 11px; letter-spacing: .1em; text-align: center; line-height: 20px; color: var(--dim) }
   .verses span:last-child { border-right: 0 }
-  .verses span.got { background: var(--accent); color: var(--sheet) }
+  .verses span.got { background: var(--accent); color: #fff }
   .gyms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px }
-  .gym { position: relative; border: 1px solid var(--ink); background: var(--sheet); padding: 12px; border-radius: 3px; overflow: hidden; min-height: 250px }
+  .gym { position: relative; border: 1px solid var(--rule); background: var(--panel); padding: 12px; border-radius: 4px; overflow: hidden; min-height: 250px }
   .gym .top { display: flex; gap: 10px; align-items: center; margin-bottom: 8px }
   .gym .top img { width: 64px; height: 64px }
   .gym h2 { font-size: 19px }
   .gym .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; margin-top: 6px; padding: 7px 10px }
-  .gym .rank { font-weight: 700; min-width: 1.5em; text-align: right }
-  .gym .badge { font-size: 12px; margin-top: 8px; color: var(--dim) }
+  .gym .rank { font-weight: 600; min-width: 1.5em; text-align: right; color: var(--gold) }
+  .gym .rank.dim { color: var(--faint); font-weight: 400 }
+  .gym .badge { font-size: 12px; margin-top: 8px; color: var(--faint) }
   .gym .badge.got { color: var(--ink) }
   /* Frost over a gym whose verse is still missing; it thaws once the badge is won. */
-  .gym::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .55; transition: opacity 1.2s;
-                background: repeating-linear-gradient(60deg, #ffffff00 0 14px, #dfe9f155 14px 15px),
-                            repeating-linear-gradient(-60deg, #ffffff00 0 14px, #dfe9f155 14px 15px), #e9f0f43a }
+  .gym::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; transition: opacity 1.2s;
+                background: repeating-linear-gradient(60deg, transparent 0 14px, rgba(200, 225, 240, .08) 14px 15px),
+                            repeating-linear-gradient(-60deg, transparent 0 14px, rgba(200, 225, 240, .08) 14px 15px), rgba(170, 205, 225, .05) }
   .gym.thawed::after { opacity: 0 }
-  .gym.locked > * { opacity: .45 }
+  .gym.locked > * { opacity: .4 }
   .finale { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
   .finale .gym { min-height: 0 }
-  .hidden-list .row .t { font-family: var(--mono) }
 
-  /* ── Overlays: options, calibration, board, first launch ─────────────── */
-  .over { position: absolute; inset: 0; background: #1d1b17a6; display: grid; place-items: center; z-index: 20 }
-  .card { width: 620px; max-height: 660px; overflow: auto; background: var(--sheet); border: 1px solid var(--ink); border-radius: 3px; padding: 22px 26px }
-  .card h2 { font-size: 22px; margin-bottom: 10px }
+  /* ── Overlays: options, calibration, board, first launch, pause ──────── */
+  .over { position: absolute; inset: 0; background: rgba(4, 6, 9, .66); display: grid; place-items: center; z-index: 20 }
+  .card { width: 620px; max-height: 660px; overflow: auto; background: rgba(18, 21, 27, .95); border: 1px solid var(--rule); border-radius: 6px; padding: 22px 26px }
+  .card h2 { font-size: 22px; font-weight: 400; margin-bottom: 10px }
   .card .line { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--rule) }
   .card .line:last-of-type { border-bottom: 0 }
   .card .btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px }
-  .card input[type=range] { width: 260px; accent-color: var(--accent) }
+  .card input[type=range] { width: 260px; accent-color: var(--tap) }
   .card table { width: 100%; border-collapse: collapse }
   .card td { padding: 5px 4px; border-bottom: 1px solid var(--rule) }
   .card td:last-child { text-align: right }
-  .seg button.on { background: var(--ink); color: var(--sheet) }
-  .calib-dot { width: 90px; height: 90px; border: 2px solid var(--ink); border-radius: 50%; margin: 18px auto; transition: background .06s }
-  .calib-dot.on { background: var(--accent) }
+  .seg button.on { background: var(--ink); color: var(--bg) }
+  .calib-dot { width: 90px; height: 90px; border: 2px solid var(--ink); border-radius: 50%; margin: 18px auto; transition: background .06s, box-shadow .06s }
+  .calib-dot.on { background: var(--tap); box-shadow: 0 0 24px var(--tap) }
 
-  /* ── The play screen ─────────────────────────────────────────────────── */
-  #play { padding: 0; background: var(--tint) }
-  #play.gym-rock { --tint: #e6e0d3; background: repeating-linear-gradient(0deg, transparent 0 39px, #cfc6b3 39px 40px),
-     repeating-linear-gradient(90deg, transparent 0 79px, #cfc6b3 79px 80px), #e6e0d3 }
-  #play.gym-water { --tint: #dfe8ec; background: repeating-radial-gradient(ellipse 120px 26px at 50% 100%, transparent 0 18px, #c6d6de 18px 19px), #dfe8ec }
-  #play.gym-electric { --tint: #ece7d2; background: repeating-linear-gradient(135deg, transparent 0 22px, #ddd3a8 22px 23px, transparent 23px 44px), #ece7d2 }
-  #play.gym-grass { --tint: #e2e9da; background: radial-gradient(circle at 20% 30%, #cbd8bf 0 3px, transparent 4px) 0 0 / 64px 64px, radial-gradient(circle at 70% 70%, #cbd8bf 0 2px, transparent 3px) 0 0 / 48px 48px, #e2e9da }
-  #play.gym-relic { --tint: #ece8f0; background: repeating-linear-gradient(to bottom, transparent 0 70px, #d6cfdf 70px 71px, transparent 71px 80px, #d6cfdf 80px 81px, transparent 81px 90px, #d6cfdf 90px 91px), #ece8f0 }
-  #play.gym-dark { --tint: #dcd8de; background: repeating-linear-gradient(90deg, transparent 0 59px, #c8c1cc 59px 60px), #dcd8de }
-  #play.gym-snake { --tint: #e1e6d6; background: repeating-linear-gradient(45deg, transparent 0 16px, #ccd4bb 16px 17px), repeating-linear-gradient(-45deg, transparent 0 16px, #ccd4bb 16px 17px), #e1e6d6 }
-  #play.pirouette { --accent: var(--pirouette) }
-  .phud { position: absolute; left: 0; right: 0; top: 0; padding: 10px 24px 10px 72px; display: flex; gap: 20px; align-items: baseline; background: var(--sheet); border-bottom: 1px solid var(--ink); z-index: 5 }
-  .phud .grow { flex: 1 }
+  /* ── The play screen: the whole stage is the playfield ───────────────── */
+  #play { padding: 0 }
+  #prog { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: rgba(255, 255, 255, .08); z-index: 6 }
+  #prog i { display: block; height: 100%; width: 0; background: rgba(255, 255, 255, .75) }
+  #pausebtn { position: absolute; left: 66px; top: 18px; width: 30px; height: 30px; padding: 0; border: 0; background: none; z-index: 6; display: flex; gap: 6px; justify-content: center; align-items: center }
+  #pausebtn i { width: 5px; height: 20px; background: var(--ink); border-radius: 1px }
+  #combo { position: absolute; left: 50%; top: 14px; width: 300px; margin-left: -150px; text-align: center; z-index: 6; pointer-events: none }
+  #combo b { display: block; font: 300 54px/1 var(--sans); letter-spacing: .02em }
+  #combo span { font-size: 12px; letter-spacing: .3em; color: var(--dim) }
+  #combo em { display: block; font-style: normal; font-size: 12px; letter-spacing: .16em; color: var(--faint); height: 16px; text-transform: uppercase }
+  #score { position: absolute; right: 28px; top: 14px; font: 300 34px/1 var(--sans); letter-spacing: .08em; z-index: 6; font-variant-numeric: tabular-nums }
+  #songname { position: absolute; left: 28px; bottom: 14px; font-size: 18px; font-weight: 300; letter-spacing: .04em; z-index: 6 }
+  #songlv { position: absolute; right: 28px; bottom: 14px; font-size: 18px; font-weight: 300; letter-spacing: .06em; z-index: 6 }
+  #beatdot { position: absolute; right: 30px; top: 58px; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .18); z-index: 6 }
+  #beatdot.beat { background: #fff; box-shadow: 0 0 10px #fff }
 
-  /* The highway: four lanes, D F J K. */
-  #highway { position: absolute; left: 460px; top: 46px; width: 360px; height: 674px; background: var(--sheet); border-left: 1px solid var(--ink); border-right: 1px solid var(--ink);
-             transition: transform .9s cubic-bezier(.5, 0, .7, 1), opacity .9s; overflow: hidden }
-  #highway .lane { position: absolute; top: 0; bottom: 0; width: 90px; border-right: 1px solid var(--rule) }
-  #highway .lane:last-of-type { border-right: 0 }
-  #highway .lane.down { background: linear-gradient(to top, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%) }
-  #judge { position: absolute; left: 0; right: 0; top: 554px; height: 6px; background: var(--ink) }
-  .keys { position: absolute; left: 0; right: 0; top: 566px; display: grid; grid-template-columns: repeat(4, 90px) }
-  .keys div { text-align: center; font-size: 12px; line-height: 1.3; padding-top: 6px }
-  .keys div b { display: block; font-size: 16px }
-  /* The highway breaks: the two halves fly apart when Meloetta sings. */
-  #highway.broken { transform: translateY(40px) scaleX(1.6); opacity: 0; pointer-events: none }
-  #highway.gone { display: none }
+  /* Lanes on the highway: three faint lines across a wide centred area, and the keys under the line. */
+  #guides { position: absolute; inset: 0; pointer-events: none; transition: opacity .9s; z-index: 1 }
+  #guides.out { opacity: 0 }
+  #guides i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .09) }
+  #guides .glow { position: absolute; top: 0; height: 600px; width: 240px; background: linear-gradient(to top, rgba(255, 255, 255, .09), transparent 70%); opacity: 0; transition: opacity .08s }
+  #guides .glow.down { opacity: 1 }
+  #keys { position: absolute; left: 0; right: 0; top: 612px; height: 40px; z-index: 2; pointer-events: none; transition: opacity .9s }
+  #keys.out { opacity: 0 }
+  #keys div { position: absolute; width: 240px; margin-left: -120px; text-align: center; line-height: 1.2 }
+  #keys b { display: block; font-size: 14px; font-weight: 400; color: var(--faint) }
+  #keys span { font-size: 10px; letter-spacing: .08em; color: rgba(255, 255, 255, .22) }
 
-  /* Notes. A skin is a class on the stage: classic, charm (Shiny Charm), crown (Calyrex). */
-  .n { position: absolute; left: 0; top: 0; width: 84px; height: 18px; margin-left: 3px; border-radius: 2px; background: var(--ink); will-change: transform }
-  .n.l1, .n.l2 { background: var(--accent) }
-  .n.hold { background: none }
-  .n .body { position: absolute; left: 22px; right: 22px; bottom: 9px; background: color-mix(in srgb, var(--ink) 30%, transparent); border: 1px solid var(--ink); border-bottom: 0 }
-  .n .head { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; border-radius: 2px; background: var(--ink) }
-  .n.l1 .head, .n.l2 .head { background: var(--accent) }
-  .n.dbl { box-shadow: 0 0 0 2px var(--sheet), 0 0 0 3px var(--ink) }
-  .n.done { display: none }
-  .skin-charm .n:not(.hold), .skin-charm .n .head, .skin-charm .ln:not(.drag) {
-    background: radial-gradient(circle at 20% 40%, #fff 0 1.5px, transparent 2.5px) 0 0 / 14px 9px,
-                linear-gradient(90deg, #b8b2c6, #f3eff8 40%, #d8c3d6 60%, #a9a3b9) !important;
-    animation: twinkle 1.1s linear infinite; outline: 1px solid var(--ink) }
+  /* Judgment lines. Each is a point the script places and turns; its bar runs
+     edge to edge, and its notes ride inside it, travelling straight at it. */
+  .jl { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; z-index: 3; transition: opacity .3s }
+  .jl .bar { position: absolute; left: -1600px; width: 3200px; top: -1px; height: 2px; background: #fff;
+             box-shadow: 0 0 6px rgba(255, 255, 255, .9), 0 0 18px rgba(255, 255, 255, .35) }
+  .jl.zap .bar { box-shadow: 0 0 10px #fff, 0 0 30px var(--gold) }
+  .jl.off { opacity: 0 }
+
+  /* Notes: thin flat glowing bars. tap cyan, double gold, hold a cyan head and a beam, drag short and yellow. */
+  .nt { position: absolute; bottom: -5px; height: 10px; transform-origin: 50% calc(100% - 5px); will-change: transform }
+  .nt .head { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; border-radius: 5px; background: var(--tap);
+              box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75), 0 0 10px rgba(79, 212, 255, .75) }
+  .nt.dbl .head { background: var(--gold); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px #fff, 0 0 12px rgba(255, 216, 102, .8) }
+  .nt.drag .head { height: 7px; bottom: 1.5px; background: #f3e27a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7), 0 0 8px rgba(243, 226, 122, .7) }
+  .nt .beam { position: absolute; left: 14%; right: 14%; bottom: 5px; background: linear-gradient(to top, rgba(160, 225, 255, .55), var(--beam));
+              border-left: 1px solid rgba(255, 255, 255, .85); border-right: 1px solid rgba(255, 255, 255, .85) }
+  .nt.miss { opacity: 0; transition: opacity .25s }
+  .nt.done { display: none }
+  .skin-charm .nt .head { background: radial-gradient(circle at 20% 40%, #fff 0 1.2px, transparent 2px) 0 0 / 14px 10px,
+                linear-gradient(90deg, #c9c2db, #fbf8ff 40%, #f0c9e6 60%, #bdb5d1) !important;
+    box-shadow: 0 0 12px rgba(255, 200, 240, .8) !important; animation: twinkle 1.1s linear infinite }
   @keyframes twinkle { to { background-position: 14px 0, 0 0 } }
-  .skin-crown .n:not(.hold), .skin-crown .n .head, .skin-crown .ln:not(.drag) {
-    background: linear-gradient(#e2c35a, #b8902c) !important; border-radius: 0;
-    clip-path: polygon(0 100%, 0 20%, 18% 60%, 34% 0, 50% 55%, 66% 0, 82% 60%, 100% 20%, 100% 100%) }
-  .skin-crown .n .body { background: #2f3f6a55; border-color: #2f3f6a }
+  .skin-crown .nt .head { height: 14px; border-radius: 0; background: linear-gradient(#f4d873, #c89a2e) !important; box-shadow: none !important;
+    clip-path: polygon(0 100%, 0 30%, 12% 62%, 25% 10%, 38% 62%, 50% 0, 62% 62%, 75% 10%, 88% 62%, 100% 30%, 100% 100%) }
+  .skin-crown .nt .beam { background: linear-gradient(to top, rgba(120, 140, 220, .5), rgba(60, 80, 160, .25)) }
 
-  /* The judgment line, for the boss fights' second half. A single div the
-     movement script places and turns every frame; its notes ride inside it. */
-  #line { position: absolute; left: 0; top: 0; width: 820px; height: 0; margin-left: -410px; will-change: transform; z-index: 3 }
-  #line .bar { position: absolute; left: 0; right: 0; top: -3px; height: 6px; background: var(--accent) }
-  #line .ln { position: absolute; left: 0; top: 0; width: 96px; height: 14px; margin: -7px 0 0 -48px; background: var(--ink); border-radius: 2px }
-  #line .ln.drag { height: 8px; margin-top: -4px; width: 64px; margin-left: -32px; background: var(--accent); border: 1px solid var(--ink) }
-  #line .ln.lhold { background: none }
-  #line .ln.lhold .body { position: absolute; left: 30px; right: 30px; bottom: 7px; background: color-mix(in srgb, var(--accent) 35%, transparent); border: 1px solid var(--ink); border-bottom: 0 }
-  #line .ln.lhold .head { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: var(--ink); border-radius: 2px }
-  #line .ln.done { display: none }
-  #line.zap .bar { background: var(--ink) }
-  /* Muted mode: a ring on the line that pulses every beat, and a small flash. */
-  .ring { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border: 3px solid var(--accent); border-radius: 50%; opacity: 0; pointer-events: none }
+  /* Hit bursts: an expanding square turning 45°, two quarter arcs, a few flying bits. */
+  .burst { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; color: var(--c) }
+  .burst .sq { position: absolute; left: -32px; top: -32px; width: 64px; height: 64px; border: 2px solid currentColor; box-shadow: 0 0 12px currentColor; animation: bsq .42s ease-out forwards }
+  .burst .arc { position: absolute; left: -42px; top: -42px; width: 84px; height: 84px; border-radius: 50%; border: 3px solid transparent; border-top-color: currentColor; animation: barc .42s ease-out forwards }
+  .burst .arc + .arc { animation-name: barc2 }
+  .burst .bit { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; background: currentColor; animation: bbit .42s ease-out forwards }
+  @keyframes bsq { from { transform: scale(.45) rotate(0); opacity: 1 } to { transform: scale(1.35) rotate(45deg); opacity: 0 } }
+  @keyframes barc { from { transform: rotate(0) scale(.6); opacity: .9 } to { transform: rotate(120deg) scale(1.15); opacity: 0 } }
+  @keyframes barc2 { from { transform: rotate(180deg) scale(.6); opacity: .9 } to { transform: rotate(300deg) scale(1.15); opacity: 0 } }
+  @keyframes bbit { from { transform: translate(0, 0) rotate(0); opacity: 1 } to { transform: translate(var(--dx), var(--dy)) rotate(90deg); opacity: 0 } }
+
+  /* Muted mode: a ring on the line that pulses every beat. */
+  .ring { position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; border: 2px solid #fff; border-radius: 50%; opacity: 0; pointer-events: none; box-shadow: 0 0 10px #fff }
   .ring.beat { animation: ring .42s ease-out }
-  @keyframes ring { from { opacity: .9; transform: scale(.6) } to { opacity: 0; transform: scale(1.5) } }
-  #flash { position: absolute; right: 24px; top: 56px; width: 14px; height: 14px; border: 1px solid var(--ink); border-radius: 50% }
-  #flash.beat { background: var(--accent) }
+  @keyframes ring { from { opacity: .9; transform: scale(.5) } to { opacity: 0; transform: scale(1.6) } }
 
-  /* The battle layer: the boss and your side, each with HP. */
-  .side { position: absolute; top: 70px; width: 380px }
-  .side.you { left: 40px }
-  .side.foe { right: 40px; text-align: right }
-  .side img { width: 150px; height: 150px; transition: filter .15s, transform .15s }
-  .side.foe img.hurt { filter: brightness(2.6) saturate(.2); transform: translateX(8px) }
-  .side.you img.hurt { filter: brightness(.5) sepia(1) hue-rotate(-30deg); transform: translateX(-8px) }
-  .hp { height: 10px; border: 1px solid var(--ink); background: var(--sheet); margin: 4px 0 }
-  .hp i { display: block; height: 100%; background: var(--accent); transition: width .2s }
-  .foe .hp i { background: var(--ink); margin-left: auto }
-  .side .move { font-size: 12px; min-height: 18px }
+  /* The battle layer: two thin HP lines and a fading line of text. */
+  #bossbar { position: absolute; left: 50%; top: 118px; width: 380px; margin-left: -190px; text-align: center; z-index: 6 }
+  #bossbar .nm, #mebar .nm { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 12px; letter-spacing: .08em; color: var(--dim) }
+  #bossbar img, #mebar img { width: 64px; height: 64px; opacity: .55; margin: -22px 0 -18px }
+  .thin { height: 3px; background: rgba(255, 255, 255, .12); margin-top: 6px; border-radius: 2px; overflow: hidden }
+  .thin i { display: block; height: 100%; width: 100%; transition: width .2s }
+  #boss-hp { background: var(--accent); box-shadow: 0 0 8px var(--accent) }
+  #mebar { position: absolute; left: 28px; bottom: 64px; width: 220px; padding-left: 64px; z-index: 6 }
+  #mebar .nm { justify-content: flex-start }
+  #mebar img { position: absolute; left: -6px; top: -26px; margin: 0 }
+  #me-hp { background: var(--tap); box-shadow: 0 0 8px var(--tap) }
+  #btext { position: absolute; left: 28px; bottom: 42px; font-size: 13px; color: var(--dim); z-index: 6; transition: opacity .5s; opacity: 0 }
+  #btext.on { opacity: 1; transition: none }
+  .hurt { animation: hurt .18s }
+  @keyframes hurt { 50% { filter: brightness(2.5); transform: translateX(3px) } }
   .pir { filter: hue-rotate(-60deg) saturate(2) }
-  #singer { position: absolute; left: 50%; top: 150px; width: 440px; margin-left: -220px; text-align: center; z-index: 4 }
-  #singer img { width: 220px; height: 220px; transition: filter .8s, transform .8s }
-  #singer img.spin { transform: rotate(360deg) }
-  #singer p { font-family: var(--display); font-size: 22px }
-  #pop { position: absolute; left: 50%; top: 300px; width: 300px; margin-left: -150px; text-align: center; font: 700 26px var(--display); z-index: 6; pointer-events: none }
-  #pop small { display: block; font: 13px var(--mono); color: var(--dim) }
-  #pop.Perfect { color: var(--perfect) } #pop.Great { color: var(--great) } #pop.Good { color: var(--good) } #pop.Miss { color: var(--miss) }
-  #pausebox { position: absolute; inset: 0; background: #1d1b17a6; display: grid; place-items: center; z-index: 30 }
+
+  /* The Relic Song break: a white flash, Meloetta filling the screen, the name in the thin font. */
+  #relicfx { position: absolute; inset: 0; z-index: 8; pointer-events: none; display: grid; place-items: center; opacity: 0; transition: opacity .6s }
+  #relicfx.on { opacity: 1 }
+  #relicfx img { position: absolute; width: 780px; height: 780px; left: 50%; top: 50%; margin: -390px 0 0 -390px; opacity: .85; transition: filter 1.2s, transform 3s ease-out; transform: scale(.94) }
+  #relicfx.on img { transform: scale(1.04) }
+  #relicfx p { position: relative; font: 200 72px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; text-shadow: 0 0 24px rgba(255, 255, 255, .6) }
+  #relicfx small { position: absolute; bottom: 150px; left: 0; right: 0; text-align: center; font-size: 14px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase }
+  #whiteflash { position: absolute; inset: 0; background: #fff; z-index: 9; pointer-events: none; opacity: 0 }
+  #whiteflash.go { animation: wflash .7s ease-out }
+  @keyframes wflash { from { opacity: .95 } to { opacity: 0 } }
 
   /* Results */
-  #result .big { font: 700 120px/1 var(--display); color: var(--accent) }
-  #result .cols { display: grid; grid-template-columns: 240px 1fr; gap: 40px; margin-top: 30px; align-items: start }
+  #result .big { font: 200 150px/1 var(--sans); color: var(--gold); text-shadow: 0 0 30px rgba(255, 216, 102, .4) }
+  #result .cols { display: grid; grid-template-columns: 260px 1fr; gap: 40px; margin-top: 30px; align-items: start }
   #result table td { padding: 4px 18px 4px 0 }
-  #result .ps { margin-top: 18px; font-style: italic }
-  #nokeys { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 40px; background: var(--paper); z-index: 50 }
+  #result table td:last-child { font-variant-numeric: tabular-nums }
+  #result .ps { margin-top: 18px; font-style: italic; color: var(--dim) }
+  #nokeys { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 40px; background: var(--bg); z-index: 50 }
 </style>
 </head>
 <body>
 <div class="stage" id="stage">
+
+  <!-- The backdrop: a huge blurred sprite, a tint, and slow translucent squares. -->
+  <div id="bg"><img id="bg-img" alt=""><div id="bg-tint"></div><div id="bg-shade"></div><div id="floats"></div></div>
 
   <!-- The map: Kanto's four gyms, the finale, and the hidden tracks. -->
   <section class="screen" id="map">
@@ -192,24 +220,23 @@
     <div class="finale" id="finale"></div>
   </section>
 
-  <!-- A song or a boss fight. -->
+  <!-- A song or a boss fight. The whole stage is the playfield. -->
   <section class="screen" id="play" hidden>
-    <div class="phud caps"><span id="p-title"></span><span class="grow"></span>
-      <span>Score <b id="p-score">0</b></span><span>Combo <b id="p-combo">0</b></span><span>Acc <b id="p-acc">100.00%</b></span>
-      <span class="dim">Esc pauses</span></div>
-    <div id="flash" hidden></div>
-    <div class="side you" id="you" hidden><img id="you-img" alt=""><div id="you-name"></div><div class="hp"><i id="you-hp"></i></div><div class="move" id="you-move"></div></div>
-    <div class="side foe" id="foe" hidden><img id="foe-img" alt=""><div id="foe-name"></div><div class="hp"><i id="foe-hp"></i></div><div class="move" id="foe-move"></div></div>
-    <div id="highway">
-      <div class="lane" style="left:0"></div><div class="lane" style="left:90px"></div><div class="lane" style="left:180px"></div><div class="lane" style="left:270px"></div>
-      <div id="notes"></div>
-      <div id="judge"></div><div class="ring" id="hring" style="left:180px;top:557px"></div>
-      <div class="keys" id="keys"></div>
-    </div>
-    <div id="line" hidden><div class="bar"></div><div class="ring" id="lring" style="left:410px;top:0"></div><div id="lnotes"></div></div>
-    <div id="singer" hidden><img id="singer-img" alt=""><p id="singer-text"></p></div>
-    <div id="pop"></div>
-    <div id="pausebox" hidden><div class="card"><h2>Paused</h2><p class="dim">The music waits with you.</p>
+    <div id="prog"><i></i></div>
+    <div id="guides"></div>
+    <div id="lines"></div>
+    <div id="keys"></div>
+    <button id="pausebtn" type="button" aria-label="Pause"><i></i><i></i></button>
+    <div id="combo"><b id="combo-n"></b><span id="combo-l">COMBO</span><em id="jtext"></em></div>
+    <div id="score">0000000</div>
+    <div id="beatdot" hidden></div>
+    <div id="bossbar" hidden><div class="nm"><img id="boss-img" alt=""><span id="boss-name"></span></div><div class="thin"><i id="boss-hp"></i></div></div>
+    <div id="btext"></div>
+    <div id="mebar" hidden><div class="nm"><img id="me-img" alt=""><span id="me-name"></span></div><div class="thin"><i id="me-hp"></i></div></div>
+    <div id="songname"></div><div id="songlv"></div>
+    <div id="relicfx"><img id="relic-img" alt=""><p id="relic-name">Relic Song</p><small id="relic-sub"></small></div>
+    <div id="whiteflash"></div>
+    <div class="over" id="pausebox" hidden><div class="card"><h2>Paused</h2><p class="dim">The music waits with you.</p>
       <div class="btns"><button id="b-quit" type="button">Back to the map</button><button id="b-retry" type="button">Retry (R)</button><button id="b-resume" type="button">Resume (Esc)</button></div></div></div>
   </section>
 
@@ -238,6 +265,7 @@
     <div class="line"><span>Audio offset <b id="o-off-v"></b></span><input id="o-off" type="range" min="-250" max="250" step="1"></div>
     <div class="line"><span class="dim">Notes late? Raise it. Early? Lower it.</span><button id="o-cal" type="button">Tap to calibrate</button></div>
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
+    <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
     <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <p class="dim" id="o-skin-note" style="margin-top:8px"></p>
@@ -345,7 +373,7 @@ const EGG_KEY = "bored.relic-song.eggs.v1";
 const STORY_KEY = "bored.poke-idle.story";
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0 }, readJSON(OPTS_KEY) || {});
+const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0 }, readJSON(OPTS_KEY) || {});
 const keepOpts = () => writeJSON(OPTS_KEY, opts);
 let save = null;
 const slotKey = () => opts.test ? TEST_KEY : SAVE_KEY;
@@ -562,8 +590,15 @@ const SONGS = [
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
     form: "A A B A B relic C B C B C",
     // The zap: the line snaps between spots every two beats, turned a new way each time.
+    // Halfway through it splits in two: one line zaps along the bottom, the other along the top, notes coming up at it.
     line: [{ at: 0, len: 1, kind: "fly", x: 640, y: 480, rot: 0 },
-           { at: 1, len: 80, kind: "zap", every: 2, spots: [[640, 480, 0], [470, 420, -18], [810, 520, 14], [640, 380, 0], [520, 540, 10], [760, 420, -12]] }] },
+           { at: 1, len: 23, kind: "zap", every: 2, spots: [[640, 480, 0], [470, 420, -18], [810, 520, 14], [640, 380, 0], [520, 540, 10], [760, 420, -12]] },
+           { at: 24, len: 32, kind: "zap", every: 2, spots: [[640, 560, 0], [480, 540, -10], [800, 580, 8], [640, 600, 0]] },
+           { at: 24, len: 2, kind: "fly", x: 640, y: 230, rot: 0, line: 1 },
+           { at: 26, len: 28, kind: "zap", every: 2, spots: [[640, 220, 0], [820, 180, 12], [460, 200, -12], [640, 250, 0]], line: 1 },
+           { at: 54, len: 2, kind: "fly", x: 640, y: 560, rot: 0, line: 1 },
+           { at: 56, len: 25, kind: "zap", every: 2, spots: [[640, 480, 0], [470, 420, -18], [810, 520, 14], [640, 380, 0], [520, 540, 10], [760, 420, -12]] }],
+    split: [[24, 56]] },
 
   // ── Erika, Celadon Gym (Grass) ──
   { id: "celadon-petals", gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
@@ -594,10 +629,14 @@ const SONGS = [
     // The line is out for beats 0-64 and 104-168 from the break (the highway has 68-100).
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 }, { at: 2, len: 16, kind: "tide", amp: 70, period: 8, tilt: 5 },
            { at: 18, len: 16, kind: "zap", every: 2, spots: [[640, 460, 0], [480, 400, -20], [800, 520, 16], [640, 360, 0]] },
-           { at: 34, len: 2, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 36, len: 28, kind: "drift", ampX: 200, period: 14, sway: 20, fall: 1.8 },
+           { at: 34, len: 2, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 36, len: 26, kind: "drift", ampX: 200, period: 14, sway: 20, fall: 1.8 },
+           { at: 62, len: 2, kind: "fly", x: 640, y: 600, rot: 0 },
            { at: 104, len: 2, kind: "fly", x: 640, y: 480, rot: 0 }, { at: 106, len: 16, kind: "zap", every: 2, spots: [[640, 480, 0], [500, 420, 18], [780, 420, -18], [640, 540, 0]] },
            { at: 122, len: 16, kind: "tide", amp: 80, period: 8, tilt: 8 }, { at: 138, len: 18, kind: "spin", perBeat: 11.25 },
-           { at: 156, len: 4, kind: "fly", x: 640, y: 480, rot: 0 }] },
+           { at: 106, len: 2, kind: "fly", x: 640, y: 220, rot: 0, line: 1 },
+           { at: 108, len: 12, kind: "tide", amp: 40, period: 4, tilt: 10, line: 1 }, { at: 120, len: 2, kind: "fly", x: 640, y: 480, rot: 0, line: 1 },
+           { at: 156, len: 4, kind: "fly", x: 640, y: 480, rot: 0 }],
+    split: [[106, 122]] },
 
   // ── Hidden tracks ──
   { id: "the-dealer", hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007,
@@ -749,9 +788,17 @@ const MOVES = {
   drift: (s, t, g) => { s.x += g.ampX * Math.sin(2 * Math.PI * t / g.period); s.rot += g.sway * Math.sin(2 * Math.PI * t / (g.period / 2)); s.y += g.fall * t; },
   spin: (s, t, g) => { s.rot += g.perBeat * t; }
 };
-function lineAt(script, beat) {
-  const s = { x: 640, y: 480, rot: 0, zap: false };
-  for (const g of script) {
+// The highway's line: horizontal, near the bottom. A boss's line starts here when it breaks free.
+const HOME = { x: 640, y: 600, rot: 0 };
+// A segment with line: 1 moves the second line. It appears where the first one is at its
+// first segment and flies apart from it; song.split says when it is on screen.
+function lineAt(script, beat, which = 0) {
+  const mine = script.filter(g => (g.line || 0) === which);
+  let s;
+  if (which) { if (!mine.length || beat < mine[0].at) return null; s = { ...lineAt(script, mine[0].at, 0) }; }
+  else s = { ...HOME };
+  s.zap = false;
+  for (const g of mine) {
     if (beat < g.at) break;
     const t = Math.min(beat - g.at, g.len);
     const base = { ...s };
@@ -762,6 +809,7 @@ function lineAt(script, beat) {
   }
   return s;
 }
+const splitAt = (song, rel) => (song.split || []).some(([a, b]) => rel >= a && rel < b);
 
 /* ── Unlocks and bests ─────────────────────────────────────────────────── */
 const bestOf = (song, diff = song.diffs[0]) => save.best[song.id + ":" + diff] || null;
@@ -806,6 +854,7 @@ function songRow(song, label) {
 }
 function drawMap() {
   showScreen("map");
+  backdrop(MELOETTA, save.badges[4] ? TINT.pirouette : TINT.aria);
   const h = hub();
   $("#m-coins").textContent = h ? fmt(h.coins) : "—";
   $("#m-badges").textContent = badges() + "/4";
@@ -859,6 +908,7 @@ function seg(box, value, set) {
 function drawOpts() {
   $("#opts").hidden = false;
   seg($("#o-sound"), opts.sound, v => { opts.sound = Number(v); setVolume(); keepOpts(); });
+  seg($("#o-jtext"), opts.jtext, v => { opts.jtext = Number(v); keepOpts(); });
   seg($("#o-test"), opts.test, v => { opts.test = Number(v); keepOpts(); loadSave(); });
   $("#o-vol").value = opts.vol; $("#o-vol").oninput = e => { opts.vol = Number(e.target.value); setVolume(); keepOpts(); };
   $("#o-off").value = opts.offset; $("#o-off-v").textContent = (opts.offset > 0 ? "+" : "") + opts.offset + " ms";
@@ -953,6 +1003,31 @@ function bossOf(song) {
   return { num: g.ace, name: g.name + "'s " + g.aceName, types: [g.type] };
 }
 
+// The backdrop: a sprite, huge and blurred, and a tint. Aria green-teal, Pirouette orange-brown, or a gym's type.
+const TINT = { aria: "#1d9a86", pirouette: "#c4652b", Rock: "#8c6f45", Water: "#2a62b4", Electric: "#c4a31c", Grass: "#3f8c3c",
+  dark: "#5b3f8f", plain: "#3d6a98", snake: "#4f7d3a" };
+function backdrop(num, tint, pir = false) {
+  const img = $("#bg-img");
+  if (num != null && !img.src.endsWith("/" + num + ".png")) img.src = sprite(num);
+  img.className = pir ? "pir" : "";
+  $("#bg-tint").style.backgroundColor = tint;
+}
+// A few translucent squares drifting up behind everything, made once.
+(() => {
+  const box = $("#floats");
+  for (let k = 0; k < 14; k++) {
+    const d = el("div", "float"), size = 10 + Math.random() * 34;
+    Object.assign(d.style, { left: Math.random() * 1280 + "px", top: 720 + "px", width: size + "px", height: size + "px",
+      animationDuration: 26 + Math.random() * 30 + "s", animationDelay: -Math.random() * 50 + "s" });
+    d.style.setProperty("--dx", (Math.random() * 200 - 100) + "px");
+    d.style.setProperty("--r", (Math.random() * 360 - 180) + "deg");
+    box.append(d);
+  }
+})();
+const LANE = 240, laneX = lane => (lane - 1.5) * LANE;
+const songTint = song => song.boss ? TINT.aria : song.gym != null ? TINT[GYMS[song.gym].type] : TINT[song.style] || TINT.plain;
+const songArt = song => song.final ? MELOETTA : song.gym != null ? GYMS[song.gym].ace : song.art || MELOETTA;
+
 function start(song) {
   if (!opts.asked) { $("#first").hidden = false; return; }
   const c = audio(); c.resume();
@@ -970,45 +1045,49 @@ function start(song) {
   // The count-in: four clicks before beat 0.
   P.ev = [0, 1, 2, 3].map(k => ({ b: k - 4, kind: "drum", hit: "r" })).concat(B.ev);
   // The battle layer
+  $("#bossbar").hidden = $("#mebar").hidden = !boss;
+  $("#btext").textContent = ""; $("#btext").className = "";
   if (boss) {
     const you = yourSide(song);
     const dmg = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 + BATTLE.charge : n.kind === "drag" ? 0.5 : 1), 0);
     P.battle = { you, youHp: BATTLE.youHp, bossMax: dmg * BATTLE.bossShare, bossHp: dmg * BATTLE.bossShare, hurt: song.final ? BATTLE.finalHurt : BATTLE.missHurt };
-    $("#you-img").src = sprite(you.num, you.shiny); $("#you-name").textContent = you.name;
-    $("#foe-img").src = sprite(boss.num); $("#foe-img").className = ""; $("#foe-name").textContent = boss.name + " · " + boss.types.join("/");
-    $("#you-move").textContent = edge ? "Type edge on " + boss.name + ": +3% score" : you.buddy ? "" : "No buddy? Set one in Poké Gacha.";
-    $("#foe-move").textContent = "";
+    $("#me-img").src = sprite(you.num, you.shiny); $("#me-name").textContent = you.name;
+    $("#boss-img").src = sprite(boss.num); $("#boss-img").className = ""; $("#boss-name").textContent = boss.name + " · " + boss.types.join("/");
+    $("#boss-hp").style.width = $("#me-hp").style.width = "100%";
+    say2(edge ? "Type edge on " + boss.name + ": +3% score" : you.buddy ? "" : "No buddy? Set one in Poké Gacha.");
   }
-  $("#you").hidden = $("#foe").hidden = !boss;
-  $("#play").className = "screen gym-" + (song.final ? "relic" : song.gym != null ? GYMS[song.gym].style : song.style) + " skin-" + skin();
-  $("#p-title").textContent = song.title + " · " + DIFF_NAME[B.diff] + (P.test ? " · test" : "");
-  $("#flash").hidden = !!opts.sound;
-  // Lanes: key and, in a boss fight, your move.
-  const keys = $("#keys"); keys.replaceChildren();
-  KEYS.forEach((k, i) => { const d = el("div"); d.append(el("b", "", k.toUpperCase())); if (P.battle) d.append(el("span", "", P.battle.you.moves[i])); keys.append(d); });
-  // Note elements, made once; each frame only moves the ones in view.
-  const hw = $("#notes"), ln = $("#lnotes");
-  hw.replaceChildren(); ln.replaceChildren();
+  $("#play").className = "screen skin-" + skin();
+  backdrop(songArt(song), songTint(song));
+  $("#songname").textContent = song.title + (P.test ? " · test" : "");
+  $("#songlv").textContent = DIFF_NAME[B.diff] + " Lv." + Math.max(1, Math.min(16, Math.round(B.chart.length / B.seconds * 4)));
+  $("#beatdot").hidden = !!opts.sound;
+  // Lanes: three faint lines, a glow per lane while its key is down, and the keys under the line.
+  const guides = $("#guides"); guides.replaceChildren(); guides.className = "";
+  for (let k = 0; k < 4; k++) { const g = el("div", "glow"); g.style.left = (640 + laneX(k) - LANE / 2) + "px"; guides.append(g); }
+  for (const x of [-1, 0, 1]) { const i = el("i"); i.style.left = (640 + x * LANE) + "px"; guides.append(i); }
+  const keys = $("#keys"); keys.replaceChildren(); keys.className = "";
+  KEYS.forEach((k, i) => { const d = el("div"); d.style.left = (640 + laneX(i)) + "px"; d.append(el("b", "", k.toUpperCase())); if (P.battle) d.append(el("span", "", P.battle.you.moves[i])); keys.append(d); });
+  // Lines: 0 is the highway's and the boss's; 1 only shows while the line is split.
+  const box = $("#lines"); box.replaceChildren();
+  P.lines = [0, 1].map(k => { const d = el("div", "jl" + (k ? " off" : "")); d.append(el("div", "bar")); if (!k) d.append(el("div", "ring")); box.append(d); return d; });
+  // Note elements, made once; each frame only moves the ones in view. Every note rides a
+  // line and travels straight at it: from above, or from below on the split line.
   const pxBeat = pxPerSec() * B.spb;
   for (const n of notes) {
-    let d;
-    if (n.mode === "highway") {
-      d = el("div", "n l" + n.lane + (n.kind === "hold" ? " hold" : "") + (n.dbl ? " dbl" : ""));
-      if (n.kind === "hold") { const body = el("div", "body"); body.style.height = (n.len * pxBeat) + "px"; d.style.height = (n.len * pxBeat + 18) + "px"; d.append(body, el("div", "head")); }
-      d.style.left = (n.lane * 90) + "px";
-      hw.append(d);
-    } else {
-      d = el("div", "ln" + (n.kind === "drag" ? " drag" : n.kind === "hold" ? " lhold" : ""));
-      n.x = 410 + (n.lane - 1.5) * 150 + ((n.i * 37) % 5 - 2) * 14;
-      if (n.kind === "hold") { const body = el("div", "body"); body.style.height = (n.len * pxBeat) + "px"; d.style.height = (n.len * pxBeat + 14) + "px"; d.style.marginTop = -(n.len * pxBeat + 7) + "px"; d.append(body, el("div", "head")); }
-      d.style.left = n.x + "px";
-      ln.append(d);
-    }
+    const rel = n.b - B.verseAt;
+    n.line = n.mode === "line" && splitAt(song, rel - 3) && splitAt(song, rel + 1) && n.lane >= 2 ? 1 : 0;
+    n.side = n.line ? -1 : 1;
+    n.x = n.mode === "highway" ? laneX(n.lane) : (n.lane - 1.5) * 150 + ((n.i * 37) % 5 - 2) * 14;
+    const w = n.kind === "drag" ? 90 : n.mode === "highway" ? 200 : 150;
+    const d = el("div", "nt" + (n.dbl ? " dbl" : "") + (n.kind === "drag" ? " drag" : "") + (n.kind === "hold" ? " hold" : ""));
+    d.style.left = (n.x - w / 2) + "px"; d.style.width = w + "px";
+    if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.len * pxBeat) + "px"; d.append(beam); }
+    d.append(el("div", "head"));
     d.style.display = "none";
+    P.lines[n.line].append(d);
     n.el = d;
   }
-  $("#highway").className = ""; $("#line").hidden = true; $("#singer").hidden = true; $("#pop").textContent = "";
-  $("#pausebox").hidden = true;
+  $("#relicfx").className = ""; $("#pausebox").hidden = true;
   showScreen("play");
   hud();
   setForm("aria");
@@ -1040,7 +1119,8 @@ function scheduler() {
 function setForm(form) {
   P.form = form;
   $("#play").classList.toggle("pirouette", form === "pirouette");
-  if (P.song.final) { $("#foe-img").className = form === "pirouette" ? "pir" : ""; $("#foe-name").textContent = "Meloetta · " + (form === "pirouette" ? "Pirouette Forme · " + FINAL.pirouette.join("/") : "Aria Forme · " + FINAL.type.join("/")); }
+  if (P.boss) backdrop(null, TINT[form], P.song.final && form === "pirouette");
+  if (P.song.final) { $("#boss-img").className = form === "pirouette" ? "pir" : ""; $("#boss-name").textContent = "Meloetta · " + (form === "pirouette" ? "Pirouette Forme · " + FINAL.pirouette.join("/") : "Aria Forme · " + FINAL.type.join("/")); }
 }
 function segmentAt(beat) {
   let mode = "highway", form = "aria", show = null;
@@ -1050,47 +1130,53 @@ function segmentAt(beat) {
   }
   return { mode, form, show };
 }
+const place = (d, s) => { d.style.transform = "translate(" + s.x + "px," + s.y + "px) rotate(" + s.rot + "deg)"; };
 
 function frame() {
   if (!P || P.done) return;
   P.raf = requestAnimationFrame(frame);
   if (P.paused) return;
-  const t = now(), beat = t / P.B.spb, B = P.B, px = pxPerSec();
-  // Modes, the Relic Song break and the finale's flips.
+  const t = now(), beat = t / P.B.spb, B = P.B, px = pxPerSec(), rel = beat - B.verseAt;
+  $("#prog i").style.width = Math.max(0, Math.min(100, 100 * t / B.seconds)) + "%";
+  // Modes, the Relic Song break and the finale's flips: a white flash, Meloetta filling
+  // the screen, then the tint turns while the lanes fade and the line breaks free.
   const at = segmentAt(beat);
   if (at.show && !P.showing) {
     P.showing = at.show;
-    $("#pop").textContent = "";
-    $("#singer").hidden = false;
-    $("#singer-img").src = sprite(MELOETTA);
-    $("#singer-img").className = P.form === "pirouette" ? "pir" : "";
-    $("#singer-text").textContent = at.show.kind === "relic" ? "Meloetta sings Relic Song!" : "Meloetta changes form!";
-    if (at.show.kind === "relic" || at.mode === "highway") $("#highway").className = "broken";
+    P.nextForm = at.show.kind === "relic" ? "pirouette" : P.form === "aria" ? "pirouette" : "aria";
+    const wf = $("#whiteflash"); wf.classList.remove("go"); void wf.offsetWidth; wf.classList.add("go");
+    $("#relic-img").src = sprite(MELOETTA);
+    $("#relic-img").className = P.form === "pirouette" ? "pir" : "";
+    $("#relic-name").textContent = at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
+    $("#relic-sub").textContent = at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
+    $("#relicfx").className = "on";
+    if (at.mode === "highway") { $("#guides").className = "out"; $("#keys").className = "out"; }
   }
-  if (at.show && P.showing) {
-    const k = (beat - at.show.from) / (at.show.to - at.show.from);
-    if (k > 0.5) { $("#singer-img").className = (P.form === "pirouette" ? "" : "pir") + " spin"; }
+  if (at.show && P.showing && !P.turned && (beat - at.show.from) / (at.show.to - at.show.from) > 0.55) {
+    P.turned = true;
+    $("#relicfx").className = "";
+    if (P.boss) backdrop(null, TINT[P.nextForm], P.song.final && P.nextForm === "pirouette");
   }
-  if (!at.show && P.showing) { P.showing = null; $("#singer").hidden = true; }
+  if (!at.show && P.showing) { P.showing = null; P.turned = false; $("#relicfx").className = ""; }
   if (at.form !== P.form && !at.show) setForm(at.form);
   if (at.mode !== P.mode && !at.show) {
     P.mode = at.mode;
-    $("#highway").className = P.mode === "highway" ? "" : "gone";
-    $("#line").hidden = P.mode !== "line";
+    $("#guides").className = $("#keys").className = P.mode === "highway" ? "" : "out";
   }
-  // The line's place, from the song's script.
-  if (P.mode === "line" && P.song.line) {
-    const s = lineAt(P.song.line, beat - B.verseAt);
-    $("#line").style.transform = "translate(" + s.x + "px," + s.y + "px) rotate(" + s.rot + "deg)";
-    $("#line").classList.toggle("zap", !!s.zap);
-  }
-  // Every beat: the muted ring and flash.
+  // The lines' places: the highway's spot, or the song's script.
+  const line = P.mode === "line" && P.song.line;
+  const s0 = line ? lineAt(P.song.line, rel, 0) : HOME;
+  place(P.lines[0], s0); P.lines[0].classList.toggle("zap", !!s0.zap);
+  const s1 = line && splitAt(P.song, rel) ? lineAt(P.song.line, rel, 1) : null;
+  P.lines[1].classList.toggle("off", !s1);
+  if (s1) { place(P.lines[1], s1); P.lines[1].classList.toggle("zap", !!s1.zap); }
+  // Every beat: the muted ring and dot.
   const whole = Math.floor(beat);
   if (whole !== P.lastBeat && beat >= -4) {
     P.lastBeat = whole;
     if (!opts.sound) {
-      for (const r of [$("#hring"), $("#lring")]) { r.classList.remove("beat"); void r.offsetWidth; r.classList.add("beat"); }
-      $("#flash").classList.add("beat"); setTimeout(() => $("#flash").classList.remove("beat"), 90);
+      const r = P.lines[0].querySelector(".ring"); r.classList.remove("beat"); void r.offsetWidth; r.classList.add("beat");
+      $("#beatdot").classList.add("beat"); setTimeout(() => $("#beatdot").classList.remove("beat"), 90);
     }
   }
   // Autoplay, for tests and the console (__relicSong.auto = true): every note Perfect.
@@ -1104,19 +1190,17 @@ function frame() {
     const dy = (n.t - t) * px;
     if (n.state === 0 && t - n.t > WIN.good) { judge(n, "Miss"); if (n.kind === "hold") judgeTail(n, "Miss"); continue; }
     if (n.kind === "drag" && n.state === 0 && t >= n.t - 0.01 && P.held.size) { judge(n, "Perfect"); continue; }
-    if (n.state === 1) {   // a hold being held
+    if (n.state === 1) {   // a hold being held: the head sits on the line and the beam drains into it
       if (t >= n.tEnd) { judgeTail(n, "Perfect"); continue; }
+      const left = Math.max(0, (n.tEnd - t) * px);
+      n.el.firstChild.style.height = left + "px";
+      n.el.style.transform = n.side < 0 ? "scaleY(-1)" : "none";
+      if (t - (n.fx || 0) > 0.16) { n.fx = t; burst(n, n.hit, true); }
+      continue;
     }
-    if (dy > 720) { n.el.style.display = "none"; if (n.t - t > 8) break; continue; }
+    if (dy > 760) { n.el.style.display = "none"; if (n.t - t > 8) break; continue; }
     n.el.style.display = "";
-    if (n.mode === "highway") {
-      const y = 554 - dy - (n.kind === "hold" ? n.len * px * B.spb : 0) - 6;
-      if (n.state === 1) { const left = Math.max(0, (n.tEnd - t) * px); n.el.style.height = (left + 18) + "px"; n.el.firstChild.style.height = left + "px"; n.el.style.transform = "translateY(" + (554 - left - 6) + "px)"; }
-      else n.el.style.transform = "translateY(" + y + "px)";
-    } else {
-      if (n.state === 1) { const left = Math.max(0, (n.tEnd - t) * px); n.el.style.height = (left + 14) + "px"; n.el.firstChild.style.height = left + "px"; n.el.style.marginTop = -(left + 7) + "px"; n.el.style.transform = "none"; }
-      else n.el.style.transform = "translateY(" + (-dy) + "px)";
-    }
+    n.el.style.transform = (n.side < 0 ? "scaleY(-1) " : "") + "translateY(" + (-dy) + "px)";
   }
   if (t > B.seconds + 1.2 && !P.finished) finish(true);
 }
@@ -1129,7 +1213,7 @@ function press(lane, code) {
   if (!P || P.paused || P.done) return;
   const t = now();
   P.held.add(code);
-  if (P.mode === "highway" && lane >= 0) document.querySelectorAll("#highway .lane")[lane].classList.add("down");
+  if (P.mode === "highway" && lane >= 0) document.querySelectorAll("#guides .glow")[lane].classList.add("down");
   // The highway judges the lane; the line judges any key, by time alone.
   let best = null;
   for (const n of P.notes) {
@@ -1147,7 +1231,7 @@ function press(lane, code) {
 function release(lane, code) {
   if (!P) return;
   P.held.delete(code);
-  if (lane >= 0) document.querySelectorAll("#highway .lane")[lane].classList.remove("down");
+  if (lane >= 0) { const g = document.querySelectorAll("#guides .glow")[lane]; if (g) g.classList.remove("down"); }
   if (P.paused || P.done) return;
   const t = now();
   for (const n of P.notes) if (n.state === 1 && n.key === code) judgeTail(n, t >= n.tEnd - WIN.good ? "Perfect" : "Miss");
@@ -1156,23 +1240,46 @@ function judge(n, j) {
   if (n.kind !== "hold") n.state = 2; else if (j === "Miss") n.state = 2;
   n.hit = j;
   count(j);
-  if (n.state === 2) n.el.classList.add("done");
+  if (j === "Miss") n.el.classList.add("miss");
+  else { burst(n, j); if (n.state === 2) n.el.classList.add("done"); }
   battle(n, j, false);
 }
 function judgeTail(n, j) {
   n.state = 2; n.tail = j;
-  n.el.classList.add("done");
+  if (j === "Miss") n.el.classList.add("miss"); else { n.el.classList.add("done"); burst(n, j); }
   count(j);
   battle(n, j, true);
+}
+// A hit's burst, on the note's line where it landed: Perfect gold, Great light blue, Good faint white.
+const BURST = { Perfect: "var(--perfect)", Great: "var(--great)", Good: "var(--good)" };
+function burst(n, j, small) {
+  if (!BURST[j]) return;
+  const b = el("div", "burst");
+  b.style.left = n.x + "px";
+  b.style.setProperty("--c", BURST[j]);
+  if (small) b.style.transform = "scale(.6)";
+  b.append(el("div", "sq"), el("div", "arc"), el("div", "arc"));
+  for (let k = 0; k < (small ? 2 : 5); k++) {
+    const bit = el("div", "bit"), a = Math.random() * Math.PI * 2, r = 50 + Math.random() * 50;
+    bit.style.setProperty("--dx", Math.cos(a) * r + "px"); bit.style.setProperty("--dy", Math.sin(a) * r + "px");
+    b.append(bit);
+  }
+  P.lines[n.line].append(b);
+  setTimeout(() => b.remove(), 450);
 }
 function count(j) {
   P.counts[j]++; P.n++; P.points += VALUE[j];
   if (j === "Miss") { P.combo = 0; P.streak = 0; }
   else { P.combo++; P.maxCombo = Math.max(P.maxCombo, P.combo); P.streak = j === "Perfect" ? P.streak + 1 : 0; }
-  const pop = $("#pop");
-  pop.className = j;
-  pop.replaceChildren(document.createTextNode(j), el("small", "", P.combo > 1 ? P.combo + " combo" : ""));
+  if (opts.jtext) $("#jtext").textContent = j;
   hud();
+}
+// The battle's running commentary: small, bottom left, gone after a second and a half.
+function say2(text) {
+  const b = $("#btext");
+  b.textContent = text; b.className = text ? "on" : "";
+  clearTimeout(b._t);
+  if (text) b._t = setTimeout(() => { b.className = ""; }, 1500);
 }
 // Hits deal damage, misses cost HP; a full hold is a charge move, a Perfect streak crits.
 function battle(n, j, tail) {
@@ -1180,31 +1287,34 @@ function battle(n, j, tail) {
   if (!b) return;
   if (j === "Miss") {
     b.youHp = Math.max(0, b.youHp - b.hurt);
-    flinch("#you-img");
-    $("#foe-move").textContent = P.boss.name + " hits back!";
+    flinch("#me-img");
+    say2(P.boss.name + " hits back!");
     if (b.youHp <= 0 && !P.finished) setTimeout(() => finish(false), 300);
   } else {
     const base = { Perfect: 1, Great: 0.8, Good: 0.5 }[j] * (n.kind === "drag" ? 0.5 : 1);
     const crit = P.streak >= BATTLE.crit;
     const dmg = tail ? (j === "Perfect" ? 1 + BATTLE.charge : 0.5) : base * (crit ? BATTLE.critMult : 1);
     b.bossHp = Math.max(0, b.bossHp - dmg);
-    flinch("#foe-img");
-    $("#you-move").textContent = tail ? b.you.moves[(n.lane + 2) % 4] + "! Fully charged." : b.you.moves[n.lane] + (crit ? ". A critical hit!" : "");
-    if (b.bossHp <= 0) $("#foe-move").textContent = P.boss.name + " is out of breath!";
+    flinch("#boss-img");
+    if (b.bossHp <= 0) say2(P.boss.name + " is out of breath!");
+    else if (tail && j === "Perfect") say2(b.you.moves[(n.lane + 2) % 4] + "! Fully charged.");
+    else if (crit && P.streak === BATTLE.crit) say2(b.you.moves[n.lane] + ". A critical hit!");
   }
-  $("#you-hp").style.width = (100 * b.youHp / BATTLE.youHp) + "%";
-  $("#foe-hp").style.width = (100 * b.bossHp / b.bossMax) + "%";
+  $("#me-hp").style.width = (100 * b.youHp / BATTLE.youHp) + "%";
+  $("#boss-hp").style.width = (100 * b.bossHp / b.bossMax) + "%";
 }
-function flinch(sel) { const i = $(sel); i.classList.add("hurt"); clearTimeout(i._t); i._t = setTimeout(() => i.classList.remove("hurt"), 140); }
+function flinch(sel) { const i = $(sel); i.classList.remove("hurt"); void i.offsetWidth; i.classList.add("hurt"); }
 function score() {
   if (!P.judged) return 0;
   const acc = P.points / (P.judged * 300), combo = P.maxCombo / P.judged;
   return Math.round((0.9 * acc + 0.1 * combo) * 1000000 * (P.edge ? EDGE : 1));
 }
 function hud() {
-  $("#p-score").textContent = fmt(score());
-  $("#p-combo").textContent = P.combo;
-  $("#p-acc").textContent = (P.n ? 100 * P.points / (P.n * 300) : 100).toFixed(2) + "%";
+  $("#score").textContent = String(score()).padStart(7, "0");
+  const show = P.combo >= 3;
+  $("#combo-n").textContent = show ? P.combo : "";
+  $("#combo-l").style.visibility = show ? "" : "hidden";
+  if (!opts.jtext) $("#jtext").textContent = "";
 }
 function pause(on) {
   if (!P || P.done) return;
@@ -1285,6 +1395,7 @@ function showResult({ song, diff, s, rank, won, why }) {
 $("#r-retry").onclick = () => { if (P) start(P.song); };
 $("#r-map").onclick = () => drawMap();
 $("#b-resume").onclick = () => pause(false);
+$("#pausebtn").onclick = e => { e.currentTarget.blur(); pause(true); };
 $("#b-retry").onclick = retry;
 $("#b-quit").onclick = () => { stop(); drawMap(); };
 
