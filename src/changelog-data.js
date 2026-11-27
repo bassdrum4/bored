@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1031,
+  "count": 1032,
   "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a7086cca","date":"2026-11-27","author":"Claude","subject":"Relic Song: real gameplay preview"},
   {"sha":"d336393e","date":"2026-11-27","author":"Daniel Lowe","subject":"Add Duck Life 3 Evolution with self-hosted Ruffle","pr":381},
   {"sha":"f9803d70","date":"2026-11-27","author":"bassdrum4","subject":"Fix browser regressions and scope isolated game CI; integrate leaderboard avatars"},
   {"sha":"9195d399","date":"2026-11-27","author":"Vettel Xu","subject":"Poké Idle: Team Thaw portraits","pr":380},
