@@ -2,13 +2,23 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1008,
+  "count": 1018,
   "newest": "2026-11-26",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c9a47080","date":"2026-11-26","author":"Daniel Lowe","subject":"Handle malformed client party data safely"},
+  {"sha":"06262a85","date":"2026-11-26","author":"Daniel Lowe","subject":"Bind progress reports to the game-opening account and throttle unchanged snapshots"},
+  {"sha":"59293aa0","date":"2026-11-26","author":"Daniel Lowe","subject":"Link private Poké Idle dashboard from existing analytics"},
+  {"sha":"0b7e7be2","date":"2026-11-26","author":"Daniel Lowe","subject":"Link private Poké Idle dashboard from existing analytics"},
+  {"sha":"137a307e","date":"2026-11-26","author":"Daniel Lowe","subject":"Link private Poké Idle dashboard from existing analytics"},
+  {"sha":"18b0f5e6","date":"2026-11-26","author":"Daniel Lowe","subject":"Add scoped Poké Idle progress dashboard"},
+  {"sha":"d009227a","date":"2026-11-26","author":"Daniel Lowe","subject":"Add scoped Poké Idle progress dashboard"},
+  {"sha":"02555afb","date":"2026-11-26","author":"Daniel Lowe","subject":"Record applied private Poké Idle snapshot migration"},
+  {"sha":"194f23d9","date":"2026-11-26","author":"Daniel Lowe","subject":"Keep Poké Idle admin snapshots out of public payloads; sync privately"},
+  {"sha":"029452b7","date":"2026-11-26","author":"Claude","subject":"Poké Idle: an admin block in the snapshot (both saves, party and counts)"},
   {"sha":"f91c7f62","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2: Crown Shrine at 1.35, and the year ends with the Engine starting"},
   {"sha":"a1c586b0","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2: the Hunt gets its own list and Year map section"},
   {"sha":"8b52ac66","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2, part 4: the Crown Shrine, Year 3's screens, Replay, and Year 2 ships"},
