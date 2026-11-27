@@ -2,13 +2,20 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1001,
+  "count": 1008,
   "newest": "2026-11-26",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f91c7f62","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2: Crown Shrine at 1.35, and the year ends with the Engine starting"},
+  {"sha":"a1c586b0","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2: the Hunt gets its own list and Year map section"},
+  {"sha":"8b52ac66","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2, part 4: the Crown Shrine, Year 3's screens, Replay, and Year 2 ships"},
+  {"sha":"03751d4c","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2, part 3: the Hunt"},
+  {"sha":"38c5d4e6","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2, part 2: the other half, the camp, and the hat"},
+  {"sha":"cd51c44c","date":"2026-11-26","author":"Claude","subject":"Poké Idle Story Year 2, part 1: the reset and the new League"},
+  {"sha":"d65728c0","date":"2026-11-26","author":"Claude","subject":"Poké Idle: Prof Penguin's text box never moves the page, and a new look"},
   {"sha":"9c8237ee","date":"2026-11-26","author":"Codebuff","subject":"Float Battleship's fleet properly, show the enemy's return fire"},
   {"sha":"eba01728","date":"2026-11-26","author":"Codebuff","subject":"Fix Battleship's white fleet, unclear setup and trailer captions"},
   {"sha":"c7ac3083","date":"2026-11-26","author":"Codebuff","subject":"Give Battleship a chase-cam salvo cinematic"},
