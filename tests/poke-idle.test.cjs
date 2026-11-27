@@ -435,7 +435,7 @@ test('Story Year 1 plays through: admins, rivals with the mascot you left, picks
       sinnoh: MAIL.find(m => m.id === 'story-sinnoh').body,
       silver: MAIL.find(m => m.id === 'story-silver').body,
       signatures: ['story-r1', 'story-r2', 'story-r3', 'story-snakes-end'].map(id => MAIL.find(m => m.id === id).body.match(/— Ss*nakes/)[0]),
-      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief').map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
+      gens: Object.entries(ADMIN_TEAMS).filter(([k]) => k !== 'aether-chief' && !k.startsWith('y2-')).map(([, [, t]]) => t).map(t => { const g = [...new Set(t.map(x => typeof x === 'string' ? (VARIANT[x].region + 1) : mon(x).gen))]; return g.length === 1 ? g[0] : g.join('/'); }), progress: storyProgress(S), seen: ['johto-250', 'unova-kyurem', 'paldea-freeze', 'silver-after'].map(id => !!S.story.seen[id]) };
   }));
   assert.equal(got.gated, false, 'the finale waits for every legend chapter, not just the dex');
   assert.equal(got.done.length, 23, 'every Year 1 chapter can be finished: ' + got.done.join(', '));
@@ -532,7 +532,7 @@ test('Story Year 1: League rules, hidden Classic extras, Story dungeons, and the
   assert.deepEqual(errors, []);
 });
 
-test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay Mode changes nothing that counts', async t => {
+test('Story Year 1 end: Begin Year 2 opens (YEAR2_READY), Red stays, and Replay Mode changes nothing that counts', async t => {
   const { tab, errors } = await openIdle(t, '2026-11-24');
   await tab.evaluate(`(${storyAllChamps})()`);
   const got = await tab.evaluate(() => {
@@ -569,7 +569,7 @@ test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay M
     return { y2, year2, red, ach, menu, inReplay, replayPick, prizeBefore: prizeBefore || null, hook, mainMoney, after: { slot, gone: localStorage.getItem(REPLAY_KEY), same: core() === main, shiny: localStorage.getItem(SHINY_KEY) === shinyBefore },
       classicAch: (slot = KEY, S = readSlot(KEY), achs().some(a => a.group === 'Story')), wiki: wikiSections().some(x => x.id === 'story'), classicMail: inbox().some(m => m.id === 'update-story-mode') };
   });
-  assert.deepEqual(got.year2, { text: 'Year 2: The Huntcoming soon', open: false }, 'Year 2 shows, but YEAR2_READY is false');
+  assert.deepEqual(got.year2, { text: 'Year 2: The Huntbegin', open: true }, 'Begin Year 2 is open now that Year 2 has shipped');
   assert.equal(got.red.open, true, 'Red can still be fought');
   assert.ok(['st_start', 'st_mewtwo', 'st_r1', 'st_started', 'st_red', 'st_y1'].every(id => got.ach.find(([k, h]) => k === id && h === 1)), 'the Year 1 story achievements are earned');
   assert.ok(got.menu.includes('replay'));
@@ -588,7 +588,7 @@ test('Story Year 1 end: Year 2 waits behind YEAR2_READY, Red stays, and Replay M
   assert.equal(got.classicAch, false, 'no Story achievements in Classic');
   assert.ok(got.y2.text.includes('Every Pokémon goes back to Lv 5') && got.y2.text.includes('your whole Box') && got.y2.text.includes('Begin Year 2.'), 'the Year 2 confirm screen');
   assert.ok(!/bond/i.test(got.y2.text), 'bond flags are kept but never listed');
-  assert.deepEqual([got.y2.disabled, got.y2.no, got.y2.closed], [true, 'Not yet.', true], 'Begin Year 2. stays disabled while YEAR2_READY is false');
+  assert.deepEqual([got.y2.disabled, got.y2.no, got.y2.closed], [false, 'Not yet.', true], 'Begin Year 2. is enabled, and Not yet. closes it');
   assert.ok(got.wiki && got.classicMail);
   assert.deepEqual(errors, []);
 });
@@ -933,7 +933,7 @@ test('Year 2 begins (test save): the reset keeps the A10 list, the new League ha
     openTab('story');
     const tabText = $('#t-story').textContent;
     const crown = yearMap().find(x => x.id === 'y2-crown');
-    const story = { crown, next: storyNext().text, red: chapterRows(1).some(x => x.x === 'johto-silver'), y1rows: chapterRows(0).length, header: tabText.includes('Year 2: The Hunt') };
+    const story = { crown, next: storyNext().text, red: chapterRows(1).some(x => x.x === 'johto-silver'), y1rows: chapterRows(0).filter(x => !x.x.startsWith('y2-')).length, header: tabText.includes('Year 2: The Hunt') };
     // Three Words: secret, so not listed until the letter is read.
     openTab('ach'); const unread = { listed: $('#t-ach').textContent.includes('Three Words'), secret: /\+\d+ secret/.test($('#t-ach').textContent) };
     openTab('mail'); document.querySelector('#mail [data-mail="story-y2-start"]').click();
@@ -943,7 +943,7 @@ test('Year 2 begins (test save): the reset keeps the A10 list, the new League ha
       // Back in Classic: the teams are the ones from before, and nothing of Year 2 shows.
       back: (useSlot(KEY), { gym: gymTeam(0, 1).map(m => m.num), champ: champTeam(5).map(m => m.num), name: gymName(0, 1), year: storyYear(), place: locName({ kind: 'gym', r: 0, k: 1 }) }) }); }, 50));
   });
-  assert.equal(got.ready, false, 'Year 2 stays off for players until all of it ships');
+  assert.equal(got.ready, true, 'Year 2 has shipped');
   assert.ok(got.row && got.go, 'the test account can begin Year 2');
   assert.equal(got.interlude, 'y2-interlude');
   const a = got.after;
@@ -975,6 +975,267 @@ test('Year 2 begins (test save): the reset keeps the A10 list, the new League ha
   assert.ok(got.three && got.listed, 'reading the letter earns Three Words');
   assert.deepEqual(got.back, { ...got.classic, place: got.back.place }, 'Classic keeps its own teams and leaders');
   assert.equal(got.back.place, "Misty's Water gym");
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2, the other half: guards, the bound legends you left, Rayquaza, the camp and its dealer, Kyurem, Memo #2, Eternatus, and the hat at the Shotgun Roulette table', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const scenes = {};
+    const skip = () => { let n = 0; while (sceneNow && n++ < 30) { if (sceneNow.id === 'y2-johto-r1-after') { sceneNow.i = 1; renderScene(); typeFinish(); scenes.johto = $('#scene .dlg-text').textContent; } endScene(); } };
+    const win = () => { B.idx = B.queue.length - 1; B.foe.hp = 1; hit(1e12); if (!B.manual) next(); };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    storyJump(to('y2-begin') + 1, { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' });
+    skip();
+    for (const b of [250, 382, 484, 644, 717, 792, 889, 1008, 384, 646, 890, 487]) delete S.box[b];
+    delete S.seen[487]; S.party = S.party.filter(n => S.box[n]); if (!S.party.length) S.party = [Object.keys(S.box).map(Number)[0]];
+    for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
+    S.balls.master = 50; save(); viewR = 0; enter('battle'); skip();
+    const done = [], fights = {}, dealer = {};
+    const chapters = chaptersNow().filter(c => c.type !== 'crown' && !c.hunt);
+    for (const c of chapters) {
+      skip(); if (!chapterOpen(c)) continue;
+      startLoc({ kind: 'chapter', r: c.r, x: c.id });
+      skip();
+      if (!B || B.kind !== 'story') { if (chDone(c.id)) done.push(c.id); continue; }
+      fights[c.id] = B.queue.map(f => f.name);
+      if (c.type === 'dealer') Object.assign(dealer, { name: B.queue[0].name, info: $('#foeinfo').textContent, shade: $('#foeimg').classList.contains('shade'), seen: !!S.seen[487], log: $('#log').textContent, where: $('#where').textContent });
+      win(); skip(); if (chDone(c.id)) done.push(c.id);
+    }
+    if (B) B = null;
+    const caught = Object.fromEntries([250, 382, 484, 644, 717, 792, 889, 1008, 384, 646, 890].map(n => [n, S.box[n] ? S.box[n].from : null]));
+    const mail = inbox().map(m => m.id).filter(x => x.startsWith('story-y2'));
+    const sig = id => (MAIL.find(m => m.id === id).body.match(/— Ss*nakes/) || [''])[0];
+    checkAch(true);
+    const dealerAfter = { seen: !!S.seen[487], box: !!S.box[487], clue: !!S.story.clues.table, hat: S.story.roulette && S.story.roulette.hat, shared: localStorage.getItem(ROULETTE_KEY) };
+    const texts = [$('#t-story').textContent, ...MAIL.filter(m => m.id.startsWith('story-y2')).map(m => m.body + m.title), ...Object.entries(SCENES).filter(([id]) => id.startsWith('y2-')).flatMap(([, s]) => s.lines.map(l => l[1])), ...Object.values(CLUES).map(c => c.title + c.text),
+      ...ACH.filter(a => a.story).map(a => a.title + a.desc), ...chaptersNow().map(c => c.name + (c.doneNote || ''))];
+    openTab('story'); texts.push($('#t-story').textContent);
+    const named = texts.filter(x => /Giratina/.test(x));
+    // The real Story save (not a test save, not Replay) shares the flag.
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug; localStorage.setItem(STORY_KEY, JSON.stringify(real));
+    useSlot(STORY_KEY); shareRoulette('hat');
+    return { done, fights, dealer, scenes, caught, mail, sigs: [sig('story-y2-r1'), sig('story-y2-r2')], pickLines: Object.keys(S.story.pickLinesSeen).filter(k => k.startsWith('y2:')).sort(),
+      master: S.balls.master, dealerAfter, named, ach: ['st_battery', 'st_otherhalf', 'st_debt'].map(id => !!S.ach[id]),
+      johtoLetter: MAIL.find(m => m.id === 'story-y2-johto-249').body, shared: JSON.parse(localStorage.getItem(ROULETTE_KEY)) };
+  });
+  assert.equal(got.done.length, 22, 'every other-half chapter plays through: ' + got.done.join(', '));
+  assert.ok(got.done.includes('y2-kanto-lab'), 'Kanto: the sealed lab');
+  assert.deepEqual(got.fights['y2-johto-rival'], ['Servine', 'Arbok', 'Sandaconda', 'Milotic'], 'Rival Y2-1 has no borrowed legend');
+  assert.deepEqual(got.fights['y2-unova-rival'], ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme']);
+  assert.deepEqual(['johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'].map(r => got.fights[`y2-${r}-bound`][0]), ['Ho-Oh', 'Kyogre', 'Palkia', 'Zekrom', 'Yveltal', 'Lunala', 'Zamazenta', 'Miraidon'], 'each region’s bound legend is the one you didn’t pick');
+  assert.deepEqual(['hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'].map(r => got.fights[`y2-${r}-admin`].length), [6, 6, 6, 6, 6, 6, 6]);
+  assert.deepEqual(got.caught, { 250: 1, 382: 2, 484: 3, 644: 4, 717: 5, 792: 6, 889: 7, 1008: 8, 384: 2, 646: 4, 890: 7 }, 'every catch has its region (A17)');
+  assert.equal(got.dealer.name, '???');
+  assert.ok(got.dealer.info.startsWith('???') && got.dealer.shade && !got.dealer.seen, 'the dealer: ???, shadowed, not seen');
+  assert.ok(!/Giratina/.test(got.dealer.log + got.dealer.where + got.dealer.info), 'the battle never names it');
+  assert.deepEqual([got.dealerAfter.seen, got.dealerAfter.box, got.dealerAfter.clue, got.dealerAfter.hat, got.dealerAfter.shared], [false, false, true, 1, null], 'not caught, not seen; the clue and the hat flag; a test save shares nothing');
+  assert.deepEqual(got.named, [], 'nothing names it: Mail, scenes, clues, achievements, rows, the Story tab');
+  assert.match(got.scenes.johto, /Ho-Oh strains against the cables/);
+  for (const id of ['story-y2-r1', 'story-y2-johto-249', 'story-y2-hoenn-383', 'story-y2-rayquaza', 'story-y2-sinnoh-483', 'story-y2-camp', 'story-y2-unova-643', 'story-y2-r2', 'story-y2-kyurem', 'story-y2-kalos-716', 'story-y2-alola-791', 'story-y2-memo2', 'story-y2-galar-888', 'story-y2-eternatus', 'story-y2-paldea-1007']) assert.ok(got.mail.includes(id), id);
+  assert.ok(!got.mail.includes('story-y2-johto-250'), 'only your pick’s line');
+  assert.equal(got.johtoLetter, "<p>Ho-Oh too, now. Your Lugia's been restless all year. I think it missed the other one.</p><p>Prof Penguin</p>");
+  assert.deepEqual(got.sigs, ['— Sssssnakes', '— Ssssssnakes'], 'the s count in each signature');
+  assert.deepEqual(got.pickLines, ['y2:alola-791', 'y2:galar-888', 'y2:hoenn-383', 'y2:johto-249', 'y2:kalos-716', 'y2:paldea-1007', 'y2:sinnoh-483', 'y2:unova-643']);
+  assert.equal(got.master, 50 - 11 + 1, 'eleven thrown, and Rival Y2-2’s Master Ball');
+  assert.deepEqual(got.ach, [true, true, true]);
+  assert.deepEqual(got.shared, { hat: 1 }, 'the real Story save shares the hat flag');
+  // Shotgun Roulette, same origin: the chair and hat wait at the table, and the hat has a note.
+  const sr = tab.url().replace('poke-idle.html', 'shotgun-roulette.html');
+  await tab.goto(sr); await tab.waitForFunction(() => typeof window.__boredSnapshot === 'function');
+  const chair = await tab.evaluate(() => { const shown = !document.querySelector('#pchair').hidden; document.querySelector('#pchair').click(); return { shown, note: document.querySelector('#pnote').textContent, noteShown: !document.querySelector('#pnote').hidden }; });
+  assert.deepEqual(chair, { shown: true, note: 'P. — you still owe me a rematch. — G.', noteShown: true });
+  await tab.evaluate(() => localStorage.removeItem('bored.poke-idle.roulette.v1')); await tab.reload(); await tab.waitForFunction(() => typeof window.__boredSnapshot === 'function');
+  assert.equal(await tab.evaluate(() => document.querySelector('#pchair').hidden), true, 'no flag, no chair');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2, the Hunt: rows open with the Champions and stay ??? until then, every catch is from its place, Meltan and Kubfu join at the cap, Kubfu waits for a tower, and Giant Chasm waits for Unova', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const skip = () => { let n = 0; while (sceneNow && n++ < 30) endScene(); };
+    // Each foe in turn (the last one is the catch), then the chapter.
+    const win = () => { const here = B; for (let n = 0; n < 12 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(), to = id => pts.findIndex(p => p.id === id);
+    storyJump(to('y2-begin') + 1, { 4: '643' }); skip();
+    const mine = [1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 892, 1024];
+    for (const n of mine) delete S.box[n];
+    S.party = S.party.filter(n => S.box[n]); S.balls.master = 50; S.won = {}; delete S.stones[10062]; delete S.stones[10063];
+    // One Champion: the Hunt is still ???.
+    S.champs = { 0: 1 }; viewR = HUNT_R; enter('battle'); skip();
+    const tabs = [...document.querySelectorAll('#regions [data-r]')].map(b => b.textContent);
+    const one = { tabs, regionRows: [0, 1, 2, 3, 4, 5, 6, 7, 8].some(r => chapterRows(r).some(x => CHAPTER[x.x].hunt)), mapHead: (openTab('story'), $('#t-story h3') && $('#t-story h3').textContent), map: yearMap().filter(x => CHAPTER[x.id].hunt).map(x => x.name), next: storyNext().text, row: chapterRows(HUNT_R).map(x => [locName(x), x.note]),
+      list: [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).filter(t => /Kitakami|Ogerpon|Scout/.test(t)) };
+    // Two: Kitakami opens (in Johto's list); the others don't.
+    S.champs[1] = 1; renderLocs();
+    const two = { open: chaptersNow().filter(c => c.hunt && chapterOpen(c)).map(c => c.id), ogerpon: chapterRows(HUNT_R).find(x => x.x === 'y2-kitakami').note };
+    // All nine: play the Hunt. Giant Chasm waits for Unova's other half.
+    for (let r = 0; r < 9; r++) { S.champs[r] = 1; for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; }
+    const capNow = levelCap(), chasmBefore = chapterOpen(CHAPTER['y2-chasm']);
+    const done = [], kubfu = {};
+    for (const c of chaptersNow().filter(c => c.hunt && c.id !== 'y2-chasm')) {
+      skip(); if (!chapterOpen(c)) continue;
+      if (c.id === 'y2-towers-climb') Object.assign(kubfu, { lv: realLevel(891), evo: evoOptions(891).length, urshifu: !!S.box[892] });
+      startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+      if (!B || B.kind !== 'story') continue;
+      win(); skip(); if (chDone(c.id)) done.push(c.id);
+    }
+    S.story.ch['y2-unova-bound'] = 1;
+    startLoc({ kind: 'chapter', r: 7, x: 'y2-chasm' }); skip(); if (chDone('y2-chasm')) done.push('y2-chasm');
+    checkAch(true);
+    const from = Object.fromEntries(mine.filter(n => S.box[n]).map(n => [n, S.box[n].from]));
+    const sig = id => (MAIL.find(m => m.id === id).body.match(/— Ss*nakes/) || [''])[0];
+    return { one, two, capNow, chasmBefore, done, from, kubfu, gifts: [realLevel(808), S.box[892] ? realLevel(892) : 0], won: Object.keys(S.won).sort(), stones: [S.stones[10062], S.stones[10063]], masks: S.story.masks,
+      under: chapterRows(HUNT_R).find(x => x.x === 'y2-underdepths').note, terapagos: !!S.box[1024],
+      mail: inbox().map(m => m.id), sigs: [sig('story-y2-alone'), sig('story-y2-stupid')], chasm: MAIL.find(m => m.id === 'story-y2-chasm').body,
+      ach: ['st_masks', 'st_deoxys', 'st_keldeo', 'st_watching', 'st_lost', 'st_tanks'].map(id => !!S.ach[id]) };
+  });
+  assert.ok(got.one.tabs.includes('The Hunt') && !got.one.regionRows, 'the Hunt has its own list, not the regions\u2019');
+  assert.equal(got.one.mapHead, 'The Hunt', 'and its own section in the Year map');
+  assert.ok(got.one.map.every(n => n === '???'), 'locked Hunt rows are ??? in the Year map: ' + got.one.map);
+  assert.ok(!/Kitakami|Ogerpon|Scout/.test(got.one.next), 'Next up doesn’t name them either');
+  assert.ok(got.one.row.every(([name]) => name === '???') && got.one.row.every(([, note]) => /^after \d Champions$/.test(note)) && got.one.row[0][1] === 'after 2 Champions' && got.one.row.at(-1)[1] === 'after 8 Champions', JSON.stringify(got.one.row));
+  assert.deepEqual(got.one.list, [], 'the list shows ??? too');
+  assert.deepEqual(got.two.open, ['y2-kitakami-1', 'y2-kitakami-2', 'y2-kitakami-3'], 'the second Champion opens the scouts');
+  assert.equal(got.two.ogerpon, 'Masks returned: 0/3');
+  assert.equal(got.chasmBefore, false, 'Giant Chasm waits for Unova’s other half');
+  assert.deepEqual(got.done, ['y2-kitakami-1', 'y2-kitakami-2', 'y2-kitakami-3', 'y2-kitakami', 'y2-meteor', 'y2-latias', 'y2-latios', 'y2-tornadus', 'y2-thundurus', 'y2-landorus', 'y2-icirrus', 'y2-towers', 'y2-towers-climb', 'y2-underdepths', 'y2-chasm']);
+  assert.deepEqual(got.from, { 1017: 8, 386: 2, 380: 2, 381: 2, 641: 4, 642: 4, 645: 4, 647: 4, 808: 7, 809: 7, 891: 7, 892: 7 }, 'A17: Kitakami → Paldea, Meteor Falls and Southern Island → Hoenn, Abundant Shrine and Icirrus → Unova, the towers and the Mystery Box → Galar');
+  assert.ok(got.kubfu.lv >= 30 && got.kubfu.evo === 0 && !got.kubfu.urshifu, `Kubfu arrives at the cap (Lv ${got.kubfu.lv}) and waits for a tower`);
+  assert.deepEqual(got.gifts, [got.capNow, got.capNow], 'Meltan and Kubfu (now Urshifu) at the cap');
+  assert.deepEqual(got.won, ['abundant', 'chasm', 'icirrus', 'kitakami', 'meteor', 'southern', 'towers'], 'the form unlocks');
+  assert.deepEqual(got.stones, [1, 1], 'Latiasite and Latiosite');
+  assert.equal(got.masks, 3);
+  assert.equal(got.under, 'Terapagos: lost. For now.');
+  assert.equal(got.terapagos, false, 'no Terapagos');
+  for (const id of ['story-y2-kitakami', 'story-y2-alone', 'story-y2-stupid', 'story-y2-promise', 'story-y2-chasm']) assert.ok(got.mail.includes(id), id);
+  assert.deepEqual(got.sigs, ['— Ssssssssnakes', '— Sssssssnakes'], 'one s too many, then his usual');
+  assert.equal(got.chasm, "<p>If the tanks are full, they'll run it. Soon. I don't know what it will take from you. But whatever happens next, the ones who've fought with you will hold on.</p><p>Prof Penguin</p>", 'bond hint 2, word for word');
+  assert.deepEqual(got.ach, [true, true, true, true, true, true]);
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2, the whole year on a real Story save: Begin Year 2, every gym, Champion and chapter, the Crown Shrine and its prizes, the Year 3 screens (off), and Replay Year 2', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    const skip = () => { let n = 0; while (sceneNow && n++ < 40) endScene(); };
+    const win = () => { const here = B; for (let n = 0; n < 12 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    // A real Story save at the end of Year 1 (built with the test account's jump, then made a real save).
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'year1-end'), { 1: '249', 2: '383', 3: '483', 4: '643', 5: '716', 6: '791', 7: '888', 8: '1007' }); skip(); overlay('#scene', false);
+    for (const n of [250, 382, 484, 644, 717, 792, 889, 1008, 384, 646, 890, 487, 1017, 386, 380, 381, 641, 642, 645, 647, 808, 809, 891, 892, 1024, 898]) delete S.box[n];
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug;
+    real.party = [248, 445, 149, 376, 373, 635]; real.balls.master = 0;
+    localStorage.setItem(STORY_KEY, JSON.stringify(real)); useSlot(STORY_KEY); enter('battle'); skip();
+    const gate = { ready: YEAR2_READY, test: !!S.test, row: unlocked({ kind: 'year2' }) };
+    startLoc({ kind: 'year2', r: 0 }); $('#scene [data-y2="go"]').click(); skip();
+    const begun = { year: S.story.year, cap: levelCap(), lv5: realLevel(248) };
+    S.balls.master = 80; S.story.lifeDex = { ...S.story.lifeDex }; for (let i = 0; i < 400; i++) S.lifeDex[3000 + i] = 1;
+    const log = { gyms: 0, champs: 0, chapters: [] };
+    for (let r = 0; r < 9; r++) {
+      viewR = r;
+      for (let k = 0; k < 4; k++) { S.kills[r + '-' + k] = KILLS_FOR_GYM; startLoc({ kind: 'gym', r, k }); skip(); if (B && B.kind === 'gym') { win(); skip(); if (badge(r, k)) log.gyms++; } }
+      startLoc({ kind: 'champ', r }); skip(); if (B && B.kind === 'champ') { win(); skip(); if (S.champs[r]) log.champs++; }
+      for (let pass = 0; pass < 3; pass++) for (const c of chaptersNow()) {
+        if (c.type === 'crown' || chDone(c.id) || !chapterOpen(c)) continue;
+        startLoc({ kind: 'chapter', r: c.r, x: c.id }); skip();
+        if (B && B.kind === 'story') { win(); skip(); }
+        if (chDone(c.id)) log.chapters.push(c.id);
+      }
+    }
+    // The Riders for the checklist, from Galar's dungeon.
+    for (const n of [896, 897]) S.box[n] = { xp: 1e6, shiny: false, from: 7 };
+    const crownOpen = chapterOpen(CHAPTER['y2-crown']);
+    startLoc({ kind: 'chapter', r: 7, x: 'y2-crown' }); skip();
+    const crownFight = B && B.queue.map(f => f.name);
+    win(); const scenes = []; let n = 0; while (sceneNow && n++ < 40) { scenes.push(sceneNow.id); endScene(); }
+    checkAch(true);
+    const cal = S.box[898];
+    const after = { done: chDone('y2-crown'), cleared: S.story.cleared, calyrex: cal && { bond: cal.bond, from: cal.from, lv: realLevel(898), cap: levelCap() }, won: [S.won.crown, S.won.weald], ach: [!!S.ach.st_bridges, !!S.ach.st_king], scenes,
+      riders: (QFORMES[898] || []).every(f => S.won[f.quest]), next: storyNext().text,
+      engine: SCENES['y2-engine'].lines[0][1], endText: ['y2-crown', 'y2-crown-after', 'y2-engine'].flatMap(id => SCENES[id].lines.map(l => l[1])).join(' '), letter: S.mail.got['story-y2-end'] && MAIL.find(m => m.id === 'story-y2-end').body };
+    // Begin Year 3: a row that says coming soon; its screens exist but stay off.
+    viewR = 7; renderLocs();
+    const y3row = [...document.querySelectorAll('#locs .loc')].map(b => b.textContent).find(t => t.startsWith('Year 3'));
+    startLoc({ kind: 'year3', r: 7 }); const y3toast = $('#toast').textContent;
+    S.test = 1; startLoc({ kind: 'year3', r: 7 });
+    const confirm = { text: $('#scene').textContent, go: $('#scene [data-y3="go"]').disabled };
+    $('#scene [data-y3="pick"]').click();
+    const box = Object.keys(S.box).length, rows = () => [...document.querySelectorAll('#po-list .po-row')];
+    const pick = { all: rows().length, first: rows()[0].textContent };
+    const q = $('#po-q'); q.value = 'calyrex'; q.dispatchEvent(new Event('input', { bubbles: true }));
+    pick.found = rows().map(r => r.textContent);
+    q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true }));
+    const rsel = $('#po-r'); rsel.value = '7'; rsel.dispatchEvent(new Event('change', { bubbles: true })); pick.galar = rows().every(r => r.textContent.includes('Comes back when Galar is freed.'));
+    rsel.value = 'all'; rsel.dispatchEvent(new Event('change', { bubbles: true }));
+    const ssel = $('#po-sort'); ssel.value = 'level'; ssel.dispatchEvent(new Event('change', { bubbles: true })); pick.top = rows()[0].textContent;
+    document.querySelector('#po-list [data-po="898"]').click();
+    pick.chosen = $('.po-chosen').textContent; pick.stay = $('#scene [data-y3="stay"]').disabled; pick.stayText = $('#scene [data-y3="stay"]').textContent;
+    pick.noBond = !/bond|♥|fought beside|half/i.test($('#scene').textContent);
+    overlay('#scene', false); pickOne = null; delete S.test; save();
+    // Replay Year 2 from the title screen: Year 2's caps and rules, and nothing that counts.
+    showTitle(); const menu = [...document.querySelectorAll('#menu [data-go]')].map(b => b.dataset.go);
+    go('replay2');
+    const replay = { slot, year: storyYear(), replay: S.replay, cap: levelCap(), max: leagueMax(), picks: S.story.picks[1], open: chaptersNow().filter(c => !chDone(c.id)).length };
+    go('endreplay');
+    return { gate, begun, log, crownOpen, crownFight, after, y3row, y3toast, confirm, box, pick, menu, replay, main: { year: storyYear(), slot } };
+  });
+  assert.deepEqual(got.gate, { ready: true, test: false, row: true }, 'Begin Year 2 is open on a real save');
+  assert.deepEqual([got.begun.year, got.begun.lv5], [2, 5]);
+  assert.deepEqual([got.log.gyms, got.log.champs], [36, 9], 'all 36 Year 2 gyms and nine Champions');
+  assert.equal(got.log.chapters.length, 37, 'every Year 2 chapter before the finale: ' + got.log.chapters.join(', '));
+  assert.ok(got.crownOpen, 'the Crown Shrine opens with its checklist met');
+  assert.deepEqual(got.crownFight, ['Serperior', 'Arbok', 'Sandaconda', 'Milotic', 'Zygarde 50% Forme']);
+  assert.ok(got.after.done);
+  assert.deepEqual(got.after.cleared, { 1: 1, 2: 1 });
+  assert.deepEqual(got.after.calyrex, { bond: 1, from: 7, lv: got.after.calyrex.cap, cap: got.after.calyrex.cap }, 'Calyrex joins bonded, at the cap, from Galar');
+  assert.deepEqual(got.after.won, [1, 1], 'both Riders and the Crowned forms');
+  assert.ok(got.after.riders);
+  assert.deepEqual(got.after.ach, [true, true]);
+  assert.deepEqual(got.after.scenes.slice(-2), ['y2-crown-after', 'y2-engine'], 'the badge in the snow, the base maps, and the Engine starts');
+  assert.equal(got.after.engine, "That's when the Engine starts. Far away, something enormous begins to hum, and the tanks start to drain.");
+  assert.ok(!/freez/i.test(got.after.endText), 'nothing at the Crown Shrine says the Box freezes');
+  assert.equal(got.after.letter, "<p>It's warming up. We have a little time. Not much.</p><p>Prof Penguin</p>");
+  assert.equal(got.after.next, 'Year 2 is done. Year 3 is coming.');
+  assert.equal(got.y3row, 'Year 3: The Thawcoming soon');
+  assert.match(got.y3toast, /isn't here yet/);
+  assert.ok(got.confirm.text.includes("Your Box will freeze. You'll keep one Pokémon. Everything else comes back as you free each region.") && got.confirm.go, 'Begin Year 3. is disabled');
+  assert.equal(got.pick.all, got.box, 'the pick-one screen lists the whole Box');
+  assert.match(got.pick.first, /^.+ Lv \d+ Comes back when \w+ is freed\.$/, 'name, level and where it comes back: ' + got.pick.first);
+  assert.deepEqual(got.pick.found.length, 1);
+  assert.ok(got.pick.galar, 'filter by where it comes back');
+  assert.match(got.pick.top, /Lv 100/, 'sort by level');
+  assert.match(got.pick.chosen, /Calyrex: Stays with you at Lv \d+\. It fights at your level cap until the cap catches up\./);
+  assert.deepEqual([got.pick.stay, got.pick.stayText], [true, 'This one stays with me.'], 'disabled until Year 3 ships');
+  assert.ok(got.pick.noBond, 'no bond status or return levels');
+  assert.ok(got.menu.includes('replay2'), 'Replay Year 2 on the title screen');
+  assert.deepEqual([got.replay.slot, got.replay.year, got.replay.replay, got.replay.max, got.replay.picks], ['bored.poke-idle.story.replay', 2, 1, { 3: 2, 4: 3 }, 249], 'Replay Year 2: its own slot, Year 2’s rules, your Year 1 picks');
+  assert.ok(got.replay.cap <= 20 && got.replay.open > 30, 'from the start of Year 2, at its caps');
+  assert.deepEqual(got.main, { year: 2, slot: 'bored.poke-idle.story' });
+  assert.deepEqual(errors, []);
+});
+
+test('Year 2 finale, the Crown Shrine: a League-legal team built on Sssssssnakes’ needs most of the clock, and the Hall of Fame stays harder', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-26');
+  const got = await tab.evaluate(() => {
+    useSlot(TEST_STORY_KEY, testStoryAccount());
+    const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'y2-begin') + 1); while (sceneNow) endScene();
+    for (let r = 0; r < 9; r++) S.champs[r] = 1;
+    viewR = 7; enter('battle'); S.debug.league = 0; startLoc({ kind: 'story', r: 7, x: 'y2-crown' });
+    const cap = areaCap(), typed = (m, f) => refHit(m, cap, f) * bestEff(m, f);
+    const pool = refPool(...refArea(7, 3), cap, 2);
+    const counter = refPick(pool, B.queue.map(f => ({ f, hp: 1 })), typed, 6, leagueRule);
+    const any = refPick(pool, B.queue.map(f => ({ f, hp: 1 })), (m, f) => refHit(m, cap, f), 6, leagueRule);
+    const need = team => B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) * B.tune * clockRate(f) / (team.reduce((d, m) => d + typed(m, f), 0) * bossBoost()), 0) / (B.bossTime * refDef(team));
+    return { counter: need(counter), any: need(any), legal: [!leagueBreaksList(counter), !leagueBreaksList(any)], team: counter.map(m => m.name), crown: CROWN_USE, hof: HOF_USE, cap, L: B.L };
+  });
+  assert.deepEqual(got.legal, [true, true]);
+  assert.ok(got.counter < 0.95 && got.counter >= 0.85, `a team built on his needs about 88% of the clock (${got.counter.toFixed(3)}: ${got.team.join(', ')}; any strong League team: ${got.any.toFixed(3)})`);
+  console.log(`# crown: counter ${got.counter.toFixed(3)}, generic ${got.any.toFixed(3)}, L ${got.L}, team ${got.team.join(', ')}`);
+  assert.ok(got.any > 1, `a generic League team still loses (${got.any.toFixed(3)})`);
+  assert.ok(got.crown < got.hof, 'the Hall of Fame stays the hardest fight');
   assert.deepEqual(errors, []);
 });
 
