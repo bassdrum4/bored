@@ -1599,3 +1599,159 @@ test('Year 3, the endgame (test save): the inner circle, Necrozma before Ultra, 
   assert.equal(got.classicDusk, false, 'Classic ignores Story\'s fusion flag');
   assert.deepEqual(errors, []);
 });
+
+// A Year 3 save at the night before Team Thaw HQ (test account), every region thawed.
+const y3Ready = () => {
+  useSlot(TEST_STORY_KEY, testStoryAccount());
+  const pts = jumpPoints(); storyJump(pts.findIndex(p => p.id === 'ch-y3-night') + 1); while (sceneNow) endScene(); overlay('#scene', false);
+  S.debug.league = 0; S.story.roulette = {};
+  // A real Story save never has Giratina before the credits (the test account has every Pokémon).
+  delete S.box[487];
+};
+
+test('Year 3 finales, measured: a team built on Sleet or on Prof Penguin (one run, both phases) wins with a little room, a generic one loses, and the Hall of Fame stays the hardest', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    enter('battle');
+    const measure = (id, phases) => {
+      runChapter(CHAPTER[id]); while (sceneNow) endScene();
+      const cap = areaCap(), typed = (m, f) => refHit(m, cap, f) * bestEff(m, f), pool = [...refPool(...refArea(B.r, 3), cap, 0), ETERNAMAX_FOE];
+      const foes = phases ? phases.flatMap(q => q()) : B.queue, T = phases ? phases.reduce((t, q) => t + fightTime(B.base, q(), regionOffense(B.r), .8, 1.2), 0) : B.bossTime;
+      const counter = refPick(pool, foes.map(f => ({ f, hp: 1 })), typed), any = refPick(pool, foes.map(f => ({ f, hp: 1 })), (m, f) => refHit(m, cap, f));
+      const need = team => foes.reduce((s, f) => s + bossHpFor(f, B.L, B.i) * B.tune * clockRate(f) / (team.reduce((d, m) => d + typed(m, f), 0) * bossBoost()), 0) / (T * refDef(team));
+      const r = { L: B.L, cap, counter: need(counter), any: need(any), team: counter.map(m => m.name) }; B = null; return r;
+    };
+    const sleet = measure('y3-sleet'); S.story.ch['y3-sleet'] = 1;
+    const penguin = measure('y3-penguin', PENGUIN_PHASES); S.story.ch['y3-penguin'] = 1;
+    const hof = measure('y3-hof');
+    return { sleet, penguin, hof, uses: [SLEET_USE, PENGUIN_USE, HOF_USE] };
+  })()`);
+  for (const [k, v] of Object.entries({ sleet: got.sleet, penguin: got.penguin, hof: got.hof })) console.log(`# ${k}: built ${v.counter.toFixed(3)}, generic ${v.any.toFixed(3)}, L ${v.L}, team ${v.team.join(', ')}`);
+  assert.ok(got.sleet.L === 100 && got.penguin.L === 100, 'both at the level cap');
+  assert.ok(got.sleet.counter >= 0.9 && got.sleet.counter <= 0.95, `Sleet: a built team needs 90–95% (${got.sleet.counter.toFixed(3)})`);
+  assert.ok(got.penguin.counter >= 0.9 && got.penguin.counter <= 0.95, `Prof Penguin: a built team needs 90–95% over both phases (${got.penguin.counter.toFixed(3)})`);
+  assert.ok(got.sleet.any > 1 && got.penguin.any > 1, `a generic strong team loses (${got.sleet.any.toFixed(3)}, ${got.penguin.any.toFixed(3)})`);
+  assert.ok(got.penguin.counter > got.sleet.counter, 'the finale is harder than Sleet');
+  assert.ok(got.hof.counter > got.penguin.counter && got.hof.counter < 1, `the Hall of Fame is still the hardest fight (${got.hof.counter.toFixed(3)})`);
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3, Sleet and Prof Penguin (test save): the 270 gate, the Silvally branch, the Roulette flag, one run over both phases, the credits, and after them', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27');
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    enter('battle');
+    // The 270 gate, shown on the rows from the start.
+    const keep = Object.keys(S.box).slice(200); for (const n of keep) S.box[n].frozen = 4;
+    const gate = { open: chapterOpen(CHAPTER['y3-sleet']), note: chapterRows(8).find(x => x.x === 'y3-sleet').note, pnote: chapterRows(0).find(x => x.x === 'y3-penguin').note, map: yearMap().find(x => x.id === 'y3-penguin').name };
+    for (const n of keep) delete S.box[n].frozen;
+    gate.after = chapterOpen(CHAPTER['y3-sleet']);
+    // Sleet with Silvally in the party: the masked Type: Null walks out.
+    S.party = [773, 150, 6]; runChapter(CHAPTER['y3-sleet']); skip();
+    const sleetQ = B.queue.map(f => f.name);
+    for (let i = 0; i < 4; i++) { B.foe.hp = 1; hit(1e12); next(); }
+    const mask = { broke: !!B.maskBroke, left: B.queue.map(f => f.name) };
+    win(); const sleetPost = skip();
+    const sleet = { maskBroke: S.story.maskBroke, post: sleetPost, done: chDone('y3-sleet') };
+    // Without Silvally, the Type: Null fights.
+    resetChapter('y3-sleet'); S.party = [150, 6]; runChapter(CHAPTER['y3-sleet']); skip(); for (let i = 0; i < 4; i++) { B.foe.hp = 1; hit(1e12); next(); }
+    const noMask = { next: B.queue[B.idx] && B.queue[B.idx].name, broke: !!B.maskBroke }; win(); const noMaskPost = skip();
+    // Prof Penguin, no Roulette flag: Giratina at full HP. Run out of time in phase 2 and it starts over from Giratina.
+    runChapter(CHAPTER['y3-penguin']); const pre = skip();
+    const p1 = { foe: B.foe.m.name, full: B.foe.hp === B.foe.max, say: $('#log').textContent, phase: B.phase };
+    B.foe.hp = 1; hit(1e12); next(); const left = B.left; B.brk = 0; storyGo();
+    const p2 = { phase: B.phase, q: B.queue.map(f => f.name), carried: B.time >= Math.round(B.left || 0) && B.left > 0, say: $('#log').textContent };
+    B.time = 0; lastTick = performance.now() - 50; tick(); const lost = { kind: B && B.kind, done: chDone('y3-penguin') };
+    // With the flag (a Hard win at Shotgun Roulette): Giratina holds back.
+    S.story.roulette = { dealer: 1 }; runChapter(CHAPTER['y3-penguin']); skip();
+    const held = { start: B.phase, hp: B.foe.hp / B.foe.max, say: $('#log').textContent };
+    // Win both phases: the confession was first, then "Wake it up.", the ending, the credits, and after them.
+    win(); B.brk = 0; storyGo(); win(); const ends = skip();
+    const credits = { open: !$('#credits').hidden, text: $('#credits').textContent };
+    $('#credits [data-credits]').click(); const after = skip();
+    const sp = S.box[395], gir = S.box[487];
+    const res = { pre, p1, p2, lost, held, ends, credits, after, empoleon: sp && { special: sp.special, lv: realLevel(395) }, giratina: gir && { bond: gir.bond, lv: realLevel(487), from: gir.from, origin: !!S.won.distortion },
+      story: { debt: S.story.giratinaDebt, title: S.story.title, cleared: S.story.cleared[3], hat: S.story.hatOwned, hofLate: S.story.hofLate }, letter: S.mail.got['story-y3-last'] && MAIL.find(m => m.id === 'story-y3-last').body,
+      progress: storyProgress(S), shared: localStorage.getItem(ROULETTE_KEY) };
+    // The golden top hat, on any party member.
+    openTab('party'); detail = 150; renderParty(); document.querySelector('#t-party [data-hat="150"]').click();
+    res.hat = { on: S.story.hat, tile: !!document.querySelector('#party [data-n="150"] .gtop') };
+    // The Hall of Fame is held back (HOF_READY): no row, no letter yet.
+    res.hof = { listed: chapterRows(3).some(x => x.x === 'y3-hof'), late: !!S.mail.got['story-y3-hof-late'], next: storyNext().text };
+    // A real Story save writes "paid" to the shared key; the test save didn't.
+    const real = JSON.parse(JSON.stringify(S)); delete real.test; delete real.debug; delete real.story.title; delete real.story.credits; localStorage.setItem(STORY_KEY, JSON.stringify(real)); useSlot(STORY_KEY);
+    afterCredits(); skip(); res.realShared = JSON.parse(localStorage.getItem(ROULETTE_KEY) || '{}');
+    useSlot(KEY);
+    return Object.assign(res, { gate, sleetQ, mask, sleet, noMask, noMaskPost });
+  })()`);
+  assert.deepEqual([got.gate.open, got.gate.after], [false, true], 'Team Thaw HQ waits for 270 species recovered');
+  assert.match(got.gate.note, /^Species recovered: 200 \/ 270$/); assert.match(got.gate.pnote, /Species recovered: \d+ \/ 270/);
+  assert.equal(got.gate.map, 'Prof Penguin', 'the finale shows on the Year map from the start');
+  assert.deepEqual(got.sleetQ, ['Baxcalibur', 'Cetitan', 'Glaceon', 'Arctozolt', "Type: Null (the Director's unit)", 'Thaw-bound Kyurem']);
+  assert.deepEqual(got.mask, { broke: true, left: ['Baxcalibur', 'Cetitan', 'Glaceon', 'Arctozolt', 'Thaw-bound Kyurem'] }, 'with Silvally in the party, the Type: Null leaves the fight');
+  assert.deepEqual([got.sleet.maskBroke, got.sleet.post, got.sleet.done], [1, ['y3-mask', 'y3-sleet-after'], true]);
+  assert.deepEqual([got.noMask.next, got.noMask.broke, got.noMaskPost], ["Type: Null (the Director's unit)", false, ['y3-sleet-after']]);
+  assert.deepEqual(got.pre, ['y3-confession']);
+  assert.deepEqual([got.p1.foe, got.p1.full, got.p1.phase], ['Giratina (Origin Forme)', true, 1]);
+  assert.ok(!/own table/.test(got.p1.say));
+  assert.equal(got.p2.phase, 2); assert.equal(got.p2.q.at(-1), "Prof Penguin's Mega Empoleon"); assert.ok(got.p2.carried, 'phase 1\'s time carries over');
+  assert.deepEqual(got.lost, { kind: 'route', done: false }, 'out of time in phase 2: back to the start');
+  assert.equal(got.held.start, 1, 'it starts over from Giratina');
+  assert.ok(Math.abs(got.held.hp - 0.85) < 0.01, `Giratina holds back at 85% (${got.held.hp})`);
+  assert.match(got.held.say, /Prof Penguin: "You beat it at its own table\?"/);
+  assert.deepEqual(got.ends, ['y3-wake', 'y3-ending']);
+  assert.ok(got.credits.open && ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova', 'Kalos', 'Alola', 'Galar', 'Paldea'].every(n => got.credits.text.includes(`${n} thaws.`)), 'the credits roll over all nine regions');
+  assert.deepEqual(got.after, ['y3-after']);
+  assert.equal(got.empoleon.special, 'prof-empoleon');
+  assert.deepEqual(got.giratina, { bond: 1, lv: 100, from: 3, origin: true }, 'Giratina joins, bonded, at the cap, in both Formes');
+  assert.deepEqual(got.story, { debt: 0, title: 'Field Researcher', cleared: 1, hat: 1, hofLate: 1 });
+  assert.equal(got.letter, "<p>The notebook's yours now. Write down the small things.</p><p>— P.</p>");
+  assert.deepEqual([got.progress.cleared, got.progress.title], [true, 'Field Researcher'], 'the story field says Cleared, with the title');
+  assert.equal(got.shared, null, 'the test save never writes the shared key');
+  assert.deepEqual(got.hat, { on: 150, tile: true });
+  assert.deepEqual(got.hof, { listed: false, late: false, next: got.hof.next });
+  assert.equal(got.realShared.paid, 1, 'the real Story save writes "paid" for Shotgun Roulette');
+  assert.deepEqual(errors, []);
+});
+
+test('Year 3 Hall of Fame, switched on (HOF_READY): the row after Prof Penguin, the late-arrival letter, and the SP Mega Hydrapple', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-27', { hof: true });
+  const got = await tab.evaluate(`(${y3Ready})(), (() => {
+    const skip = () => { const ids = []; let n = 0; while (sceneNow && n++ < 60) { ids.push(sceneNow.id); endScene(); } return ids; };
+    const win = () => { const here = B; for (let n = 0; n < 20 && B === here && B.foe; n++) { B.foe.hp = 1; hit(1e12); if (B === here && !B.manual) next(); } };
+    for (const id of ['y3-sleet', 'y3-penguin']) S.story.ch[id] = 1;
+    S.story.hofLate = 1; save(); boot();
+    const late = MAIL.find(m => m.id === 'story-y3-hof-late').body, gotLate = !!S.mail.got['story-y3-hof-late'];
+    enter('battle'); const row = chapterRows(3).find(x => x.x === 'y3-hof');
+    runChapter(CHAPTER['y3-hof']); const pre = skip(); const q = B.queue.map(f => f.name), L = B.L; delete S.hof; delete S.box[1019]; win(); const post = skip();
+    return { gotLate, late, row: row && row.note, pre, q, L, post, sp: S.box[1019] && S.box[1019].special, letter: !!S.mail.got['story-y3-hof'] };
+  })()`);
+  assert.ok(got.gotLate);
+  assert.equal(got.late, "<p>Took you long enough. I've been standing here for weeks.</p><p>— Sssssssnakes</p>");
+  assert.equal(got.row, 'optional');
+  assert.deepEqual([got.pre, got.post], [['y3-hof'], ['y3-hof-after']]);
+  assert.equal(got.q.at(-1), 'Mega Hydrapple'); assert.equal(got.L, 100);
+  assert.ok(got.sp && got.letter, 'the SP Mega Hydrapple, and his last letter');
+  assert.deepEqual(errors, []);
+});
+
+test('Shotgun Roulette reads and writes the shared Poké Idle flags: the hat note changes to "Paid in full", and a confirmed Hard win is remembered', async t => {
+  const { tab } = await openIdle(t, '2026-11-27');
+  const src = fs.readFileSync(path.join(root, 'src/games/content/shotgun-roulette.html'), 'utf8');
+  const settle = src.slice(src.indexOf('setBalance(reply);'), src.indexOf('loadBoard(game.mode);'));
+  assert.match(settle, /if \(won && game\.mode === "hard"\) penguinMark\("beatOrigin"\);/, 'only inside a confirmed (non-test) settle, and only on Hard');
+  const origin = new URL(tab.url()).origin;
+  const note = async flags => {
+    await tab.evaluate(f => localStorage.setItem('bored.poke-idle.roulette.v1', JSON.stringify(f)), flags);
+    await tab.goto(origin + '/games/content/shotgun-roulette.html');
+    await tab.waitForFunction(() => typeof showPenguinChair === 'function');
+    return tab.evaluate(() => { showPenguinChair(); const c = document.getElementById('pchair'); const hidden = c.hidden; c.click(); return { hidden, text: document.getElementById('pnote').textContent, flags: JSON.parse(localStorage.getItem('bored.poke-idle.roulette.v1')) }; });
+  };
+  const before = await note({ hat: 1 }), paid = await note({ hat: 1, paid: 1, beatOrigin: 1 });
+  assert.deepEqual([before.hidden, before.text], [false, 'P. — you still owe me a rematch. — G.']);
+  assert.deepEqual([paid.hidden, paid.text], [false, 'Paid in full. — G.'], 'the chair and hat stay, and the note changes');
+  assert.deepEqual(paid.flags, { hat: 1, paid: 1, beatOrigin: 1, paidSeen: 1 }, 'reading the paid note is remembered, and the other flags are kept');
+  const merged = await tab.evaluate(() => { localStorage.setItem('bored.poke-idle.roulette.v1', '{nope'); penguinMark('beatOrigin'); return localStorage.getItem('bored.poke-idle.roulette.v1'); });
+  assert.equal(merged, '{"beatOrigin":1}', 'a broken key is replaced, not thrown on');
+});

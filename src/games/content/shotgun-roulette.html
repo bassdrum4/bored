@@ -1454,6 +1454,8 @@ async function endGame(won, forfeit = false) {
     } else {
       setBalance(reply);
       if (won && reply.profit > 0) game.profit = reply.profit;
+      // Poké Idle's Story finale remembers a real, confirmed win over Origin Giratina on Hard.
+      if (won && game.mode === "hard") penguinMark("beatOrigin");
       text = won
         ? "You win " + (reply.payout || 0).toLocaleString("en-US") + " tokens" + (reply.capped ? ", trimmed to stay under the 3,000-token daily limit." : ".")
         : "Your bet of " + game.bet.toLocaleString("en-US") + " tokens is gone.";
@@ -3567,13 +3569,18 @@ if (mpLobby && !mpLive) {
   mpLobby.on(event => { if (event && event.event === "account" && !$("#mp-panel").hidden) mpPanel(); });
 }
 
-// Poké Idle's flag (Story Year 2, after the camp): Prof Penguin's chair and hat at this table. Read-only here.
+// The flags shared with Poké Idle's Story Mode (its Part F). Poké Idle writes hat (Year 2, after the camp: Prof
+// Penguin's chair and hat at this table) and paid (after its Year 3 credits: the note changes, and the chair and hat
+// stay). This page writes beatOrigin (a real Hard win, confirmed by the arcade) and paidSeen (the paid note read).
+// Each write keeps the other keys.
 const PENGUIN_KEY = "bored.poke-idle.roulette.v1";
 const penguinFlags = () => { try { return JSON.parse(localStorage.getItem(PENGUIN_KEY) || "{}") || {}; } catch { return {}; } };
+function penguinMark(k) { try { const o = penguinFlags(); o[k] = 1; localStorage.setItem(PENGUIN_KEY, JSON.stringify(o)); } catch {} }
+const PENGUIN_NOTE = f => f.paid ? "Paid in full. — G." : "P. — you still owe me a rematch. — G.";
 function showPenguinChair() {
   const f = penguinFlags();
   $("#pchair").hidden = !f.hat;
-  $("#pchair").onclick = () => { const n = $("#pnote"); n.textContent = "P. — you still owe me a rematch. — G."; n.hidden = !n.hidden; };
+  $("#pchair").onclick = () => { const now = penguinFlags(), n = $("#pnote"); n.textContent = PENGUIN_NOTE(now); n.hidden = !n.hidden; if (now.paid && !n.hidden) penguinMark("paidSeen"); };
 }
 showPenguinChair();
 
