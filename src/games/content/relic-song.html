@@ -264,6 +264,19 @@
   #result table td { padding: 4px 18px 4px 0 }
   #result table td:last-child { font-variant-numeric: tabular-nums }
   #result .ps { margin-top: 18px; font-style: italic; color: var(--dim) }
+  /* The chart editor (test mode): a bar of controls, an info line, the timeline, and the tools. */
+  #editor { padding: 10px 16px; display: flex; flex-direction: column; gap: 6px; background: rgba(8, 10, 14, .92) }
+  #editor .ebar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px }
+  #editor .ebar button, #editor select { font-size: 12px; padding: 3px 8px }
+  #editor select { color: var(--ink); background: rgba(255, 255, 255, .06); border: 1px solid var(--rule); border-radius: 4px; font: inherit; font-size: 12px }
+  #editor select option { background: #12151b }
+  #editor .seg button.on, #editor button.on { background: var(--ink); color: var(--bg) }
+  #editor .einfo { font-size: 13px; color: var(--dim); min-height: 18px }
+  #editor .einfo b { color: var(--ink); font-weight: 500 }
+  #editor .einfo .bad { color: #ff8a8a }
+  #ed-canvas { display: block; border: 1px solid var(--rule); border-radius: 3px; cursor: crosshair }
+  #editor .ehelp { font-size: 11px; color: var(--faint); line-height: 1.4 }
+  #ed-errors { font-size: 12px; color: #ff9a9a; max-height: 48px; overflow: auto }
   /* The sound test: every open song (and the type styles' demos), music only. */
   #sound .card { width: 700px; max-height: 680px; padding: 16px 22px }
   #sound .card h2 { margin-bottom: 4px }
@@ -368,6 +381,32 @@
     </div>
   </section>
 
+  <!-- The chart editor (test mode only; Options, Help, Chart editor). -->
+  <section class="screen" id="editor" hidden>
+    <div class="ebar"><b style="font-weight:500">Chart editor</b>
+      <select id="ed-song" aria-label="Song"></select><span class="seg" id="ed-diff"></span>
+      <button id="ed-play" type="button">Play (Space)</button>
+      <span class="seg" id="ed-speed"><button type="button" data-v="0.25">0.25x</button><button type="button" data-v="0.5">0.5x</button><button type="button" data-v="0.75">0.75x</button><button type="button" data-v="1">1x</button></span>
+      <button id="ed-metro" type="button">Metronome</button>
+      <span class="dim">Snap</span><span class="seg" id="ed-snap"><button type="button" data-v="1">1/4</button><button type="button" data-v="0.5">1/8</button><button type="button" data-v="0.3333333333333333">1/12</button><button type="button" data-v="0.25">1/16</button><button type="button" data-v="0">off</button></span>
+      <button id="ed-rec" type="button">Record</button>
+      <button id="ed-regen" type="button">Regenerate from music</button>
+      <button id="ed-test" type="button">Test from cursor</button>
+      <button id="ed-export" type="button">Export JSON</button>
+      <button id="ed-close" type="button">Close (Esc)</button></div>
+    <div class="einfo" id="ed-info"></div>
+    <canvas id="ed-canvas" width="1246" height="470"></canvas>
+    <div class="ebar"><span class="dim">Selected:</span>
+      <button id="ed-tap" type="button">Tap (1)</button><button id="ed-hold" type="button">Hold (2)</button><button id="ed-drag" type="button">Drag (3)</button>
+      <button id="ed-up" type="button">Lane up (↑)</button><button id="ed-down" type="button">Lane down (↓)</button>
+      <button id="ed-del" type="button">Delete (Del)</button><button id="ed-copy" type="button">Copy (Ctrl+C)</button><button id="ed-paste" type="button">Paste at cursor (Ctrl+V)</button>
+      <button id="ed-undo" type="button">Undo (Ctrl+Z)</button><button id="ed-redo" type="button">Redo (Ctrl+Y)</button></div>
+    <div id="ed-errors"></div>
+    <div class="ehelp">Click a lane to add a tap; drag right while adding to make a hold. Click a note to select it (Shift adds), drag it to move it; Shift-drag on empty space box-selects.
+      Click or drag the ruler to move the cursor; the wheel scrolls, Ctrl+wheel zooms. Record: play and tap the lane keys to place notes (hold a key for a hold).
+      Shaded stretches are the moving line: there a note's lane picks its zone. Red outline: no sound starts within 30 ms of the note. The strip under the lanes is the music: its level and its onsets.</div>
+  </section>
+
   <div class="over" id="first" hidden><div class="card"><h2>Before the first song</h2>
     <p>Relic Song is a rhythm game. Are you playing with sound, or muted?</p>
     <p class="dim" style="margin-top:8px">Muted adds a ring on the judgment line that pulses on every beat, and a small flash. Change it any time in Options.</p>
@@ -388,7 +427,7 @@
     <div class="line"><span>6 lanes <span class="dim">(IN, AT)</span></span><span class="binds" id="o-bind6"></span></div>
     <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
     <p class="dim" style="margin-top:6px">Keys that won't light up together can't be pressed at once. Stick to EZ/HD.</p>
-    <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button><button id="o-sound-test" type="button">Sound test</button></span></div>
+    <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button><button id="o-sound-test" type="button">Sound test</button><button id="o-editor" type="button">Chart editor</button></span></div>
     <div class="line"><span>Test mode <span class="dim">(every song open; no tokens, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
 
@@ -506,6 +545,10 @@ const CHART_DIFFS = {
   in: { lanes: 6, holdMin: 3, step: 0.1, jack: 0.18, chord: 3, fill: 1, chords: 1, fillChords: 0.5, burst: true, six: true, layer: 1 },
   at: { lanes: 6, holdMin: 2, step: 0.075, jack: 0.15, chord: 4, fill: 1, chords: 1.4, fillChords: 0.5, burst: true, six: true, layer: 2 }
 };
+// A band song's chart (song.band): which of the band's parts each difficulty plays (see bandChart in build()).
+const BAND_ROLES = { ez: ["lead"], hd: ["lead", "kick", "snare"], in: ["lead", "kick", "snare", "arp", "bass"], at: ["lead", "kick", "snare", "arp", "bass", "chord", "tom"] };
+// Hand charts from the chart editor, by "<song>-<diff>" (loaded from relic-song-charts/ at start).
+const HAND_CHARTS = {};
 // Lane keys, by physical key (e.code), so they sit in the same place on any layout.
 // Players rebind them in Options; opts.binds keeps both rows.
 const DEFAULT_BINDS = { 4: ["KeyD", "KeyF", "KeyJ", "KeyK"], 6: ["KeyS", "KeyD", "KeyF", "KeyJ", "KeyK", "KeyL"] };
@@ -754,6 +797,12 @@ const INSTRUMENTS = {
   pluck:   { wave: 0.125, a: 0.002, d: 0.06, s: 0.15, r: 0.04, gain: 0.09 },
   zip:     { wave: "sawtooth", a: 0.002, d: 0.05, s: 0.2, r: 0.03, gain: 0.07, detune: 7, cut: 3200 },
   low:     { wave: "triangle", a: 0.002, d: 0.1, s: 0.15, r: 0.05, gain: 0.3 },
+  // A band song's legato lead: a short soft attack on each onset, an octave up.
+  attack:  { wave: 0.125, a: 0.001, d: 0.05, s: 0, r: 0.03, gain: 0.24 },
+  // A band song's arpeggio: charted on IN and AT, so it sits above the pads with a sharper front.
+  bandarp: { wave: 0.125, a: 0.001, d: 0.06, s: 0.2, r: 0.03, gain: 0.3 },
+  // A band song's water lead: the same voice with a short tail, so the arp between its notes is heard.
+  flowband:{ wave: "triangle", a: 0.02, d: 0.2, s: 0.45, r: 0.08, gain: 0.28, vib: [5, 6] },
   // The type styles' voices (TYPE_STYLES below).
   square:  { wave: 0.5, a: 0.004, d: 0.08, s: 0.55, r: 0.05, gain: 0.2 },                        // Normal's bouncy lead
   drive:   { wave: "sawtooth", a: 0.004, d: 0.1, s: 0.6, r: 0.05, gain: 0.12, detune: 12, cut: 1800 }, // Fire's rock lead
@@ -1091,13 +1140,21 @@ const SONGS = [
              { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i % 3], y: 330, rot: 180, only: "hard" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", region: "kanto", key: "D", heat: { ez: 0.56, hd: 0.28 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "Water",
-    parts: { I: { lead: "d5 - - - a4 - - - | d5 - - - f#5 - . .", chords: "D A" },
-             H: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
-             A: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D", hint: "arp" },
-             B: { lead: "a4 - b4 - . . . . | d5 - e5 - . . . . | f#5 - e5 - . . . . | d5 - - - . . . .",
-                  answer: ". . . . f#5 e5 d5 - | . . . . a5 g5 f#5 - | . . . . d5 c#5 b4 - | . . . . a4 b4 c#5 -", chords: "Bm G A D" },
-             O: { lead: "e5 - - - c#5 - - - | d5 - - - - - . .", chords: "A D" } },
+  // A band song (the new model): one arrangement on every difficulty, the chart taken from what it plays.
+  // The tide's drums come in by section (busier in A and B), and its arp is the AT run.
+  { id: "cerulean-current", region: "kanto", key: "D", band: true, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "Water", diffs: ["ez", "hd", "in", "at"],
+    // A flowing melody in eighths (EZ's whole chart); the snare on 3 and a kick in A and B (HD); the arp off the beat,
+    // in sixteenths in A and B, and a bass on 1 and 3 (IN); chord stabs in H and A (AT).
+    ezBusy: 3, tune: { ez: { holdMin: 2, jack: 0.3 }, at: { chord: 3, step: 0.16 } },
+    parts: { I: { lead: "d5 - e5 - f#5 - a5 - | d5 e5 f#5 - a5 - . .", chords: "D A", drums: { k: [0], m: "off" }, arpRun: "sway", bassRun: "oneThree" },
+             H: { lead: "d5 e5 f#5 e5 a5 - f#5 e5 | e5 d5 d5 c#5 d5 - e5 - | b4 c#5 d5 c#5 e5 - d5 e5 | f#5 e5 e5 d5 c#5 - d5 -", chords: "D A Bm G",
+                  drums: { s: [4], h: "off" }, arpRun: "sway", bassRun: "oneThree", stab: "stab" },
+             A: { lead: "g5 f#5 a5 g5 f#5 e5 e5 - | f#5 e5 d5 c#5 e5 - d5 - | e5 d5 f#5 e5 d5 c#5 c#5 - | d5 c#5 b4 c#5 d5 - . .", chords: "G D A D", hint: "arp",
+                  drums: { k: [0], s: [4], h: "off" }, arpRun: "flow16", bassRun: "oneThree", stab: "stab" },
+             B: { lead: "a4 b4 c#5 d5 c#5 . . . | d5 e5 f#5 e5 d5 . . . | f#5 e5 d5 c#5 b4 . . . | d5 - c#5 - a4 . . .",
+                  answer: ". . . . . f#5 e5 d5 | . . . . . a5 g5 f#5 | . . . . . c#5 b4 a4 | . . . . . b4 c#5 d5", chords: "Bm G A D",
+                  drums: { k: [0], s: [4], h: "off" }, arpRun: "flow16", bassRun: "oneThree" },
+             O: { lead: "e5 d5 c#5 - b4 - c#5 - | d5 - - - - - . .", chords: "A D", drums: { k: [0] }, arpRun: "sway", bassRun: "oneThree" } },
     form: "I H A H B H A H B H O" },
   { id: "tidepool-waltz", region: "kanto", key: "A", heat: { ez: 0.44, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 116, bar: 3, style: "Water",
     parts: { I: { lead: "a4 - - - e5 - | a4 - - - - -", chords: "A E" },
@@ -1147,14 +1204,18 @@ const SONGS = [
                   answer: ". . . . b4 c5 d5 . | . . . . c5 d5 e5 . | . . . . d5 e5 f#5 . | . . . . a4 b4 d#5 .", chords: "Em Am G B" },
              O: { lead: "f#5 . d#5 . b4 . . . | e5 - - - - - . .", chords: "B Em" } },
     form: "I H A H B H A H B H A H B H A H O" },
-  { id: "raichu-overload", region: "kanto", key: "Am", heat: { ez: 1.36, hd: 0.2, in: 0.265 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 170, bar: 4, style: "Electric",
-    parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E" },
-             H: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
-             A: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true, hint: "bass" },
+  // A band song (the new model): one arrangement on every difficulty, the chart taken from what it plays.
+  { id: "raichu-overload", region: "kanto", key: "Am", band: true, at: true, gym: 2, boss: true, title: "Raichu Overload", bpm: 170, bar: 4, style: "Electric",
+    // The melody runs in eighths (EZ, every note of it); kick on 1 and snare on 3, the whole kit in C (HD); the arp off
+    // the beat, eighths in C (drags on the line), the bass on 1 and 3 (IN); chord stabs in B and C (AT).
+    ezBusy: 9, tune: { ez: { step: 0.16, jack: 0.25, holdMin: 2 }, hd: { step: 0.18 }, at: { chord: 3, step: 0.18, jack: 0.36 } },
+    parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E", drums: { k: [0], h: "16" }, bassRun: "oneThree", arpRun: "sway" },
+             H: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - d5 - c5 - d5 -", chords: "Am C F G", drums: { k: [0], s: [4], h: "16" }, bassRun: "oneThree", arpRun: "sway" },
+             A: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true, hint: "bass", drums: { k: [0], s: [4], h: "16" }, bassRun: "rootfifth", arpRun: "sway" },
              B: { lead: "a4 . c5 . . . . . | g4 . b4 . . . . . | f4 . a4 . . . . . | e5 - - - . . . .",
-                  answer: ". . . . e5 d5 c5 . | . . . . d5 c5 b4 . | . . . . c5 b4 a4 . | . . . . g#4 a4 b4 .", chords: "Am G F E" },
-             C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true },
-             O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am" } },
+                  answer: ". . . . e5 d5 c5 . | . . . . d5 c5 b4 . | . . . . c5 b4 a4 . | . . . . g#4 a4 b4 .", chords: "Am G F E", stab: "stab", drums: { k: [0], s: [4], h: "16" }, bassRun: "oneThree", arpRun: "sway" },
+             C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true, stab: "stab", drums: { k: [0, 4], s: [2, 6], h: "16" }, bassRun: "rootfifth", arpRun: "up8" },
+             O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am", drums: { k: [0], h: "16" }, bassRun: "oneThree", arpRun: "sway" } },
     form: "I H A H B H A H B H A H relic C H C H C O",
     // Raichu: every bar the line teleports somewhere new; mid-bar it zig-zags the other way. Every
     // chord flashes. In the last stretch two more lines cross it like lightning, swapping angles,
@@ -1450,7 +1511,10 @@ const hash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++)
 function build(song, diff = "hd") {
   // song.tune: a song's own changes to a difficulty's rules (step, jack, chords, fillChords): a champion's EZ
   // can sit closer together than a first gym's, and still be EZ (two keys at most, the same holds).
-  const style = styleOf(song.style), D = { ...CHART_DIFFS[diff], ...((song.tune || {})[diff] || {}) }, steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
+  // A band song (song.band) is one arrangement on every difficulty: no layers, the break in one place, and its
+  // chart taken from what the band already plays (bandChart below).
+  const band = !!song.band;
+  const style = styleOf(song.style), D = { ...CHART_DIFFS[diff], ...((song.tune || {})[diff] || {}), ...(band ? { layer: 0 } : {}) }, steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
   const heat = (typeof song.heat === "object" ? song.heat[diff] ?? song.heat.hd : song.heat) || 0, roll = (b, salt = 0) => hash(song.id + ":" + diff + ":" + salt + ":" + b.toFixed(3));
   const ev = [], tune = [], spots = new Map(), chordSpots = [], segments = [], barsOn = [], lay = style.layer;
   // A filler spot, on a sixteenth grid, scored by what the band plays there.
@@ -1465,11 +1529,13 @@ function build(song, diff = "hd") {
   // up: semitones the part is moved (a key change, "H^2" in the form).
   // A part can play in another style's band (part.style: Champion Blue's sections are each a gym's).
   const addPart = (name, part, chartOn, verse, up = 0) => {
-    const own = part.style ? styleOf(part.style) : style;
+    // A band song's part can bring its own drums, bass run and arp run (part.drums, part.bassRun, part.arpRun).
+    const base = part.style ? styleOf(part.style) : style;
+    const own = { ...base, drums: part.drums || base.drums, bassRun: part.bassRun || base.bassRun, arpRun: part.arpRun || base.arpRun, stab: part.stab || base.stab };
     const lead = parseLine(part.lead, steps, song.id + " " + name);
     const bars = lead.length / steps;
     const chords = part.chords.split(/\s+/);
-    const at = beat, burst = !!part.burst && D.burst, six = D.six || burst;
+    const at = beat, burst = !!part.burst && (D.burst || band), six = D.six || burst;
     // The melody, and the chart's first layer from it: the lane walks up and down with the pitch.
     let lane = L / 2 - 1, lastPitch = null, lastBeat = -9;
     for (let i = 0; i < lead.length; i++) {
@@ -1479,7 +1545,9 @@ function build(song, diff = "hd") {
       let len = 1;
       while (i + len < lead.length && lead[i + len] === "-") len++;
       const b = at + i / 2;
-      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : own.lead, midi: m, dur: len / 2 });
+      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : band && own.lead === "flow" ? "flowband" : own.lead, midi: m, dur: len / 2, role: verse ? "verse" : "lead" });
+      // A band song's legato lead gets a short soft attack on top, so every onset is heard.
+      if (band && !verse && own.holds) ev.push({ b, kind: "tone", inst: "attack", midi: m + 12, dur: 0.05 });
       if (!chartOn) continue;
       if (lastPitch != null) lane += m > lastPitch ? 1 : m < lastPitch ? -1 : (b - lastBeat < 0.75 ? (lane >= 2 ? -1 : 1) : 0);
       if (lane > L - 1) lane = L - 2; if (lane < 0) lane = 1;
@@ -1493,7 +1561,7 @@ function build(song, diff = "hd") {
       const m = midiOf(tok);
       if (m == null) return;
       let len = 1; while (line[i + len] === "-") len++;
-      ev.push({ b: at + i / 2, kind: "tone", inst: own.arp || "arp", midi: m + up, dur: len / 2 });
+      ev.push({ b: at + i / 2, kind: "tone", inst: own.arp || "arp", midi: m + up, dur: len / 2, role: "arp" });
       if (chartOn) spot(at + i / 2, mode, 3, burst, six);
     });
     // The region's verse, quietly, under a gym song's part (hint: "arp" or "bass"), in the song's key.
@@ -1512,14 +1580,14 @@ function build(song, diff = "hd") {
       const [r, t, f] = chordOf(chords[bar % chords.length], up), b0 = at + bar * song.bar, n = song.bar;
       const bassNote = r - 12;
       // The type styles' runs: sixteenth bass (Electric, Bug), half time (Ground), a walk (Dark).
-      if (own.bassRun === "sixteenths") for (let k = 0; k < n * 4; k++) ev.push({ b: b0 + k / 4, kind: "tone", inst: own.bass, midi: bassNote + (k % 8 === 6 ? 12 : 0), dur: 0.2 });
-      if (own.bassRun === "half") ev.push({ b: b0, kind: "tone", inst: own.bass, midi: bassNote - 12, dur: n - 0.3 }, { b: b0 + n / 2 + 1.5, kind: "tone", inst: own.bass, midi: bassNote - 5, dur: 0.4 });
-      if (own.bassRun === "walk") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, midi: bassNote + [0, 3, 5, 7, 10, 7][k % 6], dur: 0.8 });
-      if (own.bassRun === "eighths") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.bass, midi: bassNote, dur: 0.4 });
-      if (own.bassRun === "rootfifth") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, midi: k % 2 ? bassNote + 7 : bassNote, dur: 0.9 });
-      if (own.bassRun === "octaves") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.bass, midi: bassNote + (k % 2 ? 12 : 0), dur: 0.35 });
-      if (own.bassRun === "oneThree") for (let k = 0; k < n; k += 2) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, midi: bassNote, dur: 1.6 });
-      if (own.stab) for (let k = 0; k < n; k += own.stabEvery || 2) for (const p of [r, t, f]) ev.push({ b: b0 + k, kind: "tone", inst: own.stab, midi: p + 12, dur: 0.45 });
+      if (own.bassRun === "sixteenths") for (let k = 0; k < n * 4; k++) ev.push({ b: b0 + k / 4, kind: "tone", inst: own.bass, role: "bass", midi: bassNote + (k % 8 === 6 ? 12 : 0), dur: 0.2 });
+      if (own.bassRun === "half") ev.push({ b: b0, kind: "tone", inst: own.bass, role: "bass", midi: bassNote - 12, dur: n - 0.3 }, { b: b0 + n / 2 + 1.5, kind: "tone", inst: own.bass, role: "bass", midi: bassNote - 5, dur: 0.4 });
+      if (own.bassRun === "walk") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, role: "bass", midi: bassNote + [0, 3, 5, 7, 10, 7][k % 6], dur: 0.8 });
+      if (own.bassRun === "eighths") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.bass, role: "bass", midi: bassNote, dur: 0.4 });
+      if (own.bassRun === "rootfifth") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, role: "bass", midi: k % 2 ? bassNote + 7 : bassNote, dur: 0.9 });
+      if (own.bassRun === "octaves") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.bass, role: "bass", midi: bassNote + (k % 2 ? 12 : 0), dur: 0.35 });
+      if (own.bassRun === "oneThree") for (let k = 0; k < n; k += 2) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, role: "bass", midi: bassNote, dur: 1.6 });
+      if (own.stab) for (let k = 0; k < n; k += own.stabEvery || 2) for (const p of [r, t, f]) ev.push({ b: b0 + k, kind: "tone", inst: own.stab, midi: p + 12, dur: 0.45, role: "chord" });
       if (own.arp) {
         // The type styles add: fast16 (sixteenths straight up), wide (two octaves, airy), box (a music box
         // up and down two octaves), sparse (one high note every two beats).
@@ -1530,7 +1598,7 @@ function build(song, diff = "hd") {
           if (run === "sway" && k % 2 === 0) continue;   // off-beats only
           const idx = run === "flow16" ? [0, 1, 2, 3, 2, 1][k % 6] : run === "box" ? [0, 1, 2, 3, 4, 5, 4, 3][k % 8] : wide ? k % 6 : run === "sparse" ? [3, 2][k % 2] : k % 4;
           const b = b0 + k / per;
-          ev.push({ b, kind: "tone", inst: own.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per });
+          ev.push({ b, kind: "tone", inst: band && own.arp === "arp" ? "bandarp" : own.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per, role: "arp", burst });
           if (chartOn) spot(b, mode, per === 4 && k % 2 ? 1 : 2, burst, six);
           // A burst part's arpeggio is the chart's speed run (drag notes on the line).
           if (chartOn && burst && run !== "sway" && k % (per === 4 ? 2 : 1) === 0)
@@ -1624,6 +1692,50 @@ function build(song, diff = "hd") {
     const far = used.length ? Math.min(2, ...used.map(u => Math.abs(u - l))) : 0, same = used.filter(u => hand(u) === hand(l)).length;
     return [l, far * 2 - same * 3 + roll(b, salt + l) * 1.5];
   }).sort((x, y) => y[1] - x[1]).map(x => x[0]);
+  const modeAt = b => { let m = "highway"; for (const g of segments) if (!g.kind && b >= g.from - E) m = g.mode; return m; };
+  // A band song's chart: the band's own onsets, by difficulty (BAND_ROLES): EZ the melody (on a busy one,
+  // its notes on the beat and its long ones), HD the kick and snare too, IN the arp and the bass, AT
+  // nearly everything. Never a hat, a pad, the break's verse or a held note's middle. They go in by role
+  // (the melody first), each where it fits the difficulty's rules (fits(): spacing, jacks, chord size, two
+  // per hand); one that doesn't fit is left out. A held melody note is a hold, and its sound holds with it.
+  function bandChart() {
+    const roles = BAND_ROLES[diff], breaks = segments.filter(g => g.kind), leads = ev.filter(e => e.role === "lead");
+    const busy = leads.length / Math.max(1, beat * spb) > (song.ezBusy || 2.2);
+    const pick = [], span = {};
+    for (const e of ev) {
+      const role = e.kind === "drum" ? drumRole(e.hit) : e.role;
+      if (!role || !roles.includes(role) || breaks.some(g => e.b >= g.from - E && e.b < g.to - E)) continue;
+      if (diff === "ez" && busy && role === "lead" && Math.abs(e.b - Math.round(e.b)) > E && e.dur < 1) continue;
+      pick.push({ e, role });
+      if (e.midi != null) span[role] = [Math.min(e.midi, (span[role] || [e.midi])[0]), Math.max(e.midi, (span[role] || [0, e.midi])[1])];
+    }
+    const ORDER = ["lead", "snare", "kick", "arp", "bass", "chord", "tom"], seen = new Set();
+    // A pitched part's notes spread across the lanes by pitch; the kick (and bass) sits left, the snare right.
+    const laneFor = (role, midi) => { const r = span[role]; return r && midi != null ? Math.round((midi - r[0]) / Math.max(1, r[1] - r[0]) * (L - 1)) : role === "snare" || role === "tom" ? L - 1 : 0; };
+    pick.sort((a, b) => ORDER.indexOf(a.role) - ORDER.indexOf(b.role) || a.e.b - b.e.b);
+    for (const { e, role } of pick) {
+      const key = role + ":" + e.b.toFixed(3);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const m = modeAt(e.b), want = role === "kick" ? 0 : laneFor(role, e.midi);
+      // A burst's arp on the line is a run of drags (hold any key in its zone through it).
+      if (role === "arp" && e.burst && m === "line") { if (!moment(e.b).length && !placed.some(o => isDrag(o) && Math.abs(o.b - e.b) < E)) put({ b: e.b, lane: want, len: 0, mode: m, run: true, midi: e.midi }); continue; }
+      // Below AT the runs (arp, bass) fill the gaps between the melody and the drums, and chords stay two keys;
+      // AT chords what the band plays together, a run joining in on each bar's downbeat and filling the gaps between.
+      const here = moment(e.b).length;
+      const run = role === "arp" || role === "bass";
+      if (diff !== "at" ? here >= 2 || (run && here) : run && here && Math.abs(e.b / song.bar - Math.round(e.b / song.bar)) > E) continue;
+      const len = role === "lead" && !song.noHolds && e.dur * 2 >= D.holdMin + (style.holds ? 0 : 1) ? e.dur - 0.5 : 0;
+      // Its lane: near the one its part wants, but away from a lane hit in the last 0.4 s (no jacks if it can help it).
+      const near = around(e.b, 0), recent = l => near.some(o => o.lane === l && o.b < e.b - E && (e.b - o.b - o.len) * spb < 0.4);
+      const order = [...Array(L).keys()].sort((x, y) => Math.abs(x - want) + (recent(x) ? 3 : 0) - Math.abs(y - want) - (recent(y) ? 3 : 0) || x - y);
+      let lane = order.find(l => fits(e.b, l, len)), hold = len;
+      if (lane == null && len) { lane = order.find(l => fits(e.b, l, 0)); hold = 0; }
+      if (lane == null) continue;
+      put({ b: e.b, lane, len: hold, mode: m });
+    }
+  }
+  if (band) bandChart(); else {
   // 1. The tune, in time order. A melody note that can't keep its lane moves to the nearest
   //    one that's free (a hold that fits nowhere becomes a tap); a run only fills the melody's gaps.
   tune.sort((a, b) => a.b - b.b || (a.run ? 1 : 0) - (b.run ? 1 : 0));
@@ -1678,9 +1790,14 @@ function build(song, diff = "hd") {
       here.push(put({ b: s.b, lane: more, len: 0, mode: s.mode, fill: true }));
     }
   }
-  const chart = placed.sort((a, b) => a.b - b.b || a.lane - b.lane);
+  }
+  // A hand chart (relic-song-charts/<song>-<diff>.json, made in the chart editor) takes the place of the built one.
+  const handed = HAND_CHARTS[song.id + "-" + diff];
+  const chart = handed ? handed.map(h => ({ b: h.b, lane: Math.max(0, Math.min(L - 1, h.lane)), len: h.kind === "hold" ? Math.max(0.25, h.len) : 0, mode: modeAt(h.b), run: h.kind === "drag" }))
+    .sort((a, b) => a.b - b.b || a.lane - b.lane) : placed.sort((a, b) => a.b - b.b || a.lane - b.lane);
   // On the line: a held note is a hold, a speed run is drags, the rest are taps.
   for (const n of chart) n.kind = n.mode === "line" ? (n.len ? "hold" : n.run ? "drag" : "tap") : (n.len ? "hold" : "tap");
+  if (!band) {
   // Every note lands on a sound you can hear. A moment with nothing under it gets its own: a tick
   // between the eighths, else a short pluck on the bar's chord (the lane picks the chord tone, so a run
   // across the lanes is a run up the chord). On IN and AT every filler moment gets its pluck even if a
@@ -1697,6 +1814,7 @@ function build(song, diff = "hd") {
     const next = moments[i + 1] ?? b + 1;
     ev.push({ b, kind: "tone", inst: lay.pluck, midi: bar.tones[Math.min(3, Math.floor(ns[0].lane * 4 / L))] + lay.octave, dur: Math.min(0.45, Math.max(0.1, next - b)) });
   });
+  }
   ev.sort((a, b) => a.b - b.b);
   // Swing (a type style's, or the song's own): every off-beat eighth (or sixteenth) lands late, the
   // notes on it too, so they stay on their sounds. A hold's tail moves with the step it ends on.
@@ -1704,7 +1822,7 @@ function build(song, diff = "hd") {
   if (sw && sw.amt) {
     const g = sw.grid === 16 ? 0.5 : 1, late = b => { const k = Math.floor(b / g + 1e-9), f = b - k * g; return Math.abs(f - g / 2) < 1e-6 ? k * g + g / 2 + sw.amt * g / 6 : b; };
     for (const e of ev) e.b = late(e.b);
-    for (const n of chart) { const tail = late(n.b + n.len); n.b = late(n.b); if (n.len) n.len = tail - n.b; }
+    if (!handed) for (const n of chart) { const tail = late(n.b + n.len); n.b = late(n.b); if (n.len) n.len = tail - n.b; }
   }
   const end = beat;
   const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb };
@@ -1982,7 +2100,7 @@ const floorAt = (fl, beat) => { if (beat <= 0) return beat; let p = fl[0]; for (
 // the parts it jumps ahead of are played on the line instead (`moved` beats of them).
 function formFor(song, diff) {
   const tokens = song.form.split(/\s+/), r = tokens.indexOf("relic");
-  if (r < 0 || (diff !== "in" && diff !== "at")) return { tokens, moved: 0 };
+  if (r < 0 || song.band || (diff !== "in" && diff !== "at")) return { tokens, moved: 0 };
   const beats = t => t === "flip" ? song.bar : t === "relic" ? 0 : partOf(song, tokenOf(t).name).lead.split("|").length * song.bar;
   const total = tokens.reduce((n, t) => n + beats(t), 0);
   let j = r, best = Infinity;
@@ -2308,6 +2426,7 @@ function drawOpts() {
     box.append(b, " ");
   }
   $("#o-tips").textContent = "Reset tips";
+  $("#o-editor").disabled = !opts.test; $("#o-editor").title = opts.test ? "Edit a song's chart" : "Turn on test mode to use the chart editor";
   keyHeld.clear(); binding = null; drawBinds();
   $("#o-skin-note").textContent = locked.length ? "(more are hidden in the arcade)" : "";
 }
@@ -2357,6 +2476,7 @@ $("#b-lesson").onclick = () => lessonCard(0);
 $("#o-lesson").onclick = () => { $("#opts").hidden = true; drawMap(); lessonCard(0); };
 $("#o-bosscard").onclick = () => bossCard(null);
 $("#o-sound-test").onclick = () => { $("#sound").hidden = false; drawSound(); };
+$("#o-editor").onclick = () => openEditor(ED.song || SONGS[0], ED.diff);
 
 /* ── The sound test ────────────────────────────────────────────────────── */
 // Every song that's open (hidden tracks once found; everything in test mode) and the 18 type styles'
@@ -2482,7 +2602,7 @@ $("#f-muted").onclick = () => { opts.sound = 0; opts.asked = 1; keepOpts(); setV
 
 /* ── Playing ───────────────────────────────────────────────────────────── */
 let P = null;   // the song in play
-const showScreen = id => { for (const s of ["map", "play", "result"]) $("#" + s).hidden = s !== id; };
+const showScreen = id => { for (const s of ["map", "play", "result", "editor"]) $("#" + s).hidden = s !== id; };
 // Your four moves on the lane labels: from the buddy's types, or Meloetta's if you have no buddy.
 const TYPE_MOVES = {
   Normal: ["Tackle", "Hyper Voice"], Fire: ["Ember", "Flamethrower"], Water: ["Water Gun", "Surf"], Grass: ["Vine Whip", "Energy Ball"],
@@ -2553,7 +2673,9 @@ function start(song, diff = pickedDiff(song), given = null) {
   // The first moving line ever: show "Any key! Watch the line." for two bars without altering the scored chart.
   // over it. (The lesson's line section has its gap written in, and shows the cue every time.)
   const cue = song.lesson ? song.cue : B.lines && !opts.tips.flip ? 2 * song.bar : 0;
-  const notes = B.chart
+  // given.from: start at that beat (the chart editor's test play); notes before it aren't played.
+  const from = given && given.from > 0 ? given.from : 0;
+  const notes = B.chart.filter(n => n.b >= from - 1e-6)
     .map((n, i) => ({ ...n, i, t: n.b * B.spb, tEnd: (n.b + n.len) * B.spb, state: 0, hit: null, tail: null, key: null }));
   // Gold: every note that shares its moment with another, in any lane or on either line.
   // A note alone at its moment is cyan; drags keep their own look and don't count.
@@ -2562,12 +2684,12 @@ function start(song, diff = pickedDiff(song), given = null) {
   for (const n of notes) n.dbl = n.kind !== "drag" && together.get(moment(n)) > 1;
   const judged = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 : 1), 0);
   const lead = 4 * B.spb + 0.6;
-  P = { song, B, given, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead, next: 0, done: false, paused: false,
+  P = { song, B, given, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead - from * B.spb, next: 0, done: false, paused: false,
         cue: cue ? { to: cue, real: !song.lesson } : null, tips: tipsFor(song, B, notes, lead), zones: song.lesson ? 1 : ZONES[B.diff] || 1,
         counts: { Perfect: 0, Great: 0, Good: 0, Miss: 0 }, points: 0, n: 0, combo: 0, maxCombo: 0, streak: 0,
         held: new Set(), mode: "highway", form: "aria", seg: 0, lastBeat: -99, raf: 0, broke: false, finished: false };
   // The count-in: four clicks before beat 0.
-  P.ev = [0, 1, 2, 3].map(k => ({ b: k - 4, kind: "drum", hit: "r" })).concat(B.ev);
+  P.ev = [0, 1, 2, 3].map(k => ({ b: from + k - 4, kind: "drum", hit: "r" })).concat(from ? B.ev.filter(e => e.b >= from - 0.01) : B.ev);
   // The battle layer
   $("#foecol").hidden = $("#mecol").hidden = !boss;
   $("#btext").textContent = ""; $("#btext").className = "";
@@ -2608,7 +2730,8 @@ function start(song, diff = pickedDiff(song), given = null) {
   // On six lanes the middle four keep the move names; S and L only show their key.
   const L = B.lanes, W = laneW(L);
   // A practice that starts on the line (the lesson's drags) has no highway at all.
-  const lineFirst = B.segments.some(s => !s.kind && s.from < 0 && s.mode === "line");
+  const lineFirst = B.segments.some(s => !s.kind && s.from < 0 && s.mode === "line")
+    || (from > 0 && B.segments.filter(s => !s.kind && s.from <= from).map(s => s.mode).pop() === "line");
   const guides = $("#guides"); guides.replaceChildren(); guides.className = lineFirst ? "out" : "";
   for (let k = 0; k < L; k++) { const g = el("div", "glow"); g.style.left = (640 + laneX(k, L) - W / 2) + "px"; g.style.width = W + "px"; guides.append(g); }
   for (let k = 1; k < L; k++) { const i = el("i"); i.style.left = (640 + (k - L / 2) * W) + "px"; guides.append(i); }
@@ -2931,6 +3054,50 @@ function cut() {
 }
 function retry() { const s = P && P.song, d = P && P.B.diff, g = P && P.given; stop(); if (s) start(s, d, g); }
 
+/* ── Can you hear every note? ──────────────────────────────────────────── */
+// A chart's music, rendered offline (the same synth, no speakers), and where its onsets are: frames of 3 ms,
+// the energy of the signal's slope (attacks, not sustain), and an onset wherever it jumps ONSET_RISE times
+// over the 20 ms before and is the peak of its ±18 ms. Every moment of the chart is then checked two ways:
+// by data (a part that difficulty plays starts there, BAND_ROLES: EZ the melody, HD its kick and snare too, IN
+// the arp and bass, AT the chords and toms; never a hat, a tick or a sound patched under a note) and by render
+// (an onset within 30 ms). The render starts LEAD_IN s early so a note on beat 0 can be heard. The editor shows them.
+const ONSET_RISE = 3.2, ONSET_NEAR = 0.03, LEAD_IN = 0.3;
+const RENDERS = {};
+async function renderSong(B) {
+  const key = B.song.id + ":" + (B.song.band ? "band" : B.diff);
+  if (RENDERS[key]) return RENDERS[key];
+  const rate = 22050, secs = B.seconds + 1.5 + LEAD_IN, live = [ctx, master, noiseBuf, { ...waves }];
+  const off = new OfflineAudioContext(1, Math.ceil(rate * secs), rate);
+  ctx = off; master = off.createGain(); master.gain.value = 0.32 * 0.7; master.connect(off.destination); voices(off);
+  let d;
+  try {
+    for (const e of B.ev) { const when = e.b * B.spb + LEAD_IN; if (when < 0 || when > secs - 0.3) continue; if (e.kind === "tone") tone(e.inst, e.midi, when, e.dur * B.spb * 0.95); else DRUMS[e.hit](when); }
+    d = (await off.startRendering()).getChannelData(0);
+  } finally { [ctx, master, noiseBuf] = live; Object.assign(waves, live[3]); }
+  const hop = Math.round(rate * 0.003), frames = Math.floor(d.length / hop), E = new Float32Array(frames);
+  for (let f = 0; f < frames; f++) { let sum = 0; for (let i = f * hop + 1; i < (f + 1) * hop; i++) { const v = d[i] - 0.95 * d[i - 1]; sum += v * v; } E[f] = sum / hop; }
+  let top = 0; for (const v of E) top = Math.max(top, v);
+  const floor = top * 1e-4, back = 7, near = 6, rise = new Float32Array(frames), onsets = [];
+  for (let f = back; f < frames; f++) { let before = 0; for (let k = 1; k <= back; k++) before += E[f - k]; rise[f] = E[f] / (before / back + floor); }
+  for (let f = back; f < frames - near; f++) {
+    if (rise[f] < ONSET_RISE || E[f] < floor * 3) continue;
+    let peak = true; for (let k = -near; k <= near && peak; k++) if (k && rise[f + k] > rise[f]) peak = false;
+    if (peak) onsets.push(f * hop / rate - LEAD_IN);
+  }
+  // A coarse envelope for the editor (every 20 ms).
+  const env = []; for (let f = Math.round(LEAD_IN * rate / hop); f < frames; f += 7) env.push(Math.sqrt(E[f] / top));
+  return (RENDERS[key] = { onsets, env, step: 7 * hop / rate });
+}
+const drumRole = hit => "kK".includes(hit) ? "kick" : "sbz".includes(hit) ? "snare" : hit === "t" ? "tom" : null;
+const onPart = (B, t) => { const roles = BAND_ROLES[B.diff]; return B.ev.some(e => Math.abs(e.b * B.spb - t) <= ONSET_NEAR && roles.includes(e.kind === "drum" ? drumRole(e.hit) : e.role)); };
+async function onsetCheck(song, diff) {
+  const B = built(song, diff), r = await renderSong(B), moments = [...new Set(B.chart.map(n => +n.b.toFixed(4)))];
+  const heard = t => { let lo = 0, hi = r.onsets.length; while (lo < hi) { const m = (lo + hi) >> 1; if (r.onsets[m] < t - ONSET_NEAR) lo = m + 1; else hi = m; } return lo < r.onsets.length && r.onsets[lo] <= t + ONSET_NEAR; };
+  let data = 0, render = 0; const off = [];
+  for (const b of moments) { const t = b * B.spb, d = onPart(B, t), h = heard(t); if (d) data++; if (h) render++; if (!h && off.length < 6) off.push(+b.toFixed(2)); }
+  return { id: song.id, diff, notes: B.chart.length, moments: moments.length, data: Math.round(1000 * data / moments.length) / 10, render: Math.round(1000 * render / moments.length) / 10, onsets: r.onsets.length, off };
+}
+
 /* ── Results, tokens and the board ─────────────────────────────────────── */
 const clearPayOf = B => clearPay(B.level);
 // What the hub needs to pay: every chart's amounts by its level, the bonuses, and which songs are
@@ -3015,11 +3182,11 @@ function showResult({ song, diff, s, rank, won, why }) {
   } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn tokens and post scores.";
 }
 $("#r-retry").onclick = () => { if (P) start(P.song, P.B.diff, P.given); };
-$("#r-map").onclick = () => drawMap();
+$("#r-map").onclick = () => { if (P && P.given && P.given.editor) openEditor(); else drawMap(); };
 $("#b-resume").onclick = () => pause(false);
 $("#pausebtn").onclick = e => { e.currentTarget.blur(); pause(true); };
 $("#b-retry").onclick = retry;
-$("#b-quit").onclick = () => { stop(); drawMap(); };
+$("#b-quit").onclick = () => { const back = P && P.given && P.given.editor; stop(); if (back) openEditor(); else drawMap(); };
 
 /* ── Meloetta's Lesson, the boss card and the tips ─────────────────────── */
 // The lesson: a text box for each thing, then a few bars of practice, played again and again until
@@ -3151,10 +3318,274 @@ function showTip(text) {
   clearTimeout(d._t); d._t = setTimeout(() => { d.className = ""; }, 2000);
 }
 
+/* ── The chart editor (test mode) ──────────────────────────────────────── */
+// A song and difficulty's chart as notes ({ b, lane, len, kind }) on a timeline: the highway's lanes (on
+// the moving line, a note's lane picks its zone), the beat grid, and under it the music's level and
+// onsets from its render. Edits rebuild the chart through build() (the hand chart in place of the
+// built one), so the level, the zones and what got left out are the game's own. Export gives the JSON
+// that goes in relic-song-charts/ (docs/relic-song-songs.md).
+const ED = { song: null, diff: "ez", notes: [], sel: new Set(), undo: [], redo: [], b0: -2, ppb: 70, cursor: 0, snap: 0.5, speed: 1, metro: false, rec: false,
+  play: null, B: null, render: null, clip: [], drag: null, held: new Map(), timer: 0 };
+const ED_TOP = 24, ED_WAVE = 70;
+const edKey = () => ED.song.id + "-" + ED.diff;
+const edSnap = b => ED.snap ? Math.round(b / ED.snap) * ED.snap : Math.round(b * 48) / 48;
+const edClone = notes => notes.map(n => ({ b: n.b, lane: n.lane, len: n.len, kind: n.kind }));
+// The chart a song builds on its own, ignoring any hand chart.
+function edAuto(song, diff) {
+  const key = song.id + "-" + diff, kept = HAND_CHARTS[key];
+  delete HAND_CHARTS[key];
+  try { return build(song, diff).chart.map(n => ({ b: +n.b.toFixed(4), lane: n.lane, len: +n.len.toFixed(4), kind: n.kind })); }
+  finally { if (kept) HAND_CHARTS[key] = kept; }
+}
+function openEditor(song = ED.song, diff = ED.diff) {
+  if (!opts.test) return;
+  stopEditorPlay();
+  song = song || SONGS[0];
+  if (!song.diffs.includes(diff)) diff = song.diffs[0];
+  if (song !== ED.song || diff !== ED.diff || !ED.notes.length) {
+    Object.assign(ED, { song, diff, sel: new Set(), undo: [], redo: [], b0: -2, cursor: 0, render: null });
+    ED.notes = HAND_CHARTS[edKey()] ? edClone(HAND_CHARTS[edKey()]) : edAuto(song, diff);
+  }
+  $("#opts").hidden = true;
+  showScreen("editor");
+  const pickSong = $("#ed-song"); pickSong.replaceChildren(...SONGS.map(s => { const o = el("option", "", s.title); o.value = s.id; o.selected = s === song; return o; }));
+  pickSong.onchange = () => openEditor(SONGS.find(s => s.id === pickSong.value), ED.diff);
+  const dseg = $("#ed-diff"); dseg.replaceChildren(...song.diffs.map(d => { const b = el("button", "", DIFF_NAME[d]); b.type = "button"; b.dataset.v = d; return b; }));
+  seg(dseg, diff, v => openEditor(ED.song, v), () => {});
+  edRebuild();
+  // The music's render, once a song (and difficulty, for a song whose music changes with it): its onsets.
+  renderSong(ED.B).then(r => { if (ED.B && ED.song === song) { ED.render = r; edDraw(); edInfo(); } });
+}
+// Rebuild the chart from the notes: the level, the zones, the left-out notes and the rule checks.
+function edRebuild() {
+  const key = edKey(), kept = HAND_CHARTS[key];
+  HAND_CHARTS[key] = ED.notes;
+  try { ED.B = build(ED.song, ED.diff); } finally { if (kept) HAND_CHARTS[key] = kept; else delete HAND_CHARTS[key]; }
+  edDraw(); edInfo();
+}
+// The difficulty's rules on the notes as written: spacing, a lane hit again too soon, chord size, two keys a hand.
+function edErrors() {
+  const D = { ...CHART_DIFFS[ED.diff], ...((ED.song.tune || {})[ED.diff] || {}) }, spb = ED.B.spb, L = ED.B.lanes, out = [];
+  const ns = edClone(ED.notes).sort((a, b) => a.b - b.b), at = new Map();
+  for (const n of ns) { const k = n.b.toFixed(4); at.set(k, (at.get(k) || []).concat(n)); }
+  const times = [...at.keys()].map(Number);
+  times.forEach((t, i) => { if (i && (t - times[i - 1]) * spb < D.step - 1e-3) out.push("beat " + t.toFixed(2) + ": closer than " + Math.round(D.step * 1000) + " ms to the last"); });
+  for (const [k, g] of at) {
+    const down = g.length + ns.filter(o => o.len && o.b < +k - 1e-6 && o.b + o.len > +k).length;
+    if (down > Math.min(4, D.chord)) out.push("beat " + (+k).toFixed(2) + ": " + down + " keys at once (most " + Math.min(4, D.chord) + ")");
+    if (new Set(g.map(n => n.lane)).size < g.length) out.push("beat " + (+k).toFixed(2) + ": two notes in one lane");
+    for (const h of [0, 1]) if (g.filter(n => (n.lane < L / 2 ? 0 : 1) === h).length > 2) out.push("beat " + (+k).toFixed(2) + ": three keys on one hand");
+  }
+  const last = new Map();
+  for (const n of ns) { if (last.has(n.lane) && (n.b - last.get(n.lane)) * spb < D.jack - 1e-3 && n.b > last.get(n.lane) - 1e-6 + 1e-6) out.push("beat " + n.b.toFixed(2) + ": lane " + (n.lane + 1) + " again too soon"); last.set(n.lane, n.b + n.len); }
+  if (ED.B.left) out.push(ED.B.left + " line note(s) fit no zone and are left out");
+  return out;
+}
+const edHeard = b => { const r = ED.render; if (!r) return true; const t = b * ED.B.spb; return r.onsets.some(o => Math.abs(o - t) <= ONSET_NEAR); };
+function edInfo() {
+  if (!ED.B) return;
+  const errs = edErrors(), moments = [...new Set(ED.notes.map(n => n.b.toFixed(4)))].map(Number), heard = ED.render ? moments.filter(edHeard).length : null;
+  const info = $("#ed-info"); info.replaceChildren();
+  const add = (label, value, bad) => { info.append(label + " "); info.append(el("b", bad ? "bad" : "", value)); info.append("   "); };
+  add("Notes", String(ED.notes.length)); add("Level", DIFF_NAME[ED.diff] + " Lv." + ED.B.level);
+  add("On onsets", heard == null ? "rendering…" : Math.round(100 * heard / Math.max(1, moments.length)) + "%", heard != null && heard < moments.length);
+  add("Problems", String(errs.length), errs.length > 0); add("Chart", HAND_CHARTS[edKey()] ? "hand chart (saved)" : "built", false);
+  add("Cursor", "beat " + ED.cursor.toFixed(2)); if (ED.rec) add("Recording", "on", true);
+  $("#ed-errors").textContent = errs.slice(0, 8).join(" · ");
+}
+// The timeline.
+const edX = b => (b - ED.b0) * ED.ppb, edB = x => x / ED.ppb + ED.b0;
+function edRows() { const c = $("#ed-canvas"); return { L: ED.B.lanes, h: (c.height - ED_TOP - ED_WAVE) / ED.B.lanes }; }
+function edDraw() {
+  const c = $("#ed-canvas"), g = c.getContext("2d"), W = c.width, H = c.height, B = ED.B;
+  if (!B) return;
+  const { L, h } = edRows(), spb = B.spb, b1 = edB(W);
+  g.fillStyle = "#0d1015"; g.fillRect(0, 0, W, H);
+  // The moving line's stretches, shaded.
+  let from = null, mode = "highway";
+  const shade = (a, z) => { g.fillStyle = "rgba(226,138,62,.10)"; g.fillRect(edX(a), ED_TOP, edX(z) - edX(a), L * h); };
+  for (const sg of B.segments) { if (sg.kind) { g.fillStyle = "rgba(255,255,255,.05)"; g.fillRect(edX(sg.from), ED_TOP, edX(sg.to) - edX(sg.from), L * h); continue; }
+    if (sg.mode === "line" && mode !== "line") from = sg.from; if (sg.mode !== "line" && mode === "line") shade(from, sg.from); mode = sg.mode; }
+  if (mode === "line") shade(from, B.end);
+  // Beats, bars, the snap.
+  for (let b = Math.floor(ED.b0); b <= b1; b++) {
+    const x = edX(b), bar = b % ED.song.bar === 0;
+    g.fillStyle = bar ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.12)"; g.fillRect(x, ED_TOP, 1, L * h);
+    if (bar) { g.fillStyle = "rgba(255,255,255,.6)"; g.font = "11px sans-serif"; g.fillText(String(b / ED.song.bar + 1), x + 3, 15); }
+    if (ED.snap && ED.snap < 1 && ED.ppb * ED.snap > 8) for (let k = ED.snap; k < 1 - 1e-6; k += ED.snap) { g.fillStyle = "rgba(255,255,255,.05)"; g.fillRect(edX(b + k), ED_TOP, 1, L * h); }
+  }
+  for (let l = 1; l < L; l++) { g.fillStyle = "rgba(255,255,255,.08)"; g.fillRect(0, ED_TOP + l * h, W, 1); }
+  // The music: its level, and its onsets.
+  const wy = ED_TOP + L * h + 6, wh = ED_WAVE - 10;
+  g.fillStyle = "rgba(255,255,255,.04)"; g.fillRect(0, wy, W, wh);
+  if (ED.render) {
+    g.fillStyle = "rgba(140,215,255,.35)";
+    for (let x = 0; x < W; x += 2) { const t = edB(x) * spb, v = ED.render.env[Math.floor(t / ED.render.step)] || 0; g.fillRect(x, wy + wh / 2 - v * wh / 2, 2, Math.max(1, v * wh)); }
+    g.fillStyle = "rgba(255,216,102,.8)";
+    for (const o of ED.render.onsets) { const x = edX(o / spb); if (x >= 0 && x <= W) g.fillRect(x, wy, 1, wh); }
+  } else { g.fillStyle = "rgba(255,255,255,.4)"; g.font = "11px sans-serif"; g.fillText("rendering the music…", 8, wy + 20); }
+  // The notes; a zone dot from the built chart on the line.
+  const zoneOfNote = n => { const m = B.chart.find(o => Math.abs(o.b - n.b) < 1e-3 && o.lane === n.lane); return m && m.zone != null ? m.zone : null; };
+  for (const n of ED.notes) {
+    const x = edX(n.b), y = ED_TOP + n.lane * h, w = Math.max(6, n.len * ED.ppb);
+    if (x + w < 0 || x > W) continue;
+    g.fillStyle = n.kind === "drag" ? "#f3e27a" : n.kind === "hold" ? "rgba(79,212,255,.55)" : "#4fd4ff";
+    g.fillRect(x - 3, y + h * 0.25, n.kind === "hold" ? w + 3 : 6, h * 0.5);
+    if (n.kind === "hold") { g.fillStyle = "#4fd4ff"; g.fillRect(x - 3, y + h * 0.25, 6, h * 0.5); }
+    if (!edHeard(n.b)) { g.strokeStyle = "#ff5a5a"; g.lineWidth = 2; g.strokeRect(x - 5, y + h * 0.2, (n.kind === "hold" ? w + 3 : 6) + 4, h * 0.6); }
+    if (ED.sel.has(n)) { g.strokeStyle = "#fff"; g.lineWidth = 2; g.strokeRect(x - 4, y + h * 0.22, (n.kind === "hold" ? w + 3 : 6) + 2, h * 0.56); }
+    const z = zoneOfNote(n); if (z != null) { g.fillStyle = zoneColor(z, ZONES[ED.diff]); g.beginPath(); g.arc(x, y + h * 0.18, 3, 0, 7); g.fill(); }
+  }
+  // The box being drawn, the cursor.
+  if (ED.drag && ED.drag.box) { const d = ED.drag; g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1; g.strokeRect(Math.min(d.x0, d.x1), Math.min(d.y0, d.y1), Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0)); }
+  g.fillStyle = "#ff7a90"; g.fillRect(edX(ED.cursor), 0, 2, H);
+}
+const edSave = () => { ED.undo.push(edClone(ED.notes)); if (ED.undo.length > 200) ED.undo.shift(); ED.redo = []; };
+const edChanged = () => { ED.notes.sort((a, b) => a.b - b.b || a.lane - b.lane); clearTimeout(ED.timer); ED.timer = setTimeout(edRebuild, 120); edDraw(); };
+function edSetKind(kind) {
+  if (!ED.sel.size) return; edSave();
+  for (const n of ED.sel) { n.kind = kind; if (kind === "hold" && !n.len) n.len = ED.snap || 0.5; if (kind !== "hold") n.len = 0; }
+  edChanged();
+}
+function edLane(d) { if (!ED.sel.size) return; edSave(); for (const n of ED.sel) n.lane = Math.max(0, Math.min(ED.B.lanes - 1, n.lane + d)); edChanged(); }
+function edNudge(d) { if (!ED.sel.size) return; edSave(); for (const n of ED.sel) n.b = Math.max(0, +(n.b + d).toFixed(4)); edChanged(); }
+function edDelete() { if (!ED.sel.size) return; edSave(); ED.notes = ED.notes.filter(n => !ED.sel.has(n)); ED.sel.clear(); edChanged(); }
+function edCopy() { const sel = [...ED.sel]; if (!sel.length) return; const b = Math.min(...sel.map(n => n.b)); ED.clip = sel.map(n => ({ ...n, b: n.b - b })); }
+function edPaste() { if (!ED.clip.length) return; edSave(); const at = edSnap(ED.cursor); ED.sel.clear(); for (const n of ED.clip) { const m = { ...n, b: +(at + n.b).toFixed(4) }; ED.notes.push(m); ED.sel.add(m); } edChanged(); }
+function edUndo(back = true) {
+  const from = back ? ED.undo : ED.redo, to = back ? ED.redo : ED.undo;
+  if (!from.length) return; to.push(edClone(ED.notes)); ED.notes = from.pop(); ED.sel.clear(); edChanged();
+}
+// The mouse: the ruler scrubs; on the lanes, a note selects and moves, empty space adds (drag for a hold), Shift box-selects.
+function edMouse() {
+  const c = $("#ed-canvas"), pos = e => { const r = c.getBoundingClientRect(), k = c.width / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k }; };
+  const hit = p => { const { h } = edRows(); return ED.notes.find(n => { const x = edX(n.b), y = ED_TOP + n.lane * h, w = n.kind === "hold" ? Math.max(6, n.len * ED.ppb) + 3 : 6; return p.x >= x - 5 && p.x <= x + w + 2 && p.y >= y && p.y <= y + h; }); };
+  c.onmousedown = e => {
+    const p = pos(e), { L, h } = edRows();
+    if (p.y < ED_TOP || p.y > ED_TOP + L * h) { ED.cursor = Math.max(0, edB(p.x)); ED.drag = { scrub: true }; edDraw(); edInfo(); return; }
+    const lane = Math.max(0, Math.min(L - 1, Math.floor((p.y - ED_TOP) / h))), n = hit(p);
+    if (n) {
+      if (e.shiftKey) { if (ED.sel.has(n)) ED.sel.delete(n); else ED.sel.add(n); } else if (!ED.sel.has(n)) { ED.sel.clear(); ED.sel.add(n); }
+      edSave(); ED.drag = { move: true, x0: p.x, lane0: lane, from: [...ED.sel].map(m => [m, m.b, m.lane]) };
+    } else if (e.shiftKey) ED.drag = { box: true, x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    else { edSave(); const m = { b: Math.max(0, edSnap(edB(p.x))), lane, len: 0, kind: "tap" }; ED.notes.push(m); ED.sel.clear(); ED.sel.add(m); ED.drag = { add: m }; edChanged(); }
+    edDraw();
+  };
+  onmousemove = e => {
+    const d = ED.drag; if (!d || $("#editor").hidden) return;
+    const p = pos(e), { L, h } = edRows();
+    if (d.scrub) ED.cursor = Math.max(0, edB(p.x));
+    if (d.move) { const db = edSnap(edB(p.x) - edB(d.x0)), dl = Math.floor((p.y - ED_TOP) / h) - d.lane0;
+      for (const [m, b, l] of d.from) { m.b = Math.max(0, +(b + db).toFixed(4)); m.lane = Math.max(0, Math.min(L - 1, l + dl)); } }
+    if (d.add) { const len = edSnap(edB(p.x)) - d.add.b; d.add.len = len >= (ED.snap || 0.25) ? +len.toFixed(4) : 0; d.add.kind = d.add.len ? "hold" : "tap"; }
+    if (d.box) { d.x1 = p.x; d.y1 = p.y; }
+    edDraw(); if (d.scrub) edInfo();
+  };
+  onmouseup = () => {
+    const d = ED.drag; if (!d) return; ED.drag = null;
+    if (d.box) { const { h } = edRows(), [xa, xb] = [Math.min(d.x0, d.x1), Math.max(d.x0, d.x1)], [ya, yb] = [Math.min(d.y0, d.y1), Math.max(d.y0, d.y1)];
+      for (const n of ED.notes) { const x = edX(n.b), y = ED_TOP + n.lane * h + h / 2; if (x >= xa && x <= xb && y >= ya && y <= yb) ED.sel.add(n); } edDraw(); }
+    if (d.move || d.add) edChanged();
+  };
+  c.onwheel = e => { e.preventDefault(); if (e.ctrlKey) { const b = edB(pos(e).x); ED.ppb = Math.max(12, Math.min(400, ED.ppb * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); ED.b0 = b - pos(e).x / ED.ppb; } else ED.b0 += (e.deltaY + e.deltaX) / ED.ppb; edDraw(); };
+}
+// Playback from the cursor, at a speed; the metronome on every beat; Record places notes from the lane keys.
+function edPlay() {
+  if (ED.play) { stopEditorPlay(); return; }
+  const c = audio(); c.resume();
+  const B = ED.B, spb = B.spb / ED.speed, from = ED.cursor, t0 = c.currentTime + 0.1;
+  ED.play = { t0, from, spb, i: B.ev.findIndex(e => e.b >= from - 1e-6), beat: Math.ceil(from - 1e-6), raf: 0, timer: 0 };
+  if (ED.play.i < 0) ED.play.i = B.ev.length;
+  const tick = () => {
+    const P2 = ED.play; if (!P2) return;
+    const horizon = c.currentTime + 0.25;
+    for (; P2.i < B.ev.length; P2.i++) { const e = B.ev[P2.i], when = t0 + (e.b - from) * spb; if (when > horizon) break; if (when < c.currentTime - 0.02) continue;
+      if (e.kind === "tone") tone(e.inst, e.midi, when, e.dur * spb * 0.95); else DRUMS[e.hit](when); }
+    for (; t0 + (P2.beat - from) * spb < horizon; P2.beat++) { const when = t0 + (P2.beat - from) * spb; if (ED.metro && when >= c.currentTime - 0.01) DRUMS.r(when); }
+    if (from + (c.currentTime - t0) / spb > B.end + 1) { stopEditorPlay(); return; }
+    P2.timer = setTimeout(tick, 40);
+  };
+  const follow = () => { const P2 = ED.play; if (!P2) return; ED.cursor = Math.max(from, from + (c.currentTime - t0) / spb);
+    const x = edX(ED.cursor); if (x > $("#ed-canvas").width * 0.8 || x < 0) ED.b0 = ED.cursor - 2; edDraw(); P2.raf = requestAnimationFrame(follow); };
+  tick(); follow();
+  $("#ed-play").classList.add("on"); $("#ed-play").textContent = "Pause (Space)";
+}
+function stopEditorPlay() {
+  if (!ED.play) return;
+  clearTimeout(ED.play.timer); cancelAnimationFrame(ED.play.raf); ED.play = null; cut();
+  $("#ed-play").classList.remove("on"); $("#ed-play").textContent = "Play (Space)"; edInfo();
+}
+function edRecord(code, down) {
+  const lane = keysFor(ED.B.lanes).indexOf(code);
+  if (lane < 0 || !ED.play) return false;
+  const b = ED.snap ? edSnap(ED.cursor) : +ED.cursor.toFixed(4);
+  if (down) { edSave(); const m = { b, lane, len: 0, kind: "tap" }; ED.notes.push(m); ED.held.set(code, m); edChanged(); }
+  else { const m = ED.held.get(code); ED.held.delete(code); if (m && b - m.b >= Math.max(ED.snap || 0.5, 0.5)) { m.len = +(b - m.b).toFixed(4); m.kind = "hold"; edChanged(); } }
+  return true;
+}
+function edExport() {
+  const chart = { song: ED.song.id, diff: ED.diff, notes: edClone(ED.notes).sort((a, b) => a.b - b.b || a.lane - b.lane).map(n => ({ b: +n.b.toFixed(4), lane: n.lane, len: +n.len.toFixed(4), kind: n.kind })) };
+  const text = JSON.stringify(chart), a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "application/json" })); a.download = edKey() + ".json"; document.body.append(a); a.click(); a.remove();
+  try { navigator.clipboard.writeText(text).catch(() => {}); } catch {}
+  $("#ed-errors").textContent = "Exported " + edKey() + ".json (and copied it). Put it in src/games/content/relic-song-charts/ and list it in index.json.";
+  return text;
+}
+function editorKey(e) {
+  const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
+  if (ED.rec && !ctrl && edRecord(e.code, true)) { e.preventDefault(); return; }
+  if (k === " ") { e.preventDefault(); edPlay(); }
+  else if (k === "escape") { e.preventDefault(); stopEditorPlay(); showScreen("map"); drawOpts(); }
+  else if (k === "delete" || k === "backspace") { e.preventDefault(); edDelete(); }
+  else if (ctrl && k === "z") { e.preventDefault(); edUndo(!e.shiftKey); }
+  else if (ctrl && k === "y") { e.preventDefault(); edUndo(false); }
+  else if (ctrl && k === "c") { e.preventDefault(); edCopy(); }
+  else if (ctrl && k === "v") { e.preventDefault(); edPaste(); }
+  else if (ctrl && k === "a") { e.preventDefault(); ED.sel = new Set(ED.notes); edDraw(); }
+  else if (k === "1" || k === "2" || k === "3") edSetKind(["tap", "hold", "drag"][Number(k) - 1]);
+  else if (k === "arrowup") { e.preventDefault(); edLane(-1); }
+  else if (k === "arrowdown") { e.preventDefault(); edLane(1); }
+  else if (k === "arrowleft" || k === "arrowright") { e.preventDefault(); edNudge((k === "arrowleft" ? -1 : 1) * (ED.snap || 0.25)); }
+  else if (k === "home") { ED.cursor = 0; ED.b0 = -2; edDraw(); }
+}
+$("#ed-play").onclick = e => { e.currentTarget.blur(); edPlay(); };
+$("#ed-metro").onclick = e => { ED.metro = !ED.metro; e.currentTarget.classList.toggle("on", ED.metro); e.currentTarget.blur(); };
+$("#ed-rec").onclick = e => { ED.rec = !ED.rec; e.currentTarget.classList.toggle("on", ED.rec); e.currentTarget.blur(); edInfo(); };
+$("#ed-regen").onclick = e => { e.currentTarget.blur(); edSave(); ED.notes = edAuto(ED.song, ED.diff); ED.sel.clear(); edChanged(); };
+$("#ed-test").onclick = () => { stopEditorPlay(); edRebuild(); start(ED.song, ED.diff, { B: ED.B, from: Math.max(0, Math.floor(ED.cursor)), editor: true }); };
+$("#ed-export").onclick = e => { e.currentTarget.blur(); edExport(); };
+$("#ed-close").onclick = () => { stopEditorPlay(); showScreen("map"); drawOpts(); };
+$("#ed-tap").onclick = () => edSetKind("tap"); $("#ed-hold").onclick = () => edSetKind("hold"); $("#ed-drag").onclick = () => edSetKind("drag");
+$("#ed-up").onclick = () => edLane(-1); $("#ed-down").onclick = () => edLane(1); $("#ed-del").onclick = edDelete;
+$("#ed-copy").onclick = edCopy; $("#ed-paste").onclick = edPaste; $("#ed-undo").onclick = () => edUndo(true); $("#ed-redo").onclick = () => edUndo(false);
+seg($("#ed-speed"), ED.speed, v => { ED.speed = Number(v); if (ED.play) { stopEditorPlay(); edPlay(); } }, () => seg($("#ed-speed"), ED.speed, () => {}, () => {}));
+seg($("#ed-snap"), ED.snap, v => { ED.snap = Number(v); }, () => seg($("#ed-snap"), ED.snap, () => {}, () => {}));
+edMouse();
+
+// Hand charts: relic-song-charts/index.json lists them ("<song>-<diff>"), each its own JSON file. One that
+// checks out takes the place of that song's built chart (its level is still measured from it).
+(async () => {
+  try {
+    const dir = CONTENT_DIR + "relic-song-charts/", list = await (await fetch(dir + "index.json", { cache: "no-store" })).json();
+    for (const name of Array.isArray(list) ? list : []) {
+      if (!/^[a-z0-9-]+-(ez|hd|in|at)$/.test(name)) continue;
+      const c = await (await fetch(dir + name + ".json", { cache: "no-store" })).json(), song = SONGS.find(s => s.id === c.song);
+      if (!song || !song.diffs.includes(c.diff) || name !== c.song + "-" + c.diff || !Array.isArray(c.notes) || c.notes.length > 5000) continue;
+      const L = CHART_DIFFS[c.diff].lanes, notes = c.notes.filter(n => Number.isFinite(n.b) && n.b >= 0 && Number.isInteger(n.lane) && n.lane >= 0 && n.lane < L && ["tap", "hold", "drag"].includes(n.kind))
+        .map(n => ({ b: n.b, lane: n.lane, len: n.kind === "hold" ? Math.max(0, Number(n.len) || 0) : 0, kind: n.kind }));
+      HAND_CHARTS[name] = notes;
+      delete BUILT[song.id + ":" + c.diff];
+    }
+    payCache = null;
+    if (!$("#map").hidden) drawMap();
+  } catch (error) { console.log("Relic Song: no hand charts.", error && error.message); }
+})();
+
 /* ── Keys ──────────────────────────────────────────────────────────────── */
 addEventListener("keydown", e => {
   // A slot waiting for its key takes the next key, Ctrl and Alt included (so they can be refused).
   if (binding && !$("#opts").hidden) { bindKey(e); return; }
+  if (!$("#editor").hidden) { editorKey(e); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
@@ -3179,13 +3610,14 @@ addEventListener("keydown", e => {
   }
   if (!$("#result").hidden) {
     if (e.code === "KeyR" && !e.shiftKey) { e.preventDefault(); $("#r-retry").click(); }
-    else if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); drawMap(); }
+    else if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); $("#r-map").click(); }
     return;
   }
   // On the map, Esc leaves for the arcade.
   if (e.key === "Escape") { e.preventDefault(); try { parent.postMessage({ type: "bored:close" }, "*"); } catch {} }
 });
 addEventListener("keyup", e => {
+  if (!$("#editor").hidden) { if (ED.rec) edRecord(e.code, false); return; }
   if (!$("#opts").hidden) keyTest(e, false);
   if (!P || P.done) return;
   release(P.keys.indexOf(e.code), e.code);
@@ -3211,7 +3643,7 @@ window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Obj
   finished: !!(P && P.finished), real: !opts.test, badges: badges() });
 // For the console and tests: every song's length, note count and payout.
 window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
-  opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; },
+  opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; }, ED, openEditor, edExport, HAND_CHARTS,
   // The template: styles, demos, the recipe check and the pay table (scripts/relic-song-table.mjs reads these).
   hitKinds: () => Object.keys(HITSOUNDS), autoHit, ZONES, CHART_DIFFS, clock: () => (P && ctx ? now() : null),
   TYPE_STYLES, SCALES, GIMMICKS, REGIONS, RECIPE, DEMOS, autoLine, keyShift, finalVerses, recipeCheck, regionCheck, roleOf, typeOf, clearPay, rankPay, payTable,
@@ -3241,6 +3673,8 @@ window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s
       return Array.from((await off.startRendering()).getChannelData(0));
     } finally { [ctx, noiseBuf, hitOut, lastHit] = live; Object.assign(opts, { hitKind: live[4], hitVol: live[5], sound: live[6], hits: live[7] }); }
   },
+  onsetCheck: (id, diff) => onsetCheck(SONGS.find(s => s.id === id), diff),
+  renderSong: B => renderSong(B),
   charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
     seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), rankPay: rankPay(b.level, d, "a") + rankPay(b.level, d, "s"), ...b.stats }; })) };
 }

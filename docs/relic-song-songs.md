@@ -176,6 +176,92 @@ chords: Em C G D            key: Em
 
 For now, the final is the ending. It opens after Champion Blue, and Sssssssnakes opens after it.
 
+## Band songs (the new model, in testing)
+
+Charts used to come from the melody plus filler. Each difficulty then added its own layers to the
+music, and sounds were patched in under the filler. So many notes didn't land on anything you
+could hear.
+
+**A band song** (`band: true`; for now **Cerulean Current** and **Raichu Overload**) works like
+Phigros. The song is one full arrangement, identical on every difficulty: melody, bass, drums
+(kick, snare, hats) and an arp or chord part. The chart is taken from what that arrangement
+already plays (`bandChart` in `build()`; the parts per difficulty are `BAND_ROLES`):
+
+| Difficulty | Charted from |
+|---|---|
+| EZ | the melody's onsets (on a busy melody: the ones on the beat, and the long ones) |
+| HD | + kick and snare |
+| IN | + arp (and B's answer line) and bass |
+| AT | + chord stabs and toms |
+
+- **Never charted:** hats, ticks, pads, the break's verse, and the middle of a held note.
+- **Playability:** the parts go in by role (melody first). Each note must pass the difficulty's
+  rules (spacing, jacks, chord size, two keys per hand). One that doesn't fit is left out, and
+  nothing is ever added to fill a gap.
+- **Holds:** a held melody note is a hold, and its sound holds with it.
+- **Water leads:** a band song's legato lead gets a short soft attack (`attack`), so its onsets
+  are heard.
+- **Tuning a level:** write the arrangement for it, never filler. Busier drums, bass or arp in a
+  part (`drums`, `bassRun`, `arpRun`, `stab` on a part) raise HD, IN and AT.
+- **No moved break:** on IN and AT a band song doesn't move its break earlier, since the song
+  stays the same song.
+
+**Can you hear every note?** `onsetCheck(song, diff)`, a test hook:
+- **The render:** a chart's music is rendered offline, and onsets are found from jumps in the
+  energy of the signal's slope.
+- **By data:** whether a part that difficulty charts starts on each moment of the chart.
+- **By render:** whether an onset is detected within 30 ms.
+- **Targets for band songs:** 100% by data, 95%+ by render.
+
+## The chart editor and hand charts
+
+**Opening it:** turn on test mode, then go to Options → Help → **Chart editor**. Pick a song and
+difficulty. It opens with the song's hand chart if there is one, otherwise the built chart.
+
+**The timeline:**
+- **Rows:** the highway's lanes. On the moving line (shaded) a note's lane picks its zone, and the
+  dot shows the zone it got.
+- **Grid:** beat and bar lines.
+- **The music strip:** the song's level, with its onsets in gold. A note with no onset within
+  30 ms has a red outline.
+- **Info line:** note count, measured level, % on onsets, playability problems, and line notes
+  left out of the zones.
+
+**Controls:**
+
+| Action | How |
+|---|---|
+| Play / pause | Space, at 0.25x, 0.5x, 0.75x or 1x, with an optional metronome |
+| Scrub | click or drag the ruler |
+| Scroll / zoom | the wheel / Ctrl+wheel |
+| Snap | 1/4, 1/8, 1/12, 1/16 or off |
+| Add a tap / a hold | click a lane / drag right |
+| Select | click a note (Shift adds); Shift-drag box-selects |
+| Move | drag the selection |
+| Delete | Del |
+| Copy / paste at the cursor | Ctrl+C / Ctrl+V |
+| Undo / redo | Ctrl+Z / Ctrl+Y |
+| Change kind | 1 tap, 2 hold, 3 drag |
+| Change lane | ↑ / ↓ |
+| Nudge by the snap | ← / → |
+
+- **Record:** while playing, tap the lane keys to place notes; hold a key for a hold.
+- **Regenerate from music:** a fresh built chart.
+- **Test from cursor:** plays it in the game from that bar. Results and quitting come back to the
+  editor.
+- **Export JSON:** downloads `<song>-<diff>.json` and copies it to the clipboard.
+- **Not edited yet:** the line's movement (v1 is notes only).
+
+**Getting a hand chart into the game:**
+1. Export it from the editor.
+2. Give the file to OC (or add it yourself) as
+   `src/games/content/relic-song-charts/<song>-<diff>.json`.
+3. Add its name (`"<song>-<diff>"`) to `relic-song-charts/index.json`.
+
+The game reads the index at start. A chart that checks out (the right song and difficulty,
+lanes in range, kinds tap/hold/drag) takes the place of the built one, and its level is still
+measured from it.
+
 ## Key zones on the moving line
 
 On **EZ** any bound key hits a line note. On **HD** the screen has 2 zones: the left half takes the
