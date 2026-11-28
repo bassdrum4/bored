@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1072,
+  "count": 1073,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ff590635","date":"2026-11-28","author":"Daniel Lowe","subject":"Unpublish announcements without confirmation","pr":391},
   {"sha":"2cc921bd","date":"2026-11-28","author":"Daniel Lowe","subject":"Use Duck Life 3 title screen for game preview"},
   {"sha":"6abfc780","date":"2026-11-28","author":"bassdrum4","subject":"Use actual F-14 carrier gameplay preview"},
   {"sha":"db76b822","date":"2026-11-28","author":"bassdrum4","subject":"Replace twelve placeholder previews with actual gameplay"},
