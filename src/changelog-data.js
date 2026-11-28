@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1065,
+  "count": 1066,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"df0976b2","date":"2026-11-28","author":"Codebuff","subject":"Relight Trackbound without losing its palette"},
   {"sha":"e069086b","date":"2026-11-28","author":"Daniel Lowe","subject":"Add chat mention autocomplete and highlighted names"},
   {"sha":"3a16bfaa","date":"2026-11-28","author":"Codebuff","subject":"Play the enemy reply as one continuous take into the waterline"},
   {"sha":"4944f365","date":"2026-11-28","author":"Codebuff","subject":"Grade Battleship's sea for late sun and rebuild the hit"},
