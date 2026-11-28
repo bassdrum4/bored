@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1083,
+  "count": 1084,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -11,6 +11,7 @@ export const CHANGELOG_META = {
 export const CHANGELOG = [
   {"sha":"156a51b4","date":"2026-11-28","author":"Daniel Lowe","subject":"Permit owner-triggered CI for Vettel stack retargets"},
   {"sha":"95100d41","date":"2026-11-28","author":"Daniel Lowe","subject":"Fix brittle CI copy assertions and support stacked Relic Song automerge"},
+  {"sha":"5aead4ab","date":"2026-11-28","author":"Claude","subject":"Relic Song: anti-spam (early miss, hand smash, ghost-tap bursts)"},
   {"sha":"09c1798f","date":"2026-11-28","author":"Claude","subject":"Relic Song: a press takes the mode of the note it's for, and the zone docs rewritten"},
   {"sha":"02fca0c9","date":"2026-11-28","author":"Claude","subject":"Relic Song: Phigros scoring, keyboard regions for the line, free note positions and zone hints; zones() fix"},
   {"sha":"b2428f97","date":"2026-11-28","author":"Claude","subject":"Relic Song: band-song tuning (Cerulean, Raichu), louder band arp and a short-tailed water lead so every charted note is heard"},
