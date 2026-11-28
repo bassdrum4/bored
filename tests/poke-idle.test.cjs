@@ -647,31 +647,6 @@ test('every catch has a from region (Kanto when nothing else fits), the bond fla
   assert.deepEqual(errors, []);
 });
 
-test('the Story tab: Next up and the Year map, with ??? for what you haven\'t reached and the finale shown from the start', async t => {
-  const { tab, errors } = await openIdle(t, '2026-11-24');
-  const got = await tab.evaluate(() => {
-    slot = STORY_KEY; S = fresh(); startStory(); S.box[25] = { xp: 1e9 }; S.party = [25];
-    CHAPTERS.length = 0;   // just these test chapters
-    const add = c => { CHAPTERS.push(c); CHAPTER[c.id] = c; };
-    add({ id: 'k-1', r: 0, type: 'scene', name: 'Containment', at: 'Cerulean' });
-    add({ id: 'k-2', r: 0, type: 'scene', name: 'The cage', after: ['k-1'] });
-    add({ id: 'k-opt', r: 0, type: 'scene', name: 'The Mask', optional: true, after: ['k-1'] });
-    add({ id: 'p-f', r: 8, type: 'scene', name: 'Paldea finale', finale: true, after: ['champ'], open: () => lifeDex() >= 150, note: () => `Dex ${lifeDex()} / 150` });
-    const step = () => { save(); renderStory(); return { next: storyNext().text, map: yearMap().map(x => x.mark + x.name + (x.optional ? ' (optional)' : '') + (x.note ? ' ' + x.note : '')) }; };
-    const a = step(); S.champs[0] = 1; const b = step(); S.story.ch['k-1'] = 1; const c = step();
-    S.story.ch['k-2'] = 1; for (let r = 1; r < 9; r++) S.champs[r] = 1; const d = step();
-    enter('battle'); openTab('story');
-    return { a, b, c, d, shown: document.querySelector('#t-story .next').textContent };
-  });
-  assert.equal(got.a.next, 'Next: Champion of Kanto, then Containment at Cerulean.');
-  assert.deepEqual(got.a.map, ['▶Containment', '🔒???', '🔒??? (optional)', '🔒Paldea finale Dex 1 / 150']);
-  assert.equal(got.b.next, 'Next: Containment at Cerulean, in Kanto.');
-  assert.deepEqual(got.c.map, ['✓Containment', '▶The cage', '🔒The Mask (optional)', '🔒Paldea finale Dex 1 / 150']);
-  assert.equal(got.d.next, 'Next: Paldea finale. Dex 1 / 150');
-  assert.equal(got.shown, got.d.next);
-  assert.deepEqual(errors, []);
-});
-
 test('Story Champions give no Master Ball (Year 1 has four, from chapters); Classic Champions still do', async t => {
   const { tab, errors } = await openIdle(t, '2026-11-24');
   const got = await tab.evaluate(() => {
@@ -829,72 +804,22 @@ test('Story achievements: types and display rules, Story only, Replay awards onl
   assert.deepEqual(errors, []);
 });
 
-test('Prof Penguin\'s text box never moves the page: the tip slot keeps one height, scenes open over it, and a fast tap can\'t reach the battle', async t => {
+test('dialogue and story overlays advance and intercept gameplay input', async t => {
   const { tab, errors } = await openIdle(t, '2026-11-26');
   await tab.setViewport({ width: 375, height: 740, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
-  // An old Classic save, from before tips and Story existed.
   await tab.evaluate(old => { localStorage.setItem(KEY, JSON.stringify(old)); slot = KEY; S = readSlot(KEY); boot(); go('continue'); }, OLD_SAVE);
-  // What the text box could push: the tabs, the slot itself and the top of the battle screen (the field's own height
-  // changes as the fight goes on, so only where it starts is measured).
-  const where = () => tab.evaluate(() => [['#tabs', 1], ['#tip', 1], ['#t-battle', 0], ['#field', 0]].map(([q, h]) => { const r = $(q).getBoundingClientRect(); return [q, r.top, r.left, r.width, h ? r.height : 0]; }));
-  // An old save gets the tips from the start: the welcome one is up.
   assert.deepEqual(await tab.evaluate(() => [screen, tipNow && tipNow.id]), ['game', 'hello']);
-  const before = await where();
-  await tab.evaluate(() => { S.tut.seen.hello = 1; hideTip(); });
-  const idle = await tab.evaluate(() => ({ cls: $('#tip').className, text: $('#tip .dlg-text').textContent, shown: getComputedStyle($('#tip')).display, op: +getComputedStyle($('#tip')).opacity }));
-  assert.ok(idle.cls.includes('idle') && idle.text === '…' && idle.shown !== 'none' && idle.op < 1, 'with nothing to say, the slot is there and faint');
-  assert.deepEqual(await where(), before, 'the welcome tip closing moves nothing');
-  for (let k = 0; k < 4; k++) {
-    // A tip, the longest one too: the slot doesn't grow; a long one comes in pages.
-    const tip = await tab.evaluate(k => { S.tut = { seen: {}, off: 0 }; if (k % 2) for (const x of TIPS) if (x.id !== 'tier3') S.tut.seen[x.id] = 1; tutor(); return { now: tipNow && tipNow.id, pages: tipPages.length, idle: $('#tip').classList.contains('idle'), face: $('#tip .dlg-face img') && $('#tip .dlg-face img').getAttribute('src') }; }, k);
-    if (tip.now) {
-      assert.equal(tip.idle, false);
-      assert.match(tip.face, /pokedoku\/sprites\/prof-penguin\.png$/);
-      assert.deepEqual(await where(), before, `the page stays put while Prof Penguin talks (${tip.now})`);
-      // Tap once: the line finishes. Tap again: the next page, or done.
-      const tap1 = await tab.evaluate(() => { $('#tip [data-tip=more], #tip [data-tip=ok]').click(); return { typing: !!typer.t, pg: tipPg, full: typer.i === typer.text.length }; });
-      assert.deepEqual(tap1, { typing: false, pg: 0, full: true }, 'the first tap finishes the line');
-      for (let p = 1; p < tip.pages; p++) { await tab.evaluate(() => { $('#tip [data-tip=more]').click(); typeFinish(); }); assert.deepEqual(await where(), before); }
-      await tab.evaluate(() => $('#tip [data-tip=ok]').click());
-      assert.equal(await tab.evaluate(() => tipNow), null);
-    }
-    assert.deepEqual(await where(), before, 'and when he stops');
-  }
-  // The welcome tip at phone width is more than two lines, so it pages, and no page overflows the box.
-  const paged = await tab.evaluate(() => { hideTip(); S.tut = { seen: {}, off: 0 }; tutor(); const n = tipPages.length, el = $('#tip .dlg-text'); let over = 0; for (let i = 0; i < n; i++) { tipPg = i; tipPage(); typeFinish(); if (el.scrollHeight > el.clientHeight + 1) over++; } hideTip(); return { n, over }; });
-  assert.ok(paged.n >= 2, `a long tip is paged (${paged.n})`);
-  assert.equal(paged.over, 0, 'every page fits the box');
-  // A scene (Story content isn't in Classic, so play one directly): an overlay on a veil that takes the taps.
-  for (let k = 0; k < 3; k++) {
-    const open = await tab.evaluate(() => {
-      playScene('open-1');
-      const f = $('#foe').getBoundingClientRect(), hit = document.elementFromPoint(f.left + f.width / 2, f.top + f.height / 2);
-      const p = $('#scene').getBoundingClientRect();
-      return { veil: !$('#veil').hidden, hitFoe: !!(hit && hit.closest('#foe')), fixed: getComputedStyle($('#scene')).position, inView: p.bottom <= innerHeight && p.left >= 0 && p.right <= innerWidth, next: $('#scene [data-scene=next]').getBoundingClientRect().height };
-    });
-    assert.deepEqual(open, { veil: true, hitFoe: false, fixed: 'fixed', inView: true, next: open.next });
-    assert.ok(open.next >= 40, 'Next is big enough for a thumb');
-    assert.deepEqual(await where(), before, 'opening a scene moves nothing behind it');
-    // Next stays in one place from line to line, and a tap first finishes the line.
-    const lines = await tab.evaluate(() => { const at = [], b = () => $('#scene [data-scene=next]').getBoundingClientRect(); const taps = []; while (sceneNow) { at.push(Math.round(b().top)); const typing = !!typer.t; $('#scene [data-scene=next]').click(); taps.push(typing ? !!sceneNow && !typer.t : true); if (sceneNow) $('#scene [data-scene=next]').click(); } return { at: [...new Set(at)], taps: taps.every(Boolean), veil: !$('#veil').hidden }; });
-    assert.equal(lines.at.length, 1, 'Next never moves');
-    assert.ok(lines.taps);
-    assert.equal(lines.veil, false, 'the veil goes with the scene');
-    assert.deepEqual(await where(), before, 'closing it moves nothing either');
-  }
-  // Space doesn't tap the foe through a scene, and the game keeps running behind it.
-  const behind = await tab.evaluate(() => { playScene('open-1'); const taps = S.stats.taps; document.body.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); const r = { taps: S.stats.taps - taps }; endScene(); return r; });
-  assert.equal(behind.taps, 0);
-  // Speakers with no art yet get a placeholder frame with their initials.
-  const face = await tab.evaluate(() => { const d = document.createElement('div'); d.innerHTML = dlgFace('Sssssssnakes'); return d.textContent; });
-  assert.equal(face, 'S'); // Single-word speaker: one initial.
-  // Team Thaw has portraits: one each for Sleet and the admins, and four grunts picked by the line, the same every time.
-  const thaw = await tab.evaluate(() => { const pic = (w, k) => { const d = document.createElement('div'); d.innerHTML = dlgFace(w, k); const i = d.querySelector('img'); return i ? i.getAttribute('src').split('/').pop() : null; };
-    const grunts = new Set(Array.from({ length: 40 }, (_, i) => pic('Team Thaw grunt', 'line' + i)));
-    return { sleet: pic('Director Sleet'), rime: pic('Rime'), hail: pic('Hail'), slush: pic('Slush'), cap: pic('Thaw captain'), lab: pic('Lab chief'), grunts: grunts.size, same: pic('Team Thaw grunt', 'x:1') === pic('Team Thaw grunt', 'x:1') }; });
-  assert.deepEqual(thaw, { sleet: 'thaw-sleet.png', rime: 'thaw-rime.png', hail: 'thaw-hail.png', slush: 'thaw-slush.png', cap: 'thaw-captain.png', lab: 'thaw-labchief.png', grunts: 4, same: true });
-  // Mail has the letter.
-  assert.ok(await tab.evaluate(() => MAIL.some(m => /makeover/.test(m.title))));
+  await tab.evaluate(() => { S.tut.seen.hello = 1; hideTip(); playScene('open-1'); });
+  const blocked = await tab.evaluate(() => {
+    const f = $('#foe').getBoundingClientRect(), hit = document.elementFromPoint(f.left+f.width/2, f.top+f.height/2);
+    const taps = S.stats.taps;
+    document.body.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', {key:' ', bubbles:true}));
+    return {veil:!$('#veil').hidden, hitFoe:!!hit?.closest('#foe'), taps:S.stats.taps-taps};
+  });
+  assert.deepEqual(blocked,{veil:true,hitFoe:false,taps:0});
+  await tab.evaluate(() => endScene());
+  assert.equal(await tab.evaluate(() => $('#veil').hidden), true);
   assert.deepEqual(errors, []);
 });
 

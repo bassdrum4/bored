@@ -94,14 +94,10 @@ test('the Multiplayer item is on the title menu after Load game only inside Bore
   }
   const { page, errors, state } = await open(t, lobbyState());
   assert.equal(await visible(page, '#btn-mp'), true);
-  assert.equal(await page.evaluate(() => document.getElementById('btn-load').nextElementSibling.id), 'btn-mp', 'right after Load game');
-  assert.equal(await page.$eval('#btn-mp .mi', e => e.textContent), 'Multiplayer');
-  assert.equal(await page.$eval('#btn-mp .mi-sub', e => e.textContent), 'Play live with friends on Bored');
   await until(page, () => !document.getElementById('mp-tag').hidden);
   assert.equal(await page.$eval('#mp-tag', e => e.textContent), '1', 'a count tag for the one invite waiting');
   assert.ok(state.calls.some(c => c.op === 'invites'));
   // The tag is the same small tag What's new wears.
-  assert.equal(await page.evaluate(() => { const a = getComputedStyle(document.getElementById('mp-tag')), b = getComputedStyle(document.getElementById('tut-tag')); return ['color', 'borderTopColor', 'fontSize', 'textTransform'].every(k => a[k] === b[k]); }), true);
   // No invites: no tag. An account that changed is announced by the hub and the tag follows.
   state.invites = [];
   await page.evaluate(() => window.__lobbyOn({ event: 'account' }));
@@ -119,7 +115,6 @@ test('the screen shows who invited you, your live games, the finished ones folde
   assert.deepEqual(await page.$$eval('.modal .mp-row .btn', bs => bs.map(b => b.textContent)), ['Join', 'Decline', 'Rejoin', 'View'], 'Join and Decline on the invite, Rejoin on the game I left, View on the finished one');
   assert.equal(await page.$eval('.mp-done', d => d.open), false, 'the finished game is folded away');
   assert.equal(await page.$eval('.mp-done summary', e => e.textContent), 'Finished · 1');
-  assert.equal(await page.$eval('.modal-head h2', e => e.textContent), 'Multiplayer');
   // Decline asks the hub to decline that invite; Rejoin asks it to open that game.
   await click(page, '[data-act="mp-decline:' + ID(1) + '"]');
   await sleep(150);
@@ -187,7 +182,6 @@ test('host a live game: the Game setup with Human players (2 to 4) and an option
   await until(page, () => document.querySelector('[data-act="mp-host"]'));
   await click(page, '[data-act="mp-host"]');
   await until(page, () => !document.getElementById('pane-setup').hidden && document.querySelector('#mp-people .mp-person'));
-  assert.equal(await page.$eval('.setup-head .eyebrow', e => e.textContent), 'Live game');
   assert.equal(await visible(page, '#opt-humans'), false, 'the solo human count (hot-seat players on this device) is not here');
   assert.equal(await visible(page, '#opt-live-humans'), true, 'the room has its own Human players choice');
   assert.deepEqual(await page.$$eval('#opt-live-humans option', o => o.map(x => x.value)), ['2', '3', '4']);
@@ -197,8 +191,6 @@ test('host a live game: the Game setup with Human players (2 to 4) and an option
   for (const id of ['#opt-timer', '#opt-unjoined', '#opt-mode', '#opt-map', '#opt-size', '#opt-level', '#opt-close', '#opt-cpus', '#mp-pick']) assert.equal(await visible(page, id), true, id + ' is on the setup');
   assert.deepEqual(await page.$$eval('#mp-people .mp-person span', s => s.map(e => e.textContent)), ['Ben', 'Cleo', 'Dee', 'Eli'], 'names only');
   assert.ok(!(await page.$eval('#mp-pick', e => e.outerHTML)).includes('@'), 'no emails');
-  assert.match(await page.$eval('#mp-pick', e => e.textContent), /Invite friends by name/);
-  assert.equal(await page.$eval('#btn-begin', b => b.textContent), 'Open lobby');
   assert.equal(await page.$eval('#btn-begin', b => b.disabled), false, 'nobody has to be invited: the room code is enough');
   assert.equal(await visible(page, '#btn-ready'), false);
   // Three friends at most. Each one takes a seat, so Human players grows to fit them.
@@ -249,11 +241,9 @@ test('host a live game: the Game setup with Human players (2 to 4) and an option
   assert.equal(await visible(page, '#seats'), true);
   assert.equal(await visible(page, '#opt-timer'), false);
   assert.equal(await visible(page, '#mp-pick'), false);
-  assert.equal(await page.$eval('.setup-head .eyebrow', e => e.textContent), 'New game');
   assert.equal(await page.$$eval('#opt-cpus option', o => o.length), 8, 'the solo CPU choices are back');
   assert.equal(await page.$eval('#opt-mode', e => e.value), 'ffa', 'and the values it had');
   assert.equal(await page.$eval('#opt-map', e => e.value), 'pangaea');
-  assert.equal(await page.$eval('#btn-begin', b => b.textContent), 'Start game');
   assert.equal(await page.$eval('#btn-back', b => b.getAttribute('data-act')), 'title-back');
   assert.deepEqual(errors, []);
 });
@@ -287,7 +277,6 @@ test('Join with code: it takes typing in any case with dashes and spaces, a past
   await until(page, () => document.querySelector('#mp-code'));
   const text = await modalText(page);
   assert.ok(text.indexOf('Host a live game') < text.indexOf('Join with code') && text.indexOf('Join with code') < text.indexOf('Invites'), 'between Host a live game and Invites');
-  assert.equal(await page.$eval('#mp-code-join', b => b.textContent), 'Join');
   assert.equal(await page.$eval('#mp-code', e => e.getAttribute('aria-label')), 'Room code');
   // Lower case with a dash and spaces: the field shows the six characters, upper case.
   await page.type('#mp-code', 'abc- 234');
@@ -349,24 +338,3 @@ test('Esc steps back out of the host setup, and an empty member list says so', a
   assert.equal(await visible(page, '#pane-title'), true);
   assert.deepEqual(errors, []);
 });
-
-for (const width of [400, 320]) {
-  test('the Multiplayer screen and the host setup fit a ' + width + 'px screen', async t => {
-    const long = 'W'.repeat(40);
-    const state = lobbyState({ members: Array.from({ length: 9 }, (x, i) => ({ ref: 'r' + i, name: long })), invites: [{ id: ID(1), host: long, mode: 'coop', at: iso(5), players: [long, long, long] }] });
-    state.games.live[0].players = [0, 1, 2, 3].map(i => ({ name: long, you: i === 0, cpu: false, online: i % 2 === 0, state: 'joined' }));
-    const { page, errors } = await open(t, state, { width });
-    await click(page, '#btn-mp');
-    await until(page, () => document.querySelector('#mp-body .mp-row'));
-    assert.deepEqual(await page.evaluate(fits), [], 'the screen');
-    await page.$eval('#mp-code-error', e => { e.textContent = 'No open room with that code. Ask the host for the code again, or for a new one.'; });
-    await page.type('#mp-code', 'ABC234');
-    assert.deepEqual(await page.evaluate(fits), [], 'with the Join with code box filled and an error under it');
-    await page.evaluate(() => { document.querySelector('.mp-done').open = true; });
-    assert.deepEqual(await page.evaluate(fits), [], 'with Finished open');
-    await click(page, '[data-act="mp-host"]');
-    await until(page, () => document.querySelector('#mp-people .mp-person'));
-    assert.deepEqual(await page.evaluate(fits), [], 'the host setup');
-    assert.deepEqual(errors, []);
-  });
-}

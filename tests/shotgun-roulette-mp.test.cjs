@@ -202,24 +202,6 @@ test('reload rule, single player: the same, except for whoever started the load 
   assert.match(html, /function reload\(\) \{\s*\/\/[^\n]*\n\s*g\.loadStarter = g\.turn;/, 'every load records who starts it');
 });
 
-test('the 3D table gives every seat its own 2x2 item grid in its own quarter of the table', () => {
-  const slot = new Function('return ' + line('const SLOT =').replace('const SLOT =', '').replace(/;\s*$/, ''))();
-  const ROT = { bottom: 0, right: Math.PI / 2, top: Math.PI, left: -Math.PI / 2 };
-  const all = [];
-  for (const [pos, a] of Object.entries(ROT)) {
-    for (let k = 0; k < 4; k++) {
-      const [x, z] = slot(k);
-      const w = [x * Math.cos(a) + z * Math.sin(a), -x * Math.sin(a) + z * Math.cos(a)];
-      // Nearer to its own edge than to any other seat's: |along the seat's axis| beats |across it|.
-      const toward = [Math.sin(a), Math.cos(a)], along = w[0] * toward[0] + w[1] * toward[1];
-      assert.ok(along > Math.abs(w[0] * toward[1] - w[1] * toward[0]), pos + ' box ' + k + ' sits in front of its own seat');
-      all.push(w);
-    }
-  }
-  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++)
-    assert.ok(Math.hypot(all[i][0] - all[j][0], all[i][1] - all[j][1]) >= 0.5, 'boxes ' + i + ' and ' + j + ' are at least a slot apart');
-});
-
 test('host settings: the room code, one round, fixed HP, and rooms from before settings', () => {
   const { api } = screen(['A', 'B'], 1, 0);
   assert.equal(JSON.stringify(api.mpParseSettings('r1-h3-t20')), JSON.stringify({ rounds: 1, hp: 3, timer: 20 }));

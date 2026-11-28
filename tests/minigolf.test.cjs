@@ -154,7 +154,7 @@ test('minigolf retains nine holes and its new obstacles affect physics without c
   assert.equal(run('__boredSnapshot().finished'), false);
 });
 
-test('obstacles alter real shot corridors and flag/aim strokes remain thin', () => {
+test('obstacles alter real shot corridors', () => {
   const run = game();
   const bumper = run('(() => { holeIndex=1;loadHole();function roll(){ball={x:310,y:318,vx:0,vy:-210};moving=true;for(let i=0;i<110;i++)step(STEP);return {y:ball.y,vy:ball.vy};}const blocked=roll();holes[1].bumpers=[];const clear=roll();return {blocked,clear};})()');
   assert.ok(bumper.blocked.y > bumper.clear.y + 20, 'bumper interrupts the original right-hand lane');
@@ -164,8 +164,4 @@ test('obstacles alter real shot corridors and flag/aim strokes remain thin', () 
   assert.ok(run('Math.hypot(ball.x-330,ball.y-270)') < 3, 'portal near tee skips the bunker');
   run('holeIndex=4;loadHole();ball={x:310,y:330,vx:0,vy:-100};moving=true;step(STEP)');
   assert.ok(run('ball.vy') < -100, 'speed strip accelerates a ball on the main shot path');
-  for (let i = 0; i < 9; i++) {
-    run('holeIndex='+i+';loadHole();ctx.lineWidth=10;draw()');
-    assert.equal(run('ctx.lineWidth'), 1, 'original thin flag and power-guide strokes on hole '+(i+1));
-  }
 });

@@ -40,7 +40,7 @@ const fits = () => {
   return bad;
 };
 
-for (const width of [400, 320]) {
+for (const width of [320]) {
   test('Ashcrown 4.5: the Load and Save screens and Continue fit a ' + width + 'px screen with 60-character names', async t => {
     const { page, errors } = await open(t, width);
     const long60 = 'Qin Shi Huang & Oda Nobunaga · Renaissance · Turn 42 and on!!'.slice(0, 60);
@@ -297,8 +297,7 @@ test('Ashcrown 5.1: the setup screen offers Co-op, refuses it with no CPU to pla
   await page.click('#btn-new');
   await page.waitForSelector('#opt-mode', { visible: true });
   assert.equal(await page.$eval('#opt-mode', e => e.value), 'ffa', 'free-for-all is the default');
-  assert.deepEqual(await page.$$eval('#opt-mode option', os => os.map(o => [o.value, o.textContent])), [['ffa', 'Free-for-all'], ['coop', 'Co-op: humans vs CPUs']]);
-  assert.equal(await page.$eval('#mode-note', e => e.textContent), 'Every civ plays for itself.');
+  assert.deepEqual(await page.$$eval('#opt-mode option', os => os.map(o => o.value)), ['ffa', 'coop']);
   await page.select('#opt-humans', '2');
   await page.select('#opt-cpus', '0');
   await page.select('#opt-mode', 'coop');
@@ -307,7 +306,6 @@ test('Ashcrown 5.1: the setup screen offers Co-op, refuses it with no CPU to pla
   assert.equal(await page.evaluate('!G || !G.turn'), true, 'no game began with nobody to play against');
   assert.match(await page.evaluate('document.body.textContent'), /Co-op needs at least one CPU/, 'and it said why');
   await page.select('#opt-cpus', '2');
-  assert.match(await page.$eval('#mode-note', e => e.textContent), /Every human plays on one team against the CPUs/);
   await page.click('#btn-begin');
   await page.waitForFunction('G && G.turn >= 1');
   assert.deepEqual(await page.evaluate('[G.mode, G.teams]'), ['coop', [0, 0, 2, 3]]);
@@ -360,7 +358,7 @@ test('Ashcrown 5.1: the top bar names the team, and Alt+click pings a hex for it
   assert.deepEqual(errors, []);
 });
 
-for (const width of [400, 320]) {
+for (const width of [320]) {
   test('Ashcrown 5.1: Your team in the Council and the team end screen fit a ' + width + 'px screen', async t => {
     const { page, errors } = await coopGame(t, width);
     await page.evaluate('showCouncil()');

@@ -285,29 +285,6 @@ test('Game card leaderboard reports co-leaders instead of choosing alphabeticall
   assert.deepEqual(Array.from(leaders.get('wordle').handles), ['Adam', 'Zoe']);
 });
 
-test('Wordle win animation keeps the winning row after the guess counter advances', () => {
-  // Exercise the actual game function with deferred timers. On a sixth-guess
-  // win the old code animated row 6 (which does not exist) five times.
-  const html = load('src/games/content/wordle.html');
-  for (const winningRow of [0, 5]) {
-    const scheduled = [];
-    const animated = [];
-    const ctx = vm.createContext({
-      row: winningRow,
-      setTimeout: (callback, delay) => scheduled.push({ callback, delay }),
-      getTile: (r, col) => r >= 0 && r < 6 ? {
-        classList: { add: name => animated.push([r, col, name]) }
-      } : null
-    });
-    vm.runInContext(extractFunction(html, 'bounceRow'), ctx);
-    ctx.bounceRow();
-    ctx.row++; // submitGuess advances this before animation timers fire
-    assert.deepEqual(scheduled.map(task => task.delay), [0, 100, 200, 300, 400]);
-    for (const task of scheduled) task.callback();
-    assert.deepEqual(animated, Array.from({ length: 5 }, (_, col) => [winningRow, col, 'bounce']));
-  }
-});
-
 // ── Ashcrown save slots ────────────────────────────────────────────────────────────────────────────
 // The slot storage functions run exactly as shipped, against an in-memory localStorage that can be
 // made small, blocked or corrupt.

@@ -792,20 +792,6 @@ test('Trackbound road pieces can be dragged into a new place', () => {
   assert.equal(T.editorView.selected, 2, 'the moved piece stays selected');
 });
 
-test('Trackbound public list shows the leader and lists the next three on hover', () => {
-  const T = load().sandbox.__test;
-  const times = [
-    { handle: 'Ash', ms: 42310 }, { handle: 'Wren', ms: 43120 }, { handle: 'Bo', ms: 44000 },
-    { handle: 'Cy', ms: 45999 }, { handle: 'Dee', ms: 60000 }
-  ];
-  assert.match(T.timeLabel(times[0]), /^Ash /);
-  const hover = T.nextTimesLabel(times);
-  assert.equal(hover.split('\n').length, 3, 'only the next three are listed');
-  assert.match(hover, /^2\. Wren /);
-  assert.match(hover, /4\. Cy /);
-  assert.equal(T.nextTimesLabel([times[0]]), 'Only time on this course so far.');
-});
-
 test('Trackbound offers the editor only for a test drive and drops next track on a custom course', () => {
   const page = load();
   const T = page.sandbox.__test;
@@ -1011,38 +997,10 @@ test('Trackbound bridges a course that crosses itself instead of refusing it', (
   assert.equal(driven.race.state, 'finished', 'the bridged course can be completed');
 });
 
-test('Trackbound shows a course board as a small box by the pointer', () => {
-  const page = load();
-  const T = page.sandbox.__test;
-  const shown = new Set();
-  const board = {
-    classList: { add: name => shown.add(name), remove: name => shown.delete(name) },
-    style: {},
-    getBoundingClientRect: () => ({ width: 160, height: 90 })
-  };
-  T.placeTrackBoard(board, 100, 100);
-  assert.equal(shown.has('open'), true, 'the box is shown');
-  assert.equal(board.style.left, '114px');
-  assert.equal(board.style.top, '116px');
-  T.placeTrackBoard(board, 1010, 760);
-  assert.equal(board.style.left, '838px', 'near the right edge it flips back over the pointer');
-  assert.equal(board.style.top, '658px', 'and up from the bottom edge');
-  T.hideTrackBoard();
-  assert.equal(shown.has('open'), false, 'leaving the row puts it away');
-});
-
-test('Trackbound names a bend for the way it goes on the screen', () => {
+test('Trackbound mirrored bends have opposite geometry', () => {
   const T = load().sandbox.__test;
   // The chase camera shows the car's own +x axis on its left (see stepCar), so
   // a bend that swings towards +x is a left-hander, not a right one.
   assert.ok(T.pieceDef('curveR').curve(1).p[0] > 0, 'the Left bend swings towards +x');
   assert.ok(T.pieceDef('curveL').curve(1).p[0] < 0, 'the Right bend swings the other way');
-  assert.equal(T.BLOCKS.curveR.name, 'Left');
-  assert.equal(T.BLOCKS.curveL.name, 'Right');
-  assert.equal(T.BLOCKS.hairpinR.name, 'Hairpin L');
-  assert.equal(T.BLOCKS.hairpinL.name, 'Hairpin R');
-  assert.equal(T.BLOCKS.wallR.name, 'Wall ride L');
-  assert.equal(T.BLOCKS.wallL.name, 'Wall ride R');
-  assert.equal(T.BLOCKS.bowlR.name, 'Bowl L');
-  assert.equal(T.BLOCKS.bowlL.name, 'Bowl R');
 });

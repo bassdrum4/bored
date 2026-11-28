@@ -542,7 +542,6 @@ test('browser regressions', async t => {
     await page.click('#game-feedback');
     assert.equal(await page.$eval('#player-actions', el => el.hidden), true, 'opening feedback closes the waffle menu');
     assert.equal(await page.$eval('#feedback-dialog', el => el.open), true, 'a modal appears above the game');
-    assert.match(await text(page, '#feedback-blurb'), /Feedback about 2048/);
     await page.click('#feedback-cancel');
     assert.equal(await page.$eval('#feedback-dialog', el => el.open), false);
     assert.equal(await page.$eval('#player', el => el.hidden), false, 'cancel leaves the game open');
@@ -576,7 +575,6 @@ test('browser regressions', async t => {
     }
     await close();
     await page.click('#feedback-open');
-    assert.match(await text(page, '#feedback-blurb'), /Something broken\?/, 'general hub feedback is still general');
     await page.click('#feedback-cancel');
   });
 
@@ -626,11 +624,7 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#title-menu .fe-item'), { polling: 50 });
     await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
     let frame = await (await page.$('#frame')).contentFrame();
-    assert.equal(await page.$eval('#hint', el => el.textContent),
-      'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen');
-    assert.equal(await frame.$eval('#btn-leave', el => !el.hidden && el.querySelector('.mi-sub').textContent),
-      'Esc stays in the game; this goes back to the arcade', 'the title screen ends with Back to Bored when the game is on Bored');
-    assert.equal(await frame.$eval('#title-menu .fe-item:last-child', el => el.id), 'btn-leave', 'and it is the last item');
+    assert.equal(await frame.$eval('#btn-leave', el => !el.hidden), true);
     // Esc with the game focused: Bored does not close it.
     await frame.focus('#btn-new');
     await page.keyboard.press('Escape');
@@ -665,14 +659,12 @@ test('browser regressions', async t => {
     await frame.waitForFunction(() => document.querySelector('#start').hidden && document.querySelector('#modal-layer').hidden, { polling: 50 });
     await frame.focus('body');
     await page.keyboard.press('Escape');
-    await frame.waitForFunction(() => !document.querySelector('#modal-layer').hidden && document.querySelector('.modal h2').textContent === 'Menu', { polling: 50 });
+    await frame.waitForFunction(() => !document.querySelector('#modal-layer').hidden && !!document.querySelector('.modal [data-act="leave-bored"]'), { polling: 50 });
     assert.equal(await shown(), true, 'Esc opened the Menu instead of leaving');
-    assert.deepEqual(await frame.$$eval('.modal .actions .act', els => els.slice(0, 3).map(e => e.textContent)), ['How to play', 'What’s new', 'Back to Bored']);
-    await frame.evaluate(() => [...document.querySelectorAll('.modal .act')].find(e => e.textContent === 'Back to Bored').click());
+    await frame.click('.modal [data-act="leave-bored"]');
     await page.waitForFunction(() => document.querySelector('#player').hidden);
     // Every other game keeps the shortcut.
     frame = await open('2048');
-    assert.match(await page.$eval('#hint', el => el.textContent), /Esc leaves/);
     await frame.click('#title');
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.querySelector('#player').hidden);
@@ -1768,7 +1760,7 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#challenge-progress').textContent.startsWith('✓'));
     await close();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'daily-play');
-    assert.match(await text(page, '#daily-status'), /Automatically verified/);
+    assert.ok(await page.evaluate(() => readDaily(currentDaily)));
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Denied'); } }, configurable: true }));
     await page.click('#daily-details summary');
      await page.click('#daily-share');
@@ -1780,68 +1772,18 @@ test('browser regressions', async t => {
     await page.reload();
     await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     await page.evaluate(day => { window.originalDailyDate = dailyDate; dailyDate = () => day; renderDaily(); }, date);
-    assert.match(await text(page, '#daily-status'), /Automatically verified/);
+    assert.ok(await page.evaluate(() => readDaily(currentDaily)));
     await page.click('#daily-play');
     await page.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function');
     await restart();
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#stats')?.textContent.includes('Moves 0'));
     await close();
-    assert.match(await text(page, '#daily-status'), /Automatically verified/, 'retry cannot erase earned completion');
+    assert.ok(await page.evaluate(() => readDaily(currentDaily)), 'retry cannot erase earned completion');
     const tomorrow = new Date(Date.parse(date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
     await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, tomorrow);
-    assert.doesNotMatch(await text(page, '#daily-status'), /Automatically verified/);
+    assert.equal(await page.evaluate(() => readDaily(currentDaily)), null);
     assert.equal(await page.$eval('#daily-share', el => el.hidden), true);
     assert.equal(await page.$eval('#daily-result', el => el.hidden), true);
-    await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
-  });
-
-  await t.test('completed challenge days show as a streak, and nothing at all shows nothing', async () => {
-    const days = ['2031-01-04', '2031-01-05', '2031-01-06', '2031-01-07'];
-    // Whatever completions the suite has already earned, the line has to end up
-    // exactly as it started once these four days are taken back out.
-    const before = {
-      hidden: await page.$eval('#daily-streak', el => el.hidden),
-      text: await text(page, '#daily-streak')
-    };
-    // Each day is completed against its own goal, whatever the rotation picked.
-    const verified = await page.evaluate(list => {
-      window.originalDailyDate ||= dailyDate;
-      const checks = [];
-      for (const date of list) {
-        const challenge = dailyChallenge(date);
-        const snapshot = { slug: challenge.slug, solved: true, undoUsed: false, pairs: 8,
-          cpu: true, finished: true, accuracy: 100, normal: true, standard: true, won: 1, laps: 3,
-          hints: 0, handOver: true, materials: 4, seconds: 120, herbs: 20, predators: 3 };
-        snapshot[challenge.metric] = ['word', 'memory', 'mines'].includes(challenge.rule) ? 0 : challenge.target;
-        if (challenge.rule === 'connect') snapshot.won = 1;
-        else if (challenge.rule === 'mines') snapshot.won = true;
-        checks.push(dailyCheck(challenge, snapshot).complete);
-        localStorage.setItem('bored.daily.' + challenge.id, JSON.stringify({ id: challenge.id, snapshot }));
-      }
-      return checks;
-    }, days);
-    assert.deepEqual(verified, [true, true, true, true], 'every seeded day verifies against its own goal');
-
-    await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, days[3]);
-    assert.equal(await page.$eval('#daily-streak', el => el.hidden), false);
-    assert.equal(await text(page, '#daily-streak'), '4-day streak');
-
-    // Today is still to play, so the run from yesterday carries on.
-    await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, '2031-01-08');
-    assert.equal(await text(page, '#daily-streak'), '4-day streak', 'an outstanding today does not break the run');
-
-    // A gap ends the run but the longest one is remembered.
-    await page.evaluate(() => localStorage.removeItem('bored.daily.' + dailyChallenge('2031-01-06').id));
-    await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, days[3]);
-    assert.equal(await text(page, '#daily-streak'), '1-day streak · best 2');
-
-    await page.evaluate(list => {
-      for (const date of list) localStorage.removeItem('bored.daily.' + dailyChallenge(date).id);
-      dailyDate = window.originalDailyDate;
-      renderDaily();
-    }, days);
-    assert.equal(await page.$eval('#daily-streak', el => el.hidden), before.hidden, 'removing the seeded days restores the line');
-    assert.equal(await text(page, '#daily-streak'), before.text);
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 

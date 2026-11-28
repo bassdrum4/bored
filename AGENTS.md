@@ -47,7 +47,7 @@ tests/bored.test.cjs     node:test suite, runs src/ as the site in Chrome
 tests/discovery.test.cjs discovery, layout and mock-account flows
 tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
 .github/workflows/deploy.yml  regenerate changelog, stamp version, publish src/ to Pages
-.github/workflows/ci.yml  run the 55-file browser and logic suite on pushes and pull requests
+.github/workflows/ci.yml  run the browser and logic suite on pushes and pull requests
 scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/capture-previews.mjs  re-shoot the library previews in Chrome
 scripts/optimize-previews.py  resize them: fill landscape cards, keep portrait boards whole
@@ -81,7 +81,7 @@ Every push to `main` publishes the game files as committed, with fresh changelog
 there is no generated `index.html` and no commit back to the branch. Paths in `src/index.html` are relative (`./main.js`,
 `./styles.css`) because the site is served under `/bored/`; a root-absolute path would 404 there.
 The test suite serves `src/` through a loopback server in headless Chrome (set `CHROME_PATH` if it is
-not found) and takes several minutes (55 test files); run it before committing anything that touches a game.
+not found) and takes several minutes; run it before committing anything that touches a game.
 
 GitHub Pages is set to **Settings → Pages → Source: GitHub Actions**, which is what lets the
 workflow publish `src/`; a branch deploy can only serve the repo root or `/docs`. There is no

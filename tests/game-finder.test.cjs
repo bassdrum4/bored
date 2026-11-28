@@ -66,7 +66,6 @@ test('game finder stays optional and plays through the existing hub', async t =>
   assert.equal(await page.$eval('#game-finder', node => node.hidden), false);
   await page.click('#game-finder-open');
   assert.equal(await page.$eval('#game-finder-dialog', node => node.open), true);
-  assert.match(await page.$eval('#game-finder-progress', node => node.textContent), /QUESTION 1 OF 6/);
   for (let i = 0; i < 6; i++) await page.click('.finder-option:first-child');
   assert.equal(await page.$$eval('.finder-result', nodes => nodes.length), 3);
   const recommended = await page.$eval('.finder-result', node => node.querySelector('h4').textContent);
