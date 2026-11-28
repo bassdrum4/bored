@@ -68,25 +68,49 @@
 </section>
 <section id="announcements-view" hidden>
   <h2>Announcements</h2>
-  <p class="analytics-note">Messages are delivered inside Bored the next time someone visits. Normal messages do not interrupt games. Guests can receive public messages; messages to specific users require an account. Polls offer 2–8 answers and anyone can vote, once per account or guest browser; open-ended questions take a written reply and need a signed-in account. Responses appear under the announcement below.</p>
+  <p class="analytics-note">Create a message or collect feedback from players. Responses appear below.</p>
   <form id="announcement-form" class="announcement-form">
-    <label>Title <input id="announcement-title" type="text" minlength="3" maxlength="100" required placeholder="New game: Risk!"></label>
-    <label>Message <textarea id="announcement-body" rows="4" maxlength="1000" required placeholder="Tell players what's new."></textarea></label>
-    <div class="announcement-form-row">
-      <label>Type <select id="announcement-kind"><option value="message">Message</option><option value="poll">Poll</option><option value="question">Open-ended question</option></select></label>
-      <label>Audience <select id="announcement-audience"><option value="everyone">Everyone (including guests)</option><option value="registered">Registered accounts</option><option value="selected">Specific accounts</option></select></label>
-      <label>Importance <select id="announcement-priority"><option value="normal">Normal</option><option value="important">Important</option></select></label>
-      <label>Expires <select id="announcement-expiry"><option value="1">After 1 day</option><option value="7" selected>After 7 days</option><option value="30">After 30 days</option><option value="never">Never</option></select></label>
+    <div class="announcement-compose">
+      <div class="announcement-fields">
+        <label>What are you making?
+          <select id="announcement-kind"><option value="message">Announcement</option><option value="poll">Multiple-choice poll</option><option value="question">Open-ended question</option></select>
+        </label>
+        <p id="announcement-kind-help" class="announcement-hint"></p>
+        <label><span id="announcement-title-label">Title</span><input id="announcement-title" type="text" minlength="3" maxlength="100" required placeholder="New game: Risk!"><span id="announcement-title-count" class="announcement-hint"></span></label>
+        <label><span id="announcement-body-label">Message</span><textarea id="announcement-body" rows="3" maxlength="1000" required placeholder="Tell players what's new."></textarea><span id="announcement-body-count" class="announcement-hint"></span></label>
+        <fieldset id="announcement-options-row" hidden>
+          <legend>Answer choices</legend>
+          <p class="announcement-hint">Add 2–8 choices. Paste several lines into a choice to add them all at once.</p>
+          <div id="announcement-options"></div>
+          <button id="announcement-add-option" type="button" class="action">+ Add choice</button>
+          <p id="announcement-options-error" class="announcement-hint" role="status"></p>
+        </fieldset>
+        <details class="announcement-settings">
+          <summary>Delivery settings <span id="announcement-delivery-summary"></span></summary>
+          <div class="announcement-form-row">
+            <label>Audience <select id="announcement-audience"><option value="everyone">Everyone (including guests)</option><option value="registered">Registered accounts</option><option value="selected">Specific accounts</option></select></label>
+            <label>Importance <select id="announcement-priority"><option value="normal">Normal</option><option value="important">Important</option></select></label>
+            <label>Expires <select id="announcement-expiry"><option value="1">After 1 day</option><option value="3">After 3 days</option><option value="7" selected>After 7 days</option><option value="14">After 14 days</option><option value="30">After 30 days</option><option value="never">Never</option></select></label>
+          </div>
+          <label id="announcement-recipients-row" hidden>Recipients (Ctrl/Cmd-click to select multiple)
+            <select id="announcement-recipients" multiple size="7" aria-label="Specific account recipients"></select>
+          </label>
+          <label>Link to a game (optional) <input id="announcement-link" type="text" pattern="#[a-z0-9][a-z0-9-]{0,49}" placeholder="#risk"></label>
+        </details>
+      </div>
+      <aside class="announcement-preview">
+        <p class="announcement-preview-label">PLAYER PREVIEW</p>
+        <article id="announcement-preview-card" class="announcement-preview-card">
+          <p id="announcement-preview-kind" class="announcement-preview-label"></p>
+          <h3 id="announcement-preview-title"></h3>
+          <p id="announcement-preview-body"></p>
+          <div id="announcement-preview-options"></div>
+          <p id="announcement-preview-link" class="announcement-hint"></p>
+        </article>
+        <p class="announcement-hint">Preview only. Nothing is sent until you publish.</p>
+      </aside>
     </div>
-    <label id="announcement-recipients-row" hidden>Recipients (Ctrl/Cmd-click to select multiple)
-      <select id="announcement-recipients" multiple size="7" aria-label="Specific account recipients"></select>
-    </label>
-    <label id="announcement-options-row" hidden>Poll answers (one per line, 2–8)
-      <textarea id="announcement-options" rows="4" maxlength="640" placeholder="Add a new mode&#10;Leave the games as they are"></textarea>
-    </label>
-    <label>Link to a game (optional) <input id="announcement-link" type="text" pattern="#[a-z0-9][a-z0-9-]{0,49}" placeholder="#risk"></label>
-    <button id="announcement-send" type="submit">Publish announcement</button>
-    <p id="announcement-admin-status" role="status" aria-live="polite"></p>
+    <div class="announcement-publish-row"><button id="announcement-send" type="submit">Publish announcement</button><p id="announcement-admin-status" role="status" aria-live="polite"></p></div>
   </form>
   <div class="announcement-history-head"><h3>Sent announcements</h3><button id="announcement-refresh" type="button" class="action">Refresh</button></div>
   <div id="announcement-admin-list"></div>

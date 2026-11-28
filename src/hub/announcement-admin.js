@@ -9,13 +9,94 @@ export function createAnnouncementAdmin() {
   };
   let initialized = false, loading = false;
   const status = text => { $('announcement-admin-status').textContent = text; };
+  const choices = () => [...$('announcement-options').querySelectorAll('input')];
+  const pollOptions = () => choices().map(input => input.value.trim());
+  const pollError = options => options.length < 2 || options.length > 8 ? 'Add 2 to 8 choices.'
+    : options.some(option => !option) ? 'Fill in every choice or remove unused ones.'
+    : options.some(option => option.length > 80) ? 'Keep each choice at 80 characters or fewer.'
+    : new Set(options.map(option => option.toLowerCase())).size !== options.length ? 'Each choice must be different.' : '';
+  const defaultBody = kind => kind === 'poll' ? 'Choose one answer.' : kind === 'question' ? 'Share your thoughts.' : '';
   const showRecipients = () => {
     $('announcement-recipients-row').hidden = $('announcement-audience').value !== 'selected';
+    updatePreview();
   };
+  function updatePreview() {
+    const kind = $('announcement-kind').value;
+    const title = $('announcement-title').value;
+    const body = $('announcement-body').value;
+    $('announcement-title-count').textContent = title.length + '/100';
+    $('announcement-body-count').textContent = body.length + '/1000';
+    $('announcement-preview-kind').textContent = 'FROM BORED / NEW ' + kind.toUpperCase();
+    $('announcement-preview-title').textContent = title.trim() || (kind === 'message' ? 'Your announcement' : 'Your question');
+    $('announcement-preview-body').textContent = body.trim() || defaultBody(kind) || 'Your message will appear here.';
+    $('announcement-preview-card').classList.toggle('is-important', $('announcement-priority').value === 'important');
+    const options = $('announcement-preview-options');
+    options.replaceChildren();
+    if (kind === 'poll') {
+      for (const [i, option] of pollOptions().entries()) {
+        const choice = el('div', option || 'Choice ' + (i + 1));
+        choice.className = 'announcement-preview-choice';
+        options.append(choice);
+      }
+    } else if (kind === 'question') {
+      const answer = el('div', 'Type your answer...');
+      answer.className = 'announcement-preview-answer';
+      options.append(answer, el('small', 'Signed-in players can reply.'));
+    }
+    $('announcement-preview-link').textContent = $('announcement-link').value.trim() ? 'Play ' + $('announcement-link').value.trim() + ' →' : '';
+    const audience = $('announcement-audience');
+    const expiry = $('announcement-expiry');
+    $('announcement-delivery-summary').textContent = audience.selectedOptions[0].textContent + ' · ' + expiry.selectedOptions[0].textContent;
+    $('announcement-options-error').textContent = kind === 'poll' && pollOptions().every(Boolean) ? pollError(pollOptions()) : '';
+  }
+  function renderChoices(values = ['', '']) {
+    const list = $('announcement-options');
+    list.replaceChildren();
+    for (const [index, value] of values.entries()) {
+      const row = el('div');
+      row.className = 'announcement-choice-row';
+      const input = el('input');
+      input.type = 'text';
+      input.maxLength = 80;
+      input.placeholder = 'Choice ' + (index + 1);
+      input.setAttribute('aria-label', input.placeholder);
+      input.value = value;
+      const remove = el('button', '×');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', 'Remove choice ' + (index + 1));
+      remove.disabled = values.length <= 2;
+      remove.onclick = () => renderChoices(pollOptions().filter((_, i) => i !== index));
+      input.addEventListener('paste', event => {
+        const lines = (event.clipboardData?.getData('text') || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        if (lines.length < 2) return;
+        event.preventDefault();
+        const current = choices().map(input => input.value);
+        const next = [...current.slice(0, index), ...lines, ...current.slice(index + 1).filter(Boolean)];
+        if (next.length > 8 || lines.some(line => line.length > 80)) {
+          $('announcement-options-error').textContent = 'Paste at most 8 total choices, each 80 characters or fewer.';
+          return;
+        }
+        renderChoices(next);
+        choices()[Math.min(index + lines.length - 1, next.length - 1)].focus();
+      });
+      row.append(el('span', String(index + 1)), input, remove);
+      list.append(row);
+    }
+    $('announcement-add-option').disabled = values.length >= 8;
+    updatePreview();
+  }
   const showKind = () => {
-    const poll = $('announcement-kind').value === 'poll';
+    const kind = $('announcement-kind').value;
+    const poll = kind === 'poll';
     $('announcement-options-row').hidden = !poll;
-    $('announcement-options').required = poll;
+    $('announcement-title-label').textContent = kind === 'message' ? 'Title' : 'Question';
+    $('announcement-title').placeholder = kind === 'message' ? 'New game: Risk!' : 'What should Bored do next?';
+    $('announcement-body-label').textContent = kind === 'message' ? 'Message' : 'Extra context (optional)';
+    $('announcement-body').placeholder = kind === 'message' ? "Tell players what's new." : 'Explain the question if needed.';
+    $('announcement-body').required = kind === 'message';
+    $('announcement-kind-help').textContent = poll ? 'Anyone in the audience can vote once, including guests on public polls.' : kind === 'question' ? 'Players need an account to submit a written answer.' : 'Send a message without asking for a response.';
+    $('announcement-send').textContent = 'Publish ' + (poll ? 'poll' : kind === 'question' ? 'question' : 'announcement');
+    updatePreview();
   };
   const kindLabel = post => post.kind === 'poll' ? 'Poll' : post.kind === 'question' ? 'Question' : 'Message';
 
@@ -30,7 +111,17 @@ export function createAnnouncementAdmin() {
       box.append(el('p', total + (total === 1 ? ' response' : ' responses')));
       for (const option of options) {
         const count = votes.get(option) || 0;
-        box.append(el('p', option + ' — ' + count + (total ? ' (' + Math.round(count / total * 100) + '%)' : '')));
+        const row = el('div');
+        row.className = 'announcement-result-row';
+        const percent = total ? Math.round(count / total * 100) : 0;
+        const label = el('p', option + ' - ' + count + ' (' + percent + '%)');
+        const track = el('div');
+        track.className = 'announcement-result-track';
+        const bar = el('div');
+        bar.style.width = percent + '%';
+        track.append(bar);
+        row.append(label, track);
+        box.append(row);
       }
       return box;
     }
@@ -121,24 +212,18 @@ export function createAnnouncementAdmin() {
     const button = $('announcement-send');
     if (button.disabled) return;
     const title = $('announcement-title').value.trim();
-    const body = $('announcement-body').value.trim();
+    const body = $('announcement-body').value.trim() || defaultBody($('announcement-kind').value);
     const audience = $('announcement-audience').value;
     const priority = $('announcement-priority').value;
     const kind = $('announcement-kind').value;
     const link_url = $('announcement-link').value.trim() || null;
     const days = $('announcement-expiry').value;
-    const options = kind === 'poll'
-      ? $('announcement-options').value.split('\n').map(line => line.trim()).filter(Boolean)
-      : null;
+    const options = kind === 'poll' ? pollOptions() : null;
     const targets = audience === 'selected'
       ? [...$('announcement-recipients').selectedOptions].map(o => o.value) : [null];
     if (!targets.length) return status('Choose at least one recipient.');
     if (title.length < 3 || title.length > 100 || !body || body.length > 1000) return status('Check the title and message length.');
-    if (kind === 'poll') {
-      if (options.length < 2 || options.length > 8) return status('Give the poll 2 to 8 answers, one per line.');
-      if (options.some(option => option.length > 80)) return status('Keep each poll answer under 80 characters.');
-      if (new Set(options).size !== options.length) return status('Each poll answer must be different.');
-    }
+    if (kind === 'poll' && pollError(options)) return status(pollError(options));
     if (link_url && !/^#[a-z0-9][a-z0-9-]{0,49}$/.test(link_url)) return status('Use a game link like #risk.');
     button.disabled = true;
     try {
@@ -154,6 +239,7 @@ export function createAnnouncementAdmin() {
         }))
       });
       $('announcement-form').reset();
+      renderChoices();
       showRecipients();
       showKind();
       await reload();
@@ -168,6 +254,13 @@ export function createAnnouncementAdmin() {
     if (initialized) return;
     initialized = true;
     $('announcement-audience').onchange = showRecipients;
+    $('announcement-form').addEventListener('input', updatePreview);
+    $('announcement-form').addEventListener('change', updatePreview);
+    $('announcement-add-option').onclick = () => {
+      const values = choices().map(input => input.value);
+      if (values.length < 8) { renderChoices([...values, '']); choices().at(-1).focus(); }
+    };
+    renderChoices();
     $('announcement-kind').onchange = showKind;
     $('announcement-form').onsubmit = publish;
     $('announcement-refresh').onclick = () => void reload();

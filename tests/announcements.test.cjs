@@ -264,12 +264,11 @@ test('an announcement can be a message, a poll or an open-ended question', () =>
   const admin = fs.readFileSync(path.join(root, 'hub', 'announcement-admin.js'), 'utf8');
   const ui = fs.readFileSync(path.join(root, 'hub', 'announcements-ui.js'), 'utf8');
   assert.match(html, /id="announcement-kind"/);
-  assert.match(html, /<option value="poll">Poll<\/option>/);
+  assert.match(html, /<option value="poll">[^<]+<\/option>/);
   assert.match(html, /<option value="question">Open-ended question<\/option>/);
   assert.match(html, /id="announcement-options"/);
   // The composer publishes the kind and its listed answers with the message.
   assert.match(admin, /kind, options, link_url/);
-  assert.match(admin, /Give the poll 2 to 8 answers/);
   assert.match(admin, /announcement_responses/);
   // Players answer through the functions; open-ended answers stay private to
   // their author and the admins, and polls expose only a tally.
@@ -281,4 +280,53 @@ test('an announcement can be a message, a poll or an open-ended question', () =>
   // for an account.
   assert.match(ui, /p_guest/);
   assert.match(ui, /guestVotes/);
+});
+
+test('admin poll composer previews, validates, publishes and resets choices', async t => {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium']
+    .filter(Boolean).find(p => fs.existsSync(p));
+  assert.ok(executablePath);
+  const site = await serve(root);
+  let browser;
+  t.after(async () => { await browser?.close(); await site.close(); });
+  browser = await puppeteer.launch({ executablePath, headless: true });
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+  await page.setRequestInterception(true);
+  await page.on('request', req => {
+    if (req.url().endsWith('/hub/analytics-view.js')) return req.respond({contentType:'application/javascript', body:''});
+    if (req.url().endsWith('/hub/backend.js')) return req.respond({contentType:'application/javascript', body:
+      "export const freshSession = async () => ({user:{id:'admin'}}); export async function request(path, opts) { if(opts?.method === 'POST') window.published = opts.body; return []; }"});
+    return req.url().startsWith(site.origin) ? req.continue() : req.abort();
+  });
+  await page.goto(site.origin + '/analytics.html', {waitUntil:'domcontentloaded'});
+  await page.evaluate(async () => {
+    document.getElementById('dashboard').hidden = false;
+    document.getElementById('announcements-view').hidden = false;
+    const { createAnnouncementAdmin } = await import('./hub/announcement-admin.js');
+    createAnnouncementAdmin().init();
+  });
+  await page.select('#announcement-kind', 'poll');
+  await page.type('#announcement-title', 'How should Bored be funded?');
+  await page.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData('text/plain', 'Sponsors\nAds\nBoth');
+    document.querySelector('#announcement-options input').dispatchEvent(new ClipboardEvent('paste', {clipboardData:data,bubbles:true,cancelable:true}));
+  });
+  assert.deepEqual(await page.$$eval('#announcement-preview-options > div', nodes => nodes.map(n => n.textContent)), ['Sponsors','Ads','Both']);
+  await page.click('#announcement-add-option');
+  assert.equal(await page.$$eval('#announcement-options input', nodes => nodes.length), 4);
+  await page.click('#announcement-send');
+  assert.match(await page.$eval('#announcement-admin-status', n => n.textContent), /Fill in every choice/);
+  assert.equal(await page.evaluate(() => window.published), undefined);
+  await page.click('#announcement-options .announcement-choice-row:last-child button');
+  await page.click('#announcement-send');
+  await page.waitForFunction(() => window.published && document.querySelector('#announcement-kind').value === 'message');
+  const published = await page.evaluate(() => window.published[0]);
+  assert.deepEqual(published.options, ['Sponsors','Ads','Both']);
+  assert.equal(published.body, 'Choose one answer.');
+  assert.equal(published.audience, 'everyone');
+  assert.equal(await page.$$eval('#announcement-options input', nodes => nodes.length), 2);
+  assert.deepEqual(errors, []);
 });
