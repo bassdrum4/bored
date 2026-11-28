@@ -204,6 +204,10 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #screenMenu .menuPanel{width:min(100%,670px);padding:18px 20px}
 .menuModes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0 12px}
 .menuModes button{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:70px;padding:12px;text-align:left;border:1px solid var(--rule);background:var(--paper)}
+.menuModes #btnPublicTracks{grid-column:1/-1;background:var(--accent);border-color:var(--accent);color:#fff;min-height:64px}
+.menuModes #btnPublicTracks strong{font-size:16px}
+.menuModes #btnPublicTracks span{color:#fff;font-size:12px}
+.menuModes #btnPublicTracks:hover{background:#92400e;color:#fff}
 .menuModes button:hover{border-color:var(--accent);color:var(--ink);background:#f1e9d8}
 .menuModes strong{font-size:12px;font-weight:700;letter-spacing:.015em}
 .menuModes span{color:var(--dim);font-size:10px;line-height:1.35;letter-spacing:0;font-weight:400}
@@ -288,6 +292,10 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
           <p>Pick a track. Beat your time. Repeat.</p>
         </header>
         <nav class="menuModes" aria-label="Race modes">
+          <button id="btnPublicTracks" type="button">
+            <strong>Public tracks</strong>
+            <span>Race community-made courses and compete for the best times</span>
+          </button>
           <button id="btnDaily" type="button">
             <strong>Daily track</strong>
             <span id="dailyNote">A new course each day</span>
@@ -5283,6 +5291,7 @@ $('previewZoomOut').addEventListener('click', () => changeEditorZoom(1 / 1.25));
 $('previewReset').addEventListener('click', resetEditorCamera);
 $('menuCampaignTab').addEventListener('click', () => showMenuLibrary('campaign'));
 $('menuCustomTab').addEventListener('click', () => showMenuLibrary('custom'));
+$('btnPublicTracks').addEventListener('click', () => $('menuPublicTab').click());
 $('menuPublicTab').addEventListener('click', () => {
   showMenuLibrary('public');
   if (!publicTracks) void refreshPublicList();
