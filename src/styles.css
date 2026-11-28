@@ -749,3 +749,7 @@ html[data-reduce-motion="true"] .invite-dot::after{opacity:.6;transform:scale(1)
 #invite-claim-code{width:92px;padding:9px 10px;border:1px solid var(--rule);border-radius:0;
   background:var(--paper);color:var(--ink);font:600 16px var(--mono);letter-spacing:.18em;text-align:center}
 #invite-status{display:block;padding:0 24px 18px;min-height:1em;font:11px/1.6 var(--mono);color:var(--dim)}
+
+/* Vettel's game cards use a red rather than ink-colored hover offset. */
+.row:has(> .card:is([data-slug="ashcrown"],[data-slug="pokedoku"],[data-slug="poke-idle"],[data-slug="poke-gacha"],[data-slug="relic-song"],[data-slug="shotgun-roulette"])):hover{border-color:var(--red);box-shadow:4px 4px 0 var(--red)}
+#recent .shelf-play:is([data-slug="ashcrown"],[data-slug="pokedoku"],[data-slug="poke-idle"],[data-slug="poke-gacha"],[data-slug="relic-song"],[data-slug="shotgun-roulette"]):hover,.shelf-play:is([data-slug="ashcrown"],[data-slug="pokedoku"],[data-slug="poke-idle"],[data-slug="poke-gacha"],[data-slug="relic-song"],[data-slug="shotgun-roulette"]):hover{border-color:var(--red);box-shadow:4px 4px 0 var(--red)}
