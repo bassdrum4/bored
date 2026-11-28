@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1062,
+  "count": 1063,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"4944f365","date":"2026-11-28","author":"Codebuff","subject":"Grade Battleship's sea for late sun and rebuild the hit"},
+  {"sha":"9f5464c5","date":"2026-11-28","author":"Claude","subject":"Relic Song: Kanto remaster, Champion Blue, and a fresh start"},
   {"sha":"eb5f4098","date":"2026-11-28","author":"Codebuff","subject":"Make Battleship's shot one continuous take"},
   {"sha":"98bba617","date":"2026-11-28","author":"Codebuff","subject":"Give Battleship's your-turn camera a ship and the board back its mouse"},
   {"sha":"3ce7d6e7","date":"2026-11-28","author":"Claude","subject":"Relic Song: a song template for the regions to come, and coins by chart level"},
