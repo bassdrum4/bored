@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1058,
+  "count": 1062,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -12,6 +12,8 @@ export const CHANGELOG = [
   {"sha":"4944f365","date":"2026-11-28","author":"Codebuff","subject":"Grade Battleship's sea for late sun and rebuild the hit"},
   {"sha":"eb5f4098","date":"2026-11-28","author":"Codebuff","subject":"Make Battleship's shot one continuous take"},
   {"sha":"98bba617","date":"2026-11-28","author":"Codebuff","subject":"Give Battleship's your-turn camera a ship and the board back its mouse"},
+  {"sha":"3ce7d6e7","date":"2026-11-28","author":"Claude","subject":"Relic Song: a song template for the regions to come, and coins by chart level"},
+  {"sha":"7fdedea3","date":"2026-11-28","author":"Claude","subject":"Relic Song: Meloetta's Lesson, a boss card, first-flip grace and one-time tips"},
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
   {"sha":"ae082bee","date":"2026-11-27","author":"Daniel Lowe","subject":"Wait for game loading overlay before local Connect Four browser click"},
   {"sha":"6b5332b6","date":"2026-11-27","author":"bassdrum4","subject":"Fix homepage boot after display name locking"},
@@ -28,6 +30,8 @@ export const CHANGELOG = [
   {"sha":"f5f9ae0d","date":"2026-11-27","author":"Daniel Lowe","subject":"Use red hover accents for Vettel game cards"},
   {"sha":"9ebc7b94","date":"2026-11-27","author":"Daniel Lowe","subject":"Mark downloaded Shadow.net directory files purple"},
   {"sha":"68a08e37","date":"2026-11-27","author":"Daniel Lowe","subject":"Shorten Poké Idle portable save codes","pr":388},
+  {"sha":"145e010f","date":"2026-11-27","author":"Daniel Lowe","subject":"Test equal scoring charts on first and repeat boss attempts"},
+  {"sha":"03fd80e8","date":"2026-11-27","author":"Daniel Lowe","subject":"Keep first-boss guidance without changing leaderboard chart"},
   {"sha":"54341a41","date":"2026-11-27","author":"PenguinV360","subject":"Relic Song: fairer timing and a difficulty unlock chain","pr":386},
   {"sha":"cb120744","date":"2026-11-27","author":"PenguinV360","subject":"Relic Song: the music matches the notes on every difficulty, and hitsounds","pr":385},
   {"sha":"acc198a2","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros choreography on the moving line"},
