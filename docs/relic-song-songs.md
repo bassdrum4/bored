@@ -297,65 +297,78 @@ Perfect) show on the results and the song row, and are kept with the best.
 ## Key zones on the moving line
 
 The moving line's zones are **regions of the keyboard**, matched by physical key (`e.code`), like
-a tablet: where your hand is on the keyboard is where the note is on screen.
+a tablet: where your hand sits on the keyboard is where the note is on screen. The player's lane
+binds don't matter on the line. Any key in a region plays that region's zone.
 
-| Region | Keys |
+| Zone | Keys (the keyboard's columns, left to right) |
 |---|---|
 | 1 | 1 2 3 Q W E A S D Z X C |
 | 2 | 4 5 R T F G V B |
 | 3 | 6 7 Y U H J N M |
 | 4 | 8 9 0 - I O P [ K L ; ' , . / |
 
-- **IN and AT:** 4 zones (columns, or rows while the line is steeper than 60°).
-- **HD:** 2 zones: keyboard columns 1-5 (left hand) and 6 on (right hand).
-- **EZ:** any of these keys or Space.
+**Zones per difficulty:**
+
+| Difficulty | Zones | Keys |
+|---|---|---|
+| EZ | 1 | any region key, Space, or a bound key |
+| HD | 2 | left half (columns 1-5: zones 1+2) and right half (columns 6 on: zones 3+4) |
+| IN, AT | 4 | the four regions above |
+
+- **Columns or rows:** zones split the screen into columns. While the line is steeper than 60°,
+  they turn into rows of the play area, top to bottom.
+- **Several keys per zone:** every key in a region counts, so two fingers can share a zone. One key
+  still plays one note: a chord across zones needs a key in each.
 - **Never a zone key:** Esc, Tab, Caps Lock, Enter, Shift, Ctrl, Alt, the OS keys and the arrows.
-- **R:** it's in region 2, so in play it's a note key. Retry (R) works only on the pause and
+- **R:** it sits in zone 2, so in play it's a note key. Retry (R) works only on the pause and
   results screens.
-- **Options → Keyboard:** pick **Default (4 columns)** or **Mirrored**; see the regions on a
-  keyboard diagram (it's also the key test: held keys light up in their zone's colour); and turn
-  on **Wide lanes**. With Wide lanes on, the highway's lanes use these regions too (six-lane
-  charts split into 6, outer columns to the outer lanes). Off, the default, the highway uses the
-  exact keybinds.
+- **Options → Keyboard:** pick **Default (4 columns)** or **Mirrored**. The keyboard diagram shows
+  the regions in their zone colours and doubles as the key test: held keys light up.
+- **Wide lanes** (off by default): the highway uses the same regions instead of the exact
+  keybinds. Four-lane charts take the 4 regions. Six-lane charts split the keyboard into 6, with
+  the outer columns going to the outer lanes.
 
-**Where notes go:** anywhere inside their zone, by the music: higher pitches further right (a note
-with no pitch goes by its lane), plus a little spread so repeats don't stack. Chords spread across
-zones.
+### Where a note sits
 
-**Leniency:**
-- **Margin:** a chart keeps notes 8% of a zone's width from its borders.
-- **Border bands:** a note within 15% of a border takes the neighbouring zone's keys too. At the
-  middle border (left hand | right hand) the band is 20%.
-- **Timing:** the band is judged by the note's place at its hit.
-- **One key, one note:** a chord still needs separate keys.
+The chart builder (`zones()`) slides each line note along its line until its hit point lands in a
+zone: its lane's zone first, then the nearest one that works.
 
-**Zone hints:** each line note has a soft pastel pip just above its bar (or its ends tinted:
-`ZONE_HINT`). It's in the notes' own glow at 80%, and never changes the note's colour. A lenient
-note blends its two zones' colours. The zone grid (faint borders and region labels) shows for a
-bar as the line takes over. Tips and the first-flip cue are small banners under the combo, and
-battle text sits bottom left, so nothing sits over the playfield.
-
-The chart builder (`zones()`) moves each line note along its line so its hit point lands in its
-lane's zone, or the nearest one that works:
-- **Inside the zone:** at least 26 px from a border, at the hit and 0.15 s before, so no note
-  crosses a border as it lands.
-- **On screen:** all the way in.
-- **Chords:** no two notes of one moment share a zone.
+- **Free position:** inside its zone a note goes by the music. Higher pitches sit further right; a
+  note with no pitch goes by its lane. A little spread keeps repeats from stacking.
+- **Margin (`ZONE_MARGIN`):** every note stays at least 8% of a zone's width away from its borders.
+  That holds at the hit and 0.15 s before it, so no note crosses a border as it lands.
+- **On screen:** the note stays inside the play area for the whole 0.6 s it falls in.
+- **Chords:** no two notes of one moment share a zone, so chords spread across zones.
 - **Jacks:** a zone isn't hit again sooner than the highway lets a lane be, and a hold keeps its
   zone until it ends.
+- **Left out:** a note that fits nowhere drops from the chart; the music under it still plays.
+  Drags take the zone they land in, and any key held in that zone catches them.
 
-A note that fits nowhere is left out; the music under it still plays. Drags take the zone they
-land in, and any key held in that zone catches them.
+### Leniency bands
 
-**On screen:**
-- **Markers:** each zoned note has a dot in its zone's colour, the same colours as the highway's
-  key labels.
-- **Grid:** the zones' borders and keys flash for a bar when the line takes over.
-- **Tip:** a one-time tip explains it the first time.
+A note near a border also takes the neighbouring zone's keys (`lenientZone`):
+
+- **Outer borders (`LENIENT`):** within 15% of the zone's width from the border.
+- **Middle border (`MIDDLE`):** within 20%. That's the left hand | right hand split, where a
+  player is most likely to reach across.
+- **Judged at the hit:** the band uses the note's place at its hit time, not while it falls.
+- **Chords:** leniency never lets one key take two notes.
+
+With the 8% margin, a lenient note always sits between 8% and 15% (20% at the middle) of its zone
+from a border. Everything closer to the middle of a zone takes only its own keys.
+
+### What the player sees
+
+- **Zone hint (`ZONE_HINT`):** a soft pastel glow, about 5 px, just above the bar (`pip`, the
+  default) or a tint on the bar's two end caps (`caps`). The colours are muted pastels at 80%,
+  with no outline, and the note keeps its own colour. A lenient note blends its two zones'
+  colours half and half. `__relicSong.setHint('caps')` switches it in the console.
+- **Grid:** the zones' faint borders and region labels show for a bar as the line takes over.
+- **Tips:** a one-time tip explains zones. Tips and the first-flip cue are small banners under the
+  combo, and battle text sits bottom left, so nothing covers the playfield.
 
 **Levels:** line notes count by their zones (`LINE_WEIGHT`): any key 0.6, 2 zones 0.8, 4 zones
-like a highway note. Jacks on the line are counted per zone. Every chart was re-tuned to the same
-levels.
+like a highway note. Jacks on the line count per zone.
 
 ## Hitsounds
 

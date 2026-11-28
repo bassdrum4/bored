@@ -1930,10 +1930,10 @@ function choreograph(B, script) {
 }
 
 /* ── Key zones on the moving line ──────────────────────────────────────── */
-// On EZ any bound key hits a line note. On HD the screen has 2 zones (left half: the left keys, D or
-// F; right half: J or K), on IN and AT 4 (columns, left to right D F J K; while the line is steeper
-// than 60 degrees, rows of the play area, top to bottom). A note's zone is where its hit point is.
-// On six lanes S joins the first zone and L the last. The keys are the player's binds.
+// On EZ any zone key or Space hits a line note. On HD the screen has 2 zones (the keyboard's left
+// half | right half), on IN and AT 4 (columns, left to right the keyboard regions in KEY_COLUMNS; while
+// the line is steeper than 60 degrees, rows of the play area, top to bottom). A note's zone is where
+// its hit point is.
 // The chart decides it: each line note is moved along its line so its hit point lands in a zone (its
 // lane's, or the nearest that works), well inside it at the hit and a moment before (no note crosses
 // a border as it lands), on screen all the way in; no two notes of one moment share a zone, and a zone
@@ -1945,7 +1945,6 @@ let ZONE_HINT = "pip";
 // Muted pastels for the dark blurred stage (shown at 80%): the zone hints, the keyboard diagram, the zone grid.
 const ZONE_COLORS = ["#e3a6b6", "#a9d8b0", "#a6c4e6", "#c7b4e4"];
 const zoneColor = (z, Z) => ZONE_COLORS[Z === 2 ? z * 2 : z];
-// The zone a hit point is in, or -1 when it's off the play area or within ZONE_EDGE px of a border.
 // A chart keeps notes ZONE_MARGIN of a zone's width from its borders. Near a border a note is lenient: within
 // LENIENT of it (the middle border, left hand | right hand, MIDDLE) the neighbouring zone's keys count too.
 const ZONE_MARGIN = 0.08, LENIENT = 0.15, MIDDLE = 0.2;
@@ -3028,19 +3027,29 @@ const heldIn = n => P.zones < 2 || n.mode !== "line" ? P.held.size > 0 : [...P.h
 const laneOfKey = code => opts.wide ? keyRegion(code, P.keys.length === 6 ? 6 : 4) : P.keys.indexOf(code);
 // A key the moving line takes on EZ: any region key, Space, or a bound key.
 const lineKey = code => keyRegion(code, 4) >= 0 || code === "Space" || boundKeys().has(code);
-function press(lane, code) {
+// Which mode a key plays: the mode of the first note still waiting within the Good window, else the screen's. So a
+// note right on a switch (the first line note, as the break ends) takes an early press, and the last highway note a late one.
+function pressMode() {
+  const t = now();
+  for (const n of P.notes) {
+    if (n.state !== 0 || n.kind === "drag" || t - n.t > WIN.good) continue;
+    return n.t - t <= WIN.good ? n.mode : P.mode;
+  }
+  return P.mode;
+}
+function press(lane, code, mode = P.mode) {
   if (!P || P.paused || P.done) return;
   const t = now();
   P.held.add(code);
-  if (P.mode === "highway" && lane >= 0) document.querySelectorAll("#guides .glow")[lane].classList.add("down");
+  if (mode === "highway" && lane >= 0) document.querySelectorAll("#guides .glow")[lane].classList.add("down");
   // The highway judges the lane; the line judges any key, by time alone.
   let best = null;
   for (const n of P.notes) {
     if (n.state !== 0 || n.kind === "drag") continue;
     if (n.t - t > WIN.good) break;
-    if (n.mode !== P.mode) continue;
-    if (P.mode === "highway" && n.lane !== lane) continue;
-    if (P.mode === "line" && P.zones > 1 && !zoneTakes(n, code)) continue;
+    if (n.mode !== mode) continue;
+    if (mode === "highway" && n.lane !== lane) continue;
+    if (mode === "line" && P.zones > 1 && !zoneTakes(n, code)) continue;
     if (Math.abs(n.t - t) <= WIN.good) { best = n; break; }
   }
   if (!best) return;
@@ -3711,9 +3720,9 @@ addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
     if (P.paused) { if (e.code === "KeyR" && !e.shiftKey) retry(); return; }
     if (e.repeat) { e.preventDefault(); return; }
-    const lane = laneOfKey(e.code);
+    const lane = laneOfKey(e.code), mode = pressMode();
     // The highway wants its lane keys; on the moving line any bound key plays (either row).
-    if (P.mode === "line" ? lineKey(e.code) : lane >= 0) { e.preventDefault(); press(P.mode === "line" ? -1 : lane, e.code); }
+    if (mode === "line" ? lineKey(e.code) : lane >= 0) { e.preventDefault(); press(mode === "line" ? -1 : lane, e.code, mode); }
     return;
   }
   if (!$("#result").hidden) {
