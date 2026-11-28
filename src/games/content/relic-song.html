@@ -109,11 +109,15 @@
   /* Options holds a lot now: tighter rows so it fits the stage without scrolling. */
   #opts .card { max-height: 704px; padding: 16px 26px }
   #opts .card h2 { margin-bottom: 4px }
-  #opts .card .line { padding: 4px 0; min-height: 38px }
+  #opts .card .line { padding: 3px 0; min-height: 34px }
+  #opts .card .btns { margin-top: 8px }
+  #opts .card p.dim { font-size: 13px; line-height: 1.35 }
   .binds { display: flex; gap: 4px; align-items: center }
   .binds .slot { min-width: 34px; height: 30px; padding: 0 6px; font-size: 13px }
   .binds .slot.wait { border-color: var(--tap); color: var(--tap) }
   .binds .reset { margin-left: 8px; font-size: 12px; padding: 4px 8px }
+  .mix { display: flex; gap: 14px; align-items: center }
+  .card .mix input[type=range] { width: 200px }
   .keytest { display: flex; gap: 4px; align-items: center }
   .keytest b { min-width: 30px; padding: 0 5px; height: 30px; display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 3px; font-weight: 400; color: var(--dim) }
   .keytest b.on { background: var(--tap); color: var(--bg); border-color: var(--tap) }
@@ -303,8 +307,8 @@
     <div class="btns"><button id="f-muted" type="button">Muted</button><button id="f-sound" type="button">With sound</button></div></div></div>
 
   <div class="over" id="opts" hidden><div class="card"><h2>Options</h2>
-    <div class="line"><span>Sound</span><span class="seg" id="o-sound"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Muted</button></span></div>
-    <div class="line"><span>Volume</span><input id="o-vol" type="range" min="0" max="100" step="5"></div>
+    <div class="line"><span>Sound</span><span class="mix"><span class="seg" id="o-sound"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Muted</button></span><input id="o-vol" type="range" min="0" max="100" step="5" aria-label="Volume"></span></div>
+    <div class="line"><span>Hitsounds <span class="dim">(a click when you hit)</span></span><span class="mix"><span class="seg" id="o-hits"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Off</button></span><input id="o-hitvol" type="range" min="0" max="100" step="5" aria-label="Hitsound volume"></span></div>
     <div class="line"><span>Audio offset <b id="o-off-v"></b></span><input id="o-off" type="range" min="-250" max="250" step="1"></div>
     <div class="line"><span class="dim">Notes late? Raise it. Early? Lower it.</span><button id="o-cal" type="button">Tap to calibrate</button></div>
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
@@ -382,11 +386,13 @@ const DIFF_NAME = { ez: "EZ", hd: "HD", in: "IN", at: "AT" };
 //   fillChords  how often a filler tap comes with a second (or third) key (times the heat)
 //   burst   a burst part's sixteenths and arpeggio runs go in
 //   six     sixteenths in the filler everywhere, not only in burst parts (step still has the last word)
+//   layer   how busy the band plays: 0 the song as written, 1 (IN) eighth ticks and a busier bass, 2 (AT)
+//           sixteenth ticks and extra kicks and snares too. Every note also gets a sound of its own.
 const CHART_DIFFS = {
-  ez: { lanes: 4, holdMin: 4, step: 0.25, jack: 0.4, chord: 2, fill: 1, chords: 0.3, fillChords: 0, burst: false },
-  hd: { lanes: 4, holdMin: 3, step: 0.105, jack: 0.22, chord: 2, fill: 1, chords: 0.6, fillChords: 1, burst: true, six: true },
-  in: { lanes: 6, holdMin: 3, step: 0.1, jack: 0.18, chord: 3, fill: 1, chords: 1, fillChords: 0.5, burst: true, six: true },
-  at: { lanes: 6, holdMin: 2, step: 0.075, jack: 0.15, chord: 4, fill: 1, chords: 1.4, fillChords: 0.5, burst: true, six: true }
+  ez: { lanes: 4, holdMin: 4, step: 0.25, jack: 0.4, chord: 2, fill: 1, chords: 0.3, fillChords: 0, burst: false, layer: 0 },
+  hd: { lanes: 4, holdMin: 3, step: 0.105, jack: 0.22, chord: 2, fill: 1, chords: 0.6, fillChords: 1, burst: true, six: true, layer: 0 },
+  in: { lanes: 6, holdMin: 3, step: 0.1, jack: 0.18, chord: 3, fill: 1, chords: 1, fillChords: 0.5, burst: true, six: true, layer: 1 },
+  at: { lanes: 6, holdMin: 2, step: 0.075, jack: 0.15, chord: 4, fill: 1, chords: 1.4, fillChords: 0.5, burst: true, six: true, layer: 2 }
 };
 // Lane keys, by physical key (e.code), so they sit in the same place on any layout.
 // Players rebind them in Options; opts.binds keeps both rows.
@@ -453,7 +459,7 @@ const STORY_KEY = "bored.poke-idle.story";
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 // Reduce motion starts on when the system asks for less motion.
-const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0,
+const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitVol: 60,
   calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
 {
@@ -487,17 +493,38 @@ function audio() {
   master = ctx.createGain();
   master.connect(ctx.destination);
   setVolume();
-  noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  voices(ctx);
+  return ctx;
+}
+// The noise buffer and the pulse waves, made for a context (the live one, or an offline render's).
+function voices(c) {
+  noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   for (const duty of [0.125, 0.25]) {
     const n = 32, re = new Float32Array(n), im = new Float32Array(n);
     for (let k = 1; k < n; k++) im[k] = 2 / (k * Math.PI) * Math.sin(k * Math.PI * duty) * 2;
-    waves[duty] = ctx.createPeriodicWave(re, im);
+    waves[duty] = c.createPeriodicWave(re, im);
   }
-  return ctx;
 }
 function setVolume() { if (master) master.gain.value = opts.sound ? 0.32 * opts.vol / 100 : 0; }
+// Hitsounds: a short soft click the moment a key hits a note, on its own volume, straight to the
+// speakers (not through the song's master, which a song's end cuts). Muted mode has none. A chord's
+// keys land within a few ms of each other, so a click within 35 ms of the last one is skipped: one
+// click a chord. `level` is 1 for Perfect and Great, less for Good, least for a drag's tick.
+let hitOut = null, lastHit = -1;
+function hitsound(level) {
+  if (!ctx || !opts.sound || !opts.hits) return;
+  const w = ctx.currentTime;
+  if (w - lastHit < 0.035) return;
+  lastHit = w;
+  if (!hitOut) { hitOut = ctx.createGain(); hitOut.connect(ctx.destination); }
+  hitOut.gain.value = 0.5 * opts.hitVol / 100;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = "triangle"; o.frequency.setValueAtTime(2400, w); o.frequency.exponentialRampToValueAtTime(1000, w + 0.03);
+  g.gain.setValueAtTime(0.6 * level, w); g.gain.exponentialRampToValueAtTime(0.001, w + 0.05);
+  o.connect(g); g.connect(hitOut); o.start(w); o.stop(w + 0.06);
+}
 const hz = midi => 440 * Math.pow(2, (midi - 69) / 12);
 // An instrument: wave, envelope (seconds), level, and optional vibrato, detune pair and filter.
 const INSTRUMENTS = {
@@ -513,7 +540,11 @@ const INSTRUMENTS = {
   voice:   { wave: 0.25, a: 0.03, d: 0.15, s: 0.7, r: 0.2, gain: 0.26, vib: [6, 12], layer: "triangle" },
   ghost:   { wave: 0.5, a: 0.01, d: 0.3, s: 0.5, r: 0.3, gain: 0.18, vib: [3, 14] },
   hiss:    { wave: 0.125, a: 0.004, d: 0.1, s: 0.5, r: 0.04, gain: 0.18, vib: [7, 20] },
-  click:   { wave: "square", a: 0.001, d: 0.03, s: 0, r: 0.01, gain: 0.25 }
+  click:   { wave: "square", a: 0.001, d: 0.03, s: 0, r: 0.01, gain: 0.25 },
+  // The layers' voices: a short pluck under a note, a buzzy one for Lt. Surge, a low one for The Dealer and the snake.
+  pluck:   { wave: 0.125, a: 0.002, d: 0.06, s: 0.15, r: 0.04, gain: 0.09 },
+  zip:     { wave: "sawtooth", a: 0.002, d: 0.05, s: 0.2, r: 0.03, gain: 0.07, detune: 7, cut: 3200 },
+  low:     { wave: "triangle", a: 0.002, d: 0.1, s: 0.15, r: 0.05, gain: 0.3 }
 };
 function tone(name, midi, when, dur) {
   const I = INSTRUMENTS[name];
@@ -571,7 +602,10 @@ const DRUMS = {
   m: w => noise(w, 0.05, 0.08, 4000, "bandpass"),   // a soft shaker
   t: w => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "triangle"; o.frequency.setValueAtTime(140, w); o.frequency.exponentialRampToValueAtTime(70, w + 0.2);
             g.gain.setValueAtTime(0.5, w); g.gain.exponentialRampToValueAtTime(0.001, w + 0.25); o.connect(g); g.connect(master); o.start(w); o.stop(w + 0.3); },
-  r: w => tone("click", 84, w, 0.015)               // a rim tick
+  r: w => tone("click", 84, w, 0.015),              // a rim tick
+  q: w => noise(w, 0.02, 0.06, 8500),               // a soft closed hat, for sixteenths
+  c: w => { noise(w, 0.018, 0.09, 2500, "bandpass"); noise(w + 0.012, 0.012, 0.05, 3500, "bandpass"); },   // a card riffled off the deck
+  x: w => { for (let i = 0; i < 3; i++) noise(w + i * 0.011, 0.01, 0.07 - i * 0.015, 6500); }               // a rattle
 };
 
 /* ── Writing songs ─────────────────────────────────────────────────────── */
@@ -602,15 +636,28 @@ function parseLine(text, steps, where) {
 }
 
 // Each gym's band. `lead` plays the melody; the rest are made from the chords.
+// `layer` is what the band adds as the chart gets busier (see build()): `tick` on the eighths (IN)
+// and `fast` on the sixteenths (AT), `kick` and `snare` for AT's extra hits, `bass` for IN's busier
+// bass (the style's own by default), and `pluck` with its octave over the chord for a note's own sound.
 const STYLES = {
-  rock:     { lead: "lead", bass: "rockbass", bassRun: "eighths", stab: "stab", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1 },
-  water:    { lead: "flow", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "flow16", drums: { k: [0], s: [4], h: "off" }, holds: true },
-  electric: { lead: "buzz", bass: "sqbass", bassRun: "octaves", arp: "arp", arpRun: "up8", drums: { k: [0, 2, 4, 6], s: [2, 6], h: "16" } },
-  grass:    { lead: "flute", bass: "bass", bassRun: "oneThree", arp: "arp", arpRun: "sway", drums: { k: [0, 6], r: [3], m: "off" } },
-  relic:    { lead: "voice", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "flow16", stab: "stab", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1, holds: true },
-  dark:     { lead: "ghost", bass: "sqbass", bassRun: "oneThree", drums: { K: [0], t: [7], H: [4] } },
-  plain:    { lead: "voice", bass: "bass", bassRun: "oneThree", drums: {} },
-  snake:    { lead: "hiss", bass: "sqbass", bassRun: "eighths", drums: { k: [0, 8], s: [4, 12], m: "all" } }
+  rock:     { lead: "lead", bass: "rockbass", bassRun: "eighths", stab: "stab", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1,
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 12 } },
+  water:    { lead: "flow", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "flow16", drums: { k: [0], s: [4], h: "off" }, holds: true,
+              layer: { tick: "m", fast: "q", kick: "k", snare: "r", pluck: "pluck", octave: 24 } },
+  electric: { lead: "buzz", bass: "sqbass", bassRun: "octaves", arp: "arp", arpRun: "up8", drums: { k: [0, 2, 4, 6], s: [2, 6], h: "16" },
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "zip", octave: 12 } },
+  grass:    { lead: "flute", bass: "bass", bassRun: "oneThree", arp: "arp", arpRun: "sway", drums: { k: [0, 6], r: [3], m: "off" },
+              layer: { tick: "m", fast: "r", kick: "k", snare: "r", pluck: "pluck", octave: 24 } },
+  relic:    { lead: "voice", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "flow16", stab: "stab", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1, holds: true,
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 24 } },
+  // The Dealer's table: cards riffled on the beat, low plucks, a tom for a snare.
+  dark:     { lead: "ghost", bass: "sqbass", bassRun: "oneThree", drums: { K: [0], t: [7], H: [4] },
+              layer: { tick: "c", fast: "c", kick: "K", snare: "t", bass: "low", pluck: "low", octave: 0 } },
+  plain:    { lead: "voice", bass: "bass", bassRun: "oneThree", drums: {},
+              layer: { tick: "r", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 24 } },
+  // Sssssssnakes: rattles, and low plucks.
+  snake:    { lead: "hiss", bass: "sqbass", bassRun: "eighths", drums: { k: [0, 8], s: [4, 12], m: "all" },
+              layer: { tick: "x", fast: "x", kick: "k", snare: "s", pluck: "low", octave: 0 } }
 };
 
 // The four verses of Meloetta's song, one per gym. A boss fight sings its gym's
@@ -869,7 +916,7 @@ const hash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++)
 function build(song, diff = "hd") {
   const style = STYLES[song.style], D = CHART_DIFFS[diff], steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
   const heat = (typeof song.heat === "object" ? song.heat[diff] ?? song.heat.hd : song.heat) || 0, roll = (b, salt = 0) => hash(song.id + ":" + diff + ":" + salt + ":" + b.toFixed(3));
-  const ev = [], tune = [], spots = new Map(), chordSpots = [], segments = [];
+  const ev = [], tune = [], spots = new Map(), chordSpots = [], segments = [], barsOn = [], lay = style.layer;
   // A filler spot, on a sixteenth grid, scored by what the band plays there.
   const spot = (b, mode, pri, burst, six) => {
     const k = Math.round(b * 4);
@@ -936,6 +983,19 @@ function build(song, diff = "hd") {
       // A fill on the part's last bar.
       if (bar === bars - 1 && style.drums.s) for (const s of [n * 2 - 2, n * 2 - 1.5, n * 2 - 1]) ev.push({ b: b0 + s / 2, kind: "drum", hit: style.deep ? "t" : "s" });
       if (!chartOn) continue;
+      barsOn.push({ b0, n, tones: [r, t, f, r + 12] });
+      // The band gets busier with the chart: on IN ticks on every eighth and the bass moving on the
+      // off-beats (an octave where it already plays eighths); on AT ticks on the sixteenths too, a kick
+      // on the "and" of every other beat and a snare pickup before each backbeat.
+      if (D.layer >= 1) for (let k = 0; k < n * 2; k++) {
+        ev.push({ b: b0 + k / 2, kind: "drum", hit: lay.tick });
+        if (k % 2) ev.push({ b: b0 + k / 2, kind: "tone", inst: lay.bass || style.bass, midi: bassNote + (style.bassRun === "eighths" || style.bassRun === "octaves" || k % 4 === 3 ? 12 : 7), dur: 0.3 });
+      }
+      if (D.layer >= 2) for (let k = 0; k < n * 2; k++) {
+        ev.push({ b: b0 + k / 2 + 0.25, kind: "drum", hit: lay.fast });
+        if (k % 4 === 3) ev.push({ b: b0 + k / 2, kind: "drum", hit: lay.kick });
+        if (k % 4 === 1) ev.push({ b: b0 + k / 2 + 0.25, kind: "drum", hit: lay.snare });
+      }
       // The grid itself: every eighth is a spot (off-beats count double on a syncopated song),
       // and in a burst (or on IN and AT) every sixteenth.
       for (let k = 0; k < n * 2; k++) {
@@ -1024,7 +1084,7 @@ function build(song, diff = "hd") {
     while (here.length < size) {
       const lane = away(here.map(o => o.lane), c.b, 10).find(l => fits(c.b, l, 0));
       if (lane == null) break;
-      here.push(put({ b: c.b, lane, len: 0, mode: c.mode }));
+      here.push(put({ b: c.b, lane, len: 0, mode: c.mode, fill: true }));
     }
   }
   const fillChords = Math.min(0.9, D.fillChords * heat);
@@ -1041,18 +1101,34 @@ function build(song, diff = "hd") {
     const used = near.filter(o => Math.abs(o.b - last) < E || Math.abs(o.b - next) < E).map(o => o.lane);
     const lane = away(used, s.b, 20).find(l => fits(s.b, l, 0));
     if (lane == null) continue;
-    const here = [put({ b: s.b, lane, len: 0, mode: s.mode })];
+    const here = [put({ b: s.b, lane, len: 0, mode: s.mode, fill: true })];
     // Some filler lands as a chord too: more often the hotter the song, bigger on IN and AT.
     const size = roll(s.b, 5) >= fillChords ? 1 : D.chord >= 3 && roll(s.b, 6) < heat ? 3 : 2;
     while (here.length < size) {
       const more = away(here.map(o => o.lane), s.b, 30).find(l => fits(s.b, l, 0));
       if (more == null) break;
-      here.push(put({ b: s.b, lane: more, len: 0, mode: s.mode }));
+      here.push(put({ b: s.b, lane: more, len: 0, mode: s.mode, fill: true }));
     }
   }
   const chart = placed.sort((a, b) => a.b - b.b || a.lane - b.lane);
   // On the line: a held note is a hold, a speed run is drags, the rest are taps.
   for (const n of chart) n.kind = n.mode === "line" ? (n.len ? "hold" : n.run ? "drag" : "tap") : (n.len ? "hold" : "tap");
+  // Every note lands on a sound you can hear. A moment with nothing under it gets its own: a tick
+  // between the eighths, else a short pluck on the bar's chord (the lane picks the chord tone, so a run
+  // across the lanes is a run up the chord). On IN and AT every filler moment gets its pluck even if a
+  // drum is there, so an arpeggio follows the chart, and a sixteenth burst is a fast one.
+  const heard = ev.map(e => e.b).sort((a, b) => a - b), tol = 0.03 / spb;
+  const near = b => { let lo = 0, hi = heard.length; while (lo < hi) { const m = (lo + hi) >> 1; if (heard[m] < b - tol) lo = m + 1; else hi = m; } return lo < heard.length && heard[lo] <= b + tol; };
+  const pitched = new Set(ev.filter(e => e.kind === "tone" && e.inst !== style.lead && e.inst !== "voice" && e.inst !== style.bass).map(e => Math.round(e.b * 4)));
+  const moments = [...new Set(chart.map(n => n.b))];
+  moments.forEach((b, i) => {
+    const ns = chart.filter(n => n.b === b), fill = ns.some(n => n.fill), silent = !near(b);
+    if (!silent && !(D.layer && fill && !pitched.has(Math.round(b * 4)))) return;
+    const bar = barsOn.filter(x => x.b0 <= b + 1e-6).pop();
+    if (silent && (!bar || (!D.layer && Math.abs(b * 2 - Math.round(b * 2)) > 1e-6))) { ev.push({ b, kind: "drum", hit: lay.tick }); return; }
+    const next = moments[i + 1] ?? b + 1;
+    ev.push({ b, kind: "tone", inst: lay.pluck, midi: bar.tones[Math.min(3, Math.floor(ns[0].lane * 4 / L))] + lay.octave, dur: Math.min(0.45, Math.max(0.1, next - b)) });
+  });
   ev.sort((a, b) => a.b - b.b);
   const end = beat;
   const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb };
@@ -1414,6 +1490,8 @@ function drawOpts() {
   seg($("#o-sound"), opts.sound, v => { opts.sound = Number(v); setVolume(); keepOpts(); });
   seg($("#o-jtext"), opts.jtext, v => { opts.jtext = Number(v); keepOpts(); });
   seg($("#o-calm"), opts.calm, v => { opts.calm = Number(v); keepOpts(); });
+  seg($("#o-hits"), opts.hits, v => { opts.hits = Number(v); keepOpts(); });
+  $("#o-hitvol").value = opts.hitVol; $("#o-hitvol").oninput = e => { opts.hitVol = Number(e.target.value); keepOpts(); audio().resume(); hitsound(1); };
   seg($("#o-test"), opts.test, v => { opts.test = Number(v); keepOpts(); loadSave(); });
   $("#o-vol").value = opts.vol; $("#o-vol").oninput = e => { opts.vol = Number(e.target.value); setVolume(); keepOpts(); };
   $("#o-off").value = opts.offset; $("#o-off-v").textContent = (opts.offset > 0 ? "+" : "") + opts.offset + " ms";
@@ -1841,7 +1919,7 @@ function judge(n, j) {
   n.hit = j;
   count(j);
   if (j === "Miss") n.el.classList.add("miss");
-  else { burst(n, j); if (n.state === 2) n.el.classList.add("done"); }
+  else { burst(n, j); if (n.state === 2) n.el.classList.add("done"); hitsound(n.kind === "drag" ? 0.2 : j === "Good" ? 0.45 : 1); }
   battle(n, j, false);
 }
 function judgeTail(n, j) {
@@ -2051,6 +2129,20 @@ window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Obj
 window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
   songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length, clearPay: clearPayOf(b) }; }),
   // Every chart: lanes, notes, length, level and what the level was measured from.
+  // For tests: render a stretch of a chart's music offline (no speakers) and measure it: the peak, the
+  // loudness (RMS) and the share of samples that clip.
+  render: async (id, diff, from = 0, secs = 8) => {
+    const song = SONGS.find(s => s.id === id), B = built(song, diff), live = [ctx, master, noiseBuf, { ...waves }];
+    const off = new OfflineAudioContext(1, Math.round(44100 * secs), 44100);
+    ctx = off; master = off.createGain(); master.gain.value = 0.32 * 0.7; master.connect(off.destination); voices(off);
+    try {
+      for (const e of B.ev) { const when = e.b * B.spb - from; if (when < 0 || when > secs - 0.5) continue; if (e.kind === "tone") tone(e.inst, e.midi, when, e.dur * B.spb * 0.95); else DRUMS[e.hit](when); }
+      const d = (await off.startRendering()).getChannelData(0);
+      let peak = 0, sum = 0, clip = 0;
+      for (const v of d) { const a = Math.abs(v); peak = Math.max(peak, a); sum += v * v; if (a >= 1) clip++; }
+      return { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / d.length).toFixed(4), clip: clip / d.length };
+    } finally { [ctx, master, noiseBuf] = live; Object.assign(waves, live[3]); }
+  },
   charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
     seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), ...b.stats }; })) };
 }
