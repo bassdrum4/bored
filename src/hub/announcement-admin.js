@@ -96,7 +96,6 @@ export function createAnnouncementAdmin() {
         button.className = 'action';
         button.type = 'button';
         button.onclick = async () => {
-          if (post.active && !confirm('Unpublish this announcement?')) return;
           button.disabled = true;
           try {
             if (!(await freshSession())) throw Error('Sign in again.');

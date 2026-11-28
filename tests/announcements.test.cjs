@@ -88,7 +88,7 @@ test('public announcement renders safely, persists guest dismissal and never tra
   assert.deepEqual(errors, []);
 });
 
-test('announcement composer offers targeted delivery and deliberate unpublishing', () => {
+test('announcement composer offers targeted delivery and one-click unpublishing', () => {
   const html = fs.readFileSync(path.join(root, 'analytics.html'), 'utf8');
   const module = fs.readFileSync(path.join(root, 'hub', 'announcement-admin.js'), 'utf8');
   assert.match(html, /data-view="announcements"/);
@@ -96,6 +96,7 @@ test('announcement composer offers targeted delivery and deliberate unpublishing
   assert.match(html, /id="announcement-priority"/);
   assert.match(module, /recipient_id/);
   assert.match(module, /method: 'PATCH'/);
+  assert.doesNotMatch(module, /\bconfirm\s*\(/);
   assert.match(module, /method: 'POST'/);
 });
 
