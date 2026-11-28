@@ -57,6 +57,41 @@ test('Relic Song boots, has playable charts and uses the shared leaderboard cont
   // EZ stays tame: one line, no flips, spins, speed changes or shakes.
   const ez=await page.evaluate(()=>{const R=window.__relicSong;return R.SONGS.filter(s=>s.line).map(s=>{const B=R.built(s,'ez');return {id:s.id,lines:B.lines.slice(1).filter(l=>l.length).length,turns:B.lines[0].filter(g=>g.kind==='flip'||g.kind==='spin').length,speeds:B.floors.flat().length-4,shakes:B.fx.filter(f=>f.kind==='shake').length};});});
   for(const c of ez) assert.deepEqual([c.lines,c.turns,c.speeds,c.shakes],[0,0,0,0],c.id);
+  // Onix Rising is the first boss: on EZ and HD its line only stomps (one line, no flips or spins, one
+  // speed, every note from above). The stomp flip is IN and AT's.
+  const onix=await page.evaluate(()=>{const R=window.__relicSong,s=R.SONGS.find(x=>x.id==='onix-rising');return s.diffs.map(d=>{const B=R.built(s,d);
+    return {d,lines:B.lines.slice(1).filter(l=>l.length).length,turns:B.lines[0].filter(g=>g.kind==='flip'||g.kind==='spin').length,speeds:B.floors.flat().length-4,
+      below:B.chart.filter(n=>n.mode==='line'&&n.side*Math.cos(R.lineAt(B.lines[n.line],n.rel,n.line).rot*Math.PI/180)<0).length};});});
+  for(const c of onix.filter(c=>c.d==='ez'||c.d==='hd')) assert.deepEqual([c.lines,c.turns,c.speeds,c.below],[0,0,0,0],'onix '+c.d);
+  assert.ok(onix.find(c=>c.d==='in').turns>0,'onix IN keeps its stomp flip');
+  // Meloetta's Lesson: six practices, every note on a sound, and the line one never turns.
+  const lesson=await page.evaluate(()=>{const R=window.__relicSong;return R.LESSON_STEPS.filter(s=>s.part).map(s=>{const B=R.lessonPart(s);
+    return {n:s.n,notes:B.chart.length,seconds:B.seconds,silent:B.chart.filter(n=>!B.ev.some(e=>Math.abs(e.b-n.b)<0.02)).length,kinds:[...new Set(B.chart.map(n=>n.kind))].sort().join(),
+      turns:B.lines?B.lines[0].filter(g=>g.kind==='flip'||g.kind==='spin').length:0,line:B.chart.some(n=>n.mode==='line')};});});
+  assert.deepEqual(lesson.map(l=>l.n),[1,2,3,4,5,6]);
+  for(const l of lesson){assert.equal(l.silent,0,'lesson '+l.n);assert.equal(l.turns,0,'lesson '+l.n);}
+  assert.ok(lesson.find(l=>l.n===2).kinds.includes('hold')&&lesson.find(l=>l.n===5).kinds.includes('drag')&&lesson.find(l=>l.n===4).line);
+  const lessonSecs=lesson.reduce((t,l)=>t+l.seconds,0);
+  assert.ok(lessonSecs>=55&&lessonSecs<=95,'lesson music '+lessonSecs+'s');
+  // A fresh save: the sound question, then the lesson; Pewter Steps waits for it; Esc skips it and opens it.
+  const pewter=()=>page.evaluate(()=>document.querySelector('.gym .row').classList.contains('off'));
+  assert.equal(await page.evaluate(()=>!document.querySelector('#first').hidden),true);
+  assert.equal(await pewter(),true);
+  await page.click('#f-sound');
+  assert.equal(await page.evaluate(()=>!document.querySelector('#lesson').hidden),true);
+  await page.keyboard.press('Escape');
+  assert.deepEqual(await page.evaluate(()=>[document.querySelector('#lesson').hidden,window.__relicSong.opts.lesson]),[true,1]);
+  assert.equal(await pewter(),false);
+  // The first moving line: two quiet bars and the cue, once; the boss card first, once.
+  const first=await page.evaluate(()=>{const R=window.__relicSong;R.start('onix-rising','hd');const card=!document.querySelector('#bosscard').hidden;
+    document.querySelector('#bc-go').click();const P=R.play,quiet=P.notes.filter(n=>n.mode==='line'&&n.rel<8).length,cue=P.cue&&P.cue.to;
+    R.opts.tips.flip=1;document.querySelector('#b-quit').click();R.start('onix-rising','hd');const again=[!document.querySelector('#bosscard').hidden,R.play.cue,R.play.notes.filter(n=>n.mode==='line'&&n.rel<8).length>0];
+    document.querySelector('#b-quit').click();return {card,quiet,cue,again};});
+  assert.deepEqual(first,{card:true,quiet:0,cue:8,again:[false,null,true]});
+  // Tips: queued once each, before the thing they're about.
+  const tips=await page.evaluate(()=>{const R=window.__relicSong,s=R.SONGS.find(x=>x.id==='starmie-undertow'),B=R.built(s,'in');const notes=B.chart.map(n=>({...n,t:n.b*B.spb}));
+    const t=R.tipsFor(s,B,notes,3);for(const x of t)R.opts.tips[x.id]=1;return {ids:t.map(x=>x.id).sort(),again:R.tipsFor(s,B,notes,3).length};});
+  assert.deepEqual(tips,{ids:['below','lines','six','speed'],again:0});
   assert.deepEqual(errors,[]);
 });
 
@@ -75,4 +110,13 @@ test('Relic Song pays its PAY table once, and tops up old payouts once', async (
   assert.equal(t.paid, (100 - 12) + (25 - 3) + 250);
   assert.equal(coins(t.wallet), 100 + 25 + 250);
   assert.equal(topUpRelicSong(t.wallet, { table, bosses, final }).paid, 0);
+});
+
+test('Meloetta\'s Lesson pays its bonus once', async () => {
+  const { payRelicLesson } = await import('../src/hub/relic-song.js');
+  const { walletBalance, mergeWallet } = await import('../src/hub/rewards.js');
+  const first = payRelicLesson(mergeWallet({}), { table: { lesson: 50 } });
+  assert.equal(first.paid, 50);
+  assert.equal(walletBalance(first.wallet).coins, 50);
+  assert.equal(payRelicLesson(first.wallet, { table: { lesson: 50 } }).paid, 0);
 });
