@@ -69,7 +69,7 @@ try {
         <summary>More<span class="invite-dot" aria-hidden="true" hidden></span></summary>
         <div class="mobile-more-menu">
           <a href="#leaderboard">Leaderboard</a>
-          <a href="./changelog.html">Changelog</a>
+
           <a href="#settings">Settings<span class="invite-dot" aria-hidden="true" hidden></span></a>
         </div>
       </details>
@@ -105,12 +105,12 @@ try {
   <p id="together-home" class="bt-home" hidden><a id="together-home-link" href="#together"></a></p>
   <section id="together" aria-labelledby="together-heading" hidden>
     <div class="section-heading"><div><p class="eyebrow">Bored / Together</p><h2 id="together-heading">Bored Together</h2><svg class="bo bo-sm" data-mood="pleased" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#pleased"/></svg></div>
-    <div class="bt-actions"><button id="together-refresh" class="action" type="button">Refresh</button><button id="together-back" class="action" type="button">All Games</button></div></div>
+    <div class="bt-actions"><button id="together-back" class="action" type="button">All Games</button></div></div>
     <p id="together-status" role="status" aria-live="polite"></p>
     <div id="together-content"></div>
   </section>
   <section id="recent" class="shelf" aria-labelledby="recent-heading">
-    <div class="section-heading"><div><h2 id="recent-heading">Jump Back In</h2></div><div class="section-links"><button id="favorites-all" class="text-button" type="button" hidden>Browse favorites</button><a class="text-link" href="#library">All games &#8599;</a></div></div>
+    <div class="section-heading"><div><h2 id="recent-heading">Jump Back In</h2></div><div class="section-links"><a class="text-link" href="#library">All games &#8599;</a></div></div>
     <div class="empty-note"><svg class="bo bo-sm" data-mood="shrug" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#shrug"/></svg>
     <p id="recent-empty" class="section-note">No recent games.</p></div>
     <div id="recent-list" class="shelf-grid"></div>
@@ -129,13 +129,12 @@ try {
         <p id="daily-date"></p>
         <p id="daily-meta" class="game-meta"></p>
         <p id="daily-status" role="status">Everyone gets the same first board.</p>
-        <button id="daily-share" class="text-button" type="button" hidden>Copy result</button>
-        <textarea id="daily-result" aria-label="Daily challenge result to share" readonly rows="5" hidden></textarea>
+
       </div>
     </details>
   </section>
   <section id="library" aria-labelledby="library-heading" tabindex="-1">
-    <div class="section-heading"><div><h2 id="library-heading">All Games<span class="wordmark-dot">.</span></h2></div><div class="section-links"><span id="library-count" class="section-aside"></span><span id="game-finder"><button id="game-finder-open" class="text-button" type="button" aria-haspopup="dialog" aria-controls="game-finder-dialog">Help me choose &#8599;</button></span></div></div>
+    <div class="section-heading"><div><h2 id="library-heading">All Games<span class="wordmark-dot">.</span></h2></div><div class="section-links"><span id="game-finder"><button id="game-finder-open" class="text-button" type="button" aria-haspopup="dialog" aria-controls="game-finder-dialog">Help me choose &#8599;</button></span></div></div>
   <div class="tools">
     <div class="search-row">
       <label class="sr-only" for="q">Search the game library</label><input id="q" type="search" placeholder="Search games" autocomplete="off" aria-label="Find a game or a category" aria-controls="grid">
@@ -144,20 +143,20 @@ try {
     <nav id="filters" class="filters" aria-label="Filter games">
       <button class="filter" type="button" data-filter="Vettel" aria-pressed="false">Vettels!</button>
       <button class="filter" type="button" data-filter="All" aria-pressed="true">All</button>
-      <button class="filter" type="button" data-filter="Quick" aria-pressed="false">Quick games</button>
+
       <button class="filter" type="button" data-filter="Friends" aria-pressed="false">2 players</button>
-      <button class="filter" type="button" data-filter="Relax" aria-pressed="false">Relaxing</button>
-      <button class="filter" type="button" data-filter="New" aria-pressed="false">New</button>
+
+
       <button class="filter" type="button" data-filter="Favorites" aria-pressed="false">Favorites</button>
       <button class="filter" type="button" data-filter="Arcade" aria-pressed="false">Arcade</button>
-      <button class="filter" type="button" data-filter="Puzzle" aria-pressed="false">Puzzle</button>
-      <button class="filter" type="button" data-filter="Strategy" aria-pressed="false">Strategy</button>
-      <button class="filter" type="button" data-filter="Sandbox" aria-pressed="false">Sandbox</button>
-      <button class="filter" type="button" data-filter="Online" aria-pressed="false">Online</button>
+      <button class="filter" type="button" data-filter="Puzzle" aria-pressed="false">Puzzle &amp; Strategy</button>
+
+
+
     </nav>
-    <div class="library-bar">
+    <div class="sr-only">
       <span id="results" role="status" aria-live="polite"></span>
-      <label>Sort <select id="sort" aria-label="Sort games" title="Popular ranks by distinct players over the previous seven days, updated weekly on Monday; the four newest releases stay at the top"><option value="popular">Popular</option><option value="original">Newest</option><option value="az">A–Z</option></select></label>
+
     </div>
   </div>
   <div id="grid" class="grid" aria-label="Game library"></div>
@@ -167,9 +166,7 @@ try {
 
   <section id="leaderboard" aria-labelledby="leaderboard-heading">
     <div class="bo-heading"><h2 id="leaderboard-heading">Leaderboard</h2><svg class="bo bo-sm" data-mood="surprised" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#surprised"/></svg></div>
-    <div class="lb-bar">
-      <button id="lb-refresh" class="action" type="button">Refresh</button>
-    </div>
+
     <p id="lb-note">5 points for a first place in a game, 1 for fifth.</p>
     <ol id="lb-list"></ol>
     <p id="lb-empty" hidden></p>
@@ -184,7 +181,7 @@ try {
     <div class="settings-layout">
       <div class="settings-panels">
         <section class="settings-panel" id="account-panel" aria-labelledby="account-panel-heading" hidden>
-          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◔</span><div>
+          <div class="settings-panel-header"><div>
             <h3 id="account-panel-heading">Account</h3>
             <p></p>
           </div></div>
@@ -194,18 +191,16 @@ try {
             <button id="account-signout" class="action" type="button">Sign out</button></div>
         </section>
         <section class="settings-panel" aria-labelledby="appearance-heading">
-          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◐</span><div>
+          <div class="settings-panel-header"><div>
             <h3 id="appearance-heading">Appearance</h3>
           </div></div>
           <div class="settings-row"><div><label for="setting-theme">Theme</label></div>
             <select id="setting-theme"><option value="light">Light</option><option value="dark">Dark</option></select></div>
-          <div class="settings-row"><div><label for="setting-density">Game card size</label></div>
-            <select id="setting-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
-          <div class="settings-row"><div><label for="setting-descriptions">Show game descriptions</label></div>
-            <input id="setting-descriptions" class="settings-checkbox" type="checkbox" checked></div>
+          <div class="settings-row"><div><label for="sort">Game order</label></div><select id="sort" aria-label="Sort games" title="Popular ranks by distinct players over the previous seven days, updated weekly on Monday; the four newest releases stay at the top"><option value="popular">Popular</option><option value="original">Newest</option><option value="az">A–Z</option></select></div>
+
         </section>
         <section class="settings-panel" aria-labelledby="comfort-heading">
-          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">✳</span><div>
+          <div class="settings-panel-header"><div>
             <h3 id="comfort-heading">Comfort &amp; privacy</h3>
             <p class="settings-note">Chat is public. Message text is processed by OpenAI for automated moderation; avoid sharing personal information.</p>
           </div></div>
@@ -217,7 +212,7 @@ try {
             <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
         </section>
         <section class="settings-panel" id="invite-panel" aria-labelledby="invite-heading">
-          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">✳</span><div>
+          <div class="settings-panel-header"><div>
             <h3 id="invite-heading">Invites</h3>
             <p id="invite-blurb">Want to have a cool badge by your name? Give someone this code when they're signing up, and you'll get credit for them.</p>
           </div></div>
@@ -237,19 +232,19 @@ try {
           <p id="invite-status" class="settings-saved" role="status" aria-live="polite"></p>
         </section>
       </div>
-      <aside class="settings-sidebar">
-        <div class="settings-aside"><h3>This browser</h3>
+      <div class="settings-panel settings-maintenance">
+        <div class="settings-aside">
           <p id="settings-saved" class="settings-saved" role="status" aria-live="polite">Your changes save automatically.</p>
         </div>
-        <div class="settings-aside"><h3>Clear local preferences</h3>
+        <div class="settings-aside">
           <p>This won’t delete your account or scores.</p>
           <div class="settings-actions"><button type="button" id="settings-clear-favorites" class="action">Clear favorites</button>
           <button type="button" id="settings-reset" class="action">Reset settings</button></div>
         </div>
-      </aside>
+      </div>
     </div>
   </section>
-  <footer class="foot"><span>have fun. stay a while.</span><span><a id="admin-analytics-link" href="./analytics.html" hidden>Analytics · </a><a id="admin-preview-link" href="#shotgun-roulette" hidden>Shotgun Roulette (admin preview) · </a><span id="foot-count"></span></span></footer>
+  <footer class="foot"><span>have fun. stay a while.</span><span><a id="admin-analytics-link" href="./analytics.html" hidden>Analytics</a><a id="admin-preview-link" href="#shotgun-roulette" hidden>Shotgun Roulette (admin preview)</a></span></footer>
 </main>
 
 <!-- A game waiting on you, in the corner. Quiet, dismissible, never over a game. -->

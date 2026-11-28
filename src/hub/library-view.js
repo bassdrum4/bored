@@ -133,7 +133,7 @@ function previewFor(slug) {
     preview.appendChild(image);
   } else {
     preview.classList.add('external-preview');
-    preview.append(element('span', 'external-mark', '↗'), element('span', '', 'ONLINE EXTRA'));
+    preview.append(element('span', 'external-mark', '↗'), element('span', '', 'PLAY'));
   }
   return preview;
 }
@@ -236,7 +236,7 @@ function renderRecent() {
   // Rankings are aggregated, never individual player histories. Offline has a fixed fallback.
   // Every NEW-badged launch belongs here even before it has a rank.
   const popular = sortPopularGames(
-    ORDER.filter(([slug]) => !EXTERNS[slug] &&
+    ORDER.filter(([slug]) =>
       (popularRankings.has(slug) || FRESH_GAMES.includes(slug) || isFeatured(slug, FEATURED_UNTIL))),
     popularRankings, { freshGames: FRESH_GAMES, featuredUntil: FEATURED_UNTIL }
   ).slice(0, SHELF_LIMIT).map(([slug]) => slug);
@@ -247,12 +247,10 @@ function renderRecent() {
   $('#recent-heading').textContent = hasHistory ? 'Jump Back In' : 'Start playing';
   $('#recent-list').replaceChildren(...shown.map(slug => shelfGame(slug,
     hasHistory
-      ? (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
+      ? (state.recentGames.includes(slug)
         ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
         : 'Favorite')
       : (FRESH_GAMES.includes(slug) ? 'Just added' : popularRankings.has(slug) ? 'Popular right now' : 'Easy to jump into'))));
-  $('#favorites-all').hidden = !state.favorites.size;
-  $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
   $('#recent-empty').hidden = shown.length > 0;
   $('#recent-empty').closest('.empty-note').hidden = shown.length > 0;
 }
@@ -268,13 +266,11 @@ function renderLibrary() {
     const meta = META[slug];
     return (EXTERNS[slug] || PAYLOAD_SLUGS.includes(slug) || NEW_GAMES.includes(slug)) &&
       (!filter || [name, slug, ...meta, gameMeta(slug), ...(DISCOVERY[slug]?.inputs || [])].join(' ').toLowerCase().includes(filter)) &&
-      (state.category === 'All' || (state.category === 'New' ? FRESH_GAMES.includes(slug) :
-        state.category === 'Favorites' ? state.favorites.has(slug) :
+      (state.category === 'All' || (state.category === 'Favorites' ? state.favorites.has(slug) :
         state.category === 'Vettel' ? inCollection(slug, 'vettel') :
-        state.category === 'Quick' ? inCollection(slug, 'quick') :
         state.category === 'Friends' ? (Boolean(TOGETHER_GAMES[slug]) ||
           (DISCOVERY[slug]?.players || '').includes('2 local')) :
-        state.category === 'Relax' ? inCollection(slug, 'relax') : meta[0] === state.category));
+        state.category === 'Puzzle' ? ['Puzzle', 'Strategy'].includes(meta[0]) : meta[0] === state.category));
   });
   const sortMode = $('#sort').value;
   if (sortMode === 'az') state.visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
@@ -289,10 +285,7 @@ function renderLibrary() {
     const text = element('span', 'text');
     const title = element('span', 'name', name);
     if (FRESH_GAMES.includes(slug)) title.appendChild(element('span', 'badge', 'NEW'));
-    const discovery = DISCOVERY[slug] || {};
-    const playInfo = [discovery.minutes, discovery.players || discovery.inputs?.join(' / ')].filter(Boolean).join(' · ');
-    text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online · Internet required' : META[slug][0]),
-      title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', playInfo));
+    text.append(title, element('span', 'detail', META[slug][1].replace(/\s*[^\w\s]?\s*internet required\.?$/i, '').trim()));
     const best = cardBest(slug);
     if (best) text.appendChild(best);
     card.appendChild(text);
@@ -342,14 +335,11 @@ function renderLibrary() {
     : 'Nothing matches that. Try another search, or clear the filters and start over.';
   $('#results').textContent = state.visibleGames.length + ' of ' + ORDER.length + ' entries';
   $('#count').textContent = ORDER.length;
-  const counts = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';
-  $('#library-count').textContent = counts;
-  $('#foot-count').textContent = counts;
   $('#random').disabled = !state.visibleGames.length;
 }
 
 function showLibraryMessage() {
-  $('#results').textContent = 'These entries need internet. Choose Online to include them in Surprise me.';
+  $('#results').textContent = 'No games match your search.';
 }
 
 

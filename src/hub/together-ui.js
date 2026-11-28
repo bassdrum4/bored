@@ -829,7 +829,6 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   });
   $('#together-nav').onclick = e => { e.preventDefault(); open(); };
   $('#together-home-link').onclick = e => { e.preventDefault(); open(); };
-  $('#together-refresh').onclick = () => run(() => refresh(true));
   $('#together-back').onclick = () => { close(); try { history.replaceState(null, '', '#library'); } catch {} $('#library').scrollIntoView(); };
   for (const link of document.querySelectorAll('.site-nav a:not(#together-nav)')) link.addEventListener('click', close);
   // The notice belongs to the site, not to a game: it shows on the first page

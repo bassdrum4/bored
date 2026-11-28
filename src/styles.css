@@ -753,3 +753,8 @@ html[data-reduce-motion="true"] .invite-dot::after{opacity:.6;transform:scale(1)
 /* Vettel's game cards use a red rather than ink-colored hover offset. */
 .row:has(> .card:is([data-slug="ashcrown"],[data-slug="pokedoku"],[data-slug="poke-idle"],[data-slug="poke-gacha"],[data-slug="relic-song"],[data-slug="shotgun-roulette"])):hover{border-color:var(--red);box-shadow:4px 4px 0 var(--red)}
 #recent .shelf-play:is([data-slug="ashcrown"],[data-slug="pokedoku"],[data-slug="poke-idle"],[data-slug="poke-gacha"],[data-slug="relic-song"],[data-slug="shotgun-roulette"]):hover,.shelf-play:is([data-slug="ashcrown"],[data-slug="pokedoku"],[data-slug="poke-idle"],[data-slug="poke-gacha"],[data-slug="relic-song"],[data-slug="shotgun-roulette"]):hover{border-color:var(--red);box-shadow:4px 4px 0 var(--red)}
+
+/* Settings stay in one simple column. */
+.settings-layout{display:block!important;max-width:760px;margin-inline:auto}
+.settings-maintenance{margin-top:16px}
+.settings-maintenance .settings-aside{padding:0;border:0;background:none}

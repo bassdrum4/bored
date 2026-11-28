@@ -1128,8 +1128,6 @@ function renderDaily() {
     ? '✓ Automatically verified. Your completed result is saved.'
     : 'Same goal for everyone. Retry as much as you want.';
   $('#daily-play').textContent = result ? 'Play again →' : 'Play today’s challenge →';
-  $('#daily-share').hidden = !result;
-  if ($('#daily-result').dataset.challenge !== challenge.id) $('#daily-result').hidden = true;
   renderStreak();
 }
 
@@ -1187,26 +1185,6 @@ function pollDaily() {
   } catch { /* Wait for the next game frame to finish loading. */ }
 }
 
-async function shareDailyResult() {
-  const challenge = dailyChallenge(challengeDate());
-  const result = readDaily(challenge);
-  if (!result) return;
-  const box = $('#daily-result');
-  box.value = 'Bored Daily · ' + challenge.date + '\n' + ORDER.find(([slug]) => slug === challenge.slug)[1] +
-    ' · ' + challenge.label + '\n✓ ' + challenge.goal + '\n' +
-    dailyCheck(challenge, result.snapshot).progress + '\nhttps://bassdrum4.github.io/bored/';
-  box.dataset.challenge = challenge.id;
-  box.hidden = false;
-  try {
-    await navigator.clipboard.writeText(box.value);
-    $('#daily-status').textContent = 'Result copied! Challenge a friend.';
-  } catch {
-    box.focus();
-    box.select();
-    $('#daily-status').textContent = 'Select and copy your result below.';
-  }
-}
-
 const { renderLeaderboard, loadLeaderboard } = createLeaderboardView({
   state: uiState, openGame,
   // The cards carry each board's leader, so fresh rows repaint them. Never out
@@ -1245,19 +1223,14 @@ searchInput.addEventListener('input', () => {
       results: visibleGames.length, category });
   }, 700);
 });
+const savedSort = readStored('bored.library.sort', 'popular');
+$('#sort').value = ['popular', 'original', 'az'].includes(savedSort) ? savedSort : 'popular';
 $('#sort').addEventListener('change', () => {
+  writeStored('bored.library.sort', $('#sort').value);
   renderLibrary();
   analytics.track('library_action', { surface: 'library', action: 'sort',
     results: visibleGames.length, category });
 });
-$('#favorites-all').onclick = () => {
-  category = 'Favorites';
-  analytics.track('library_action', { surface: 'library', action: 'filter', category });
-  searchInput.value = '';
-  for (const button of $('#filters').children) button.setAttribute('aria-pressed', String(button.dataset.filter === 'Favorites'));
-  renderLibrary();
-  $('#filters [data-filter="Favorites"]').focus();
-};
 $('#filters').addEventListener('click', event => {
   const button = event.target.closest('[data-filter]');
   if (!button) return;
@@ -1268,8 +1241,7 @@ $('#filters').addEventListener('click', event => {
 });
 
 $('#random').onclick = () => {
-  // Offline by default; a deliberate Online filter opts into remote entries.
-  const pool = visibleGames.filter(([slug]) => category === 'Online' || !EXTERNS[slug]);
+  const pool = visibleGames;
   if (pool.length) openGame(pool[Math.floor(Math.random() * pool.length)][0]);
   else showLibraryMessage();
 };
@@ -1292,7 +1264,6 @@ $('#daily-play').onclick = () => {
   const challenge = dailyChallenge(challengeDate());
   openGame(challenge.slug, challenge);
 };
-$('#daily-share').onclick = shareDailyResult;
 
 menuButton.onclick = event => {
   const open = menuPanel.hidden;

@@ -426,7 +426,7 @@ test('browser regressions', async t => {
       total: ORDER.length,
       newest: FRESH_GAMES.length,
       fresh: FRESH_GAMES,
-      puzzle: ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').length,
+      puzzle: ORDER.filter(([slug]) => ['Puzzle', 'Strategy'].includes(META[slug][0])).length,
       online: Object.keys(EXTERNS).length
     }));
     assert.equal(await page.$$eval('.card', els => els.length), catalog.total);
@@ -436,7 +436,7 @@ test('browser regressions', async t => {
     const unfeatured = (await page.$$eval('.card', els => els.map(el => el.dataset.slug))).filter(slug => !catalog.featured.includes(slug));
     const fresh = catalog.fresh.filter(slug => !catalog.featured.includes(slug));
     assert.deepEqual(unfeatured.slice(0, fresh.length).sort(), fresh.slice().sort(), 'NEW games stay at the top after explicitly featured games');
-    await page.select('#sort', 'original');
+    await page.$eval('#sort', el => { el.value = 'original'; el.dispatchEvent(new Event('change')); });
     assert.ok(catalog.newest > 0 && catalog.newest <= 4, 'the NEW badge holds four games at most');
     assert.deepEqual(
       await page.$$eval('.card', els => els.map(el => el.dataset.slug)),
@@ -448,8 +448,6 @@ test('browser regressions', async t => {
       catalog.fresh.slice().sort(),
       'the NEW badge marks the newest arrivals in place'
     );
-    await filter('New');
-    assert.equal(await page.$$eval('.card', els => els.length), catalog.newest);
     await filter('Puzzle');
     assert.equal(await page.$$eval('.card', els => els.length), catalog.puzzle);
     await filter('All');
@@ -464,10 +462,10 @@ test('browser regressions', async t => {
     assert.equal(await page.$eval('#random', el => el.disabled), true);
     assert.equal(await page.$eval('#empty', el => el.hidden), false);
     await page.$eval('#q', el => { el.value = ''; el.dispatchEvent(new Event('input')); });
-    await page.select('#sort', 'az');
+    await page.$eval('#sort', el => { el.value = 'az'; el.dispatchEvent(new Event('change')); });
     const names = await page.$$eval('.card .name', els => els.map(el => el.firstChild.textContent));
     assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b)));
-    await page.select('#sort', 'popular');
+    await page.$eval('#sort', el => { el.value = 'popular'; el.dispatchEvent(new Event('change')); });
     // The popularity refresh can rebuild cards between Puppeteer's element lookup
     // and its coordinate click. Dispatch from within the page to the current node.
     await page.$eval('[aria-label="Add Memory to favorites"]', el => el.click());
@@ -1744,7 +1742,7 @@ test('browser regressions', async t => {
     // Network-dependent games are allowed; their APIs are not an offline contract.
   });
 
-  await t.test('daily goal verifies actual Memory gameplay, persists completion, shares, and rolls over', async () => {
+  await t.test('daily goal verifies actual Memory gameplay, persists completion and rolls over', async () => {
     const date = dateFor('memory');
     await page.evaluate(day => { window.originalDailyDate ||= dailyDate; dailyDate = () => day; renderDaily(); }, date);
     if (await page.$eval('#player', el => !el.hidden)) await close();
@@ -1761,14 +1759,6 @@ test('browser regressions', async t => {
     await close();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'daily-play');
     assert.ok(await page.evaluate(day => readDaily(dailyChallenge(day)), date));
-    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Denied'); } }, configurable: true }));
-    await page.click('#daily-details summary');
-     await page.click('#daily-share');
-    assert.match(await page.$eval('#daily-result', el => el.value), /8 moves/);
-    assert.equal(await page.$eval('#daily-result', el => el.hidden), false);
-    await page.evaluate(() => { window.copied = ''; navigator.clipboard.writeText = async value => { window.copied = value; }; });
-    await page.click('#daily-share');
-    assert.match(await page.evaluate(() => window.copied), /Bored Daily/);
     await page.reload();
     await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     await page.evaluate(day => { window.originalDailyDate = dailyDate; dailyDate = () => day; renderDaily(); }, date);
@@ -1782,8 +1772,6 @@ test('browser regressions', async t => {
     const tomorrow = new Date(Date.parse(date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
     await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, tomorrow);
     assert.equal(await page.evaluate(day => readDaily(dailyChallenge(day)), tomorrow), null);
-    assert.equal(await page.$eval('#daily-share', el => el.hidden), true);
-    assert.equal(await page.$eval('#daily-result', el => el.hidden), true);
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 
@@ -1830,11 +1818,13 @@ test('browser regressions', async t => {
 
   await t.test('mobile hub and all new games fit at 320px; random respects the active filter', async () => {
     await page.setViewport({ width: 320, height: 740, isMobile: true, hasTouch: true });
-    await filter('New');
+    await filter('All');
+    await page.$eval('#q', el => { el.value = 'memory'; el.dispatchEvent(new Event('input')); });
     await noOverflow();
     await page.$eval('#random', button => button.click());
     await page.waitForFunction(() => !document.querySelector('#player').hidden);
-    assert.ok(await page.evaluate(() => FRESH_GAMES.includes(current)));
+    assert.equal(await page.evaluate(() => current), 'memory');
+    await page.$eval('#q', el => { el.value = ''; el.dispatchEvent(new Event('input')); });
     await close();
     // Open the daily challenge directly: this test measures the narrow layout,
     // while the Daily Play button is exercised by the dedicated interaction tests.
@@ -1956,7 +1946,6 @@ test('browser regressions', async t => {
       await page.locator('#mobile-more-nav summary').click();
       await page.locator('#mobile-more-nav a[href="#leaderboard"]').click();
     } else await page.locator('#leaderboard-nav').click();
-    await page.locator('#lb-refresh').click();
     await page.waitForFunction(() => document.querySelector('#lb-note').textContent.includes('Players ranked'));
     assert.doesNotMatch(await text(page, '#lb-mine'), /Your account/);
     assert.doesNotMatch(await text(page, '#lb-list'), /\(you\)/);

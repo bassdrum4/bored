@@ -110,21 +110,13 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.click('[data-filter="Puzzle"]');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.filter), 'Puzzle', 'the filter keeps keyboard focus');
     const actual = await page.$$eval('#grid .card', cards => cards.map(card => card.dataset.slug));
-    const expected = await page.evaluate(() => ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').map(([slug]) => slug));
+    const expected = await page.evaluate(() => ORDER.filter(([slug]) => ['Puzzle', 'Strategy'].includes(META[slug][0])).map(([slug]) => slug));
     assert.deepEqual(actual.sort(), expected.sort());
-    await page.click('[data-filter="Quick"]');
-    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
-    assert.ok(await page.$$eval('#grid .card', cards =>
-      cards.every(card => DISCOVERY[card.dataset.slug]?.quick === true)), 'quick games really are short-session picks');
     await page.click('[data-filter="Friends"]');
     assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
     assert.ok(await page.$$eval('#grid .card', cards => cards.every(card =>
       !!card.closest('.row')?.querySelector('.catalog-together') ||
       (DISCOVERY[card.dataset.slug]?.players || '').includes('2 local'))));
-    await page.click('[data-filter="Relax"]');
-    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
-    assert.ok(await page.$$eval('#grid .card', cards =>
-      cards.every(card => DISCOVERY[card.dataset.slug]?.pace === 'Relaxing')));
     await page.click('[data-filter="Favorites"]');
     assert.equal(await page.$$eval('#grid .card', cards => cards.length), 0);
     assert.equal(await page.$eval('#random', b => b.disabled), true);
@@ -166,10 +158,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.equal(await page.$$eval('#recent-list [data-slug="memory"]', nodes => nodes.length), 0);
   });
 
-  await t.test('Surprise Me keeps online extras opt-in', async () => {
-    await page.click('#random');
-    assert.equal(await page.evaluate(() => !!EXTERNS[location.hash.slice(1)]), false, 'a random pick stays offline');
-    await page.evaluate(() => closeGame());
+  await t.test('Surprise Me respects the search, including remote games', async () => {
     await page.evaluate(() => {
       document.querySelector('[data-filter="All"]').click();
       const q = document.querySelector('#q');
@@ -179,9 +168,6 @@ test('discovery keeps its controls and fits small screens', async t => {
     });
     await page.type('#q', 'f-14');
     assert.equal(await page.$eval('#random', button => button.disabled), false);
-    await page.click('#random');
-    assert.equal(await page.evaluate(() => document.querySelector('#player').hidden), true);
-    await page.click('[data-filter="Online"]');
     await page.click('#random');
     assert.equal(await page.evaluate(() => !!EXTERNS[location.hash.slice(1)]), true);
     await page.evaluate(() => closeGame());
@@ -204,12 +190,10 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.click('#settings-nav');
     assert.equal(await page.$eval('#settings', el => el.hidden), false);
     assert.equal(await page.$eval('#setting-theme', el => el.value), 'light');
-    await page.select('#setting-density', 'compact');
-    await page.click('#setting-descriptions');
     await page.click('#setting-reduced-motion');
+    await page.select('#sort', 'az');
     await page.select('#setting-theme', 'dark');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.descriptions), 'hidden');
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
 
     // The theme is an explicit device-local choice rather than an OS preference,
@@ -222,14 +206,12 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.ui.preferences')).theme), 'dark');
     assert.equal(await page.$eval('#setting-theme', el => el.value), 'dark');
-    assert.equal(await page.$eval('#setting-density', el => el.value), 'compact');
-    assert.equal(await page.$eval('#setting-descriptions', el => el.checked), false);
+    assert.equal(await page.$eval('#sort', el => el.value), 'az');
     assert.equal(await page.$eval('#setting-reduced-motion', el => el.checked), true);
     await page.select('#setting-theme', 'light');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
     await page.click('#settings-reset');
-    assert.equal(await page.$eval('#setting-density', el => el.value), 'comfortable');
-    assert.equal(await page.$eval('#setting-descriptions', el => el.checked), true);
+    assert.equal(await page.$eval('#sort', el => el.value), 'popular');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
     await page.click('#home-nav');
     assert.equal(await page.$eval('#daily', el => el.hidden), false);

@@ -108,7 +108,6 @@ function renderLeaderboard() {
   const list = $('#lb-list');
   const empty = $('#lb-empty');
   list.replaceChildren();
-  $('#lb-refresh').disabled = !backendReady();
 
   if (!backendReady()) {
     $('#lb-note').textContent = 'The leaderboard is down. Everything else still works.';
