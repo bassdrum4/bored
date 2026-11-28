@@ -73,7 +73,7 @@ function addDeveloperNote(host, slug, name) {
   const tip = element('span', 'developer-note-tip');
   tip.id = id;
   tip.setAttribute('role', 'tooltip');
-  tip.append(element('span', 'developer-note-label', 'A note from the developer'),
+  tip.append(element('span', 'developer-note-label', 'Dev note'),
     element('span', 'developer-note-copy', note));
   // Keep information and play as separate buttons, including on phones.
   host.querySelector('.card, .shelf-play')?.setAttribute('aria-describedby', id);

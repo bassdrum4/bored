@@ -5,37 +5,37 @@
 import { setBo } from './bo.js';
 
 const LATE = [
-  'Still up? Respect.',
-  'It is very late. Pick something short.',
-  'Go to bed. After one more game.'
+  'Still up?',
+  'Go to bed.',
+  'Why are you awake?'
 ];
 const MORNING = [
-  'Morning. Bold of you to open this first.',
-  'Early start. Warm up with something easy.',
-  'Good morning. The games are awake.'
+  'Good morning.',
+  'Morning.',
+  'Good morning.'
 ];
 const SCHOOL_HOURS = [
-  'Free period? Lucky.',
-  'Study hall, presumably.',
-  'Nothing to see here, just a very productive tab.'
+  'Free period?',
+  'Study hall?',
+  'What are you playing?'
 ];
 const AFTERNOON = [
-  'School is over. This is not.',
-  'You earned this one.',
-  'Afternoon. What are we breaking today?'
+  'School is over.',
+  'Good afternoon.',
+  'Good afternoon.'
 ];
 const EVENING = [
-  'Evening. Homework can wait a few more minutes.',
-  'Prime time. What are you playing?',
-  'The good hours. Pick something.'
+  'Good evening.',
+  'What are you playing?',
+  'Good evening.'
 ];
 
 export const FOOTERS = [
-  'have fun. stay a while.',
-  'one more game. you said that already.',
-  'no ads. no pop-ups. no homework.',
-  'made by one person, probably during class.',
-  'still here? good.'
+  'Have fun!',
+  '',
+  'No ads.',
+  'Thanks for playing.',
+  ''
 ];
 
 const pick = (list, random) => list[Math.min(list.length - 1, Math.floor(random() * list.length))];

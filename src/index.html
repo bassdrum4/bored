@@ -33,10 +33,10 @@ try {
   <div class="game-loading-content">
     <div class="game-loading-top"><span class="game-loading-brand">Bored<span>.</span></span><span class="game-loading-kicker">THE ARCADE</span></div>
     <svg class="bo game-loading-bo" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
-    <h2>Nothing to do.<br>Yet.</h2>
-    <p id="hub-loading-message" class="game-loading-message">Getting the games ready…</p>
+    <h2>Loading Bored</h2>
+    <p id="hub-loading-message" class="game-loading-message">Loading games…</p>
     <div class="game-loading-track is-indeterminate" aria-hidden="true"><span class="game-loading-fill"></span></div>
-    <small>No ads. No homework. Almost there.</small>
+    
     <button id="hub-loading-retry" class="action" type="button" hidden>Reload Bored</button>
   </div>
 </div>
@@ -82,7 +82,7 @@ try {
           <strong>Online now</strong>
           <p id="online-status" role="status">Connecting…</p>
           <ul id="online-names" aria-label="Online players"></ul>
-          <p class="online-note" id="presence-privacy-note">Your online status is visible to other participating players. You can turn it off in <a id="presence-settings-link" href="#settings">Settings</a>.</p>
+          <p class="online-note" id="presence-privacy-note">Other players can see when you’re online. Turn it off in <a id="presence-settings-link" href="#settings">Settings</a>.</p>
         </div>
       </details>
       <button id="announcement-toggle" class="header-icon" type="button" aria-label="Announcements" title="Announcements" aria-haspopup="dialog" aria-controls="announcement-dialog"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 6-3 7-3 9h18c0-2-3-3-3-9M10 21h4"/></svg><span id="announcement-count" class="badge" hidden></span></button>
@@ -98,7 +98,7 @@ try {
     <p class="sub"><b id="count"></b> things to play &middot; in your browser </p>
     <div class="intro-row">
       <svg class="bo" id="bo-intro" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
-      <p class="intro">No ads, no homework. What are you playing today?</p>
+      <p class="intro">What are you playing?</p>
     </div>
   </header>
   <section id="announcement-banner" class="announcement-banner" aria-label="Latest announcement" hidden></section>
@@ -112,7 +112,7 @@ try {
   <section id="recent" class="shelf" aria-labelledby="recent-heading">
     <div class="section-heading"><div><h2 id="recent-heading">Jump Back In</h2></div><div class="section-links"><button id="favorites-all" class="text-button" type="button" hidden>Browse favorites</button><a class="text-link" href="#library">All games &#8599;</a></div></div>
     <div class="empty-note"><svg class="bo bo-sm" data-mood="shrug" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#shrug"/></svg>
-    <p id="recent-empty" class="section-note">Nothing here yet. Play something and it shows up here.</p></div>
+    <p id="recent-empty" class="section-note">No recent games.</p></div>
     <div id="recent-list" class="shelf-grid"></div>
   </section>
   <section id="daily" aria-labelledby="daily-heading">
@@ -128,7 +128,7 @@ try {
       <div class="daily-detail-content">
         <p id="daily-date"></p>
         <p id="daily-meta" class="game-meta"></p>
-        <p id="daily-status" role="status">New game, new goal, every day. Everybody gets the same first board.</p>
+        <p id="daily-status" role="status">Everyone gets the same first board.</p>
         <button id="daily-share" class="text-button" type="button" hidden>Copy result</button>
         <textarea id="daily-result" aria-label="Daily challenge result to share" readonly rows="5" hidden></textarea>
       </div>
@@ -138,7 +138,7 @@ try {
     <div class="section-heading"><div><h2 id="library-heading">All Games<span class="wordmark-dot">.</span></h2></div><div class="section-links"><span id="library-count" class="section-aside"></span><span id="game-finder"><button id="game-finder-open" class="text-button" type="button" aria-haspopup="dialog" aria-controls="game-finder-dialog">Help me choose &#8599;</button></span></div></div>
   <div class="tools">
     <div class="search-row">
-      <label class="sr-only" for="q">Search the game library</label><input id="q" type="search" placeholder="Search games. Try &quot;chess&quot; or &quot;puzzle&quot;" autocomplete="off" aria-label="Find a game or a category" aria-controls="grid">
+      <label class="sr-only" for="q">Search the game library</label><input id="q" type="search" placeholder="Search games" autocomplete="off" aria-label="Find a game or a category" aria-controls="grid">
       <button id="random" class="action" type="button">Surprise me &#8599;</button>
     </div>
     <nav id="filters" class="filters" aria-label="Filter games">
@@ -176,8 +176,8 @@ try {
   </section>
   <section id="settings" class="settings-page" aria-labelledby="settings-heading" hidden>
     <div class="settings-intro">
-      <div><p class="eyebrow">A few things your way</p><div class="bo-heading"><h2 id="settings-heading">Settings<span class="wordmark-dot">.</span></h2><svg class="bo bo-sm" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg></div>
-      <p>Just the useful stuff. No account required, and no settings maze.</p></div>
+      <div><div class="bo-heading"><h2 id="settings-heading">Settings<span class="wordmark-dot">.</span></h2><svg class="bo bo-sm" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg></div>
+      </div>
       <span class="settings-local-note">Saved on this device</span>
     </div>
     <div class="settings-layout">
@@ -185,18 +185,18 @@ try {
         <section class="settings-panel" id="account-panel" aria-labelledby="account-panel-heading" hidden>
           <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◔</span><div>
             <h3 id="account-panel-heading">Account</h3>
-            <p>Your scores follow the account, not this browser.</p>
+            <p></p>
           </div></div>
-          <div class="settings-row"><div><p class="invite-label">Display name</p><p>The name other players see on the leaderboard.</p></div>
+          <div class="settings-row"><div><p class="invite-label">Display name</p></div>
             </div>
-          <div class="settings-row"><div><p class="invite-label">Sign out</p><p>Signing out keeps your scores on your account for next time.</p></div>
+          <div class="settings-row"><div><p class="invite-label">Sign out</p><p>Your scores will still be saved.</p></div>
             <button id="account-signout" class="action" type="button">Sign out</button></div>
         </section>
         <section class="settings-panel" aria-labelledby="appearance-heading">
           <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◐</span><div>
             <h3 id="appearance-heading">Appearance</h3>
           </div></div>
-          <div class="settings-row"><div><label for="setting-theme">Theme</label><p>Paper, or dark for a dark room.</p></div>
+          <div class="settings-row"><div><label for="setting-theme">Theme</label></div>
             <select id="setting-theme"><option value="light">Light</option><option value="dark">Dark</option></select></div>
           <div class="settings-row"><div><label for="setting-density">Game card size</label></div>
             <select id="setting-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
@@ -210,7 +210,7 @@ try {
           </div></div>
           <div class="settings-row"><div><label for="setting-reduced-motion">Reduce animations</label></div>
             <input id="setting-reduced-motion" class="settings-checkbox" type="checkbox"></div>
-          <div class="settings-row"><div><label for="presence-enabled">Show when I'm online</label><p>Signed-in players share their display name with other participating accounts. Guests are counted anonymously. Your preference applies to your account, or this browser if you're a guest.</p><p id="presence-setting-status" role="status">Loading online status…</p></div>
+          <div class="settings-row"><div><label for="presence-enabled">Show when I'm online</label><p>Other players can see your name when you’re online. Guests are anonymous. This setting saves to your account or browser.</p><p id="presence-setting-status" role="status">Loading online status…</p></div>
             <input id="presence-enabled" class="settings-checkbox" type="checkbox" disabled></div>
           <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Which games get played, and for how long.</p></div>
             <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
@@ -237,11 +237,11 @@ try {
         </section>
       </div>
       <aside class="settings-sidebar">
-        <div class="settings-aside"><p class="eyebrow">Just this browser</p><h3>Nothing to sign in for.</h3>
+        <div class="settings-aside"><h3>This browser</h3>
           <p id="settings-saved" class="settings-saved" role="status" aria-live="polite">Your changes save automatically.</p>
         </div>
-        <div class="settings-aside"><p class="eyebrow">Start fresh</p><h3>Clear local preferences</h3>
-          <p>Neither one touches your account or scores.</p>
+        <div class="settings-aside"><h3>Clear local preferences</h3>
+          <p>This won’t delete your account or scores.</p>
           <div class="settings-actions"><button type="button" id="settings-clear-favorites" class="action">Clear favorites</button>
           <button type="button" id="settings-reset" class="action">Reset settings</button></div>
         </div>
@@ -272,10 +272,10 @@ try {
 <dialog id="auth-dialog" aria-labelledby="auth-title">
   <form id="auth-form" novalidate>
     <h2 id="auth-title">Sign in</h2>
-    <p id="auth-blurb">Save your scores so they follow you around, and see who is beating you.</p>
+    <p id="auth-blurb">Sign in to save your scores.</p>
     <label id="auth-email-row">Email<input id="auth-email" type="email" autocomplete="email" required></label>
     <label id="auth-pass-row">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label>
-    <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required aria-describedby="auth-name-note"><small id="auth-name-note">Your name cannot be changed after creating your account.</small></label>
+    <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required aria-describedby="auth-name-note"><small id="auth-name-note">You can’t change your name later.</small></label>
     <label id="auth-invite-row" hidden>Invite code (optional)<input id="auth-invite" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="123"></label>
     <p id="auth-message" role="status" aria-live="polite"></p>
     <div class="dialog-actions">
@@ -289,7 +289,7 @@ try {
 <dialog id="claim-dialog" aria-labelledby="claim-heading">
   <div class="dialog-head"><svg class="bo bo-sm" id="claim-bo" data-mood="pleased" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#pleased"/></svg>
   <h2 id="claim-heading">Nice run.</h2></div>
-  <p id="claim-blurb">Make an account and it goes on the leaderboard. Skip it and it stays our secret.</p>
+  <p id="claim-blurb">Sign in to put your score on the leaderboard.</p>
   <div class="dialog-actions">
     <button id="claim-signin" type="button">Sign in</button>
     <button id="claim-signup" type="button">Create an account</button>
@@ -311,7 +311,7 @@ try {
 
 <dialog id="game-finder-dialog" aria-labelledby="game-finder-title">
   <div class="finder-head">
-    <div><p class="eyebrow">Bored / Game finder</p><h2 id="game-finder-title">Find my game</h2></div>
+    <div><h2 id="game-finder-title">Find my game</h2></div>
     <button id="game-finder-close" type="button">Close</button>
   </div>
   <p id="game-finder-progress" aria-live="polite"></p>
@@ -321,7 +321,7 @@ try {
 <dialog id="feedback-dialog" aria-labelledby="feedback-title">
   <form id="feedback-form" novalidate>
     <div class="bo-heading"><h2 id="feedback-title">Send feedback</h2><svg class="bo bo-sm" data-mood="shrug" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#shrug"/></svg></div>
-    <p id="feedback-blurb">Something broken? A game that will not load? A game you want added? Tell me.</p>
+    <p id="feedback-blurb">Something broken? Want a game added? Tell me.</p>
     <label for="feedback-text">Message<textarea id="feedback-text" rows="5" maxlength="2000" required></textarea></label>
     <label for="feedback-email">Email (only if you want a reply)<input id="feedback-email" type="email" autocomplete="email" maxlength="120"></label>
     <p id="feedback-status" role="status" aria-live="polite"></p>
@@ -335,7 +335,7 @@ try {
 <dialog id="enjoyment-dialog" aria-labelledby="enjoyment-title">
   <form id="enjoyment-form">
     <div class="bo-heading"><h2 id="enjoyment-title">Quick question</h2><svg class="bo bo-sm" data-mood="surprised" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#surprised"/></svg></div>
-    <p>Be honest. How is Bored treating you?</p>
+    <p>What do you think of Bored?</p>
     <fieldset class="enjoyment-choices"><legend>Your rating</legend>
       <label><input type="radio" name="rating" value="5" required> Obsessed</label>
       <label><input type="radio" name="rating" value="4"> Pretty good</label>
@@ -391,12 +391,12 @@ try {
       <div class="game-loading-top"><span class="game-loading-brand">Bored<span>.</span></span><span class="game-loading-kicker">NOW LOADING</span></div>
       <svg class="bo game-loading-bo" id="game-loading-bo" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
       <h2 id="game-loading-title">Getaway Shootout</h2>
-      <p id="getaway-loading-message" class="game-loading-message">Preparing the getaway…</p>
+      <p id="getaway-loading-message" class="game-loading-message">Loading…</p>
       <div id="getaway-loading-track" class="game-loading-track" role="progressbar" aria-label="Game loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <span id="getaway-loading-fill" class="game-loading-fill"></span>
       </div>
       <p id="getaway-loading-percent" class="game-loading-percent">0%</p>
-      <small>Bo is waiting too. Press Esc or use the game menu to leave.</small>
+      <small>Press Esc to leave.</small>
     </div>
   </div>
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; pointer-lock; clipboard-write; encrypted-media; picture-in-picture"></iframe>
