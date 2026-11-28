@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1069,
+  "count": 1070,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"db76b822","date":"2026-11-28","author":"bassdrum4","subject":"Replace twelve placeholder previews with actual gameplay"},
   {"sha":"ea0ad78b","date":"2026-11-28","author":"bassdrum4","subject":"Keep all developer notes"},
   {"sha":"db41512f","date":"2026-11-28","author":"bassdrum4","subject":"Simplify Bored copy and remove filler notes"},
   {"sha":"93e286a5","date":"2026-11-28","author":"bassdrum4","subject":"Remove Among Us game and imported assets"},
