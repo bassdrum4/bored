@@ -3468,21 +3468,57 @@ for (const id of ["fresh", "dupe", "shiny"]) {
   sel.innerHTML = `<option value="auto">Auto</option><option value="best">Best I have</option><option value="none">Don't throw</option>` + BALLS.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
   sel.onchange = () => { S.set[id] = sel.value; save(); };
 }
-$("#export").onclick = () => { save(); $("#savecode").value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $("#savecode").select(); $("#setmsg").textContent = "Copy this code and keep it somewhere safe."; };
-const BAD_CODE = 'That code didn\'t load. Paste the whole code from "Show my save code".';
-function loadCode(text) {
+const SAVE_PREFIX = "PI2:";
+function saveBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(binary);
+}
+async function encodeSaveCode(state) {
+  const bytes = new TextEncoder().encode(JSON.stringify(state));
+  const legacy = saveBase64(bytes);
   try {
-    const s = JSON.parse(decodeURIComponent(escape(atob(String(text).trim())))); if (!s || s.v !== 1 || !s.box) return false;
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+    const packed = SAVE_PREFIX + saveBase64(new Uint8Array(await new Response(stream).arrayBuffer()));
+    return packed.length < legacy.length ? packed : legacy;
+  } catch { return legacy; }
+}
+async function decodeSaveCode(text) {
+  const code = String(text).trim();
+  if (!code.startsWith(SAVE_PREFIX)) return JSON.parse(decodeURIComponent(escape(atob(code))));
+  const bytes = Uint8Array.from(atob(code.slice(SAVE_PREFIX.length)), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await new Response(stream).arrayBuffer()));
+}
+$("#export").onclick = async () => {
+  save();
+  const field = $("#savecode");
+  field.value = await encodeSaveCode(S);
+  field.select();
+  $("#setmsg").textContent = "Copy this code and keep it somewhere safe.";
+};
+const BAD_CODE = 'That code didn\'t load. Paste the whole code from "Show my save code".';
+async function loadCode(text) {
+  try {
+    const s = await decodeSaveCode(text); if (!s || s.v !== 1 || !s.box) return false;
     const k = s.mode === "story" ? STORY_KEY : slot === STORY_KEY ? KEY : slot;
     if (k !== slot) { if (S) save(); slot = k; setSlotPref(k); }
     S = s; save(); return true;
   }
   catch { return false; }
 }
-$("#import").onclick = () => {
-  if (loadCode($("#savecode").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); }
-  else $("#setmsg").innerHTML = `<span class="bad">${esc(BAD_CODE)}</span>`;
-};
+let importingCode = false;
+async function importCode(text, onError) {
+  if (importingCode) return;
+  importingCode = true;
+  try {
+    if (await loadCode(text)) { boot(); titleMsg = "Save loaded."; renderTitle(); }
+    else onError();
+  } finally { importingCode = false; }
+}
+$("#import").onclick = () => importCode($("#savecode").value, () => {
+  $("#setmsg").innerHTML = `<span class="bad">${esc(BAD_CODE)}</span>`;
+});
 function eraseSave() { try { localStorage.removeItem(slot); } catch {} S = null; B = null; showPick(); }
 let resetArmed = false;
 $("#reset").onclick = () => {
@@ -5275,7 +5311,7 @@ $("#t-card").onclick = e => {
   else if (a.dataset.act === "keep") { panel = "save"; renderTitle(); }
   else if (a.dataset.act === "prestige-ask") { panel = "prestige"; renderTitle(); }
   else if (a.dataset.act === "prestige") prestige();
-  else if (a.dataset.act === "load") { if (loadCode($("#t-code").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); } else $("#t-msg").textContent = BAD_CODE; }
+  else if (a.dataset.act === "load") importCode($("#t-code").value, () => { const msg = $("#t-msg"); if (msg) msg.textContent = BAD_CODE; });
 };
 $("#pickback").onclick = () => { if (!S && pickFrom && pickFrom !== slot) { slot = pickFrom; setSlotPref(slot); S = readSlot(slot); boot(); return; } showTitle(); };
 // A new game, or the first partner of a new journey after a prestige (S.pick): the SP editions that came along join after it.
