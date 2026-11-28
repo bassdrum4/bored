@@ -40,13 +40,13 @@ const GROUPS = Object.fromEntries(Object.entries({
   strategy: 'battleship ashcrown risk chess scrabble ticket-to-ride corner transit-chaos signal-tower prism-duel commanders poker tank2 connect-four poke-idle poke-gacha deep',
   physics: 'getaway-shootout rooftop-snipers basket-random ballistic-chickens wallbound tank2 sumo minigolf air-hockey downhill-mayhem circuit trackbound gun-mayhem',
   peace: 'sand fluid eco mahjong solitaire photo-puzzle wordle memory sudoku 2048 minigolf clicker poke-idle',
-  immersive: 'f-14 ashcrown risk poke-idle poke-gacha signal-tower transit-chaos ticket-to-ride eco deep imposter shadow-net',
+  immersive: 'f-14 ashcrown risk poke-idle poke-gacha signal-tower transit-chaos ticket-to-ride eco deep shadow-net',
   skill: 'trackbound aim-lab quickdraw circuit chess tetris typing-test minesweeper block-blast f-14',
   challenging: 'ashcrown risk chess scrabble transit-chaos signal-tower sudoku crossword minesweeper prism-duel f-14 ticket-to-ride',
   lowkey: 'block-blast 2048 wordle photo-puzzle mahjong solitaire clicker sand fluid eco memory lights-out minigolf',
 }).map(([key, slugs]) => [key, new Set(slugs.split(' '))]));
 
-const ONLINE_MULTIPLAYER = new Set(['imposter', 'f-14']);
+const ONLINE_MULTIPLAYER = new Set(['f-14']);
 // Some local-duel games offer a CPU opponent, others require a second person.
 const SOLO_CPU_DUELS = new Set(['getaway-shootout', 'rooftop-snipers', 'basket-random', 'chess', 'connect-four']);
 const NOT_A_GAME = new Set(['klang']);
@@ -70,9 +70,7 @@ function canPlay(slug, social) {
   if (social === 'online') return ONLINE_MULTIPLAYER.has(slug);
   if (social === 'local') return /2 local/.test(players) || slug === 'getaway-shootout';
   // Do not offer a two-person-only game to someone playing alone.
-  // Among Us requires other humans; F-14 can also be flown solo.
   if (social === 'solo') {
-    if (slug === 'imposter') return false;
     if (players === '2 local' && !SOLO_CPU_DUELS.has(slug)) return false;
   }
   return true;

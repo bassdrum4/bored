@@ -12,7 +12,6 @@ export const DISCOVERY = {
   "getaway-shootout": info('3–8 min', 'Competitive', ['Keyboard'], {quick:true, players:'2 local'}),
   "shotgun-roulette": info('5–10 min', 'Competitive', ['Mouse']),
   "crossword": info('5–20 min', 'Focused', ['Keyboard', 'Mouse', 'Touch']),
-  "imposter": info('10–25 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { players: '3–10 online' }),
   "sudoku": info('3–12 min', 'Focused', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   "photo-puzzle": info('2–8 min', 'Relaxing', ['Mouse', 'Touch'], { quick: true }),
   "poke-gacha": info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
@@ -103,7 +102,7 @@ export function inCollection(slug, collection) {
 // A newly scaffolded game starts with an SVG placeholder and is listed here
 // until a real capture replaces it. F-14 and Klang use self-hosted illustrated
 // SVG previews; Risk keeps its existing SVG preview.
-export const PREVIEW_FALLBACKS = {"duck-life-3": '.svg',  battleship: ".svg", squaretato: '.svg', "getaway-shootout": '.svg',"crossword": '.svg', "imposter": '.svg', "sudoku": '.svg', "photo-puzzle": '.svg', "poke-gacha": '.svg', "poke-idle": '.svg', "air-hockey": '.svg', "pokedoku": '.svg', "quickdraw": ".svg","clicker": '.svg',"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
+export const PREVIEW_FALLBACKS = {"duck-life-3": '.svg',  battleship: ".svg", squaretato: '.svg', "getaway-shootout": '.svg',"crossword": '.svg', "sudoku": '.svg', "photo-puzzle": '.svg', "poke-gacha": '.svg', "poke-idle": '.svg', "air-hockey": '.svg', "pokedoku": '.svg', "quickdraw": ".svg","clicker": '.svg',"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug] || PREVIEW_FALLBACKS[slug]).map(([slug]) => [slug, previewUrl(slug)]));

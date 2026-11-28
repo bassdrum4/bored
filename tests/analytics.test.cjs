@@ -210,19 +210,6 @@ test('QA browser mode survives navigation and can be explicitly switched off', a
   assert.equal(await session(), false);
 });
 
-test('Imposter exposes a safe snapshot so analytics can detect loading and active play', async t => {
-  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
-  assert.ok(executablePath);
-  const site = await serve(path.join(root, 'src'));
-  const browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
-  t.after(async () => { await browser.close(); await site.close(); });
-  const page = await browser.newPage();
-  await page.goto(site.origin + '/games/content/imposter.html');
-  await page.waitForFunction(() => typeof window.__boredSnapshot === 'function');
-  const snapshot = await page.evaluate(() => window.__boredSnapshot());
-  assert.deepEqual(snapshot, { slug:'imposter', joined:false, inRound:false });
-});
-
 test('retention cohorts, meaningful play, and returning visitor calculations', async () => {
   const { summarizeEngagement, excludeAdmins } = await import('../src/hub/analytics-data.js');
   const make = (day, session, kind, active=0, details={}) => ({

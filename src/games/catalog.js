@@ -13,7 +13,7 @@
 // four native arcade.js games came after the initial documents but before DEEP.
 // Keep their original NEW-badge chronology (Aim Lab, Connect Four, Memory,
 // 2048) between DEEP and SUMO; NEW_GAMES identifies the implementation type.
-export const ORDER = [["duck-life-3", "Duck Life 3: Evolution"], ["relic-song", "Relic Song"], ["battleship", "Battleship"], ["squaretato", "Squaretato"], ["ballistic-chickens", "Ballistic Chickens"], ["getaway-shootout", "Getaway Shootout"], ["shotgun-roulette", "Shotgun Roulette"], ["crossword", "Crossword"], ["imposter", "Among Us"], ["sudoku", "Sudoku"], ["photo-puzzle", "Photo Puzzle"], ["poke-gacha", "Poké Gacha"], ["poke-idle", "Poké Idle"], ["air-hockey", "Air Hockey"], ["pokedoku", "Pokédoku"], ["krillion","Krillion"],["quickdraw","Quickdraw"],["clicker", "Clicker"], ["downhill-mayhem","Downhill Mayhem"],["corner","Corner"],["ticket-to-ride","Ticket to Ride"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Civ Lite"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
+export const ORDER = [["duck-life-3", "Duck Life 3: Evolution"], ["relic-song", "Relic Song"], ["battleship", "Battleship"], ["squaretato", "Squaretato"], ["ballistic-chickens", "Ballistic Chickens"], ["getaway-shootout", "Getaway Shootout"], ["shotgun-roulette", "Shotgun Roulette"], ["crossword", "Crossword"], ["sudoku", "Sudoku"], ["photo-puzzle", "Photo Puzzle"], ["poke-gacha", "Poké Gacha"], ["poke-idle", "Poké Idle"], ["air-hockey", "Air Hockey"], ["pokedoku", "Pokédoku"], ["krillion","Krillion"],["quickdraw","Quickdraw"],["clicker", "Clicker"], ["downhill-mayhem","Downhill Mayhem"],["corner","Corner"],["ticket-to-ride","Ticket to Ride"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Civ Lite"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
 // Hidden development games are intentionally excluded from every public catalog surface.
 // Access is checked through the existing Supabase admin role before launch.
 export const ADMIN_PREVIEWS = Object.freeze({ geopeaks: 'GeoPeaks' });
@@ -28,7 +28,7 @@ export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": 
 // Rooftop Snipers is the compiled original Unity export: it exposes no score API.
 // Krillion's dive total proved too easy to game from the client, so it keeps no
 // board here even though the game still shows the score it just earned.
-export const UNSCORED_GAMES = ["duck-life-3", "battleship", "getaway-shootout", "imposter", "prism-duel", "fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand", "krillion"];
+export const UNSCORED_GAMES = ["duck-life-3", "battleship", "getaway-shootout", "prism-duel", "fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand", "krillion"];
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
@@ -47,7 +47,6 @@ export const LAUNCHED = {
   "getaway-shootout": "2026-11-21",
   "shotgun-roulette": "2026-11-21",
   "crossword": "2026-11-20",
-  "imposter": "2026-11-19",
   "sudoku": "2026-11-18",
   "photo-puzzle": "2026-11-17",
   "poke-gacha": "2026-11-16",
@@ -90,7 +89,6 @@ export const META = {
   "getaway-shootout": ["Arcade", "Hop left or right, grab weapons, and race your rivals to the escape. Play against computers or challenge a friend on one keyboard. Internet required for the Unity game files."],
   "shotgun-roulette": ["Arcade", "Take turns with Giratina pointing a shotgun at yourself or each other in the Distortion World. Bet tokens, or play a free test game."],
   "crossword": ["Puzzle", "The New York Times archive, one grid at a time. Everyone gets the same puzzle each morning; pull another whenever you like. Needs a connection to fetch a grid."],
-  "imposter": ["Online", "Fill tasks or hunt the crew. A public room is always open; private rooms use a four-letter code."],
   "sudoku": ["Puzzle", "Nine by nine, three levels: fill every row, column and box without a repeat."],
   "photo-puzzle": ["Puzzle", "Upload a picture, break it into tiles, then swap them back into place."],
   "poke-gacha": ["Arcade", "Pull eggs, hatch a team, and beat Team Rocket in tower defense."],

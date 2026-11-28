@@ -73,5 +73,4 @@ export const DEVELOPER_NOTES = Object.freeze({
   'corner': "Go capitalism!",
   'downhill-mayhem': "Fun.",
   '8ball': "I have a horrid break.",
-  'imposter': "Work in progress, but still pretty good!"
 });

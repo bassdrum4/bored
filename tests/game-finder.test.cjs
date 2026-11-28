@@ -24,7 +24,7 @@ test('game finder uses public catalog games and respects multiplayer requirement
 
   const withOnline = [...baseline]; withOnline[4] = 'online';
   const onlineResults = recommendGames(withOnline);
-  assert.deepEqual(onlineResults.map(game => game.slug).sort(), ['f-14', 'imposter']);
+  assert.deepEqual(onlineResults.map(game => game.slug).sort(), ['f-14']);
   const withLocal = [...baseline]; withLocal[4] = 'local';
   const localResults = recommendGames(withLocal);
   assert.ok(localResults.length > 0);
