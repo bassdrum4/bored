@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1037,
-  "newest": "2026-11-27",
+  "count": 1038,
+  "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
   {"sha":"acc198a2","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros choreography on the moving line"},
   {"sha":"84ca4806","date":"2026-11-27","author":"Claude","subject":"Relic Song: more Phigros on the line"},
   {"sha":"b19483fb","date":"2026-11-27","author":"Claude","subject":"Relic Song: custom keybinds"},
