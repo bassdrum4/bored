@@ -74,8 +74,13 @@
   .gyms .row .t { flex-basis: 100% }
   .gym .row .meta { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex: 1 1 auto; font-size: 12px }
   .gym .pick { display: flex; gap: 4px }
-  .gym .pick button { padding: 0 6px; font-size: 11px; letter-spacing: .06em; border-radius: 3px }
+  .gym .pick button { padding: 0 6px; font-size: 11px; letter-spacing: .06em; border-radius: 3px; white-space: nowrap }
   .gym .pick button.on { background: rgba(255, 255, 255, .85); color: var(--bg) }
+  .gym .pick button.lock { color: var(--faint); cursor: default }
+  .gym .pick button.lock:hover { background: rgba(255, 255, 255, .06) }
+  /* A padlock in two strokes: a shackle over a small body. */
+  .padlock { display: inline-block; position: relative; width: 7px; height: 5px; margin: 0 4px 0 1px; background: currentColor; border-radius: 1px; vertical-align: 0 }
+  .padlock::before { content: ""; position: absolute; left: 1px; top: -4px; width: 3px; height: 4px; border: 1px solid currentColor; border-bottom: 0; border-radius: 3px 3px 0 0 }
   .gym .best { color: var(--gold); font-variant-numeric: tabular-nums }
   .gym .best { min-width: 90px; text-align: right }
   .gym .best.dim { color: var(--dim) }
@@ -368,7 +373,8 @@ const PAY = {
 };
 
 /* ── Rules ─────────────────────────────────────────────────────────────── */
-const WIN = { perfect: 0.045, great: 0.09, good: 0.135 };   // seconds either side
+// Seconds either side of a note. Phigros-wide, not osu!mania-strict: keyboards are hard enough.
+const WIN = { perfect: 0.07, great: 0.11, good: 0.15 };
 const VALUE = { Perfect: 300, Great: 200, Good: 100, Miss: 0 };
 const RANKS = [["S", 950000], ["A", 900000], ["B", 800000], ["C", 650000]];
 const EDGE = 1.03;   // the buddy's type edge on a boss fight: score only
@@ -376,7 +382,7 @@ const BATTLE = { youHp: 100, missHurt: 5, finalHurt: 6, bossShare: 0.75, crit: 1
 const DIFF_NAME = { ez: "EZ", hd: "HD", in: "IN", at: "AT" };
 // How a difficulty builds its chart from the parts (see build()). Every song has
 // EZ and HD; bosses and hidden tracks add IN; the finale, The Dealer and
-// Sssssssnakes add AT. IN and AT open after an A on the song's HD.
+// Sssssssnakes add AT. Each one opens on the one before it (UNLOCKS below).
 //   lanes   4 (D F J K by default) or 6 (S D F J K L); the keys are the player's binds
 //   step    the closest two moments in the chart may sit, in seconds
 //   jack    the closest two notes in one lane may sit (after a hold's tail), in seconds
@@ -408,8 +414,10 @@ const KEY_NAMES = { Space: "Space", Semicolon: ";", Quote: "'", Comma: ",", Peri
   ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", IntlBackslash: "\\", ContextMenu: "Menu" };
 const keyName = code => KEY_NAMES[code] || (/^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5)
   : /^Numpad/.test(code) ? "Num " + code.slice(6).replace("Add", "+").replace("Subtract", "-").replace("Multiply", "*").replace("Divide", "/").replace("Decimal", ".") : code);
-// IN and AT open with an A or better on HD.
-const UNLOCK_RANK = "A";
+// A song's difficulties open as a chain: EZ from the start, HD after clearing EZ, IN after an A on
+// HD, AT after an S on IN. Gym progress only ever needs a clear, so EZ is enough to go on.
+const UNLOCKS = { hd: { after: "ez", rank: "C", ask: "Clear EZ to unlock" }, in: { after: "hd", rank: "A", ask: "Get an A or better on HD to unlock" },
+  at: { after: "in", rank: "S", ask: "Get an S on IN to unlock" } };
 
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -684,7 +692,7 @@ const riptide = (b, rot) => [{ at: b, len: 1, kind: "fly", x: 640, y: 585, rot }
 // Pirouette: a teleport every bar and a sharp snap (a tilt and a shove) on the beats between.
 const pirouette = (from, to) => every(from, to, 2, (b, i) => i % 2
   ? [{ at: b, len: 0.2, kind: "snap", rot: i % 4 === 1 ? 16 : -16, dx: i % 4 === 1 ? -70 : 70 }]
-  : [{ at: b - 0.25, len: 0.5, kind: "teleport", x: [520, 760, 640, 580, 700][(i / 2) % 5], y: [560, 580, 540, 600, 560][(i / 2) % 5] }, { at: b, len: 0.17, kind: "snap", rot: 0 }]);
+  : [{ at: b - 0.25, len: 0.5, kind: "teleport", x: [520, 760, 640, 580, 700][(i / 2) % 5], y: [560, 580, 555, 600, 560][(i / 2) % 5] }, { at: b, len: 0.17, kind: "snap", rot: 0 }]);
 // A surge: the line sits low; every four beats its notes crawl for two, then rush in, with a jolt.
 const surge = (from, to) => [{ at: from, len: 0.5, kind: "fly", x: 640, y: 620, rot: 0 }, { at: from, len: 0.5, kind: "width", w: 0.7 },
   ...every(from, to, 4, (b, i) => [{ at: b, kind: "speed", to: 0.5 }, { at: b + 2, kind: "speed", to: 1.3 }, { at: b + 2, len: 0.12, kind: "snap", rot: i % 2 ? 10 : -10 }, { at: b + 2, kind: "shake" }]),
@@ -694,15 +702,15 @@ const PETALS = [[380, 520], [640, 480], [900, 540], [520, 600], [780, 600], [300
 
 const SONGS = [
   // ── Brock, Pewter Gym (Rock) ──
-  { id: "pewter-steps", heat: { ez: 0, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
+  { id: "pewter-steps", heat: { ez: 0.06, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
     parts: { A: { lead: "c5 - e5 - g5 - e5 - | f5 - a5 - g5 - - - | e5 - g5 - c6 - g5 - | f5 - e5 - d5 - - -", chords: "C F C G" },
              B: { lead: "a4 - c5 - e5 - - - | f5 - e5 - d5 - - - | g4 - b4 - d5 - g5 - | e5 - d5 - c5 - - -", chords: "Am F G C" } },
     form: "A A B B A A B A" },
-  { id: "boulder-march", heat: { ez: 0.04, hd: 0.06 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
+  { id: "boulder-march", heat: { ez: 0.12, hd: 0.08 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
     parts: { A: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
              B: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D" } },
     form: "A A B A A B B A" },
-  { id: "onix-rising", heat: { ez: 0.12, hd: 0.08, in: 0.26 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
+  { id: "onix-rising", heat: { ez: 0.24, hd: 0.08, in: 0.14 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
     parts: { A: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
@@ -723,15 +731,15 @@ const SONGS = [
            ...every(48, 64, 4, b => [{ at: b, len: 0.08, kind: "snap", dy: 40, only: "ez" }, { at: b + 0.5, len: 3, kind: "fly", x: 640, y: 500, rot: 0, only: "ez" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", heat: { ez: 0.46, hd: 0.38 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
+  { id: "cerulean-current", heat: { ez: 0.44, hd: 0.32 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
     parts: { A: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
              B: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D" } },
     form: "A A B A B B A A" },
-  { id: "tidepool-waltz", heat: { ez: 0.9, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
+  { id: "tidepool-waltz", heat: { ez: 0.8, hd: 0.24 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
     parts: { A: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
              B: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A" } },
     form: "A A B A A B B A A A B A A B B A" },
-  { id: "starmie-undertow", heat: { ez: 0.58, hd: 0.44, in: 0.5 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
+  { id: "starmie-undertow", heat: { ez: 0.54, hd: 0.34, in: 0.42 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
     parts: { A: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
              B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
              C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
@@ -750,15 +758,15 @@ const SONGS = [
            { at: 48, len: 1, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 48, kind: "speed", to: 0.65 }, { at: 49, len: 7, kind: "spin", perBeat: 360 / 7 }, ...riptide(56, 360)] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
-  { id: "vermilion-voltage", heat: { ez: 0.9, hd: 0.24 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
+  { id: "vermilion-voltage", heat: { ez: 0.58, hd: 0.12 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
              B: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "lightning-rod", heat: { ez: 1, hd: 0.28 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
+  { id: "lightning-rod", heat: { ez: 0.6, hd: 0.12 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
     parts: { A: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
              B: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "raichu-overload", heat: { ez: 0.62, hd: 0.22, in: 0.38 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
+  { id: "raichu-overload", heat: { ez: 0.62, hd: 0.06, in: 0.16 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
              B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
@@ -775,15 +783,15 @@ const SONGS = [
            ...every(64, 80, 2, (b, i) => [{ at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? 32 : -32, line: 1 }, { at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? -32 : 32, line: 2 }])] },
 
   // ── Erika, Celadon Gym (Grass) ──
-  { id: "celadon-petals", heat: { ez: 0.98, hd: 0.46 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
+  { id: "celadon-petals", heat: { ez: 0.8, hd: 0.4 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
     parts: { A: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
              B: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F" } },
     form: "A A B A B B A A" },
-  { id: "gloom-garden", heat: { ez: 1, hd: 0.46 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
+  { id: "gloom-garden", heat: { ez: 0.94, hd: 0.4 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
     parts: { A: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
              B: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm" } },
     form: "A A B A B B A A" },
-  { id: "vileplume-drift", heat: { ez: 0.98, hd: 0.48, in: 0.58 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
+  { id: "vileplume-drift", heat: { ez: 0.98, hd: 0.4, in: 0.48 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
     parts: { A: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
              B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
              C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
@@ -806,7 +814,7 @@ const SONGS = [
            { at: 58, len: 6, kind: "drift", ampX: 140, period: 12, sway: 12, fall: 1 }] },
 
   // ── The finale: Meloetta ──
-  { id: "relic-song", heat: { ez: 0.52, hd: 0.36, in: 0.36, at: 0.34 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
+  { id: "relic-song", heat: { ez: 0.8, hd: 0.3, in: 0.28, at: 0.26 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
     parts: { A: { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "Em C G D" },
              B: { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - - | g5 - a5 - b5 - d6 - | e6 - - - - - . .", chords: "Am Em G Em" },
              C: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | g5 a5 b5 c6 d6 c6 b5 a5 | b5 - - - - - - - | e5 - - - . . . .", chords: "Em D C B", burst: true },
@@ -842,7 +850,7 @@ const SONGS = [
   // ── Hidden tracks ──
   // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
   // land on beats 1 and 4 every bar, and the B part fires a fast burst.
-  { id: "the-dealer", heat: { ez: 0.84, hd: 0.48, in: 0.5, at: 0.44 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007, at: true,
+  { id: "the-dealer", heat: { ez: 0.56, hd: 0.32, in: 0.32, at: 0.32 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007, at: true,
     sync: true, chordAt: [0, 6], chordsAlways: true,
     // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
     verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
@@ -871,7 +879,7 @@ const SONGS = [
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", heat: { ez: 0.88, hd: 0.42, in: 0.46, at: 0.46 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+  { id: "sssssssnakes", heat: { ez: 0.88, hd: 0.34, in: 0.38, at: 0.36 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
     // The break: a long hiss, and then the line slithers in an S for the rest of the song.
     verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
     line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 580, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.55 }, { at: 0, kind: "speed", to: 0.9 },
@@ -1071,9 +1079,9 @@ function build(song, diff = "hd") {
     if (lane == null) continue;
     n.lane = lane; put(n);
   }
-  // 2. Chords. Rock and the finale chord on every strong beat (Brock's two keys at once), The
+  // 2. Chords. Rock and the finale chord on most strong beats (Brock's two keys at once; all of them when hot), The
   //    Dealer on beats 1 and 4; other songs as often as their heat says. Bigger chords on IN and AT.
-  const chordRate = !D.chords ? 0 : song.chordsAlways ? 1 : Math.min(1, D.chords * (style.doubles ? 1.6 : heat));
+  const chordRate = !D.chords ? 0 : song.chordsAlways ? 1 : Math.min(1, D.chords * (style.doubles ? 1 + heat : heat));
   for (const c of chordSpots) {
     if (roll(c.b, 1) >= chordRate) continue;
     const here = moment(c.b);
@@ -1170,9 +1178,14 @@ function choreograph(B, script) {
 /* ── A chart's level, measured from the chart ──────────────────────────── */
 // The same scale as Phigros, where 11 is already hard: EZ 1-5, HD 4-10, IN 9-13, AT 13-15.
 // What counts: notes a second on average and over the busiest four seconds, how much of
-// the chart is chords (and how big), notes pressed while a hold is down, drags (nearly
+// the chart is chords (and how big: three and four keys at once weigh the most), jacks (a
+// lane hit again soon after itself), notes pressed while a hold is down, drags (nearly
 // free), six lanes, and how far the judgment line travels while its notes come in.
+// Then the keyboard: the same chart plays about three levels harder on keys than on a touch
+// screen, mostly in its jacks and big chords, so everything above Lv.1 is scaled up by KEYBOARD.
+// A Lv.10 here should feel like a Phigros Lv.10, not a 12 or 13.
 const BANDS = { ez: [1, 5], hd: [1, 10], in: [9, 13], at: [13, 15] };
+const KEYBOARD = 1.2;
 function rate(B) {
   const ns = B.chart, secs = Math.max(1, B.seconds), spb = B.spb, song = B.song;
   const w = n => n.kind === "drag" ? 0.25 : n.kind === "hold" ? 1.25 : 1;
@@ -1191,6 +1204,17 @@ function rate(B) {
   const holds = presses.filter(n => n.kind === "hold");
   const under = presses.filter(n => holds.some(h => h !== n && h.b < n.b - 1e-6 && h.b + h.len > n.b)).length / Math.max(1, presses.length);
   const drags = (ns.length - presses.length) / Math.max(1, ns.length);
+  // Jacks: each note's gap to the last note in its lane (from a hold's tail), worth more the closer
+  // it is: nothing at 0.4 s, full at 0.15 s (the tightest AT allows).
+  const lastIn = new Map();
+  let jacks = 0;
+  for (const n of presses) {
+    const gap = lastIn.has(n.lane) ? (n.b - lastIn.get(n.lane)) * spb : 9;
+    jacks += Math.max(0, Math.min(1, (0.4 - gap) / 0.25));
+    lastIn.set(n.lane, n.b + n.len);
+  }
+  jacks /= Math.max(1, presses.length);
+  const big = sizes.filter(s => s > 2).reduce((t, s) => t + s, 0) / Math.max(1, presses.length);
   // The line: px (and degrees, x4) each note's line covers in the half beat before it, per second,
   // and how much its scroll speed changes (a note that crawls and then rushes in is harder to read).
   const onLine = ns.filter(n => n.mode === "line");
@@ -1206,11 +1230,12 @@ function rate(B) {
   const lineShare = onLine.length / Math.max(1, ns.length);
   // Two levels for every note a second (most of it the average, some the peak), then the extras.
   const nps = 0.6 * avg + 0.4 * peak;
-  const value = 2 * nps - 4 + 2 * inChords * (chord - 1) / 2 + 1.5 * under + (B.lanes === 6 ? 0.5 : 0)
+  const touch = 2 * nps - 4 + 1.5 * inChords * (chord - 1) + 2 * big + 4 * jacks + 1.5 * under + (B.lanes === 6 ? 0.5 : 0)
     + Math.min(1, move / 300) * lineShare * 1.5 - drags;
+  const value = touch > 1 ? 1 + (touch - 1) * KEYBOARD : touch;
   const [lo, hi] = BANDS[B.diff];
   const level = Math.max(lo, Math.min(hi, Math.round(value)));
-  return { level, stats: { avg: +avg.toFixed(2), peak: +peak.toFixed(2), chord, inChords: +inChords.toFixed(2), under: +under.toFixed(2),
+  return { level, stats: { avg: +avg.toFixed(2), peak: +peak.toFixed(2), chord, inChords: +inChords.toFixed(2), big: +big.toFixed(2), jacks: +jacks.toFixed(2), under: +under.toFixed(2),
     drags: +drags.toFixed(2), move: Math.round(move), lineShare: +lineShare.toFixed(2), value: +value.toFixed(2) } };
 }
 const BUILT = {};
@@ -1381,8 +1406,17 @@ function fair(script, due) {
 
 /* ── Unlocks and bests ─────────────────────────────────────────────────── */
 const bestOf = (song, diff = song.diffs[0]) => save.best[song.id + ":" + diff] || null;
-// IN and AT open once the song's HD best is an A or better (test mode opens everything).
-const diffOpen = (song, diff) => opts.test || (diff !== "in" && diff !== "at") || rankIndex((bestOf(song, "hd") || {}).rank) >= rankIndex(UNLOCK_RANK);
+// Is a difficulty open? Test mode opens everything; a song's first difficulty is always open. A clear
+// counts for everything under it too: an HD cleared before the chain existed means EZ is done (so HD
+// stays open), and a difficulty already cleared stays open whatever came before it.
+function diffOpen(song, diff) {
+  const i = song.diffs.indexOf(diff), u = UNLOCKS[diff];
+  if (opts.test || i <= 0 || !u) return true;
+  const done = d => song.diffs.slice(song.diffs.indexOf(d)).some(x => bestOf(song, x));
+  if (done(diff)) return true;
+  const prev = bestOf(song, u.after);
+  return u.rank === "C" ? done(u.after) : !!prev && rankIndex(prev.rank) >= rankIndex(u.rank);
+}
 const cleared = song => song.diffs.some(d => bestOf(song, d));
 const badges = () => GYMS.filter((g, i) => save.badges[i]).length;
 const gymSongs = g => SONGS.filter(s => s.gym === g);
@@ -1411,7 +1445,8 @@ function say(text, num = MELOETTA, pir = false) {
 }
 // The difficulty each song row has picked (this session); HD until you pick another.
 const picked = {};
-const pickedDiff = song => song.diffs.includes(picked[song.id]) && diffOpen(song, picked[song.id]) ? picked[song.id] : song.diffs.includes("hd") ? "hd" : song.diffs[0];
+const pickedDiff = song => song.diffs.includes(picked[song.id]) && diffOpen(song, picked[song.id]) ? picked[song.id]
+  : song.diffs.includes("hd") && diffOpen(song, "hd") ? "hd" : song.diffs[0];
 function songRow(song, label) {
   const ok = open(song), diff = pickedDiff(song), b = bestOf(song, diff);
   const row = el("div", "row" + (ok ? "" : " off"));
@@ -1421,11 +1456,14 @@ function songRow(song, label) {
   const meta = el("span", "meta");
   const pick = el("span", "pick");
   for (const d of song.diffs) {
+    // A locked one stays in the picker with a padlock, and says what opens it on hover (it isn't
+    // `disabled`: some browsers show no tooltip on a disabled button).
     const free = diffOpen(song, d);
-    const c = el("button", d === diff ? "on" : "", DIFF_NAME[d] + " " + levelOf(song, d));
-    c.type = "button"; c.disabled = !ok || !free;
-    c.title = DIFF_NAME[d] + " Lv." + levelOf(song, d) + (free ? "" : " · get an " + UNLOCK_RANK + " or better on HD to open it");
-    c.onclick = () => { picked[song.id] = d; drawMap(); };
+    const c = el("button", d === diff ? "on" : free ? "" : "lock", DIFF_NAME[d] + " " + levelOf(song, d));
+    if (!free) { c.prepend(el("i", "padlock")); c.setAttribute("aria-disabled", "true"); }
+    c.type = "button"; c.disabled = !ok;
+    c.title = free ? DIFF_NAME[d] + " Lv." + levelOf(song, d) : UNLOCKS[d].ask;
+    c.onclick = () => { if (!free) return; picked[song.id] = d; drawMap(); };
     pick.append(c);
   }
   meta.append(pick, el("span", "best" + (b ? "" : " dim"), !ok ? "locked" : b ? b.rank + " · " + fmt(b.score) : "-"));
@@ -1465,7 +1503,7 @@ function drawMap() {
   hc.append(el("h2", "", "Hidden tracks"));
   for (const s of SONGS.filter(x => x.hidden)) {
     if (hiddenOpen(s)) hc.append(songRow(s));
-    else { const r = el("div", "row off"), t = el("button", "t", "???"); t.type = "button"; t.disabled = true; r.append(t, el("span", "meta", el("span", "best dim", "-"))); hc.append(r); }
+    else { const r = el("div", "row off"), t = el("button", "t", "???"); t.type = "button"; t.disabled = true; const meta = el("span", "meta"); meta.append(el("span", "best dim", "-")); r.append(t, meta); hc.append(r); }
   }
   fin.append(hc);
   const next = GYMS.findIndex((g, i) => !save.badges[i]);
