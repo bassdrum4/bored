@@ -102,7 +102,7 @@ export function inCollection(slug, collection) {
 // A newly scaffolded game starts with an SVG placeholder and is listed here
 // until a real capture replaces it. F-14 and Klang use self-hosted illustrated
 // SVG previews; Risk keeps its existing SVG preview.
-export const PREVIEW_FALLBACKS = {"duck-life-3": '.svg',    "getaway-shootout": '.svg',   "poke-gacha": '.svg', "poke-idle": '.svg',  "pokedoku": '.svg',      'f-14': '.webp', klang: '.svg' };
+export const PREVIEW_FALLBACKS = {"getaway-shootout": '.svg',   "poke-gacha": '.svg', "poke-idle": '.svg',  "pokedoku": '.svg',      'f-14': '.webp', klang: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug] || PREVIEW_FALLBACKS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
