@@ -1,0 +1,1 @@
+alter policy poke_idle_admin_read on public.poke_idle_admin_snapshots using ((select auth.uid()) = 'da33b6a3-0eae-48b9-9bd0-82d49f36c8c6'::uuid and exists (select 1 from public.game_analytics_readers g where g.user_id=(select auth.uid()) and g.game='poke-idle'));
