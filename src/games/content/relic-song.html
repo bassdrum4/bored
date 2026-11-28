@@ -106,6 +106,18 @@
   .card td { padding: 5px 4px; border-bottom: 1px solid var(--rule) }
   .card td:last-child { text-align: right }
   .seg button.on { background: var(--ink); color: var(--bg) }
+  /* Options holds a lot now: tighter rows so it fits the stage without scrolling. */
+  #opts .card { max-height: 704px; padding: 16px 26px }
+  #opts .card h2 { margin-bottom: 4px }
+  #opts .card .line { padding: 4px 0; min-height: 38px }
+  .binds { display: flex; gap: 4px; align-items: center }
+  .binds .slot { min-width: 34px; height: 30px; padding: 0 6px; font-size: 13px }
+  .binds .slot.wait { border-color: var(--tap); color: var(--tap) }
+  .binds .reset { margin-left: 8px; font-size: 12px; padding: 4px 8px }
+  .keytest { display: flex; gap: 4px; align-items: center }
+  .keytest b { min-width: 30px; padding: 0 5px; height: 30px; display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 3px; font-weight: 400; color: var(--dim) }
+  .keytest b.on { background: var(--tap); color: var(--bg); border-color: var(--tap) }
+  .keytest span { width: 70px; text-align: right; font-size: 12px; color: var(--dim) }
   .calib-dot { width: 90px; height: 90px; border: 2px solid var(--ink); border-radius: 50%; margin: 18px auto; transition: background .06s, box-shadow .06s }
   .calib-dot.on { background: var(--tap); box-shadow: 0 0 24px var(--tap) }
 
@@ -159,12 +171,18 @@
   .nt.miss { opacity: 0; transition: opacity .25s }
   .nt.morph { transition: left .7s ease-in-out, width .7s ease-in-out }
   .nt.done { display: none }
-  .skin-charm .nt .head { background: radial-gradient(circle at 20% 40%, #fff 0 1.2px, transparent 2px) 0 0 / 14px 10px,
-                linear-gradient(90deg, #c9c2db, #fbf8ff 40%, #f0c9e6 60%, #bdb5d1) !important;
-    box-shadow: 0 0 12px rgba(255, 200, 240, .8) !important; animation: twinkle 1.1s linear infinite }
+  /* Skins keep the two kinds apart: a single note and one that lands with others. Drags keep their own look.
+     Shiny Charm: silver sparkle, pink sparkle together. Crown: a silver crown, a gold crown together. */
+  .skin-charm .nt:not(.drag) .head { background: radial-gradient(circle at 20% 40%, #fff 0 1.2px, transparent 2px) 0 0 / 14px 10px,
+                linear-gradient(90deg, #b9bec8, #fbfcff 40%, #dfe5ee 60%, #aab0bc) !important;
+    box-shadow: 0 0 12px rgba(225, 235, 255, .8) !important; animation: twinkle 1.1s linear infinite }
+  .skin-charm .nt.dbl:not(.drag) .head { background: radial-gradient(circle at 20% 40%, #fff 0 1.2px, transparent 2px) 0 0 / 14px 10px,
+                linear-gradient(90deg, #e79ac8, #fff0f8 40%, #f6b8dc 60%, #d986b8) !important;
+    box-shadow: 0 0 12px rgba(255, 160, 215, .9) !important }
   @keyframes twinkle { to { background-position: 14px 0, 0 0 } }
-  .skin-crown .nt .head { height: 14px; border-radius: 0; background: linear-gradient(#f4d873, #c89a2e) !important; box-shadow: none !important;
+  .skin-crown .nt:not(.drag) .head { height: 14px; border-radius: 0; background: linear-gradient(#f2f4f8, #9ca3b0) !important; box-shadow: none !important;
     clip-path: polygon(0 100%, 0 30%, 12% 62%, 25% 10%, 38% 62%, 50% 0, 62% 62%, 75% 10%, 88% 62%, 100% 30%, 100% 100%) }
+  .skin-crown .nt.dbl:not(.drag) .head { background: linear-gradient(#f4d873, #c89a2e) !important }
   .skin-crown .nt .beam { background: linear-gradient(to top, rgba(120, 140, 220, .5), rgba(60, 80, 160, .25)) }
 
   /* Hit bursts: an expanding square turning 45° and a few small squares flying out. Nothing else. */
@@ -286,6 +304,11 @@
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
     <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
+    <div class="line"><span>Keybinds <span class="dim">(click a key, then press the new one)</span></span><span class="dim" id="o-bind-note"></span></div>
+    <div class="line"><span>4 lanes <span class="dim">(EZ, HD)</span></span><span class="binds" id="o-bind4"></span></div>
+    <div class="line"><span>6 lanes <span class="dim">(IN, AT)</span></span><span class="binds" id="o-bind6"></span></div>
+    <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
+    <p class="dim" style="margin-top:6px">If some keys don't light up together, your keyboard can't press them at once. Stick to EZ/HD.</p>
     <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <p class="dim" id="o-skin-note" style="margin-top:8px"></p>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
@@ -296,7 +319,7 @@
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
 
-  <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys, D F J K. Open it on a computer.</p></div></div>
+  <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys on a keyboard. Open it on a computer.</p></div></div>
 </div>
 
 <script>
@@ -319,20 +342,18 @@
    wait for the arcade. */
 {
 /* ── Coins: tune these ─────────────────────────────────────────────────── */
-// Shotgun Roulette's rate, worked out from its code (shotgun-roulette.html and
-// src/hub/roulette.js): the default bet is 50, a won Normal game pays 1.8x, so
-// a win nets 50 x 0.8 = 40 tokens, and a game runs 5–10 minutes (7.5 on
-// average, src/games/discovery.js). 40 / 7.5 = 5.33 a minute. (Its bot wins
-// 43.1% on Normal, simShotgun(20000), so the table's long-run net is negative;
-// the rate a winning game pays is the one worth matching.)
+// Every amount is paid once, through the hub's ledger (src/hub/relic-song.js); replays pay
+// nothing. Raise a number here and players already paid under the old one get the rest,
+// once, the next time the game opens from the arcade.
 const PAY = {
-  rouletteCoinsPerMinute: 40 / 7.5,
-  // First clear of a song = rate x the song's minutes x this, per difficulty.
-  diff: { ez: 0.75, hd: 1, in: 1.5, at: 2 },
-  // Each rank step above C (B, A, S), the first time your best reaches it: this share of the clear pay.
-  rankStep: 0.25,
-  // Every payout is at least this many coins.
-  floor: 1
+  // The first clear of a song on each difficulty.
+  clear: { ez: 50, hd: 100, in: 200, at: 400 },
+  // The first time your best on a difficulty reaches each rank, times that difficulty's multiplier.
+  rank: { b: 25, a: 50, s: 100 },
+  mult: { ez: 0.5, hd: 1, in: 2, at: 4 },
+  // A gym boss's first clear on any difficulty (its badge), and the final boss's first clear.
+  badge: 250,
+  finale: 500
 };
 
 /* ── Rules ─────────────────────────────────────────────────────────────── */
@@ -342,14 +363,40 @@ const RANKS = [["S", 950000], ["A", 900000], ["B", 800000], ["C", 650000]];
 const EDGE = 1.03;   // the buddy's type edge on a boss fight: score only
 const BATTLE = { youHp: 100, missHurt: 5, finalHurt: 6, bossShare: 0.75, crit: 16, critMult: 1.5, charge: 1.5 };
 const DIFF_NAME = { ez: "EZ", hd: "HD", in: "IN", at: "AT" };
-// How a difficulty builds its chart from the parts. One per song ships today (HD).
+// How a difficulty builds its chart from the parts (see build()). Every song has
+// EZ and HD; bosses and hidden tracks add IN; the finale, The Dealer and
+// Sssssssnakes add AT. IN and AT open after an A on the song's HD.
+//   lanes   4 (D F J K by default) or 6 (S D F J K L); the keys are the player's binds
+//   step    the closest two moments in the chart may sit, in seconds
+//   jack    the closest two notes in one lane may sit (after a hold's tail), in seconds
+//   chord   the most keys down at once, holds included (never more than 4: keyboards ghost)
+//   fill    how much of the filler layer goes in (times the song's heat for this difficulty)
+//   chords  how often a strong beat becomes a chord (times the song's heat)
+//   fillChords  how often a filler tap comes with a second (or third) key (times the heat)
+//   burst   a burst part's sixteenths and arpeggio runs go in
+//   six     sixteenths in the filler everywhere, not only in burst parts (step still has the last word)
 const CHART_DIFFS = {
-  ez: { holdMin: 4, doubles: false, burst: false, gap: 0.5 },
-  hd: { holdMin: 3, doubles: true, burst: true, gap: 0.25 },
-  in: { holdMin: 3, doubles: true, burst: true, gap: 0.25, arp: true },
-  at: { holdMin: 2, doubles: true, burst: true, gap: 0.125, arp: true }
+  ez: { lanes: 4, holdMin: 4, step: 0.25, jack: 0.4, chord: 2, fill: 1, chords: 0.3, fillChords: 0, burst: false },
+  hd: { lanes: 4, holdMin: 3, step: 0.105, jack: 0.22, chord: 2, fill: 1, chords: 0.6, fillChords: 1, burst: true, six: true },
+  in: { lanes: 6, holdMin: 3, step: 0.1, jack: 0.18, chord: 3, fill: 1, chords: 1, fillChords: 0.5, burst: true, six: true },
+  at: { lanes: 6, holdMin: 2, step: 0.075, jack: 0.15, chord: 4, fill: 1, chords: 1.4, fillChords: 0.5, burst: true, six: true }
 };
-const KEYS = ["d", "f", "j", "k"];
+// Lane keys, by physical key (e.code), so they sit in the same place on any layout.
+// Players rebind them in Options; opts.binds keeps both rows.
+const DEFAULT_BINDS = { 4: ["KeyD", "KeyF", "KeyJ", "KeyK"], 6: ["KeyS", "KeyD", "KeyF", "KeyJ", "KeyK", "KeyL"] };
+// Esc pauses, R retries, Enter continues: never a lane. Ctrl, Alt and the OS key belong to the browser.
+const RESERVED_KEYS = ["Escape", "KeyR", "Enter", "NumpadEnter", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "OSLeft", "OSRight"];
+const keysFor = lanes => opts.binds[lanes === 6 ? 6 : 4];
+// Every bound key, either row: any of them plays on the moving line.
+const boundKeys = () => new Set([...opts.binds[4], ...opts.binds[6]]);
+// A key's name as printed on it: "Space", ";", "Shift", "F", "7".
+const KEY_NAMES = { Space: "Space", Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", BracketLeft: "[", BracketRight: "]",
+  Minus: "-", Equal: "=", Backquote: "`", ShiftLeft: "Shift", ShiftRight: "Shift", Tab: "Tab", CapsLock: "Caps", Backspace: "Bksp",
+  ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", IntlBackslash: "\\", ContextMenu: "Menu" };
+const keyName = code => KEY_NAMES[code] || (/^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5)
+  : /^Numpad/.test(code) ? "Num " + code.slice(6).replace("Add", "+").replace("Subtract", "-").replace("Multiply", "*").replace("Divide", "/").replace("Decimal", ".") : code);
+// IN and AT open with an A or better on HD.
+const UNLOCK_RANK = "A";
 
 const $ = s => document.querySelector(s);
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -399,6 +446,12 @@ const STORY_KEY = "bored.poke-idle.story";
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0 }, readJSON(OPTS_KEY) || {});
+// Saved binds are kept only if each row is whole, has no repeats and no reserved key.
+{
+  const saved = opts.binds || {}, ok = (row, n) => Array.isArray(row) && row.length === n && new Set(row).size === n
+    && row.every(c => typeof c === "string" && /^[A-Za-z0-9]{1,24}$/.test(c) && !RESERVED_KEYS.includes(c));
+  opts.binds = { 4: ok(saved[4], 4) ? saved[4].slice() : DEFAULT_BINDS[4].slice(), 6: ok(saved[6], 6) ? saved[6].slice() : DEFAULT_BINDS[6].slice() };
+}
 const keepOpts = () => writeJSON(OPTS_KEY, opts);
 let save = null;
 const slotKey = () => opts.test ? TEST_KEY : SAVE_KEY;
@@ -566,33 +619,38 @@ const VERSES = [
    line is the movement script for the judgment line, in beats from the break. */
 const SONGS = [
   // ── Brock, Pewter Gym (Rock) ──
-  { id: "pewter-steps", lv: { hd: 2 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
+  { id: "pewter-steps", heat: { ez: 0, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
     parts: { A: { lead: "c5 - e5 - g5 - e5 - | f5 - a5 - g5 - - - | e5 - g5 - c6 - g5 - | f5 - e5 - d5 - - -", chords: "C F C G" },
              B: { lead: "a4 - c5 - e5 - - - | f5 - e5 - d5 - - - | g4 - b4 - d5 - g5 - | e5 - d5 - c5 - - -", chords: "Am F G C" } },
     form: "A A B B A A B A" },
-  { id: "boulder-march", lv: { hd: 3 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
+  { id: "boulder-march", heat: { ez: 0.04, hd: 0.06 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
     parts: { A: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
              B: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D" } },
     form: "A A B A A B B A" },
-  { id: "onix-rising", lv: { hd: 4 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
+  { id: "onix-rising", heat: { ez: 0.12, hd: 0.08, in: 0.26 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
     parts: { A: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
     form: "A A B A relic C C B C",
-    // Tutorial boss: the line steps between a few spots, like blocks set down.
-    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 520, rot: 0 }, { at: 16, len: 1, kind: "fly", x: 640, y: 440, rot: 0 }, { at: 32, len: 1, kind: "fly", x: 640, y: 520, rot: -8 },
-           { at: 40, len: 1, kind: "fly", x: 640, y: 520, rot: 8 }, { at: 48, len: 2, kind: "fly", x: 640, y: 480, rot: 0 }] },
+    // Tutorial boss, the first moving line: slow tilts up to 20 degrees, a few moves, and one slow
+    // full turn near the end, set down like blocks.
+    line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 }, { at: 2, len: 6, kind: "fly", x: 640, y: 500, rot: -12 },
+           { at: 8, len: 8, kind: "fly", x: 640, y: 480, rot: 12 }, { at: 16, len: 4, kind: "fly", x: 520, y: 460, rot: -20 },
+           { at: 20, len: 4, kind: "fly", x: 760, y: 460, rot: 20 }, { at: 24, len: 8, kind: "tide", amp: 50, period: 8, tilt: 10 },
+           { at: 32, len: 4, kind: "fly", x: 640, y: 420, rot: -20 }, { at: 36, len: 4, kind: "fly", x: 640, y: 520, rot: 16 },
+           { at: 40, len: 4, kind: "fly", x: 560, y: 480, rot: 0 }, { at: 44, len: 4, kind: "fly", x: 640, y: 460, rot: 0 },
+           { at: 48, len: 12, kind: "spin", perBeat: 30 }, { at: 60, len: 4, kind: "fly", x: 640, y: 520, rot: 360 }] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", lv: { hd: 4 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
+  { id: "cerulean-current", heat: { ez: 0.46, hd: 0.38 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
     parts: { A: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
              B: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D" } },
     form: "A A B A B B A A" },
-  { id: "tidepool-waltz", lv: { hd: 5 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
+  { id: "tidepool-waltz", heat: { ez: 0.9, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
     parts: { A: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
              B: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A" } },
     form: "A A B A A B B A A A B A A B B A" },
-  { id: "starmie-undertow", lv: { hd: 6 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
+  { id: "starmie-undertow", heat: { ez: 0.58, hd: 0.44, in: 0.5 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
     parts: { A: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
              B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
              C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
@@ -601,15 +659,15 @@ const SONGS = [
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 470, rot: 0 }, { at: 2, len: 62, kind: "tide", amp: 90, period: 8, tilt: 6 }] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
-  { id: "vermilion-voltage", lv: { hd: 7 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
+  { id: "vermilion-voltage", heat: { ez: 0.9, hd: 0.24 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
              B: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "lightning-rod", lv: { hd: 8 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
+  { id: "lightning-rod", heat: { ez: 1, hd: 0.28 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
     parts: { A: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
              B: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "raichu-overload", lv: { hd: 9 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
+  { id: "raichu-overload", heat: { ez: 0.62, hd: 0.22, in: 0.38 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
              B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
@@ -626,15 +684,15 @@ const SONGS = [
     split: [[24, 56]] },
 
   // ── Erika, Celadon Gym (Grass) ──
-  { id: "celadon-petals", lv: { hd: 7 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
+  { id: "celadon-petals", heat: { ez: 0.98, hd: 0.46 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
     parts: { A: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
              B: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F" } },
     form: "A A B A B B A A" },
-  { id: "gloom-garden", lv: { hd: 8 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
+  { id: "gloom-garden", heat: { ez: 1, hd: 0.46 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
     parts: { A: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
              B: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm" } },
     form: "A A B A B B A A" },
-  { id: "vileplume-drift", lv: { hd: 10 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
+  { id: "vileplume-drift", heat: { ez: 0.98, hd: 0.48, in: 0.58 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
     parts: { A: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
              B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
              C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
@@ -643,7 +701,7 @@ const SONGS = [
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 380, rot: 0 }, { at: 2, len: 62, kind: "drift", ampX: 220, period: 16, sway: 22, fall: 2.2 }] },
 
   // ── The finale: Meloetta ──
-  { id: "relic-song", lv: { hd: 12 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
+  { id: "relic-song", heat: { ez: 0.52, hd: 0.36, in: 0.36, at: 0.34 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
     parts: { A: { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "Em C G D" },
              B: { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - - | g5 - a5 - b5 - d6 - | e6 - - - - - . .", chords: "Am Em G Em" },
              C: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | g5 a5 b5 c6 d6 c6 b5 a5 | b5 - - - - - - - | e5 - - - . . . .", chords: "Em D C B", burst: true },
@@ -664,23 +722,32 @@ const SONGS = [
     split: [[106, 122]] },
 
   // ── Hidden tracks ──
-  { id: "the-dealer", lv: { hd: 9 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007,
+  // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
+  // land on beats 1 and 4 every bar, and the B part fires a fast burst.
+  { id: "the-dealer", heat: { ez: 0.84, hd: 0.48, in: 0.5, at: 0.44 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007, at: true,
+    sync: true, chordAt: [0, 6], chordsAlways: true,
+    // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
+    verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
+    loose: true, line: [{ at: 0, len: 6, kind: "fly", x: 640, y: 400, rot: 0 }, { at: 6, len: 999, kind: "chamber", every: 6, step: 60, snap: 0.35 }],
     parts: { A: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
-             B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G" } },
-    form: "A A B A B A", note: "Six beats a bar. The house always counts its own way." },
-  { id: "its-started-go", lv: { hd: 1 }, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true,
+             B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G", burst: true } },
+    form: "A A B relic A B A", note: "Six beats a bar. The house always counts its own way." },
+  { id: "its-started-go", heat: 0, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true, diffs: ["hd"],
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", lv: { hd: 10 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497,
+  { id: "sssssssnakes", heat: { ez: 0.88, hd: 0.42, in: 0.46, at: 0.46 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+    // The break: a long hiss, and then the line slithers in an S for the rest of the song.
+    verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
+    loose: true, line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 430, rot: 0 }, { at: 4, len: 999, kind: "slither", ampX: 240, ampY: 60, period: 8, tilt: 24 }],
     parts: { A: { lead: "e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - a4 - g4 - f#4 - - - . . . .", chords: "Em Em" },
              B: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" } },
-    form: "A A B A A B B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
+    form: "A A B A A B relic B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
 ];
-// Every song ships one difficulty today; the chart builder already takes the rest.
-// lv is each chart's level, shown bottom right in play and on the map: gym 1 lowest, the finale highest.
-for (const s of SONGS) s.diffs = s.diffs || ["hd"];
-const levelOf = (song, diff) => (song.lv && song.lv[diff]) || 1;
+// heat is how much of the filler layer a song takes: gym 1 lowest, the finale and the hidden
+// tracks highest. The level shown on the map and in play is measured from the built chart (rate()).
+for (const s of SONGS) s.diffs = s.diffs || ["ez", "hd"].concat(s.boss || s.hidden ? ["in"] : [], s.final || s.at ? ["at"] : []);
+const levelOf = (song, diff) => built(song, diff).level;
 
 const GYMS = [
   { name: "Brock", place: "Pewter Gym", type: "Rock", badge: "Boulder Badge", ace: 95, aceName: "Onix", style: "rock",
@@ -696,34 +763,47 @@ const FINAL = { name: "Meloetta", type: ["Normal", "Psychic"], pirouette: ["Norm
 
 /* ── Building a song: the audio events and the chart, on one grid ────────── */
 // Times are in beats from beat 0. A step is an eighth note (half a beat).
+// The chart is laid in three layers, in this order so the tune always wins:
+//   1. the melody, one note per melody note (and a burst part's arpeggio run);
+//   2. chords on the strong beats: the bar's downbeat and middle, or song.chordAt;
+//   3. the filler: taps where the band plays and the melody rests (drums, the
+//      arpeggio, off-beat eighths, sixteenths in bursts), the strongest spots first.
+// A note only goes in if it can be played to a full combo (fits() below).
+// A small hash of the song, difficulty and beat stands in for chance, so a chart is the same every load.
+const hash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
 function build(song, diff = "hd") {
-  const style = STYLES[song.style], D = CHART_DIFFS[diff], steps = song.bar * 2;
-  const ev = [], chart = [], segments = [];
+  const style = STYLES[song.style], D = CHART_DIFFS[diff], steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
+  const heat = (typeof song.heat === "object" ? song.heat[diff] ?? song.heat.hd : song.heat) || 0, roll = (b, salt = 0) => hash(song.id + ":" + diff + ":" + salt + ":" + b.toFixed(3));
+  const ev = [], tune = [], spots = new Map(), chordSpots = [], segments = [];
+  // A filler spot, on a sixteenth grid, scored by what the band plays there.
+  const spot = (b, mode, pri, burst, six) => {
+    const k = Math.round(b * 4);
+    if (k % 2 && !six) return;
+    const s = spots.get(k) || { b: k / 4, mode, pri: 0, burst };
+    s.pri += pri; spots.set(k, s);
+  };
   let beat = 0, mode = "highway", form = "aria";
-  const tokens = song.form.split(/\s+/);
+  const { tokens, moved } = formFor(song, diff);
   const addPart = (name, part, chartOn, verse) => {
     const lead = parseLine(part.lead, steps, song.id + " " + name);
     const bars = lead.length / steps;
     const chords = part.chords.split(/\s+/);
-    const at = beat;
-    // The melody, and the chart from it.
-    let lane = 1, lastPitch = null, lastBeat = -9;
+    const at = beat, burst = !!part.burst && D.burst, six = D.six || burst;
+    // The melody, and the chart's first layer from it: the lane walks up and down with the pitch.
+    let lane = L / 2 - 1, lastPitch = null, lastBeat = -9;
     for (let i = 0; i < lead.length; i++) {
       const m = midiOf(lead[i]);
       if (m == null) continue;
       let len = 1;
       while (i + len < lead.length && lead[i + len] === "-") len++;
       const b = at + i / 2;
-      ev.push({ b, kind: "tone", inst: verse ? "voice" : style.lead, midi: m, dur: len / 2 });
+      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : style.lead, midi: m, dur: len / 2 });
       if (!chartOn) continue;
       if (lastPitch != null) lane += m > lastPitch ? 1 : m < lastPitch ? -1 : (b - lastBeat < 0.75 ? (lane >= 2 ? -1 : 1) : 0);
-      if (lane > 3) lane = 2; if (lane < 0) lane = 1;
+      if (lane > L - 1) lane = L - 2; if (lane < 0) lane = 1;
       lastPitch = m; lastBeat = b;
       const hold = !song.noHolds && len >= D.holdMin + (style.holds ? 0 : 1) ? (len - 1) / 2 : 0;
-      chart.push({ b, lane, len: hold, mode, burst: !!part.burst && D.burst });
-      // Rock (and the finale): a second key on the bar's downbeat and its middle, a block chord.
-      if (style.doubles && D.doubles && (i % steps === 0 || i % steps === steps / 2) && !hold)
-        chart.push({ b, lane: (lane + 2) % 4, len: 0, mode, dbl: true });
+      tune.push({ b, lane, len: hold, mode });
     }
     // Chords: bass, stabs and arpeggios.
     for (let bar = 0; bar < bars; bar++) {
@@ -743,19 +823,31 @@ function build(song, diff = "hd") {
           const idx = run === "flow16" ? [0, 1, 2, 3, 2, 1][k % 6] : k % 4;
           const b = b0 + k / per;
           ev.push({ b, kind: "tone", inst: style.arp, midi: tones[idx] + (run === "up8" ? 12 : 0), dur: 0.9 / per });
+          if (chartOn) spot(b, mode, per === 4 && k % 2 ? 1 : 2, burst, six);
           // A burst part's arpeggio is the chart's speed run (drag notes on the line).
-          if (chartOn && part.burst && D.burst && run !== "sway" && k % (per === 4 ? 2 : 1) === 0)
-            chart.push({ b, lane: idx % 4, len: 0, mode, run: true });
+          if (chartOn && burst && run !== "sway" && k % (per === 4 ? 2 : 1) === 0)
+            tune.push({ b, lane: idx % 4 + (L - 4) / 2, len: 0, mode, run: true });
         }
       }
       // Drums
       const dr = style.drums;
       for (const [hit, when] of Object.entries(dr)) {
         const stepsList = when === "all" ? [...Array(n * 2).keys()] : when === "off" ? [...Array(n).keys()].map(k => k * 2 + 1) : when === "16" ? [...Array(n * 4).keys()].map(k => k / 2) : when;
-        for (const s of stepsList) if (s < n * 2) ev.push({ b: b0 + s / 2, kind: "drum", hit });
+        for (const s of stepsList) if (s < n * 2) {
+          ev.push({ b: b0 + s / 2, kind: "drum", hit });
+          if (chartOn) spot(b0 + s / 2, mode, "kKst".includes(hit) ? 3 : 1, burst, six);
+        }
       }
       // A fill on the part's last bar.
       if (bar === bars - 1 && style.drums.s) for (const s of [n * 2 - 2, n * 2 - 1.5, n * 2 - 1]) ev.push({ b: b0 + s / 2, kind: "drum", hit: style.deep ? "t" : "s" });
+      if (!chartOn) continue;
+      // The grid itself: every eighth is a spot (off-beats count double on a syncopated song),
+      // and in a burst (or on IN and AT) every sixteenth.
+      for (let k = 0; k < n * 2; k++) {
+        spot(b0 + k / 2, mode, k % 2 ? (song.sync ? 2 : 0.5) : 1, burst, six);
+        spot(b0 + k / 2 + 0.25, mode, burst ? 2.5 : 0.3, burst, six);
+      }
+      for (const s of song.chordAt || (n % 2 ? [0] : [0, n])) chordSpots.push({ b: b0 + s / 2, mode, strong: s === 0 });
     }
     beat += bars * song.bar;
   };
@@ -763,7 +855,7 @@ function build(song, diff = "hd") {
   for (const tok of tokens) {
     if (tok === "relic") {
       const start = beat;
-      const sung = song.final ? VERSES : [VERSES[song.gym]];
+      const sung = song.verse ? [song.verse] : song.final ? VERSES : [VERSES[song.gym]];
       for (const v of sung) addPart("verse", v, false, true);
       segments.push({ from: start, to: beat, kind: "relic" });
       mode = "line"; form = "pirouette"; verseAt = beat;
@@ -781,25 +873,141 @@ function build(song, diff = "hd") {
     }
     addPart(tok, song.parts[tok], true, false);
   }
-  // Tidy the chart: sorted, nothing closer than the difficulty's gap in one lane, runs only on the line or at speed.
-  chart.sort((a, b) => a.b - b.b || a.lane - b.lane);
-  const lastIn = [-9, -9, -9, -9], clean = [];
-  // A speed run only fills the melody's gaps: nothing within a quarter beat of a melody note.
-  const tune = chart.filter(n => !n.run).map(n => n.b);
-  const nearTune = b => tune.some(x => Math.abs(x - b) < 0.24);
-  for (const n of chart) {
-    if (n.run && ((n.mode === "highway" && song.style !== "electric" && !song.final) || nearTune(n.b))) continue;
-    if (n.b - lastIn[n.lane] < D.gap - 1e-6) continue;
-    if (n.len && clean.some(o => o.lane === n.lane && o.len && o.b + o.len > n.b - D.gap)) continue;
-    if (clean.some(o => o.lane === n.lane && o.len && o.b < n.b && o.b + o.len + D.gap > n.b)) continue;
-    lastIn[n.lane] = n.b;
-    clean.push(n);
+
+  // ── Laying the chart ──
+  // fits(): may a note start in this lane at beat b and last len beats? Only if no other moment
+  // is closer than the difficulty's step, the lane is clear for its jack gap on both sides
+  // (holds included), and the keys down at that moment, held notes included, stay within the
+  // difficulty's chord size and two per hand (S D F | J K L): keyboards drop keys past that.
+  const step = D.step / spb, jack = D.jack / spb, cap = Math.min(4, D.chord), E = 1e-6;
+  const placed = [], index = new Map();
+  const hand = l => l < L / 2 ? 0 : 1;
+  const isDrag = n => n.run && n.mode === "line";
+  const put = n => { placed.push(n); const k = Math.floor(n.b); if (!index.has(k)) index.set(k, []); index.get(k).push(n); return n; };
+  const around = (b, len) => { const out = []; for (let k = Math.floor(b) - 8; k <= Math.floor(b + len + jack) + 1; k++) for (const o of index.get(k) || []) if (!isDrag(o)) out.push(o); return out; };
+  const moment = b => around(b, 0).filter(o => Math.abs(o.b - b) < E);
+  function fits(b, lane, len) {
+    let down = 1, mine = 1;
+    for (const o of around(b, len)) {
+      const same = Math.abs(o.b - b) < E;
+      if (!same && Math.abs(o.b - b) < step - E) return false;
+      if (o.lane === lane && (same || (o.b < b ? o.b + o.len + jack > b + E : b + len + jack > o.b + E))) return false;
+      if (same || (o.len && o.b < b && o.b + o.len > b - E)) { down++; if (hand(o.lane) === hand(lane)) mine++; }
+    }
+    return down <= cap && mine <= 2;
   }
+  // Lanes for a new note, best first: away from the lanes in use, on the quieter hand.
+  const away = (used, b, salt) => [...Array(L).keys()].map(l => {
+    const far = used.length ? Math.min(2, ...used.map(u => Math.abs(u - l))) : 0, same = used.filter(u => hand(u) === hand(l)).length;
+    return [l, far * 2 - same * 3 + roll(b, salt + l) * 1.5];
+  }).sort((x, y) => y[1] - x[1]).map(x => x[0]);
+  // 1. The tune, in time order. A melody note that can't keep its lane moves to the nearest
+  //    one that's free (a hold that fits nowhere becomes a tap); a run only fills the melody's gaps.
+  tune.sort((a, b) => a.b - b.b || (a.run ? 1 : 0) - (b.run ? 1 : 0));
+  const sung = new Set(tune.filter(n => !n.run).map(n => Math.round(n.b * 4)));
+  for (const n of tune) {
+    if (n.run) {
+      if ((n.mode === "highway" && song.style !== "electric" && !song.final) || sung.has(Math.round(n.b * 4))) continue;
+      if (n.mode === "line") { if (!moment(n.b).length && !placed.some(o => isDrag(o) && Math.abs(o.b - n.b) < E)) put(n); continue; }
+    }
+    const order = [...Array(L).keys()].sort((x, y) => Math.abs(x - n.lane) - Math.abs(y - n.lane));
+    let lane = order.find(l => fits(n.b, l, n.len));
+    if (lane == null && n.len) { lane = order.find(l => fits(n.b, l, 0)); if (lane != null) n.len = 0; }
+    if (lane == null) continue;
+    n.lane = lane; put(n);
+  }
+  // 2. Chords. Rock and the finale chord on every strong beat (Brock's two keys at once), The
+  //    Dealer on beats 1 and 4; other songs as often as their heat says. Bigger chords on IN and AT.
+  const chordRate = !D.chords ? 0 : song.chordsAlways ? 1 : Math.min(1, D.chords * (style.doubles ? 1.6 : heat));
+  for (const c of chordSpots) {
+    if (roll(c.b, 1) >= chordRate) continue;
+    const here = moment(c.b);
+    if (!here.length && !song.chordsAlways) continue;
+    let size = 2;
+    if (D.chord >= 3 && roll(c.b, 2) < 0.3 + 0.5 * heat) size = 3;
+    if (D.chord >= 4 && c.strong && roll(c.b, 3) < 0.2 + 0.6 * heat) size = 4;
+    while (here.length < size) {
+      const lane = away(here.map(o => o.lane), c.b, 10).find(l => fits(c.b, l, 0));
+      if (lane == null) break;
+      here.push(put({ b: c.b, lane, len: 0, mode: c.mode }));
+    }
+  }
+  const fillChords = Math.min(0.9, D.fillChords * heat);
+  // 3. The filler: the strongest spots first, as many as the difficulty and the song's heat ask for.
+  const room = [...spots.values()].filter(s => !sung.has(Math.round(s.b * 4)));
+  for (const s of room) s.rank = s.pri + roll(s.b, 4) * 1.5;
+  room.sort((a, b) => b.rank - a.rank);
+  for (const s of room.slice(0, Math.round(room.length * Math.min(1, D.fill * heat)))) {
+    if (moment(s.b).length) continue;
+    // The moments just before and after: go somewhere else from both, so runs swap hands.
+    const near = around(s.b, 1.5).filter(o => Math.abs(o.b - s.b) < 1.5);
+    const before = near.filter(o => o.b < s.b - E), after = near.filter(o => o.b > s.b + E);
+    const last = before.length ? Math.max(...before.map(o => o.b)) : null, next = after.length ? Math.min(...after.map(o => o.b)) : null;
+    const used = near.filter(o => Math.abs(o.b - last) < E || Math.abs(o.b - next) < E).map(o => o.lane);
+    const lane = away(used, s.b, 20).find(l => fits(s.b, l, 0));
+    if (lane == null) continue;
+    const here = [put({ b: s.b, lane, len: 0, mode: s.mode })];
+    // Some filler lands as a chord too: more often the hotter the song, bigger on IN and AT.
+    const size = roll(s.b, 5) >= fillChords ? 1 : D.chord >= 3 && roll(s.b, 6) < heat ? 3 : 2;
+    while (here.length < size) {
+      const more = away(here.map(o => o.lane), s.b, 30).find(l => fits(s.b, l, 0));
+      if (more == null) break;
+      here.push(put({ b: s.b, lane: more, len: 0, mode: s.mode }));
+    }
+  }
+  const chart = placed.sort((a, b) => a.b - b.b || a.lane - b.lane);
   // On the line: a held note is a hold, a speed run is drags, the rest are taps.
-  for (const n of clean) n.kind = n.mode === "line" ? (n.len ? "hold" : n.run ? "drag" : "tap") : (n.len ? "hold" : "tap");
+  for (const n of chart) n.kind = n.mode === "line" ? (n.len ? "hold" : n.run ? "drag" : "tap") : (n.len ? "hold" : "tap");
   ev.sort((a, b) => a.b - b.b);
   const end = beat;
-  return { song, diff, ev, chart: clean, segments, end, verseAt, spb: 60 / song.bpm, seconds: end * 60 / song.bpm };
+  const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb, ...lineFor(song, diff, moved, end - verseAt) };
+  Object.assign(B, rate(B));
+  return B;
+}
+
+/* ── A chart's level, measured from the chart ──────────────────────────── */
+// The same scale as Phigros, where 11 is already hard: EZ 1-5, HD 4-10, IN 9-13, AT 13-15.
+// What counts: notes a second on average and over the busiest four seconds, how much of
+// the chart is chords (and how big), notes pressed while a hold is down, drags (nearly
+// free), six lanes, and how far the judgment line travels while its notes come in.
+const BANDS = { ez: [1, 5], hd: [1, 10], in: [9, 13], at: [13, 15] };
+function rate(B) {
+  const ns = B.chart, secs = Math.max(1, B.seconds), spb = B.spb, song = B.song;
+  const w = n => n.kind === "drag" ? 0.25 : n.kind === "hold" ? 1.25 : 1;
+  const presses = ns.filter(n => n.kind !== "drag");
+  const avg = ns.reduce((t, n) => t + w(n), 0) / secs;
+  let peak = 0, run = 0;
+  for (let i = 0, j = 0; i < ns.length; i++) {
+    run += w(ns[i]);
+    while ((ns[i].b - ns[j].b) * spb >= 4) run -= w(ns[j++]);
+    peak = Math.max(peak, run / 4);
+  }
+  const groups = new Map();
+  for (const n of presses) { const k = Math.round(n.b * 1000); groups.set(k, (groups.get(k) || 0) + 1); }
+  const sizes = [...groups.values()], chord = Math.max(1, ...sizes);
+  const inChords = sizes.filter(s => s > 1).reduce((t, s) => t + s, 0) / Math.max(1, presses.length);
+  const holds = presses.filter(n => n.kind === "hold");
+  const under = presses.filter(n => holds.some(h => h !== n && h.b < n.b - 1e-6 && h.b + h.len > n.b)).length / Math.max(1, presses.length);
+  const drags = (ns.length - presses.length) / Math.max(1, ns.length);
+  // The line: px (and degrees, x4) it covers in the half beat before each of its notes, per second.
+  const onLine = ns.filter(n => n.mode === "line");
+  let move = 0;
+  if (B.line && onLine.length) {
+    for (const n of onLine) {
+      const r = n.b - B.verseAt, a = lineAt(B.line, r - 0.5), c = lineAt(B.line, r);
+      move += Math.hypot(c.x - a.x, c.y - a.y) + 4 * Math.abs(c.rot - a.rot);
+    }
+    move /= onLine.length * 0.5 * spb;
+  }
+  const lineShare = onLine.length / Math.max(1, ns.length);
+  // Two levels for every note a second (most of it the average, some the peak), then the extras.
+  const nps = 0.6 * avg + 0.4 * peak;
+  const value = 2 * nps - 4 + 2 * inChords * (chord - 1) / 2 + 1.5 * under + (B.lanes === 6 ? 0.5 : 0)
+    + Math.min(1, move / 300) * lineShare * 1.5 - drags;
+  const [lo, hi] = BANDS[B.diff];
+  const level = Math.max(lo, Math.min(hi, Math.round(value)));
+  return { level, stats: { avg: +avg.toFixed(2), peak: +peak.toFixed(2), chord, inChords: +inChords.toFixed(2), under: +under.toFixed(2),
+    drags: +drags.toFixed(2), move: Math.round(move), lineShare: +lineShare.toFixed(2), value: +value.toFixed(2) } };
 }
 const BUILT = {};
 const built = (song, diff = song.diffs[0]) => BUILT[song.id + ":" + diff] || (BUILT[song.id + ":" + diff] = build(song, diff));
@@ -813,8 +1021,62 @@ const MOVES = {
   tide: (s, t, g) => { const p = Math.sin(2 * Math.PI * t / g.period); s.y += g.amp * p; s.rot += g.tilt * Math.cos(2 * Math.PI * t / g.period); },
   zap: (s, t, g) => { const i = Math.floor(t / g.every) % g.spots.length, [x, y, r] = g.spots[i]; s.x = x; s.y = y; s.rot = r; s.zap = t % g.every < 0.18; },
   drift: (s, t, g) => { s.x += g.ampX * Math.sin(2 * Math.PI * t / g.period); s.rot += g.sway * Math.sin(2 * Math.PI * t / (g.period / 2)); s.y += g.fall * t; },
-  spin: (s, t, g) => { s.rot += g.perBeat * t; }
+  spin: (s, t, g) => { s.rot += g.perBeat * t; },
+  // The Dealer's cylinder: at every bar after the first it snaps a chamber round (step degrees), with a flash.
+  chamber: (s, t, g) => { const i = Math.floor(t / g.every), f = t - i * g.every; s.rot += i ? g.step * (i - 1 + ease(Math.min(1, f / g.snap))) : 0; s.zap = i > 0 && f < 0.2; },
+  // Sssssssnakes: an S-wave. Side to side, up and down twice as fast, tilted along the curve.
+  slither: (s, t, g) => { const a = 2 * Math.PI * t / g.period; s.x += g.ampX * Math.sin(a); s.y += g.ampY * Math.sin(2 * a); s.rot += g.tilt * Math.cos(a); }
 };
+// The form a difficulty plays. On IN and AT the break comes about a third of the way in, not halfway:
+// the parts it jumps ahead of are played on the line instead (`moved` beats of them).
+function formFor(song, diff) {
+  const tokens = song.form.split(/\s+/), r = tokens.indexOf("relic");
+  if (r < 0 || (diff !== "in" && diff !== "at")) return { tokens, moved: 0 };
+  const beats = t => t === "flip" ? song.bar : t === "relic" ? 0 : song.parts[t].lead.split("|").length * song.bar;
+  const total = tokens.reduce((n, t) => n + beats(t), 0);
+  let j = r, best = Infinity;
+  for (let k = 1, at = beats(tokens[0]); k <= r; at += beats(tokens[k]), k++) if (Math.abs(at - total / 3) < best) { best = Math.abs(at - total / 3); j = k; }
+  const moved = tokens.slice(j, r).reduce((n, t) => n + beats(t), 0);
+  return { tokens: [...tokens.slice(0, j), "relic", ...tokens.slice(j, r), ...tokens.slice(r + 1)], moved };
+}
+// The line's script for a difficulty. HD plays it as written. EZ is gentle: half the swing, slower,
+// no spins, one line. IN and AT swing wider and faster, run the script's own moves through the parts
+// the break jumped ahead of, and split into two lines for a stretch if the song never does.
+// A loose script (the hidden tracks) is the same move all the way, so it only scales.
+function lineFor(song, diff, moved, length) {
+  if (!song.line) return { line: null, split: [] };
+  const gentle = diff === "ez", hard = diff === "in" || diff === "at";
+  const k = gentle ? 0.5 : diff === "at" ? 1.5 : diff === "in" ? 1.3 : 1, pace = gentle ? 1.5 : diff === "at" ? 0.7 : diff === "in" ? 0.8 : 1;
+  const tune = g => {
+    const o = { ...g };
+    for (const f of ["amp", "ampX", "ampY", "tilt", "sway"]) if (o[f] != null) o[f] *= k;
+    if (o.period) o.period *= pace;
+    if (o.kind === "fly" && Math.abs(o.rot) < 90) o.rot = Math.max(-35, Math.min(35, o.rot * k));
+    else if (o.kind === "fly" && gentle) o.rot %= 360;   // EZ has no spins, so nothing to come out of
+    if (o.kind === "zap") { o.spots = o.spots.map(([x, y, r]) => [640 + (x - 640) * Math.min(1.2, k), y, r * k]); if (gentle) o.every *= 2; }
+    if (o.kind === "spin" && gentle) o.perBeat = 0;
+    if (o.kind === "chamber" && gentle) { o.snap *= 3; o.every *= 2; }
+    return o;
+  };
+  let line = song.line.map(tune), split = (song.split || []).map(w => w.slice());
+  if (gentle) { line = line.filter(g => !g.line); split = []; }
+  if (moved && !song.loose) {
+    // The moved parts come first: fly in, then the script's own moves back to back (no spins).
+    const own = line.filter(g => !g.line && g.at > 0 && g.kind !== "spin" && g.kind !== "fly");
+    const pre = [{ ...line[0], at: 0 }];
+    for (let at = line[0].len; own.length && at < moved;) for (const g of own) { if (at >= moved) break; const len = Math.min(g.len, moved - at); pre.push({ ...g, at, len }); at += len; }
+    line = pre.concat(line.map(g => ({ ...g, at: g.at + moved })));
+    split = split.map(([a, b]) => [a + moved, b + moved]);
+  }
+  if (hard && !split.length) {
+    // Two lines at once: a second one rises to the top for sixteen beats, rocking, then drops back.
+    const a = Math.round(moved + (length - moved) * 0.45), w = 16;
+    line.push({ at: a, len: 2, kind: "fly", x: 640, y: 220, rot: 0, line: 1 }, { at: a + 2, len: w - 4, kind: "tide", amp: 40, period: 4, tilt: 10, line: 1 },
+      { at: a + w - 2, len: 2, kind: "fly", x: 640, y: 480, rot: 0, line: 1 });
+    split.push([a, a + w]);
+  }
+  return { line, split };
+}
 // The highway's line: horizontal, near the bottom. A boss's line starts here when it breaks free.
 const HOME = { x: 640, y: 540, rot: 0 };
 // A segment with line: 1 moves the second line. It appears where the first one is at its
@@ -836,10 +1098,12 @@ function lineAt(script, beat, which = 0) {
   }
   return s;
 }
-const splitAt = (song, rel) => (song.split || []).some(([a, b]) => rel >= a && rel < b);
+const splitAt = (B, rel) => (B.split || []).some(([a, b]) => rel >= a && rel < b);
 
 /* ── Unlocks and bests ─────────────────────────────────────────────────── */
 const bestOf = (song, diff = song.diffs[0]) => save.best[song.id + ":" + diff] || null;
+// IN and AT open once the song's HD best is an A or better (test mode opens everything).
+const diffOpen = (song, diff) => opts.test || (diff !== "in" && diff !== "at") || rankIndex((bestOf(song, "hd") || {}).rank) >= rankIndex(UNLOCK_RANK);
 const cleared = song => song.diffs.some(d => bestOf(song, d));
 const badges = () => GYMS.filter((g, i) => save.badges[i]).length;
 const gymSongs = g => SONGS.filter(s => s.gym === g);
@@ -866,9 +1130,9 @@ function say(text, num = MELOETTA, pir = false) {
   pix($("#say-img"), sprite(num), 80); $("#say-img").className = pir ? "pir" : "";
   $("#say-text").textContent = text;
 }
-// The difficulty each song row has picked (this session). One per song ships today.
+// The difficulty each song row has picked (this session); HD until you pick another.
 const picked = {};
-const pickedDiff = song => song.diffs.includes(picked[song.id]) ? picked[song.id] : song.diffs[0];
+const pickedDiff = song => song.diffs.includes(picked[song.id]) && diffOpen(song, picked[song.id]) ? picked[song.id] : song.diffs.includes("hd") ? "hd" : song.diffs[0];
 function songRow(song, label) {
   const ok = open(song), diff = pickedDiff(song), b = bestOf(song, diff);
   const row = el("div", "row" + (ok ? "" : " off"));
@@ -878,8 +1142,10 @@ function songRow(song, label) {
   const meta = el("span", "meta");
   const pick = el("span", "pick");
   for (const d of song.diffs) {
+    const free = diffOpen(song, d);
     const c = el("button", d === diff ? "on" : "", DIFF_NAME[d] + " " + levelOf(song, d));
-    c.type = "button"; c.disabled = !ok; c.title = DIFF_NAME[d] + " Lv." + levelOf(song, d);
+    c.type = "button"; c.disabled = !ok || !free;
+    c.title = DIFF_NAME[d] + " Lv." + levelOf(song, d) + (free ? "" : " · get an " + UNLOCK_RANK + " or better on HD to open it");
     c.onclick = () => { picked[song.id] = d; drawMap(); };
     pick.append(c);
   }
@@ -926,7 +1192,7 @@ function drawMap() {
   const next = GYMS.findIndex((g, i) => !save.badges[i]);
   if (save.badges[4]) say("You gave me my whole song back. Thank you. I'll keep singing it, for the ones who are still cold.");
   else if (next < 0) say("All four verses! Now let me sing the whole thing. Come and keep up with me, if you can.", MELOETTA, true);
-  else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? Hit D F J K as the notes reach the line. " + GYMS[0].hello);
+  else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? Hit " + opts.binds[4].map(keyName).join(" ") + " as the notes reach the line. " + GYMS[0].hello);
   else say(GYMS[next].hello);
 }
 
@@ -958,7 +1224,49 @@ function drawOpts() {
     b.onclick = () => { opts.skin = s.id; keepOpts(); drawOpts(); };
     box.append(b, " ");
   }
+  keyHeld.clear(); binding = null; drawBinds();
   $("#o-skin-note").textContent = locked.length ? "Locked skins come from somewhere else in the arcade." : "";
+}
+// The key test: hold your lane keys (both rows) and see which ones the keyboard reports together.
+const keyHeld = new Set();
+function drawKeyTest() {
+  const box = $("#o-keys"); box.replaceChildren();
+  for (const code of boundKeys()) box.append(el("b", keyHeld.has(code) ? "on" : "", keyName(code)));
+  box.append(el("span", "", keyHeld.size + " down"));
+}
+function keyTest(e, down) {
+  if (!boundKeys().has(e.code)) return;
+  e.preventDefault();
+  if (down) keyHeld.add(e.code); else keyHeld.delete(e.code);
+  drawKeyTest();
+}
+// Keybinds: click a slot, press a key. A key already in the row swaps places with it.
+let binding = null;   // { lanes, i } while a slot waits for its key
+function drawBinds(note = "") {
+  for (const lanes of [4, 6]) {
+    const box = $("#o-bind" + lanes); box.replaceChildren();
+    opts.binds[lanes].forEach((code, i) => {
+      const wait = binding && binding.lanes === lanes && binding.i === i;
+      const b = el("button", "slot" + (wait ? " wait" : ""), wait ? "press" : keyName(code)); b.type = "button";
+      b.title = wait ? "Press a key (Esc cancels)" : "Lane " + (i + 1) + ": " + keyName(code) + ". Click to change.";
+      b.onclick = () => { binding = wait ? null : { lanes, i }; b.blur(); drawBinds(); };
+      box.append(b);
+    });
+    const r = el("button", "reset", "Reset to default"); r.type = "button";
+    r.onclick = () => { opts.binds[lanes] = DEFAULT_BINDS[lanes].slice(); binding = null; keepOpts(); r.blur(); drawBinds(); };
+    box.append(r);
+  }
+  $("#o-bind-note").textContent = note;
+  drawKeyTest();
+}
+function bindKey(e) {
+  e.preventDefault();
+  if (e.code === "Escape") { binding = null; drawBinds(); return; }
+  if (RESERVED_KEYS.includes(e.code) || !e.code) { drawBinds(keyName(e.code) + " is taken: Esc pauses, R retries, Enter continues."); return; }
+  const row = opts.binds[binding.lanes], was = row.indexOf(e.code);
+  if (was >= 0 && was !== binding.i) row[was] = row[binding.i];   // already in this row: the two swap
+  row[binding.i] = e.code;
+  binding = null; keepOpts(); drawBinds();
 }
 $("#b-opts").onclick = drawOpts;
 $("#o-close").onclick = () => { $("#opts").hidden = true; drawMap(); };
@@ -966,14 +1274,29 @@ $("#o-cal").onclick = calibrate;
 
 // Tap to calibrate: clicks on the audio clock every half second; each tap's
 // distance to the nearest click, and the median of 16 sets the offset.
+// The clicks go through one gain of their own and are queued a second ahead,
+// a few at a time, so closing the box (or opening it again) silences them at once.
 let cal = null;
 function calibrate() {
+  if (cal) endCal();
   const c = audio(); c.resume();
   $("#calib").hidden = false;
-  const t0 = c.currentTime + 0.5, gap = 0.5;
-  for (let k = 0; k < 40; k++) { const w = t0 + k * gap; const o = c.createOscillator(), g = c.createGain(); o.type = "square"; o.frequency.value = k % 4 ? 880 : 1320;
-    g.gain.setValueAtTime(0.25 * opts.vol / 100, w); g.gain.exponentialRampToValueAtTime(0.001, w + 0.05); o.connect(g); g.connect(c.destination); o.start(w); o.stop(w + 0.06); }
-  cal = { t0, gap, taps: [], raf: 0 };
+  const t0 = c.currentTime + 0.5, gap = 0.5, out = c.createGain();
+  out.gain.value = 0.25 * opts.vol / 100; out.connect(c.destination);
+  cal = { t0, gap, taps: [], raf: 0, timer: 0, out, osc: [], k: 0 };
+  const queue = () => {
+    if (!cal) return;
+    for (; cal.t0 + cal.k * gap < c.currentTime + 1; cal.k++) {
+      const w = cal.t0 + cal.k * gap, o = c.createOscillator(), g = c.createGain();
+      o.type = "square"; o.frequency.value = cal.k % 4 ? 880 : 1320;
+      g.gain.setValueAtTime(1, w); g.gain.exponentialRampToValueAtTime(0.004, w + 0.05);
+      o.connect(g); g.connect(cal.out); o.start(w); o.stop(w + 0.06);
+      o.onended = () => { if (cal) cal.osc = cal.osc.filter(x => x !== o); };
+      cal.osc.push(o);
+    }
+    cal.timer = setTimeout(queue, 250);
+  };
+  queue();
   $("#c-read").textContent = "0 of 16";
   const blink = () => { if (!cal) return; const p = (c.currentTime - t0) / gap; $("#c-dot").classList.toggle("on", p >= 0 && p - Math.floor(p) < 0.15); cal.raf = requestAnimationFrame(blink); };
   blink();
@@ -992,7 +1315,14 @@ function calTap() {
     drawOpts();
   }
 }
-function endCal() { if (cal) cancelAnimationFrame(cal.raf); cal = null; $("#calib").hidden = true; }
+function endCal() {
+  if (cal) {
+    cancelAnimationFrame(cal.raf); clearTimeout(cal.timer);
+    for (const o of cal.osc) { try { o.onended = null; o.stop(); } catch {} }
+    try { cal.out.disconnect(); } catch {}
+  }
+  cal = null; $("#calib").hidden = true;
+}
 $("#c-close").onclick = endCal;
 
 $("#f-sound").onclick = () => { opts.sound = 1; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
@@ -1050,12 +1380,14 @@ function backdrop(num, tint, pir = false) {
     box.append(d);
   }
 })();
-const LANE = 240, laneX = lane => (lane - 1.5) * LANE;
+// Lane width on the highway: four lanes of 240px, or six of 180px on IN and AT.
+const laneW = lanes => lanes === 6 ? 180 : 240, laneX = (lane, lanes = 4) => (lane - (lanes - 1) / 2) * laneW(lanes);
 const songTint = song => song.boss ? TINT.aria : song.gym != null ? TINT[GYMS[song.gym].type] : TINT[song.style] || TINT.plain;
 const songArt = song => song.final ? MELOETTA : song.gym != null ? GYMS[song.gym].ace : song.art || MELOETTA;
 
 function start(song, diff = pickedDiff(song)) {
   if (!opts.asked) { $("#first").hidden = false; return; }
+  if (!song.diffs.includes(diff) || !diffOpen(song, diff)) diff = pickedDiff(song);
   const c = audio(); c.resume();
   const B = built(song, diff);
   const boss = song.boss ? bossOf(song) : null;
@@ -1063,9 +1395,14 @@ function start(song, diff = pickedDiff(song)) {
   let edge = false;
   if (boss && G) { const h = hub(); if (h && h.buddy) edge = G.typeEdge(h.buddy.species, boss.types) > 1 || (boss.pirTypes && G.typeEdge(h.buddy.species, boss.pirTypes) > 1); }
   const notes = B.chart.map((n, i) => ({ ...n, i, t: n.b * B.spb, tEnd: (n.b + n.len) * B.spb, state: 0, hit: null, tail: null, key: null }));
+  // Gold: every note that shares its moment with another, in any lane or on either line.
+  // A note alone at its moment is cyan; drags keep their own look and don't count.
+  const together = new Map(), moment = n => Math.round(n.b * 1000);
+  for (const n of notes) if (n.kind !== "drag") together.set(moment(n), (together.get(moment(n)) || 0) + 1);
+  for (const n of notes) n.dbl = n.kind !== "drag" && together.get(moment(n)) > 1;
   const judged = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 : 1), 0);
   const lead = 4 * B.spb + 0.6;
-  P = { song, B, notes, judged, boss, edge, test: !!opts.test, start: c.currentTime + lead, next: 0, done: false, paused: false,
+  P = { song, B, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead, next: 0, done: false, paused: false,
         counts: { Perfect: 0, Great: 0, Good: 0, Miss: 0 }, points: 0, n: 0, combo: 0, maxCombo: 0, streak: 0,
         held: new Set(), mode: "highway", form: "aria", seg: 0, lastBeat: -99, raf: 0, broke: false, finished: false };
   // The count-in: four clicks before beat 0.
@@ -1091,12 +1428,20 @@ function start(song, diff = pickedDiff(song)) {
   $("#songname").textContent = song.title + (P.test ? " · test" : "");
   $("#songlv").textContent = DIFF_NAME[B.diff] + " Lv." + levelOf(song, B.diff);
   $("#beatdot").hidden = !!opts.sound;
-  // Lanes: three faint lines, a glow per lane while its key is down, and the keys under the line.
+  // Lanes: faint lines between them, a glow per lane while its key is down, and the keys under the line.
+  // On six lanes the middle four keep the move names; S and L only show their key.
+  const L = B.lanes, W = laneW(L);
   const guides = $("#guides"); guides.replaceChildren(); guides.className = "";
-  for (let k = 0; k < 4; k++) { const g = el("div", "glow"); g.style.left = (640 + laneX(k) - LANE / 2) + "px"; guides.append(g); }
-  for (const x of [-1, 0, 1]) { const i = el("i"); i.style.left = (640 + x * LANE) + "px"; guides.append(i); }
+  for (let k = 0; k < L; k++) { const g = el("div", "glow"); g.style.left = (640 + laneX(k, L) - W / 2) + "px"; g.style.width = W + "px"; guides.append(g); }
+  for (let k = 1; k < L; k++) { const i = el("i"); i.style.left = (640 + (k - L / 2) * W) + "px"; guides.append(i); }
   const keys = $("#keys"); keys.replaceChildren(); keys.className = "";
-  KEYS.forEach((k, i) => { const d = el("div"); d.style.left = (640 + laneX(i)) + "px"; d.append(el("b", "", k.toUpperCase())); if (P.battle) d.append(el("span", "", P.battle.you.moves[i])); keys.append(d); });
+  P.keys.forEach((k, i) => {
+    const d = el("div"); d.style.left = (640 + laneX(i, L)) + "px"; d.style.width = W + "px"; d.style.marginLeft = -W / 2 + "px";
+    d.append(el("b", "", keyName(k)));
+    const m = i - (L - 4) / 2;
+    if (P.battle && m >= 0 && m < 4) d.append(el("span", "", P.battle.you.moves[m]));
+    keys.append(d);
+  });
   // Lines: 0 is the highway's and the boss's; 1 only shows while the line is split.
   const box = $("#lines"); box.replaceChildren();
   P.lines = [0, 1].map(k => { const d = el("div", "jl" + (k ? " off" : "")); d.append(el("div", "bar")); if (!k) d.append(el("div", "ring")); box.append(d); return d; });
@@ -1105,12 +1450,12 @@ function start(song, diff = pickedDiff(song)) {
   const pxBeat = pxPerSec() * B.spb;
   for (const n of notes) {
     const rel = n.b - B.verseAt;
-    n.line = n.mode === "line" && splitAt(song, rel - 3) && splitAt(song, rel + 1) && n.lane >= 2 ? 1 : 0;
+    n.line = n.mode === "line" && splitAt(B, rel - 3) && splitAt(B, rel + 1) && n.lane >= L / 2 ? 1 : 0;
     n.side = n.line ? -1 : 1;
     // Two layouts: the highway's (wide, on the lanes) and the line's (narrower). Every note starts
     // on the highway's, and a line note narrows to its own while Meloetta sings (see frame).
-    n.hw = { x: laneX(n.lane), w: n.kind === "drag" ? 90 : 200 };
-    n.ln = n.mode === "line" ? { x: (n.lane - 1.5) * 150 + ((n.i * 37) % 5 - 2) * 14, w: n.kind === "drag" ? 90 : 150 } : n.hw;
+    n.hw = { x: laneX(n.lane, L), w: n.kind === "drag" ? 90 : W - 40 };
+    n.ln = n.mode === "line" ? { x: (n.lane - (L - 1) / 2) * (L === 6 ? 115 : 150) + ((n.i * 37) % 5 - 2) * 14, w: n.kind === "drag" ? 90 : L === 6 ? 110 : 150 } : n.hw;
     const d = el("div", "nt" + (n.dbl ? " dbl" : "") + (n.kind === "drag" ? " drag" : "") + (n.kind === "hold" ? " hold" : ""));
     if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.len * pxBeat) + "px"; d.append(beam); }
     d.append(el("div", "head"));
@@ -1180,10 +1525,12 @@ function frame() {
     P.showing = at.show;
     P.nextForm = at.show.kind === "relic" ? "pirouette" : P.form === "aria" ? "pirouette" : "aria";
     const wf = $("#whiteflash"); wf.classList.remove("go"); void wf.offsetWidth; wf.classList.add("go");
-    pix($("#relic-img"), sprite(MELOETTA), 680, 20);
-    $("#relic-img").className = P.form === "pirouette" ? "pir" : "";
-    $("#relic-name").textContent = at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
-    $("#relic-sub").textContent = at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
+    // A hidden track's break is its own: its art, its name for it.
+    const own = P.song.breakName && at.show.kind === "relic";
+    pix($("#relic-img"), sprite(own ? songArt(P.song) : MELOETTA), 680, 20);
+    $("#relic-img").className = !own && P.form === "pirouette" ? "pir" : "";
+    $("#relic-name").textContent = own ? P.song.breakName : at.show.kind === "relic" ? "Relic Song" : P.nextForm === "pirouette" ? "Pirouette" : "Aria";
+    $("#relic-sub").textContent = own ? P.song.breakSub : at.show.kind === "relic" ? "Meloetta sings" : "Meloetta changes form";
     $("#relicfx").className = "on";
     if (at.mode === "highway") {
       $("#guides").className = "out"; $("#keys").className = "out";
@@ -1203,10 +1550,10 @@ function frame() {
     $("#guides").className = $("#keys").className = P.mode === "highway" ? "" : "out";
   }
   // The lines' places: the highway's spot, or the song's script.
-  const line = P.mode === "line" && P.song.line;
-  const s0 = line ? lineAt(P.song.line, rel, 0) : HOME;
+  const line = P.mode === "line" && B.line;
+  const s0 = line ? lineAt(B.line, rel, 0) : HOME;
   place(P.lines[0], s0); P.lines[0].classList.toggle("zap", !!s0.zap);
-  const s1 = line && splitAt(P.song, rel) ? lineAt(P.song.line, rel, 1) : null;
+  const s1 = line && splitAt(B, rel) ? lineAt(B.line, rel, 1) : null;
   P.lines[1].classList.toggle("off", !s1);
   if (s1) { place(P.lines[1], s1); P.lines[1].classList.toggle("zap", !!s1.zap); }
   // Every beat: the muted ring and dot.
@@ -1335,12 +1682,14 @@ function battle(n, j, tail) {
     b.bossHp = Math.max(0, b.bossHp - dmg);
     flinch("#boss-img");
     if (b.bossHp <= 0) say2(P.boss.name + " is out of breath!");
-    else if (tail && j === "Perfect") say2(b.you.moves[(n.lane + 2) % 4] + "! Fully charged.");
-    else if (crit && P.streak === BATTLE.crit) say2(b.you.moves[n.lane] + ". A critical hit!");
+    else if (tail && j === "Perfect") say2(moveOf(n.lane + 2) + "! Fully charged.");
+    else if (crit && P.streak === BATTLE.crit) say2(moveOf(n.lane) + ". A critical hit!");
   }
   $("#me-hp").style.width = (100 * b.youHp / BATTLE.youHp) + "%";
   $("#boss-hp").style.width = (100 * b.bossHp / b.bossMax) + "%";
 }
+// A lane's move: the middle four lanes have one each; on six lanes S and L borrow from the far side.
+const moveOf = lane => P.battle.you.moves[((lane - (P.B.lanes - 4) / 2) % 4 + 4) % 4];
 function flinch(sel) { const i = $(sel); i.classList.remove("hurt"); void i.offsetWidth; i.classList.add("hurt"); }
 function score() {
   if (!P.judged) return 0;
@@ -1373,6 +1722,11 @@ function stop() {
 function retry() { const s = P && P.song, d = P && P.B.diff; stop(); if (s) start(s, d); }
 
 /* ── Results, coins and the board ──────────────────────────────────────── */
+const clearPayOf = B => PAY.clear[B.diff];
+// What the hub needs to pay and top up: the table, and which songs are bosses.
+const payTable = () => ({ table: PAY, bosses: Object.fromEntries(SONGS.filter(s => s.boss && !s.final).map(s => [s.id, s.gym])), final: (SONGS.find(s => s.final) || {}).id });
+// Everything a full save pays: every chart's clear and S, the four badges and the finale.
+const fullPay = () => SONGS.reduce((t, s) => t + s.diffs.reduce((u, d) => u + PAY.clear[d] + ["b", "a", "s"].reduce((v, r) => v + Math.round(PAY.rank[r] * PAY.mult[d]), 0), 0), 0) + 4 * PAY.badge + PAY.finale;
 function finish(reachedEnd) {
   if (P.finished) return;
   P.finished = true;
@@ -1419,13 +1773,14 @@ function showResult({ song, diff, s, rank, won, why }) {
   if (P.test) { $("#r-pay").textContent = "Test mode: no coins, and nothing posted."; return; }
   // Coins: the first clear, then each new rank step. The hub's ledger makes every one pay once.
   if (G) {
-    const minutes = P.B.seconds / 60;
-    const clearPay = Math.max(PAY.floor, Math.round(PAY.rouletteCoinsPerMinute * minutes * PAY.diff[diff]));
-    const rankPay = Math.max(PAY.floor, Math.round(clearPay * PAY.rankStep));
     let paid = null;
-    try { paid = G.pay({ song: song.id, diff: diff, rank: rank.toLowerCase(), clearPay, rankPay }); } catch (error) { console.log("Relic Song: no payout.", error && error.message); }
-    if (paid && paid.ok && paid.paid.total > 0)
-      $("#r-pay").textContent = "+" + paid.paid.total + " coins (" + [paid.paid.clear && "first clear " + paid.paid.clear, paid.paid.rank && "rank up " + paid.paid.rank].filter(Boolean).join(", ") + "). You have " + fmt(paid.coins) + ".";
+    try { paid = G.pay({ song: song.id, diff: diff, rank: rank.toLowerCase(), badge: song.boss && !song.final ? song.gym : null, finale: !!song.final, ...payTable() }); }
+    catch (error) { console.log("Relic Song: no payout.", error && error.message); }
+    if (paid && paid.ok && paid.paid.total > 0) {
+      const p = paid.paid;
+      $("#r-pay").textContent = "+" + fmt(p.total) + " coins (" + [p.clear && "first clear " + p.clear, p.rank && "rank up " + p.rank, p.badge && "badge " + p.badge,
+        p.finale && "finale " + p.finale, p.top && "back pay " + p.top].filter(Boolean).join(", ") + "). You have " + fmt(paid.coins) + ".";
+    }
     else $("#r-pay").textContent = "No coins this time: this song and rank have already paid.";
   } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn coins and post scores.";
 }
@@ -1438,22 +1793,23 @@ $("#b-quit").onclick = () => { stop(); drawMap(); };
 
 /* ── Keys ──────────────────────────────────────────────────────────────── */
 addEventListener("keydown", e => {
+  // A slot waiting for its key takes the next key, Ctrl and Alt included (so they can be refused).
+  if (binding && !$("#opts").hidden) { bindKey(e); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const k = e.key.toLowerCase();
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
-  if (!$("#opts").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#o-close").click(); } return; }
+  if (!$("#opts").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#o-close").click(); } else keyTest(e, true); return; }
   if (!$("#play").hidden && P && !P.done) {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
-    if (P.paused) { if (k === "r" && !e.shiftKey) retry(); return; }
+    if (P.paused) { if (e.code === "KeyR" && !e.shiftKey) retry(); return; }
     if (e.repeat) { e.preventDefault(); return; }
-    const lane = KEYS.indexOf(k);
-    // Any letter or Space plays on the line; the highway wants D F J K.
-    if (lane >= 0 || (P.mode === "line" && (k.length === 1 || k === " "))) { e.preventDefault(); press(lane, e.code); }
+    const lane = P.keys.indexOf(e.code);
+    // The highway wants its lane keys; on the moving line any bound key plays (either row).
+    if (lane >= 0 || (P.mode === "line" && boundKeys().has(e.code))) { e.preventDefault(); press(lane, e.code); }
     return;
   }
   if (!$("#result").hidden) {
-    if (k === "r" && !e.shiftKey) { e.preventDefault(); $("#r-retry").click(); }
+    if (e.code === "KeyR" && !e.shiftKey) { e.preventDefault(); $("#r-retry").click(); }
     else if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); drawMap(); }
     return;
   }
@@ -1461,13 +1817,16 @@ addEventListener("keydown", e => {
   if (e.key === "Escape") { e.preventDefault(); try { parent.postMessage({ type: "bored:close" }, "*"); } catch {} }
 });
 addEventListener("keyup", e => {
+  if (!$("#opts").hidden) keyTest(e, false);
   if (!P || P.done) return;
-  release(KEYS.indexOf(e.key.toLowerCase()), e.code);
+  release(P.keys.indexOf(e.code), e.code);
 });
 // Losing the window lets go of every key, and pauses a song in play.
-addEventListener("blur", () => { if (P && !P.done && !P.paused && !$("#play").hidden) { for (const code of [...P.held]) release(-1, code); pause(true); } });
+addEventListener("blur", () => { if (keyHeld.size) { keyHeld.clear(); drawKeyTest(); } if (P && !P.done && !P.paused && !$("#play").hidden) { for (const code of [...P.held]) release(-1, code); pause(true); } });
 
 if (!opts.asked) $("#first").hidden = false;
+// Old payouts brought up to today's PAY table, once each (the hub skips anything already settled).
+if (G && G.topUp) { try { G.topUp(payTable()); } catch (error) { console.log("Relic Song: no top-up.", error && error.message); } }
 drawMap();
 
 // The hub reads this. total is the sum of best scores, one per song and
@@ -1475,8 +1834,11 @@ drawMap();
 window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Object.values((readJSON(SAVE_KEY) || {}).best || {}).reduce((t, b) => t + (b.score || 0), 0),
   finished: !!(P && P.finished), real: !opts.test, badges: badges() });
 // For the console and tests: every song's length, note count and payout.
-window.__relicSong = { auto: false, start: id => start(SONGS.find(s => s.id === id)), SONGS, PAY, build, lineAt, songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length,
-  clearPay: Math.max(PAY.floor, Math.round(PAY.rouletteCoinsPerMinute * b.seconds / 60 * PAY.diff[b.diff])) }; }) };
+window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt,
+  songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length, clearPay: clearPayOf(b) }; }),
+  // Every chart: lanes, notes, length, level and what the level was measured from.
+  charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
+    seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), ...b.stats }; })) };
 }
 </script>
 </body>
