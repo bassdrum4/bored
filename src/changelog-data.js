@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1043,
+  "count": 1044,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
+  {"sha":"0589a966","date":"2026-11-27","author":"Daniel Lowe","subject":"Add developer notes for nine games"},
   {"sha":"f5f9ae0d","date":"2026-11-27","author":"Daniel Lowe","subject":"Use red hover accents for Vettel game cards"},
   {"sha":"9ebc7b94","date":"2026-11-27","author":"Daniel Lowe","subject":"Mark downloaded Shadow.net directory files purple"},
   {"sha":"68a08e37","date":"2026-11-27","author":"Daniel Lowe","subject":"Shorten Poké Idle portable save codes","pr":388},
