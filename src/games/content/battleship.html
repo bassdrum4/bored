@@ -67,15 +67,16 @@ function render(){window.ironTide?.setFleet(fleet);const seat=ctx?.seat||1, play
 let cineMode=matchMedia('(prefers-reduced-motion: reduce)').matches?'brief':'full', audio=false;
 const cineLabel=()=>{$('cineToggle').textContent='Shot view: '+cineMode;};
 function applyMode(){window.ironTide?.mode(cineMode);cineLabel();if(cineMode==='off')window.ironTide?.skip();}
-async function playCine(run){
+function openCinema(){const main=document.querySelector('main');document.body.dataset.cinema='true';$('cineSkip').hidden=false;if(main)main.inert=true;}
+function closeCinema(){window.ironTide?.skip();document.body.dataset.cinema='false';document.body.dataset.shot='';$('cineSkip').hidden=true;const notice=$('cineNotice');if(notice)notice.textContent='';const main=document.querySelector('main');if(main)main.inert=false;}
+async function playCine(run,hold){
  if(!run||cineMode==='off')return;
- const main=document.querySelector('main'), skip=$('cineSkip');
- document.body.dataset.cinema='true';skip.hidden=false;if(main)main.inert=true;
+ openCinema();
  let timer;
  try{await Promise.race([run(),new Promise(resolve=>timer=setTimeout(resolve,9000))]);}
- finally{clearTimeout(timer);window.ironTide?.skip();document.body.dataset.cinema='false';document.body.dataset.shot='';skip.hidden=true;if(main)main.inert=false;}
+ finally{clearTimeout(timer);window.ironTide?.skip();if(!hold)closeCinema();}
 }
-const showShot=(i,hit,sunk)=>playCine(window.ironTide?()=>window.ironTide.fire(i,hit,sunk):null);
+const showShot=(i,hit,sunk,hold)=>playCine(window.ironTide?()=>window.ironTide.fire(i,hit,sunk):null,hold);
 const showIncoming=(i,hit,sunk)=>playCine(window.ironTide?.incoming?()=>window.ironTide.incoming(i,hit,sunk):null);
 $('cineToggle').onclick=()=>{cineMode=cineMode==='full'?'brief':cineMode==='brief'?'off':'full';applyMode();};$('cineSound').onclick=()=>{audio=!audio;$('cineSound').textContent='Sound: '+(audio?'on':'off');window.ironTide?.sound(audio);};$('cineSkip').onclick=()=>window.ironTide?.skip();
 addEventListener('keydown',e=>{if(document.body.dataset.cinema==='true'&&(e.key==='Escape'||e.key===' '||e.key==='Enter')){e.preventDefault();window.ironTide?.skip();}},true);
@@ -83,6 +84,11 @@ addEventListener('pointerdown',e=>{if(document.body.dataset.cinema==='true'){e.p
 applyMode();
 addEventListener('iron-tide-ready',()=>{window.ironTide.setFleet(fleet);window.ironTide.sound(audio);applyMode();});const sceneUrl=new URL(location.pathname.endsWith('/battleship.html')?'./battleship-assets/scene.mjs':'./games/content/battleship-assets/scene.mjs',document.baseURI);import(sceneUrl.href).catch(e=>console.warn('3D unavailable; tactical board remains playable',e));
 async function online(move){if(busy)return;busy=true;busyNote='Saving / resolving turn...';render();try{ctx=await bridge.submit(move);sync();if(Number.isInteger(move.fire)){const result=shots.find(s=>s.cell===move.fire);if(result)await showShot(move.fire,result.hit);}busy=false;render();if(!ctx.canPlay||ctx.status!=='active')setTimeout(()=>bridge.finishTurn(),1000);}catch(e){busy=false;render();bridge.error(e,()=>online(move));}}
-async function fire(i){if(busy||phase!=='battle'||shots.some(x=>x.cell===i))return;if(bridge){if(ctx.canPlay)online({fire:i});return;}const result=shot(enemy,i);shots.push(result);busy=true;busyNote='Firing.';render();const round=generation;const index=enemy.findIndex(s=>s.includes(i));const sunk=index>=0&&enemy[index].every(c=>shots.some(s=>s.cell===c&&s.hit))?{index,cells:enemy[index]}:null;await showShot(i,result.hit,sunk);if(round!==generation)return;if(lost(enemy,shots)){busy=false;winner=1;phase='over';render();return;}busyNote='Enemy firing.';render();await new Promise(resolve=>setTimeout(resolve,420));if(round!==generation)return;const cell=cpuPick(),back=shot(fleet,cell);const hitIndex=fleet.findIndex(s=>s.includes(cell));const down=hitIndex>=0&&fleet[hitIndex].every(c=>c===cell||incoming.some(s=>s.cell===c&&s.hit))?{index:hitIndex,cells:fleet[hitIndex]}:null;await showIncoming(cell,back.hit,down);if(round!==generation)return;incoming.push(back);busy=false;if(lost(fleet,incoming)){winner=2;phase='over';}render();}
+async function fire(i){if(busy||phase!=='battle'||shots.some(x=>x.cell===i))return;if(bridge){if(ctx.canPlay)online({fire:i});return;}const result=shot(enemy,i);shots.push(result);busy=true;busyNote='Firing.';render();const round=generation;const index=enemy.findIndex(s=>s.includes(i));const sunk=index>=0&&enemy[index].every(c=>shots.some(s=>s.cell===c&&s.hit))?{index,cells:enemy[index]}:null;// One frame for the whole turn: your shot, the pause, the reply. The board never
+// fades back in between them. showShot holds it open; the reply or the game-over
+// branch closes it. The finally covers a restart mid-turn.
+try{
+ await showShot(i,result.hit,sunk,true);if(round!==generation)return;if(lost(enemy,shots)){busy=false;winner=1;phase='over';render();return;}busyNote='Enemy firing.';render();if(cineMode!=='off'){const notice=$('cineNotice');if(notice)notice.textContent='Enemy firing';document.body.dataset.shot='';}await new Promise(resolve=>setTimeout(resolve,420));if(round!==generation)return;const cell=cpuPick(),back=shot(fleet,cell);const hitIndex=fleet.findIndex(s=>s.includes(cell));const down=hitIndex>=0&&fleet[hitIndex].every(c=>c===cell||incoming.some(s=>s.cell===c&&s.hit))?{index:hitIndex,cells:fleet[hitIndex]}:null;await showIncoming(cell,back.hit,down);if(round!==generation)return;incoming.push(back);busy=false;if(lost(fleet,incoming)){winner=2;phase='over';}render();
+}finally{if(document.body.dataset.cinema==='true')closeCinema();}}
 $('rotate').onclick=()=>{vertical=!vertical;render();};$('random').onclick=()=>{fleet=randomFleet();render();};$('clear').onclick=()=>{fleet=[];render();};$('ready').onclick=()=>{if(fleet.length!==5||busy)return;if(bridge){online({fleet});return;}enemy=randomFleet();phase='battle';render();if(matchMedia('(max-width:640px)').matches)$('enemy').scrollIntoView({block:'center'});};$('restart').onclick=()=>{window.ironTide?.clear();generation++;fleet=[];enemy=[];shots=[];incoming=[];winner=null;busy=false;phase='setup';render();};sync();render();
 </script></body></html>
