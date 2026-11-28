@@ -84,6 +84,34 @@ async function changedFiles(number) {
   throw new Error('PR too large to classify safely');
 }
 
+// A concurrent changelog or game merge can advance main between GitHub's
+// mergeability calculation and its merge request. Retry only that transient
+// response, never a conflict, denied permission, or changed PR head.
+export async function mergeWithRetry(pr, request = api, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+  const number = pr.number;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) {
+      await pause(attempt * 1500);
+      const { payload: current } = await request(`pulls/${number}`, readToken);
+      if (current.head?.sha !== pr.head.sha || current.head?.ref !== pr.head.ref ||
+          current.head?.repo?.full_name !== pr.head.repo.full_name ||
+          current.base?.ref !== 'main' || current.base?.repo?.full_name !== pr.base.repo.full_name ||
+          current.user?.id !== pr.user.id || current.draft) throw new Error(`PR #${number} changed while retrying; fresh CI required.`);
+      if (current.merged === true) return { merged: true };
+      if (current.state !== 'open') throw new Error(`PR #${number} is no longer open.`);
+    }
+    try {
+      const { payload } = await request(`pulls/${number}/merge`, mergeToken, 'PUT', {
+        sha: pr.head.sha, merge_method: 'merge',
+      });
+      return payload;
+    } catch (error) {
+      if (attempt === 2 || !/HTTP 405: Base branch was modified/i.test(error.message)) throw error;
+      note(`PR #${number}: main advanced during merge; rechecking the same head.`);
+    }
+  }
+}
+
 export async function run() {
   if (!repo || !readToken || !eventFile) throw new Error('Missing Actions event or read token');
   if (repo !== 'bassdrum4/bored') throw new Error('This workflow only operates in bassdrum4/bored');
@@ -150,10 +178,7 @@ export async function run() {
     // Preserve ancestry so stacked game PRs can be retargeted after their parent lands.
     // The bypass-capable owner's token is used for the SHA-locked merge and safe retargeting.
     // GitHub refuses if the PR head changes after classification or CI.
-    const { payload: result } = await api(`pulls/${number}/merge`, mergeToken, 'PUT', {
-      sha: pr.head.sha,
-      merge_method: 'merge',
-    });
+    const result = await mergeWithRetry(pr);
     if (result.merged !== true) throw new Error(`PR #${number} was not merged: ${result.message || 'Unknown reason'}`);
     note(`Automatically merged vetted game-only PR #${number} after the relevant Check Bored jobs passed.`);
     // Only retarget trusted same-repo children of this exact merged branch.
