@@ -7,6 +7,7 @@
 //   rs:rank:<song>:<diff>:<rank>    the first time the best rank reached b, a or s
 //   rs:badge:<gym>                  a gym boss's first clear, on any difficulty (gyms 0-3)
 //   rs:finale                       the final boss's first clear
+//   rs:lesson                       finishing Meloetta's Lesson, the tutorial (once, however often it's replayed)
 //   rs:top:<entry without rs:>      once only: the rest of an entry that paid under today's table
 // A rank reached again, or a lower one, finds its entry already there and pays nothing.
 // The amounts come from the game's PAY table; this side caps each one.
@@ -35,6 +36,7 @@ function worth(table, id) {
   if (m) return coinsIn(Math.round(((t.rank || {})[m[2]] || 0) * ((t.mult || {})[m[1]] || 0)));
   if (/^rs:badge:[0-3]$/.test(id)) return coinsIn(t.badge);
   if (id === 'rs:finale') return coinsIn(t.finale);
+  if (id === 'rs:lesson') return coinsIn(t.lesson);
   return 0;
 }
 
@@ -99,6 +101,12 @@ export function payRelicSong(wallet, { song, diff, rank, table, badge = null, fi
   return { wallet: next, ok: true, paid };
 }
 
+/** Pay Meloetta's Lesson once: the table's `lesson` amount, the first time it's finished. */
+export function payRelicLesson(wallet, { table } = {}, { now = Date.now() } = {}) {
+  const s = settle(wallet, 'rs:lesson', table, now);
+  return { wallet: s.wallet, ok: true, paid: s.paid };
+}
+
 /** How the buddy's types hit a defender's: the best of its types, 0 to 4. */
 export function typeEdge(species, defend) {
   const row = DEX[Math.trunc(Number(species)) - 1];
@@ -132,6 +140,12 @@ export function relicBridge({ onChange = () => {} } = {}) {
       const result = payRelicSong(readWallet(), options || {});
       if (result.ok && result.paid.total > 0) { writeWallet(result.wallet); try { onChange(); } catch {} }
       return { ok: result.ok, reason: result.reason, paid: result.paid, coins: walletBalance(readWallet()).coins || 0 };
+    },
+    // Finishing the tutorial: its small bonus, once.
+    lesson: options => {
+      const result = payRelicLesson(readWallet(), options || {});
+      if (result.paid > 0) { writeWallet(result.wallet); try { onChange(); } catch {} }
+      return { ok: true, paid: result.paid, coins: walletBalance(readWallet()).coins || 0 };
     },
     // On load: old payouts brought up to today's table, once.
     topUp: options => {

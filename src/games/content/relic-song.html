@@ -114,7 +114,7 @@
   /* Options holds a lot now: tighter rows so it fits the stage without scrolling. */
   #opts .card { max-height: 704px; padding: 16px 26px }
   #opts .card h2 { margin-bottom: 4px }
-  #opts .card .line { padding: 3px 0; min-height: 34px }
+  #opts .card .line { padding: 2px 0; min-height: 33px }
   #opts .card .btns { margin-top: 8px }
   #opts .card p.dim { font-size: 13px; line-height: 1.35 }
   .binds { display: flex; gap: 4px; align-items: center }
@@ -123,6 +123,8 @@
   .binds .reset { margin-left: 8px; font-size: 12px; padding: 4px 8px }
   .mix { display: flex; gap: 14px; align-items: center }
   .card .mix input[type=range] { width: 200px }
+  .help { gap: 6px }
+  .help button { font-size: 12px; padding: 4px 8px }
   .keytest { display: flex; gap: 4px; align-items: center }
   .keytest b { min-width: 30px; padding: 0 5px; height: 30px; display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 3px; font-weight: 400; color: var(--dim) }
   .keytest b.on { background: var(--tap); color: var(--bg); border-color: var(--tap) }
@@ -249,6 +251,41 @@
   #result table td { padding: 4px 18px 4px 0 }
   #result table td:last-child { font-variant-numeric: tabular-nums }
   #result .ps { margin-top: 18px; font-style: italic; color: var(--dim) }
+  /* ── Help: Meloetta's Lesson, the first boss card, one-time tips, the first line's cue ── */
+  #lesson .step { margin-bottom: 8px; color: var(--dim) }
+  .teach { display: flex; gap: 18px; align-items: center; min-height: 110px }
+  .teach img { flex: none }
+  .teach p { font-size: 17px; line-height: 1.5 }
+  .caps-keys { display: flex; gap: 6px; margin-top: 12px }
+  .caps-keys b { min-width: 38px; height: 36px; padding: 0 8px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .6); border-radius: 3px; font-weight: 400; font-size: 17px }
+  .say button { flex: none; margin-left: auto }
+  /* A tip: a small box under the combo for two seconds; the song doesn't stop. */
+  #tip { position: absolute; left: 50%; top: 116px; transform: translateX(-50%); padding: 6px 18px; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel);
+         font-size: 16px; white-space: nowrap; z-index: 10; pointer-events: none; opacity: 0; transition: opacity .3s }
+  #tip.on { opacity: 1 }
+  /* The cue over the first moving line: placed on the line each frame, never turned with it. */
+  #cue { position: absolute; left: 0; top: 0; width: 440px; margin-left: -220px; text-align: center; font-size: 22px; font-weight: 300; letter-spacing: .06em; z-index: 6; pointer-events: none }
+  /* The boss card's picture: four lanes and notes falling, a flash, then the lanes gone and the line
+     tilting and drifting while notes fly at it from above and below. Six seconds, round and round. */
+  #bosscard .card { background: rgb(18, 21, 27) }
+  .demo { position: relative; height: 170px; margin: 14px 0 4px; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; background: rgba(0, 0, 0, .35) }
+  .demo * { position: absolute; animation: 6s linear infinite }
+  .demo .dl { top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .2); animation-name: d-lanes }
+  .demo .dk { top: 138px; width: 60px; margin-left: -30px; text-align: center; font-size: 13px; color: var(--dim); animation-name: d-lanes }
+  .demo .dj { left: -100px; right: -100px; top: 128px; height: 2px; background: #fff; box-shadow: 0 0 6px #fff; animation-name: d-line; animation-timing-function: ease-in-out }
+  .demo .dn { top: -10px; width: 70px; margin-left: -35px; height: 6px; border-radius: 3px; background: var(--tap); box-shadow: 0 0 8px var(--tap); opacity: 0; animation-name: d-fall }
+  .demo .dj .dn { top: -2px; animation-name: d-in }
+  .demo .dj .dn.up { animation-name: d-up }
+  .demo .dfl { inset: 0; background: #fff; opacity: 0; animation-name: d-flash }
+  .demo .dcap { left: 10px; top: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); animation-name: d-lanes }
+  .demo .dcap + .dcap { animation-name: d-cap }
+  @keyframes d-lanes { 0%, 44% { opacity: 1 } 50%, 94% { opacity: 0 } 100% { opacity: 1 } }
+  @keyframes d-cap { 0%, 46% { opacity: 0 } 52%, 92% { opacity: 1 } 98%, 100% { opacity: 0 } }
+  @keyframes d-line { 0%, 46% { transform: none } 56%, 70% { transform: translate(-20px, -44px) rotate(-12deg) } 80%, 92% { transform: translate(30px, -22px) rotate(10deg) } 100% { transform: none } }
+  @keyframes d-fall { 0% { transform: translateY(0); opacity: 0 } 2% { opacity: 1 } 13% { transform: translateY(134px); opacity: 1 } 14%, 100% { transform: translateY(134px); opacity: 0 } }
+  @keyframes d-in { 0% { transform: translateY(-110px); opacity: 0 } 2% { opacity: 1 } 12% { transform: translateY(0); opacity: 1 } 13%, 100% { transform: translateY(0); opacity: 0 } }
+  @keyframes d-up { 0% { transform: translateY(70px); opacity: 0 } 2% { opacity: 1 } 12% { transform: translateY(0); opacity: 1 } 13%, 100% { transform: translateY(0); opacity: 0 } }
+  @keyframes d-flash { 0%, 45% { opacity: 0 } 46% { opacity: .7 } 52%, 100% { opacity: 0 } }
   #nokeys { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 40px; background: var(--bg); z-index: 50 }
 </style>
 </head>
@@ -266,7 +303,7 @@
       <span id="m-test" hidden><b>Test mode</b></span>
       <button id="b-opts" type="button">Options</button>
     </div>
-    <div class="say"><img id="say-img" alt=""><p id="say-text"></p></div>
+    <div class="say"><img id="say-img" alt=""><p id="say-text"></p><button id="b-lesson" type="button" hidden>Meloetta's Lesson</button></div>
     <div class="verses" id="verses"></div>
     <div class="gyms" id="gyms"></div>
     <div class="finale" id="finale"></div>
@@ -287,6 +324,7 @@
     <div id="mecol" hidden><img class="spr" id="me-img" alt=""><div class="nm" id="me-name"></div><div class="thin"><i id="me-hp"></i></div></div>
     <div id="songname"></div><div id="songlv"></div>
     <div id="relicfx"><img id="relic-img" alt=""><p id="relic-name">Relic Song</p><small id="relic-sub"></small></div>
+    <div id="tip"></div><div id="cue" hidden>Any key! Watch the line.</div>
     <div id="whiteflash"></div><div id="hitflash"></div>
     <div class="over" id="pausebox" hidden><div class="card"><h2>Paused</h2><p class="dim">The music waits with you.</p>
       <div class="btns"><button id="b-quit" type="button">Back to the map</button><button id="b-retry" type="button">Retry (R)</button><button id="b-resume" type="button">Resume (Esc)</button></div></div></div>
@@ -319,14 +357,14 @@
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
     <div class="line"><span>Judgment text <span class="dim">(Perfect, Great... under the combo)</span></span><span class="seg" id="o-jtext"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="line"><span>Reduce motion <span class="dim">(no shakes or flashes)</span></span><span class="seg" id="o-calm"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
-    <div class="line"><span>Note skin</span><span class="seg" id="o-skin"></span></div>
+    <div class="line"><span>Note skin <span class="dim" id="o-skin-note"></span></span><span class="seg" id="o-skin" style="white-space:nowrap"></span></div>
     <div class="line"><span>Keybinds <span class="dim">(click a key, then press the new one)</span></span><span class="dim" id="o-bind-note"></span></div>
     <div class="line"><span>4 lanes <span class="dim">(EZ, HD)</span></span><span class="binds" id="o-bind4"></span></div>
     <div class="line"><span>6 lanes <span class="dim">(IN, AT)</span></span><span class="binds" id="o-bind6"></span></div>
     <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
-    <p class="dim" style="margin-top:6px">If some keys don't light up together, your keyboard can't press them at once. Stick to EZ/HD.</p>
+    <p class="dim" style="margin-top:6px">Keys that won't light up together can't be pressed at once. Stick to EZ/HD.</p>
+    <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button></span></div>
     <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
-    <p class="dim" id="o-skin-note" style="margin-top:8px"></p>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
 
   <div class="over" id="calib" hidden><div class="card"><h2>Tap to calibrate</h2>
@@ -334,6 +372,25 @@
     <div class="calib-dot" id="c-dot"></div>
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
+
+  <!-- Meloetta's Lesson: one text box a step; the practice plays between them. -->
+  <div class="over" id="lesson" hidden><div class="card">
+    <div class="caps step" id="l-step"></div>
+    <div class="teach"><img id="l-img" alt=""><div><p id="l-text"></p><div class="caps-keys" id="l-keys"></div></div></div>
+    <div class="btns"><button id="l-skip" type="button">Skip the lesson (Esc)</button><button id="l-go" type="button">Go (Enter)</button></div></div></div>
+
+  <!-- Before the first boss ever (and from Options): what the break does. -->
+  <div class="over" id="bosscard" hidden><div class="card"><h2>Boss fight!</h2>
+    <p>Halfway through, Meloetta sings Relic Song and the lanes break. Notes fly at a moving line. Any key hits them.</p>
+    <div class="demo" aria-hidden="true">
+      <span class="dcap">Lanes: each key its own lane</span><span class="dcap">The moving line: any key, only timing</span>
+      <i class="dl" style="left:184px"></i><i class="dl" style="left:284px"></i><i class="dl" style="left:384px"></i>
+      <span class="dk" style="left:134px">D</span><span class="dk" style="left:234px">F</span><span class="dk" style="left:334px">J</span><span class="dk" style="left:434px">K</span>
+      <i class="dn" style="left:134px"></i><i class="dn" style="left:334px;animation-delay:.6s"></i><i class="dn" style="left:234px;animation-delay:1.2s"></i><i class="dn" style="left:434px;animation-delay:1.8s"></i>
+      <div class="dj"><i class="dn" style="left:230px;animation-delay:3.3s"></i><i class="dn" style="left:470px;animation-delay:3.8s"></i><i class="dn up" style="left:350px;animation-delay:4.8s"></i><i class="dn" style="left:560px;animation-delay:5.2s"></i></div>
+      <i class="dfl"></i>
+    </div>
+    <div class="btns"><button id="bc-go" type="button">Got it (Enter)</button></div></div></div>
 
   <div id="nokeys" hidden><div><h2>Relic Song needs a keyboard</h2><p class="dim" style="margin-top:8px">It's a desktop game: four keys on a keyboard. Open it on a computer.</p></div></div>
 </div>
@@ -369,7 +426,9 @@ const PAY = {
   mult: { ez: 0.5, hd: 1, in: 2, at: 4 },
   // A gym boss's first clear on any difficulty (its badge), and the final boss's first clear.
   badge: 250,
-  finale: 500
+  finale: 500,
+  // Finishing Meloetta's Lesson, the tutorial, the first time.
+  lesson: 50
 };
 
 /* ── Rules ─────────────────────────────────────────────────────────────── */
@@ -467,7 +526,9 @@ const STORY_KEY = "bored.poke-idle.story";
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 // Reduce motion starts on when the system asks for less motion.
-const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitVol: 60,
+// lesson: Meloetta's Lesson is finished or skipped. tips: the one-time help already seen (six, lines,
+// below, speed: the tips; boss: the first boss card; flip: the first moving line's two-bar cue).
+const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitVol: 60,
   calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
 {
@@ -475,6 +536,7 @@ const opts = Object.assign({ asked: 0, sound: 1, vol: 70, offset: 0, speed: 10, 
     && row.every(c => typeof c === "string" && /^[A-Za-z0-9]{1,24}$/.test(c) && !RESERVED_KEYS.includes(c));
   opts.binds = { 4: ok(saved[4], 4) ? saved[4].slice() : DEFAULT_BINDS[4].slice(), 6: ok(saved[6], 6) ? saved[6].slice() : DEFAULT_BINDS[6].slice() };
 }
+if (!opts.tips || typeof opts.tips !== "object") opts.tips = {};
 const keepOpts = () => writeJSON(OPTS_KEY, opts);
 let save = null;
 const slotKey = () => opts.test ? TEST_KEY : SAVE_KEY;
@@ -715,20 +777,23 @@ const SONGS = [
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
     form: "A A B A relic C C B C",
-    // Onix stomps: on each bar's kick the line slams down and jolts, then climbs back somewhere else.
-    // Halfway it starts tilting (up to 20 degrees); near the end it rises and flips, so the last notes
-    // come up from below and the stomps go up. EZ keeps stomping on the ground.
+    // Onix stomps: on each bar's kick the line comes down with a thud, then climbs back somewhere else.
+    // It's the first boss, so on EZ and HD that's all it does: slow stomps on the ground, a few degrees
+    // of tilt, every note from above, one line, one speed. On IN and AT the stomps slam and jolt, it
+    // tilts up to 20 degrees halfway, and near the end it rises and flips, so the last notes come up
+    // from below and the stomps go up.
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 },
-           ...every(4, 32, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 44, drot: i % 2 ? 6 : -6 }, { at: b, kind: "shake" },
-             { at: b + 0.5, len: 3, kind: "fly", x: [560, 720, 640, 520, 760, 640, 600][i], y: 500, rot: 0 }]),
+           ...every(4, 64, 4, (b, i) => [{ at: b, len: 0.3, kind: "snap", dy: 30, drot: i % 2 ? 4 : -4, diffs: ["ez", "hd"] }, { at: b, kind: "shake", diffs: ["hd"] },
+             { at: b + 0.5, len: 3, kind: "fly", x: [560, 720, 640, 520, 760, 640, 600][i % 7], y: 500, rot: i >= 7 && i < 11 ? (i % 2 ? 6 : -6) : 0, diffs: ["ez", "hd"] }]),
            { at: 30, len: 2, kind: "width", w: 0.7 },
-           ...every(32, 48, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 40 }, { at: b, kind: "shake" },
-             { at: b + 0.5, len: 3, kind: "fly", x: i % 2 ? 740 : 540, y: 540, rot: i % 2 ? 20 : -20 }]),
-           { at: 47, kind: "speed", to: 0.55 }, { at: 48, len: 3, kind: "fly", x: 640, y: 330, rot: 0, ez: false }, { at: 48, len: 3, kind: "width", w: 1, ez: false },
-           { at: 51, len: 1, kind: "flip", ez: false }, { at: 51, kind: "flash", ez: false }, { at: 53, kind: "speed", to: 1 },
-           ...every(52, 64, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: -40, drot: i % 2 ? 6 : -6, ez: false }, { at: b, kind: "shake" },
-             { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i], y: 330, rot: 180, ez: false }]),
-           ...every(48, 64, 4, b => [{ at: b, len: 0.08, kind: "snap", dy: 40, only: "ez" }, { at: b + 0.5, len: 3, kind: "fly", x: 640, y: 500, rot: 0, only: "ez" }])] },
+           ...every(4, 32, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 44, drot: i % 2 ? 6 : -6, only: "hard" }, { at: b, kind: "shake", only: "hard" },
+             { at: b + 0.5, len: 3, kind: "fly", x: [560, 720, 640, 520, 760, 640, 600][i], y: 500, rot: 0, only: "hard" }]),
+           ...every(32, 48, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 40, only: "hard" }, { at: b, kind: "shake", only: "hard" },
+             { at: b + 0.5, len: 3, kind: "fly", x: i % 2 ? 740 : 540, y: 540, rot: i % 2 ? 20 : -20, only: "hard" }]),
+           { at: 47, kind: "speed", to: 0.55, only: "hard" }, { at: 48, len: 3, kind: "fly", x: 640, y: 330, rot: 0, only: "hard" }, { at: 48, len: 3, kind: "width", w: 1, only: "hard" },
+           { at: 51, len: 1, kind: "flip", only: "hard" }, { at: 51, kind: "flash", only: "hard" }, { at: 53, kind: "speed", to: 1, only: "hard" },
+           ...every(52, 64, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: -40, drot: i % 2 ? 6 : -6, only: "hard" }, { at: b, kind: "shake", only: "hard" },
+             { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i], y: 330, rot: 180, only: "hard" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
   { id: "cerulean-current", heat: { ez: 0.44, hd: 0.32 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
@@ -1426,6 +1491,7 @@ function open(song) {
   if (song.final) return badges() === 4;
   if (song.gym > 0 && !save.badges[song.gym - 1]) return false;
   const list = gymSongs(song.gym), i = list.indexOf(song);
+  if (song.gym === 0 && i === 0) return lessonOk();
   return i === 0 || cleared(list[i - 1]);
 }
 function hiddenOpen(song) {
@@ -1450,6 +1516,7 @@ const pickedDiff = song => song.diffs.includes(picked[song.id]) && diffOpen(song
 function songRow(song, label) {
   const ok = open(song), diff = pickedDiff(song), b = bestOf(song, diff);
   const row = el("div", "row" + (ok ? "" : " off"));
+  if (!ok && song.gym === 0 && !lessonOk()) row.title = "Finish or skip Meloetta's Lesson to open it";
   const t = el("button", "t", label || song.title);
   t.type = "button"; t.disabled = !ok;
   t.onclick = () => start(song, pickedDiff(song));
@@ -1466,7 +1533,7 @@ function songRow(song, label) {
     c.onclick = () => { if (!free) return; picked[song.id] = d; drawMap(); };
     pick.append(c);
   }
-  meta.append(pick, el("span", "best" + (b ? "" : " dim"), !ok ? "locked" : b ? b.rank + " · " + fmt(b.score) : "-"));
+  meta.append(pick, el("span", "best" + (b ? "" : " dim"), !ok ? (song.gym === 0 && !lessonOk() ? "after the lesson" : "locked") : b ? b.rank + " · " + fmt(b.score) : "-"));
   row.append(t, meta);
   return row;
 }
@@ -1509,8 +1576,10 @@ function drawMap() {
   const next = GYMS.findIndex((g, i) => !save.badges[i]);
   if (save.badges[4]) say("You gave me my whole song back. Thank you. I'll keep singing it, for the ones who are still cold.");
   else if (next < 0) say("All four verses! Now let me sing the whole thing. Come and keep up with me, if you can.", MELOETTA, true);
+  else if (!lessonOk()) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? First, a short lesson: Pewter Steps opens after it.");
   else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? Hit " + opts.binds[4].map(keyName).join(" ") + " as the notes reach the line. " + GYMS[0].hello);
   else say(GYMS[next].hello);
+  $("#b-lesson").hidden = lessonOk();
 }
 
 /* ── Overlays ──────────────────────────────────────────────────────────── */
@@ -1544,8 +1613,9 @@ function drawOpts() {
     b.onclick = () => { opts.skin = s.id; keepOpts(); drawOpts(); };
     box.append(b, " ");
   }
+  $("#o-tips").textContent = "Reset tips";
   keyHeld.clear(); binding = null; drawBinds();
-  $("#o-skin-note").textContent = locked.length ? "Locked skins come from somewhere else in the arcade." : "";
+  $("#o-skin-note").textContent = locked.length ? "(more are hidden in the arcade)" : "";
 }
 // The key test: hold your lane keys (both rows) and see which ones the keyboard reports together.
 const keyHeld = new Set();
@@ -1589,6 +1659,10 @@ function bindKey(e) {
   binding = null; keepOpts(); drawBinds();
 }
 $("#b-opts").onclick = drawOpts;
+$("#b-lesson").onclick = () => lessonCard(0);
+$("#o-lesson").onclick = () => { $("#opts").hidden = true; drawMap(); lessonCard(0); };
+$("#o-bosscard").onclick = () => bossCard(null);
+$("#o-tips").onclick = e => { opts.tips = {}; keepOpts(); e.currentTarget.textContent = "Tips reset"; };
 $("#o-close").onclick = () => { $("#opts").hidden = true; drawMap(); };
 $("#o-cal").onclick = calibrate;
 
@@ -1645,8 +1719,8 @@ function endCal() {
 }
 $("#c-close").onclick = endCal;
 
-$("#f-sound").onclick = () => { opts.sound = 1; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
-$("#f-muted").onclick = () => { opts.sound = 0; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; };
+$("#f-sound").onclick = () => { opts.sound = 1; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; if (lessonDue()) lessonCard(0); };
+$("#f-muted").onclick = () => { opts.sound = 0; opts.asked = 1; keepOpts(); setVolume(); $("#first").hidden = true; if (lessonDue()) lessonCard(0); };
 
 /* ── Playing ───────────────────────────────────────────────────────────── */
 let P = null;   // the song in play
@@ -1670,6 +1744,7 @@ function yourSide(song) {
   return { num: MELOETTA, shiny: false, name: "Meloetta (lending her moves)", moves: ["Round", "Confusion", "Echoed Voice", "Hyper Voice"], buddy: false };
 }
 function bossOf(song) {
+  if (song.foe) return song.foe;
   if (song.final) return { num: MELOETTA, name: "Meloetta", types: FINAL.type, pirTypes: FINAL.pirouette };
   const g = GYMS[song.gym];
   return { num: g.ace, name: g.name + "'s " + g.aceName, types: [g.type] };
@@ -1702,19 +1777,26 @@ function backdrop(num, tint, pir = false) {
 })();
 // Lane width on the highway: four lanes of 240px, or six of 180px on IN and AT.
 const laneW = lanes => lanes === 6 ? 180 : 240, laneX = (lane, lanes = 4) => (lane - (lanes - 1) / 2) * laneW(lanes);
-const songTint = song => song.boss ? TINT.aria : song.gym != null ? TINT[GYMS[song.gym].type] : TINT[song.style] || TINT.plain;
+const songTint = song => song.lesson ? TINT.aria : song.boss ? TINT.aria : song.gym != null ? TINT[GYMS[song.gym].type] : TINT[song.style] || TINT.plain;
 const songArt = song => song.final ? MELOETTA : song.gym != null ? GYMS[song.gym].ace : song.art || MELOETTA;
 
-function start(song, diff = pickedDiff(song)) {
+// given: { B } plays a chart made elsewhere (the lesson's) instead of the song's built one.
+function start(song, diff = pickedDiff(song), given = null) {
   if (!opts.asked) { $("#first").hidden = false; return; }
   if (!song.diffs.includes(diff) || !diffOpen(song, diff)) diff = pickedDiff(song);
+  // Before the first boss ever: what the break does.
+  if (song.boss && !song.lesson && !opts.tips.boss) { bossCard(() => start(song, diff, given)); return; }
   const c = audio(); c.resume();
-  const B = built(song, diff);
+  const B = (given && given.B) || built(song, diff);
   const boss = song.boss ? bossOf(song) : null;
   // The buddy's edge: super effective on the boss (either form in the finale) is +3% score.
   let edge = false;
   if (boss && G) { const h = hub(); if (h && h.buddy) edge = G.typeEdge(h.buddy.species, boss.types) > 1 || (boss.pirTypes && G.typeEdge(h.buddy.species, boss.pirTypes) > 1); }
-  const notes = B.chart.map((n, i) => ({ ...n, i, t: n.b * B.spb, tEnd: (n.b + n.len) * B.spb, state: 0, hit: null, tail: null, key: null }));
+  // The first moving line ever: show "Any key! Watch the line." for two bars without altering the scored chart.
+  // over it. (The lesson's line section has its gap written in, and shows the cue every time.)
+  const cue = song.lesson ? song.cue : B.lines && !opts.tips.flip ? 2 * song.bar : 0;
+  const notes = B.chart
+    .map((n, i) => ({ ...n, i, t: n.b * B.spb, tEnd: (n.b + n.len) * B.spb, state: 0, hit: null, tail: null, key: null }));
   // Gold: every note that shares its moment with another, in any lane or on either line.
   // A note alone at its moment is cyan; drags keep their own look and don't count.
   const together = new Map(), moment = n => Math.round(n.b * 1000);
@@ -1722,7 +1804,8 @@ function start(song, diff = pickedDiff(song)) {
   for (const n of notes) n.dbl = n.kind !== "drag" && together.get(moment(n)) > 1;
   const judged = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 : 1), 0);
   const lead = 4 * B.spb + 0.6;
-  P = { song, B, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead, next: 0, done: false, paused: false,
+  P = { song, B, given, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead, next: 0, done: false, paused: false,
+        cue: cue ? { to: cue, real: !song.lesson } : null, tips: tipsFor(song, B, notes, lead),
         counts: { Perfect: 0, Great: 0, Good: 0, Miss: 0 }, points: 0, n: 0, combo: 0, maxCombo: 0, streak: 0,
         held: new Set(), mode: "highway", form: "aria", seg: 0, lastBeat: -99, raf: 0, broke: false, finished: false };
   // The count-in: four clicks before beat 0.
@@ -1746,15 +1829,19 @@ function start(song, diff = pickedDiff(song)) {
   $("#play").className = "screen skin-" + skin();
   backdrop(songArt(song), songTint(song));
   $("#songname").textContent = song.title + (P.test ? " · test" : "");
-  $("#songlv").textContent = DIFF_NAME[B.diff] + " Lv." + levelOf(song, B.diff);
+  $("#songlv").textContent = song.lesson ? "Lesson · " + song.step + " of 6" : DIFF_NAME[B.diff] + " Lv." + B.level;
+  $("#tip").className = ""; $("#cue").hidden = true;
   $("#beatdot").hidden = !!opts.sound;
   // Lanes: faint lines between them, a glow per lane while its key is down, and the keys under the line.
   // On six lanes the middle four keep the move names; S and L only show their key.
   const L = B.lanes, W = laneW(L);
-  const guides = $("#guides"); guides.replaceChildren(); guides.className = "";
+  // A practice that starts on the line (the lesson's drags) has no highway at all.
+  const lineFirst = B.segments.some(s => !s.kind && s.from < 0 && s.mode === "line");
+  const guides = $("#guides"); guides.replaceChildren(); guides.className = lineFirst ? "out" : "";
   for (let k = 0; k < L; k++) { const g = el("div", "glow"); g.style.left = (640 + laneX(k, L) - W / 2) + "px"; g.style.width = W + "px"; guides.append(g); }
   for (let k = 1; k < L; k++) { const i = el("i"); i.style.left = (640 + (k - L / 2) * W) + "px"; guides.append(i); }
-  const keys = $("#keys"); keys.replaceChildren(); keys.className = "";
+  const keys = $("#keys"); keys.replaceChildren(); keys.className = lineFirst ? "out" : "";
+  if (lineFirst) P.mode = "line";
   P.keys.forEach((k, i) => {
     const d = el("div"); d.style.left = (640 + laneX(i, L)) + "px"; d.style.width = W + "px"; d.style.marginLeft = -W / 2 + "px";
     d.append(el("b", "", keyName(k)));
@@ -1780,7 +1867,8 @@ function start(song, diff = pickedDiff(song)) {
     d.style.display = "none";
     P.lines[n.line].append(d);
     n.el = d;
-    layout(n, n.hw);
+    if (lineFirst && n.mode === "line") n.morphed = true;
+    layout(n, n.morphed ? n.ln : n.hw);
   }
   $("#relicfx").className = ""; $("#pausebox").hidden = true;
   showScreen("play");
@@ -1876,6 +1964,14 @@ function frame() {
     const o = Math.min(1, s.a * 2); d.style.opacity = o; d.firstChild.style.opacity = s.a / o;
     if (d._l !== s.l) { d._l = s.l; d.firstChild.style.width = s.l + "px"; d.firstChild.style.left = -s.l / 2 + "px"; }
   }
+  // The first line's cue, on the line (but upright), and the one-time tips as they come due.
+  if (P.cue) {
+    const on = rel >= -0.25 && rel < P.cue.to, c = $("#cue");
+    c.hidden = !on;
+    if (on) { const s = B.lines ? lineAt(B.lines[0], Math.max(0, rel), 0) : LINE0; c.style.transform = "translate(" + Math.max(240, Math.min(1040, s.x)) + "px," + Math.max(180, Math.min(640, s.y - 70)) + "px)"; }
+    if (P.cue.real && rel >= 0 && !opts.tips.flip) { opts.tips.flip = 1; keepOpts(); }
+  }
+  while (P.tips.length && t >= P.tips[0].at) { const tp = P.tips.shift(); showTip(tp.text); opts.tips[tp.id] = 1; keepOpts(); }
   // Flashes and shakes, on their beats (not in Reduce motion).
   while (P.fx < B.fx.length && B.fx[P.fx].b <= beat) { const f = B.fx[P.fx++]; if (!opts.calm && beat - f.b < 0.25) jolt(f.kind); }
   // Every beat: the muted ring and dot.
@@ -2001,7 +2097,7 @@ function battle(n, j, tail) {
   const b = P.battle;
   if (!b) return;
   if (j === "Miss") {
-    b.youHp = Math.max(0, b.youHp - b.hurt);
+    b.youHp = Math.max(P.song.lesson ? 10 : 0, b.youHp - b.hurt);   // the lesson has no fail
     flinch("#me-img");
     say2(P.boss.name + " hits back!");
     if (b.youHp <= 0 && !P.finished) setTimeout(() => finish(false), 300);
@@ -2049,7 +2145,7 @@ function stop() {
   master = ctx.createGain(); master.connect(ctx.destination); setVolume();
   if (ctx.state === "suspended") ctx.resume();
 }
-function retry() { const s = P && P.song, d = P && P.B.diff; stop(); if (s) start(s, d); }
+function retry() { const s = P && P.song, d = P && P.B.diff, g = P && P.given; stop(); if (s) start(s, d, g); }
 
 /* ── Results, coins and the board ──────────────────────────────────────── */
 const clearPayOf = B => PAY.clear[B.diff];
@@ -2062,6 +2158,14 @@ function finish(reachedEnd) {
   P.finished = true;
   // Anything left unjudged at a knock-out counts as missed.
   for (const n of P.notes) { if (n.state === 0) { count("Miss"); if (n.kind === "hold") count("Miss"); } else if (n.state === 1) count("Miss"); n.state = 2; }
+  // A lesson practice: most of it landed, on to the next step; else the same practice again.
+  if (P.song.lesson) {
+    const landed = P.n ? (P.n - P.counts.Miss) / P.n : 0, again = P.given, song = P.song;
+    stop();
+    if (landed >= LESSON_HIT) lessonCard(lessonAt + 1);
+    else { start(song, "ez", again); say2("Once more. Hit most of them to go on."); }
+    return;
+  }
   const s = score(), song = P.song, diff = P.B.diff;
   let rank = (RANKS.find(([, min]) => s >= min) || [null])[0];
   let won = reachedEnd && !!rank;
@@ -2114,12 +2218,142 @@ function showResult({ song, diff, s, rank, won, why }) {
     else $("#r-pay").textContent = "No coins this time: this song and rank have already paid.";
   } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn coins and post scores.";
 }
-$("#r-retry").onclick = () => { if (P) start(P.song, P.B.diff); };
+$("#r-retry").onclick = () => { if (P) start(P.song, P.B.diff, P.given); };
 $("#r-map").onclick = () => drawMap();
 $("#b-resume").onclick = () => pause(false);
 $("#pausebtn").onclick = e => { e.currentTarget.blur(); pause(true); };
 $("#b-retry").onclick = retry;
 $("#b-quit").onclick = () => { stop(); drawMap(); };
+
+/* ── Meloetta's Lesson, the boss card and the tips ─────────────────────── */
+// The lesson: a text box for each thing, then a few bars of practice, played again and again until
+// most of it lands (there's no fail). It comes up the first time the game opens, before Pewter Steps,
+// which it opens; it can be skipped, and replayed from Options. Its charts are written here by hand on
+// a C F G C loop, not built from a song, and every note has a sound of its own (the bar's chord tone).
+const LESSON_HIT = 0.7;   // the share of a practice's judgments that has to land to go on
+const LESSON = { id: "meloettas-lesson", title: "Meloetta's Lesson", bpm: 100, bar: 4, style: "plain", lesson: true, art: MELOETTA, diffs: ["ez"] };
+// A practice's notes are [beat, lane, hold beats, drag]. relic: Meloetta sings verse 1 from that beat
+// and the highway breaks onto the line two bars later (cue: beats of nothing but the cue after it).
+// line: on the line from the start. foe: a battle.
+const beats = (from, to, lanes, step = 1) => { const out = []; for (let b = from, i = 0; b < to - 1e-9; b += step, i++) out.push([b, lanes[i % lanes.length]]); return out; };
+const LESSON_STEPS = [
+  { intro: true, say: "I'm Meloetta. Before the gyms, a short lesson: six things, a few notes each. The song waits while I talk." },
+  { n: 1, keys: true, say: "Hit the key when the note reaches the line.",
+    part: { bars: 4, notes: beats(0, 14, [0, 1, 2, 3, 3, 2, 1, 0, 1, 2, 0, 3, 2, 1]) } },
+  { n: 2, say: "Keep the key down until the note ends.",
+    part: { bars: 4, notes: [[0, 1, 1.5], [2, 2, 1.5], [4, 0, 3], [8, 3, 1.5], [10, 1, 1.5], [12, 2, 2.5]] } },
+  { n: 3, say: "Gold means hit together.",
+    part: { bars: 4, notes: [[0, 0], [0, 3], [1, 1], [2, 1], [2, 2], [3, 3], [4, 0], [4, 2], [6, 1], [6, 3], [7, 0], [8, 0], [8, 3], [10, 1], [10, 2], [11, 0], [12, 0], [12, 2], [13, 3]] } },
+  { n: 4, pir: true, say: "In boss fights I sing Relic Song halfway through. The lanes break and the line starts moving. Notes fly at the line from anywhere. Any of your keys hits them, so only timing matters.",
+    part: { bars: 7, relic: 4, cue: 4, notes: [...beats(0, 4, [0, 1, 2, 3]), ...beats(16, 27, [1, 2, 0, 3, 2, 1, 3, 0, 1, 2, 0])] } },
+  { n: 5, pir: true, say: "Short yellow notes: just keep any key held.",
+    part: { bars: 4, line: true, notes: [[0, 1], ...beats(1, 4, [0, 1, 2, 3], 0.5).map(([b, l]) => [b, l, 0, true]), [4, 2], ...beats(5, 8, [3, 2, 1, 0], 0.5).map(([b, l]) => [b, l, 0, true]),
+      [8, 0], ...beats(9, 12, [1, 2, 3, 2], 0.5).map(([b, l]) => [b, l, 0, true]), [12, 3], [13, 1]] } },
+  { n: 6, say: "In boss fights, hitting notes damages the boss. Missing hurts you. Hit 0 HP and you lose.",
+    part: { bars: 4, foe: { num: 95, name: "Brock's Onix (practice)", types: ["Rock"] }, notes: [...beats(0, 14, [0, 2, 1, 3, 1, 2, 0, 3, 2, 1, 3, 0, 1, 2]), [4, 3], [8, 1], [12, 3]] } },
+  { done: true, say: "That's all of it. Pewter Steps is open, and Brock is waiting. Listen for me in the boss fights." }
+];
+// A practice as a built chart: the same shape build() makes, so start() plays it like any song.
+function lessonPart(step) {
+  if (step.B) return step.B;
+  const p = step.part, song = { ...LESSON, step: step.n, boss: !!p.foe, foe: p.foe || null, cue: p.cue || 0 }, n = song.bar, spb = 60 / song.bpm;
+  const ev = [], chart = [], segments = [], prog = ["C", "F", "G", "C"], r = p.relic;
+  const verseAt = r != null ? r + 2 * n : 0, lineFrom = p.line ? -Infinity : r != null ? verseAt : Infinity, end = p.bars * n;
+  // The band: kick and bass on 1 and 3, a hat on the off-beats; the verse's two bars are Meloetta's.
+  for (let bar = 0; bar < p.bars; bar++) {
+    const b0 = bar * n;
+    if (r != null && b0 >= r && b0 < verseAt) continue;
+    const root = chordOf(prog[bar % 4])[0];
+    for (const k of [0, 2]) ev.push({ b: b0 + k, kind: "drum", hit: "k" }, { b: b0 + k, kind: "tone", inst: "bass", midi: root - 12, dur: 1.6 });
+    for (let k = 0; k < n; k++) ev.push({ b: b0 + k + 0.5, kind: "drum", hit: "h" });
+  }
+  if (r != null) {
+    const v = VERSES[0], lead = parseLine(v.lead, 2 * n, "lesson verse");
+    lead.forEach((tok, i) => { const m = midiOf(tok); if (m == null) return; let len = 1; while (lead[i + len] === "-") len++; ev.push({ b: r + i / 2, kind: "tone", inst: "voice", midi: m, dur: len / 2 }); });
+    v.chords.split(/\s+/).forEach((c, i) => ev.push({ b: r + i * n, kind: "tone", inst: "bass", midi: chordOf(c)[0] - 12, dur: n - 0.4 }));
+    segments.push({ from: r, to: verseAt, kind: "relic" }, { from: verseAt, mode: "line", form: "pirouette" });
+  }
+  if (p.line) segments.push({ from: -99, mode: "line", form: "pirouette" });
+  for (const [b, lane, len = 0, drag = false] of p.notes) {
+    const mode = b >= lineFrom - 1e-6 ? "line" : "highway", tones = chordOf(prog[Math.floor(b / n) % 4]);
+    chart.push({ b, lane, len, mode, run: drag, kind: len ? "hold" : drag && mode === "line" ? "drag" : "tap" });
+    ev.push({ b, kind: "tone", inst: drag ? "pluck" : "lead", midi: [...tones, tones[0] + 12][lane] + 24, dur: len || 0.4 });
+  }
+  chart.sort((a, b) => a.b - b.b || a.lane - b.lane); ev.sort((a, b) => a.b - b.b);
+  const B = { song, diff: "ez", ev, chart, segments, end, verseAt, lanes: 4, spb, seconds: end * spb, level: 1 };
+  // On the line it only sways a little: no flips, spins or speed changes yet.
+  choreograph(B, r != null || p.line ? [{ at: 0, len: 2, kind: "fly", x: 640, y: 520, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.8 }, { at: 2, len: end, kind: "tide", amp: 16, period: 8, tilt: 3 }] : null);
+  return (step.B = B);
+}
+// Pewter Steps opens once the lesson is finished or skipped (or for anyone who has already played).
+const lessonOk = () => !!(opts.test || opts.lesson || Object.keys(save.best).length);
+const lessonDue = () => !lessonOk();
+let lessonAt = 0;
+function lessonCard(i) {
+  const s = LESSON_STEPS[i];
+  lessonAt = i;
+  let text = s.say;
+  if (s.done) {
+    // The end: the lesson counts as done, and pays its bonus once (not in test mode).
+    opts.lesson = 1; keepOpts();
+    if (!opts.test && G && G.lesson) {
+      try { const r = G.lesson({ table: PAY }); if (r && r.paid > 0) text += " +" + fmt(r.paid) + " coins for finishing."; }
+      catch (error) { console.log("Relic Song: no lesson payout.", error && error.message); }
+    }
+    drawMap();
+  }
+  $("#l-step").textContent = s.intro ? "Meloetta's Lesson" : s.done ? "Lesson done" : "Step " + s.n + " of 6";
+  pix($("#l-img"), sprite(MELOETTA), 110); $("#l-img").className = s.pir ? "pir" : "";
+  $("#l-text").textContent = text;
+  const keys = $("#l-keys"); keys.replaceChildren(...(s.keys ? opts.binds[4].map(c => el("b", "", keyName(c))) : [])); keys.hidden = !s.keys;
+  $("#l-go").textContent = s.intro ? "Start the lesson (Enter)" : s.done ? "To the map (Enter)" : "Play (Enter)";
+  $("#l-skip").hidden = !!s.done;
+  $("#lesson").hidden = false;
+}
+$("#l-go").onclick = () => {
+  const s = LESSON_STEPS[lessonAt];
+  $("#lesson").hidden = true;
+  if (s.intro) lessonCard(1);
+  else if (s.done) drawMap();
+  else { const B = lessonPart(s); start(B.song, "ez", { B }); }
+};
+$("#l-skip").onclick = () => { $("#lesson").hidden = true; if (P && !P.done) stop(); opts.lesson = 1; keepOpts(); drawMap(); };
+
+// The boss card: once before the first boss ever, then from Options. `then` starts the fight.
+let bossThen = null;
+function bossCard(then) {
+  bossThen = then;
+  const keys = opts.binds[4].map(keyName);
+  document.querySelectorAll("#bosscard .dk").forEach((d, i) => { d.textContent = keys[i]; });
+  $("#bosscard").hidden = false;
+}
+$("#bc-go").onclick = () => { $("#bosscard").hidden = true; opts.tips.boss = 1; keepOpts(); const then = bossThen; bossThen = null; if (then) then(); };
+
+// One-time tips, two seconds each, just before the thing first shows up: six lanes, more lines, notes
+// from below, a speed change. Each is seen once (opts.tips), until Reset tips in Options.
+function tipsFor(song, B, notes, lead) {
+  if (song.lesson) return [];
+  const out = [], tip = (id, at, text) => { if (!opts.tips[id] && at != null) out.push({ id, at: Math.max(-lead + 0.5, at), text }); };
+  const keys = keysFor(B.lanes), line = notes.filter(n => n.mode === "line" && B.lines);
+  const first = test => { const n = line.find(test); return n ? n.t - 2.5 : null; };
+  if (B.lanes === 6) tip("six", -lead + 0.5, "6 lanes: " + keyName(keys[0]) + " and " + keyName(keys[5]) + " join in");
+  tip("lines", first(n => n.line > 0), "More lines: notes fly at each one");
+  // From below: the note travels up the screen to its line (its side, and the line turned past 90 degrees).
+  tip("below", first(n => n.side * Math.cos(lineAt(B.lines[n.line], n.rel, n.line).rot * Math.PI / 180) < -0.5), "Notes from below now");
+  let speed = null;
+  if (B.floors) B.floors.forEach((fl, k) => fl.forEach((q, i) => {
+    if (i && Math.abs(q.v - fl[i - 1].v) > 0.05 && line.some(n => n.line === k && n.rel >= q.at - 1e-6)) speed = speed == null ? q.at : Math.min(speed, q.at);
+  }));
+  tip("speed", speed == null ? null : (B.verseAt + speed) * B.spb - 1.5, "Speed change: the notes slow down or rush in");
+  out.sort((a, b) => a.at - b.at);
+  for (let i = 1; i < out.length; i++) out[i].at = Math.max(out[i].at, out[i - 1].at + 2.2);
+  return out;
+}
+function showTip(text) {
+  const d = $("#tip");
+  d.textContent = text; d.className = "on";
+  clearTimeout(d._t); d._t = setTimeout(() => { d.className = ""; }, 2000);
+}
 
 /* ── Keys ──────────────────────────────────────────────────────────────── */
 addEventListener("keydown", e => {
@@ -2128,6 +2362,13 @@ addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
+  // The boss card and the lesson's text boxes: Enter (or Space) goes on, Esc skips the lesson.
+  if (!$("#bosscard").hidden) { if (e.key === "Enter" || e.key === " " || e.key === "Escape") { e.preventDefault(); $("#bc-go").click(); } return; }
+  if (!$("#lesson").hidden) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#l-go").click(); }
+    else if (e.key === "Escape" && !$("#l-skip").hidden) { e.preventDefault(); $("#l-skip").click(); }
+    return;
+  }
   if (!$("#opts").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#o-close").click(); } else keyTest(e, true); return; }
   if (!$("#play").hidden && P && !P.done) {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
@@ -2158,6 +2399,8 @@ if (!opts.asked) $("#first").hidden = false;
 // Old payouts brought up to today's PAY table, once each (the hub skips anything already settled).
 if (G && G.topUp) { try { G.topUp(payTable()); } catch (error) { console.log("Relic Song: no top-up.", error && error.message); } }
 drawMap();
+// The first time: Meloetta's Lesson, before Pewter Steps (after the sound question, if that's up).
+if (opts.asked && lessonDue()) lessonCard(0);
 
 // The hub reads this. total is the sum of best scores, one per song and
 // difficulty; test mode reports real: false and never counts.
@@ -2165,6 +2408,7 @@ window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Obj
   finished: !!(P && P.finished), real: !opts.test, badges: badges() });
 // For the console and tests: every song's length, note count and payout.
 window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
+  opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; },
   songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length, clearPay: clearPayOf(b) }; }),
   // Every chart: lanes, notes, length, level and what the level was measured from.
   // For tests: render a stretch of a chart's music offline (no speakers) and measure it: the peak, the
