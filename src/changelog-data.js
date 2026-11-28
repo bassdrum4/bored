@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1084,
+  "count": 1085,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"52b07d05","date":"2026-11-28","author":"Daniel Lowe","subject":"Retry transient automerge base advances without bypassing the tested head"},
   {"sha":"156a51b4","date":"2026-11-28","author":"Daniel Lowe","subject":"Permit owner-triggered CI for Vettel stack retargets"},
   {"sha":"95100d41","date":"2026-11-28","author":"Daniel Lowe","subject":"Fix brittle CI copy assertions and support stacked Relic Song automerge"},
   {"sha":"5aead4ab","date":"2026-11-28","author":"Claude","subject":"Relic Song: anti-spam (early miss, hand smash, ghost-tap bursts)"},
