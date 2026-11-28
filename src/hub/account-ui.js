@@ -1,4 +1,4 @@
-import { backendReady, getSession, getHandle, suggestedHandle, hasIdentity, renameHandle, authErrorMessage, signIn, signUp, signOut, adoptToken, setHandle, loadRules, freshSession, ensureProfile } from './backend.js';
+import { backendReady, getSession, getHandle, suggestedHandle, hasIdentity, authErrorMessage, signIn, signUp, signOut, adoptToken, setHandle, loadRules, freshSession, ensureProfile } from './backend.js';
 import { capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './player-storage.js';
 import { addMedal, syncInvite } from './invites.js';
 export function createAccountUI({ state: ui, activateProfile, applyPendingClaim, startClaimAuth, closeClaimDialog,
@@ -20,7 +20,6 @@ function renderAccount() {
   const guest = !hasIdentity();
   const state = $('#account-state');
   const action = $('#account-action');
-  const rename = $('#account-rename');
   const signout = $('#account-signout');
   const accountPanel = $('#account-panel');
   const label = $('#profile-label');
@@ -30,7 +29,6 @@ function renderAccount() {
     state.textContent = 'The leaderboard is down. Your local bests still work.';
     label.textContent = 'Account';
     action.hidden = true;
-    rename.hidden = true;
     signout.hidden = true;
     accountPanel.hidden = true;
     return;
@@ -41,10 +39,9 @@ function renderAccount() {
     state.append('Signed in as ', nameNode,
       ui.lbNotice ? ' · ' + ui.lbNotice : '. Best scores sync to the shared board.');
     // The menu keeps the name and the way back to the board; signing out and
-    // renaming live on the settings page now.
+    // account management lives on the settings page now.
     action.hidden = true;
     action.classList.remove('primary');
-    rename.hidden = false;
     signout.hidden = false;
     accountPanel.hidden = false;
   } else {
@@ -53,7 +50,6 @@ function renderAccount() {
     // Signing in is the one thing a guest has to find, so it carries the weight.
     action.hidden = false;
     action.classList.add('primary');
-    rename.hidden = true;
     signout.hidden = true;
     accountPanel.hidden = true;
   }
@@ -62,30 +58,29 @@ function renderAccount() {
 
 function openAuthDialog(mode = 'signin') {
   if (!backendReady()) return;
-  authMode = mode === 'name' && !hasIdentity() ? 'signin' : mode;
+  authMode = mode === 'signup' ? 'signup' : 'signin';
   const dialog = $('#auth-dialog');
-  const naming = authMode === 'name';
-  $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : naming ? 'Display name' : 'Sign in';
+  $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : 'Sign in';
   $('#auth-blurb').textContent = authMode === 'signup'
     ? 'Pick a name for the board. The email is just for signing in.'
-    : naming ? 'What other players see. 1 to 16 characters, no spaces.' : 'Keep your scores between devices, and see who\'s beating you.';
-  $('#auth-email-row').hidden = naming;
-  $('#auth-pass-row').hidden = naming;
+    : 'Keep your scores between devices, and see who\'s beating you.';
+  $('#auth-email-row').hidden = false;
+  $('#auth-pass-row').hidden = false;
   $('#auth-name-row').hidden = authMode === 'signin';
   $('#auth-invite-row').hidden = authMode !== 'signup';
   if (authMode !== 'signup') $('#auth-invite').value = '';
-  $('#auth-submit').textContent = authMode === 'signup' ? 'Create account' : naming ? 'Save name' : 'Sign in';
+  $('#auth-submit').textContent = authMode === 'signup' ? 'Create account' : 'Sign in';
   const toggle = $('#auth-toggle');
-  toggle.hidden = naming;
+  toggle.hidden = false;
   toggle.textContent = authMode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account';
   $('#auth-message').textContent = '';
-  $('#auth-name').value = naming ? (getHandle() || suggestedHandle()) : '';
+  $('#auth-name').value = '';
   $('#auth-password').value = '';
   if (!dialog.open) {
     if (dialog.showModal) dialog.showModal();
     else dialog.setAttribute('open', '');
   }
-  setTimeout(() => (naming ? $('#auth-name') : $('#auth-email')).focus(), 40);
+  setTimeout(() => $('#auth-email').focus(), 40);
 }
 
 function closeAuthDialog() {
@@ -102,37 +97,6 @@ async function submitAuth(event) {
   const email = $('#auth-email').value.trim();
   const password = $('#auth-password').value;
   const invite = $('#auth-invite').value.trim();
-  if (authMode === 'name') {
-    if (!name) { message.textContent = 'Choose a name first.'; return; }
-    authBusy = true;
-    $('#auth-submit').disabled = true;
-    message.textContent = 'Saving…';
-    // The strip and the board are this browser's view of the account, so the
-    // new name goes on immediately; the server still decides whether it is
-    // taken, and a refusal puts the old name back and reopens the dialog.
-    const previous = getHandle();
-    setHandle(name);
-    closeAuthDialog();
-    renderAccount();
-    renderLeaderboard();
-    try {
-      await renameHandle(name);
-      ui.lbCache.clear();
-      renderAccount();
-      renderLeaderboard();
-      loadLeaderboard(true);
-    } catch (err) {
-      setHandle(previous);
-      renderAccount();
-      renderLeaderboard();
-      openAuthDialog('name');
-      $('#auth-message').textContent = authErrorMessage(err);
-    } finally {
-      authBusy = false;
-      $('#auth-submit').disabled = false;
-    }
-    return;
-  }
   if (!email || !password) { message.textContent = 'Email and password are required.'; return; }
   if (password.length < 6) { message.textContent = 'Use at least 6 characters for the password.'; return; }
   if (authMode === 'signup' && !name) { message.textContent = 'Choose a display name.'; return; }
@@ -254,7 +218,6 @@ function initAccount() {
   });
   const profile = $('#profile-menu');
   $('#account-action').onclick = () => { profile.open = false; if (hasIdentity()) signOutUser(); else openAuthDialog('signin'); };
-  $('#account-rename').onclick = () => { profile.open = false; openAuthDialog('name'); };
   $('#account-signout').onclick = () => { profile.open = false; signOutUser(); };
   profile.addEventListener('click', event => { if (event.target.closest('a')) profile.open = false; });
   document.addEventListener('pointerdown', event => { if (profile.open && !profile.contains(event.target)) profile.open = false; });

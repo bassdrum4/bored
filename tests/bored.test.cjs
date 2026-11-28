@@ -1974,7 +1974,7 @@ test('browser regressions', async t => {
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.session') || 'null')), null);
     assert.equal(await text(page, '#account-state'), 'Playing as a guest. Your scores stay in this browser until you make an account.');
     assert.equal(await text(page, '#account-action'), 'Sign in');
-    assert.equal(await page.$eval('#account-rename', el => el.hidden), true);
+    assert.equal(await page.$('#account-rename'), null);
     assert.equal(await page.$eval('#account-action', el => el.classList.contains('primary')), true);
     await close({ dismissClaim: false });
     // Leaving the game names the run they just saved and offers an account for it.
