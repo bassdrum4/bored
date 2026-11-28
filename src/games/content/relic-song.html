@@ -251,6 +251,17 @@
   #result table td { padding: 4px 18px 4px 0 }
   #result table td:last-child { font-variant-numeric: tabular-nums }
   #result .ps { margin-top: 18px; font-style: italic; color: var(--dim) }
+  /* The sound test: every open song (and the type styles' demos), music only. */
+  #sound .card { width: 700px; max-height: 680px; padding: 16px 22px }
+  #sound .card h2 { margin-bottom: 4px }
+  #sound .list { max-height: 520px; overflow: auto; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule) }
+  #sound table td { padding: 3px 6px; font-size: 13px; white-space: nowrap }
+  #sound table td:first-child { width: 100%; white-space: normal }
+  #sound table td:last-child { text-align: right }
+  #sound tr.head td { text-align: left; padding-top: 10px; color: var(--dim); font-size: 11px; letter-spacing: .14em; text-transform: uppercase }
+  #sound tr.on td:first-child { color: var(--gold) }
+  #sound button.play { font-size: 12px; padding: 2px 10px; min-width: 56px }
+  #sound .now { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin: 8px 0; min-height: 30px; font-size: 13px }
   /* ── Help: Meloetta's Lesson, the first boss card, one-time tips, the first line's cue ── */
   #lesson .step { margin-bottom: 8px; color: var(--dim) }
   .teach { display: flex; gap: 18px; align-items: center; min-height: 110px }
@@ -363,7 +374,7 @@
     <div class="line"><span>6 lanes <span class="dim">(IN, AT)</span></span><span class="binds" id="o-bind6"></span></div>
     <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
     <p class="dim" style="margin-top:6px">Keys that won't light up together can't be pressed at once. Stick to EZ/HD.</p>
-    <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button></span></div>
+    <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button><button id="o-sound-test" type="button">Sound test</button></span></div>
     <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
 
@@ -372,6 +383,12 @@
     <div class="calib-dot" id="c-dot"></div>
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
+
+  <!-- The sound test: music only, for reviewing songs. -->
+  <div class="over" id="sound" hidden><div class="card"><h2>Sound test</h2>
+    <div class="now"><span id="st-now" class="dim">Pick a song. Music only, no notes.</span><span>Arrangement <span class="seg" id="st-diff"><button type="button" data-v="ez">EZ</button> <button type="button" data-v="hd">HD</button> <button type="button" data-v="in">IN</button> <button type="button" data-v="at">AT</button></span></span></div>
+    <div class="list"><table><tbody id="st-list"></tbody></table></div>
+    <div class="btns"><button id="st-stop" type="button">Stop</button><button id="st-close" type="button">Done (Esc)</button></div></div></div>
 
   <!-- Meloetta's Lesson: one text box a step; the practice plays between them. -->
   <div class="over" id="lesson" hidden><div class="card">
@@ -415,21 +432,26 @@
    wait for the arcade. */
 {
 /* ── Coins: tune these ─────────────────────────────────────────────────── */
-// Every amount is paid once, through the hub's ledger (src/hub/relic-song.js); replays pay
-// nothing. Raise a number here and players already paid under the old one get the rest,
-// once, the next time the game opens from the arcade.
+// Coins follow the chart's real level, not its difficulty's name: an EZ Lv.2 clears first try, an
+// AT Lv.15 takes hours. Every amount is paid once, through the hub's ledger (src/hub/relic-song.js);
+// replays pay nothing. Anything the ledger already paid, under this table or an older one, stays
+// paid and pays nothing more: changing a number here only changes what new entries pay.
 const PAY = {
-  // The first clear of a song on each difficulty.
-  clear: { ez: 50, hd: 100, in: 200, at: 400 },
-  // The first time your best on a difficulty reaches each rank, times that difficulty's multiplier.
-  rank: { b: 25, a: 50, s: 100 },
-  mult: { ez: 0.5, hd: 1, in: 2, at: 4 },
-  // A gym boss's first clear on any difficulty (its badge), and the final boss's first clear.
-  badge: 250,
+  // The first clear of a chart: perLevel x level squared, from its measured level (rate()), to the
+  // nearest `round` coins and never less than that. Lv.2 10, Lv.6 70, Lv.10 200, Lv.15 450.
+  perLevel: 2, round: 5,
+  // Rank coins, on IN and AT only: the first A and the first S on a chart, each a share of its clear pay.
+  rank: { a: 0.25, s: 0.5 }, rankDiffs: ["in", "at"],
+  // A gym boss's first clear on any difficulty (its badge), a region champion's, and the final boss's.
+  badge: 100,
+  champion: 250,
   finale: 500,
   // Finishing Meloetta's Lesson, the tutorial, the first time.
   lesson: 50
 };
+const toRound = v => Math.round(v / PAY.round) * PAY.round;
+const clearPay = level => Math.max(PAY.round, toRound(PAY.perLevel * level * level));
+const rankPay = (level, diff, rank) => PAY.rankDiffs.includes(diff) && PAY.rank[rank] ? toRound(clearPay(level) * PAY.rank[rank]) : 0;
 
 /* ── Rules ─────────────────────────────────────────────────────────────── */
 // Seconds either side of a note. Phigros-wide, not osu!mania-strict: keyboards are hard enough.
@@ -596,7 +618,8 @@ function hitsound(level) {
   o.connect(g); g.connect(hitOut); o.start(w); o.stop(w + 0.06);
 }
 const hz = midi => 440 * Math.pow(2, (midi - 69) / 12);
-// An instrument: wave, envelope (seconds), level, and optional vibrato, detune pair and filter.
+// An instrument: wave, envelope (seconds), level, and optional vibrato, detune pair and filter,
+// echo (a delay in seconds, fed back: Psychic's dream) and tremolo ([rate, depth]: Ghost's shiver).
 const INSTRUMENTS = {
   lead:    { wave: 0.25, a: 0.005, d: 0.08, s: 0.6, r: 0.06, gain: 0.30 },
   stab:    { wave: "square", a: 0.003, d: 0.12, s: 0.25, r: 0.05, gain: 0.12 },
@@ -614,8 +637,37 @@ const INSTRUMENTS = {
   // The layers' voices: a short pluck under a note, a buzzy one for Lt. Surge, a low one for The Dealer and the snake.
   pluck:   { wave: 0.125, a: 0.002, d: 0.06, s: 0.15, r: 0.04, gain: 0.09 },
   zip:     { wave: "sawtooth", a: 0.002, d: 0.05, s: 0.2, r: 0.03, gain: 0.07, detune: 7, cut: 3200 },
-  low:     { wave: "triangle", a: 0.002, d: 0.1, s: 0.15, r: 0.05, gain: 0.3 }
+  low:     { wave: "triangle", a: 0.002, d: 0.1, s: 0.15, r: 0.05, gain: 0.3 },
+  // The type styles' voices (TYPE_STYLES below).
+  square:  { wave: 0.5, a: 0.004, d: 0.08, s: 0.55, r: 0.05, gain: 0.2 },                        // Normal's bouncy lead
+  drive:   { wave: "sawtooth", a: 0.004, d: 0.1, s: 0.6, r: 0.05, gain: 0.12, detune: 12, cut: 1800 }, // Fire's rock lead
+  bell:    { wave: 0.125, a: 0.001, d: 0.35, s: 0, r: 0.35, gain: 0.2, layer: "triangle" },          // Ice: rings and dies
+  chime:   { wave: "triangle", a: 0.001, d: 0.25, s: 0, r: 0.3, gain: 0.16 },                       // Ice's sparse arp
+  punch:   { wave: 0.25, a: 0.002, d: 0.06, s: 0.4, r: 0.03, gain: 0.26 },                          // Fighting's lead
+  wobble:  { wave: 0.25, a: 0.01, d: 0.1, s: 0.6, r: 0.08, gain: 0.32, vib: [4, 45] },               // Poison's sick vibrato
+  sub:     { wave: "triangle", a: 0.004, d: 0.2, s: 0.85, r: 0.08, gain: 0.6 },                      // Ground's heavy low bass
+  air:     { wave: "triangle", a: 0.03, d: 0.2, s: 0.6, r: 0.3, gain: 0.26, vib: [5, 7], detune: 6 },  // Flying's lead
+  dream:   { wave: 0.25, a: 0.05, d: 0.2, s: 0.6, r: 0.35, gain: 0.2, vib: [4, 10], layer: "triangle", echo: 0.32 },  // Psychic
+  dreamarp:{ wave: "triangle", a: 0.003, d: 0.12, s: 0.2, r: 0.15, gain: 0.1, echo: 0.32 },
+  bzz:     { wave: "sawtooth", a: 0.002, d: 0.04, s: 0.3, r: 0.02, gain: 0.1, detune: 18, cut: 3000 }, // Bug: staccato and buzzy
+  haunt:   { wave: 0.5, a: 0.04, d: 0.3, s: 0.6, r: 0.4, gain: 0.16, vib: [3, 12], trem: [7, 0.6] },   // Ghost
+  hero:    { wave: "sawtooth", a: 0.01, d: 0.15, s: 0.7, r: 0.1, gain: 0.14, detune: 8, cut: 2200 },  // Dragon's big lead
+  brass:   { wave: "sawtooth", a: 0.01, d: 0.15, s: 0.5, r: 0.08, gain: 0.08, detune: 10, cut: 1600 }, // Dragon's chords
+  metal:   { wave: 0.125, a: 0.001, d: 0.05, s: 0.35, r: 0.03, gain: 0.27, detune: 25 },               // Steel's clanging lead
+  musicbox:{ wave: "triangle", a: 0.001, d: 0.18, s: 0.05, r: 0.25, gain: 0.24, vib: [6, 4] },       // Fairy
+  // The verse's quiet hint in a gym song (an arp or bass under the band; see addPart).
+  hint:    { wave: 0.125, a: 0.003, d: 0.1, s: 0.3, r: 0.1, gain: 0.07 },
+  hintbass:{ wave: "triangle", a: 0.004, d: 0.1, s: 0.6, r: 0.08, gain: 0.18 }
 };
+// One echo for each master gain (a song's, or an offline render's): a delay fed back into itself.
+function echoBus(time) {
+  if (!master._echo) master._echo = {};
+  if (master._echo[time]) return master._echo[time];
+  const d = ctx.createDelay(1), fb = ctx.createGain(), wet = ctx.createGain();
+  d.delayTime.value = time; fb.gain.value = 0.38; wet.gain.value = 0.45;
+  d.connect(fb); fb.connect(d); d.connect(wet); wet.connect(master);
+  return (master._echo[time] = d);
+}
 function tone(name, midi, when, dur) {
   const I = INSTRUMENTS[name];
   const g = ctx.createGain(), end = when + Math.max(0.03, dur);
@@ -626,7 +678,14 @@ function tone(name, midi, when, dur) {
   g.gain.linearRampToValueAtTime(0, end + I.r);
   let out = g;
   if (I.cut) { const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = I.cut; g.connect(f); out = f; }
+  if (I.trem) {
+    const t = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
+    t.gain.value = 1 - I.trem[1] / 2; lfo.frequency.value = I.trem[0]; depth.gain.value = I.trem[1] / 2;
+    lfo.connect(depth); depth.connect(t.gain); out.connect(t); out = t;
+    lfo.start(when); lfo.stop(end + I.r + 0.02);
+  }
   out.connect(master);
+  if (I.echo) out.connect(echoBus(I.echo));
   const voices = [[I.wave, 0]];
   if (I.detune) voices.push([I.wave, I.detune]);
   if (I.layer) voices.push([I.layer, 0]);
@@ -675,7 +734,11 @@ const DRUMS = {
   r: w => tone("click", 84, w, 0.015),              // a rim tick
   q: w => noise(w, 0.02, 0.06, 8500),               // a soft closed hat, for sixteenths
   c: w => { noise(w, 0.018, 0.09, 2500, "bandpass"); noise(w + 0.012, 0.012, 0.05, 3500, "bandpass"); },   // a card riffled off the deck
-  x: w => { for (let i = 0; i < 3; i++) noise(w + i * 0.011, 0.01, 0.07 - i * 0.015, 6500); }               // a rattle
+  x: w => { for (let i = 0; i < 3; i++) noise(w + i * 0.011, 0.01, 0.07 - i * 0.015, 6500); },              // a rattle
+  // The type styles' drums.
+  z: w => { noise(w, 0.06, 0.16, 3200, "bandpass"); tone("click", 91, w, 0.03); tone("click", 97, w + 0.004, 0.02); },   // a metal clang
+  w: w => { noise(w, 0.03, 0.05, 9500); tone("chime", 108, w, 0.02); },                                         // a sparkle
+  b: w => { noise(w, 0.08, 0.3, 900, "bandpass"); kick(w, false); }                                             // a punch: snare body on a kick
 };
 
 /* ── Writing songs ─────────────────────────────────────────────────────── */
@@ -688,10 +751,11 @@ function midiOf(tok) {
   if (!m) return null;
   return 12 * (Number(m[3]) + 1) + PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
 }
-function chordOf(name) {
+// `up` moves it by semitones (a key change), wrapped to stay in the same octave.
+function chordOf(name, up = 0) {
   const m = /^([A-G])(#|b)?(m|7|m7|sus)?$/.exec(name);
   if (!m) return [48, 52, 55];
-  const root = 48 + PC[m[1].toLowerCase()] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
+  const root = 48 + ((PC[m[1].toLowerCase()] + up) % 12 + 12) % 12 + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
   const third = m[3] === "m" || m[3] === "m7" ? 3 : m[3] === "sus" ? 5 : 4;
   return [root, root + third, root + 7];
 }
@@ -721,7 +785,7 @@ const STYLES = {
   relic:    { lead: "voice", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "flow16", stab: "stab", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1, holds: true,
               layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 24 } },
   // The Dealer's table: cards riffled on the beat, low plucks, a tom for a snare.
-  dark:     { lead: "ghost", bass: "sqbass", bassRun: "oneThree", drums: { K: [0], t: [7], H: [4] },
+  dealer:   { lead: "ghost", bass: "sqbass", bassRun: "oneThree", drums: { K: [0], t: [7], H: [4] },
               layer: { tick: "c", fast: "c", kick: "K", snare: "t", bass: "low", pluck: "low", octave: 0 } },
   plain:    { lead: "voice", bass: "bass", bassRun: "oneThree", drums: {},
               layer: { tick: "r", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 24 } },
@@ -729,6 +793,114 @@ const STYLES = {
   snake:    { lead: "hiss", bass: "sqbass", bassRun: "eighths", drums: { k: [0, 8], s: [4, 12], m: "all" },
               layer: { tick: "x", fast: "x", kick: "k", snare: "s", pluck: "low", octave: 0 } }
 };
+
+// Scales, as semitones from the key's root: what a type writes its melodies in (TYPE_STYLES.scale),
+// what the recipe check reads a song's key against, and what the style demos are made from.
+const SCALES = {
+  major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10], mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11], phrygian: [0, 1, 3, 5, 7, 8, 10], harmonic: [0, 2, 3, 5, 7, 8, 11], pentatonic: [0, 2, 4, 7, 9],
+  minorpent: [0, 3, 5, 7, 10], blues: [0, 3, 5, 6, 7, 10], wholetone: [0, 2, 4, 6, 8, 10], chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+};
+/* The 18 type styles: the template every new song is written in (docs/relic-song-songs.md). Kanto's
+   songs keep the styles above, as they were written; these are for the regions to come. Each has the
+   band (lead, bass and its run, arp and its run, stabs, drums, the layer it adds on IN and AT), and
+   what a song in it should be: its scales (the first is the usual one), its BPM range, its swing
+   ({ grid: 8 or 16, amt 0-1 }, a third of a step late at 1), and the line gimmicks its boss's moving
+   line is made from (GIMMICKS below). A dual type is "Main/Second": the main type's band and drums,
+   the second type's line. */
+const TYPE_STYLES = {
+  Normal:   { lead: "square", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "up8", drums: { k: [0, 2, 4, 6], s: [2, 6], h: "off" },
+              scale: ["major"], bpm: [110, 130], line: ["hop"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 12 } },
+  Fire:     { lead: "drive", bass: "rockbass", bassRun: "eighths", arp: "arp", arpRun: "fast16", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 0.6,
+              scale: ["mixolydian", "minor"], bpm: [140, 170], line: ["flicker", "jump"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 12 } },
+  Water:    { lead: "flow", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "flow16", drums: { k: [0], s: [4], h: "off" }, holds: true, swing: { grid: 16, amt: 0.5 },
+              scale: ["dorian", "major"], bpm: [90, 120], line: ["tide"],
+              layer: { tick: "m", fast: "q", kick: "k", snare: "r", pluck: "pluck", octave: 24 } },
+  Grass:    { lead: "flute", bass: "bass", bassRun: "oneThree", arp: "arp", arpRun: "sway", drums: { k: [0, 6], r: [3], m: "off" },
+              scale: ["pentatonic"], bpm: [85, 105], line: ["sway", "drift"],
+              layer: { tick: "m", fast: "r", kick: "k", snare: "r", pluck: "pluck", octave: 24 } },
+  Electric: { lead: "buzz", bass: "sqbass", bassRun: "sixteenths", arp: "arp", arpRun: "up8", drums: { k: [0, 2, 4, 6], s: [2, 6], h: "16" },
+              scale: ["minor", "dorian"], bpm: [150, 175], line: ["zap", "teleport"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "zip", octave: 12 } },
+  Ice:      { lead: "bell", bass: "bass", bassRun: "oneThree", arp: "chime", arpRun: "sparse", drums: { k: [0], r: [4], w: [3, 7] }, holds: true,
+              scale: ["lydian"], bpm: [100, 120], line: ["glide", "freeze"],
+              layer: { tick: "w", fast: "r", kick: "k", snare: "r", pluck: "chime", octave: 24 } },
+  Fighting: { lead: "punch", bass: "sqbass", bassRun: "eighths", stab: "stab", stabEvery: 1, drums: { k: [0, 3], b: [2, 6], h: "off" }, doubles: 0.8,
+              scale: ["minor"], bpm: [130, 150], line: ["jab"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "b", pluck: "pluck", octave: 12 } },
+  Poison:   { lead: "wobble", bass: "sqbass", bassRun: "oneThree", arp: "arp", arpRun: "sway", drums: { k: [0, 5], s: [4], m: "off" },
+              scale: ["phrygian", "chromatic"], bpm: [110, 125], line: ["wobble", "drip"],
+              layer: { tick: "m", fast: "x", kick: "k", snare: "s", pluck: "pluck", octave: 12 } },
+  Ground:   { lead: "lead", bass: "sub", bassRun: "half", drums: { K: [0], s: [4], h: [0, 2, 4, 6] }, deep: true, doubles: 0.5,
+              scale: ["minor", "minorpent"], bpm: [95, 115], line: ["slam"],
+              layer: { tick: "h", fast: "q", kick: "K", snare: "s", bass: "sub", pluck: "low", octave: 12 } },
+  Flying:   { lead: "air", bass: "bass", bassRun: "rootfifth", arp: "arp", arpRun: "wide", drums: { k: [0, 4], s: [4], h: "off" }, holds: true,
+              scale: ["major"], bpm: [120, 140], line: ["swoop"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "r", pluck: "pluck", octave: 24 } },
+  Psychic:  { lead: "dream", bass: "bass", bassRun: "oneThree", arp: "dreamarp", arpRun: "flow16", drums: { k: [0], s: [4], m: "off" }, holds: true,
+              scale: ["wholetone", "lydian"], bpm: [100, 120], line: ["teleport", "twin"],
+              layer: { tick: "m", fast: "q", kick: "k", snare: "r", pluck: "dreamarp", octave: 12 } },
+  Bug:      { lead: "bzz", bass: "sqbass", bassRun: "sixteenths", arp: "bzz", arpRun: "fast16", drums: { k: [0, 4], s: [2, 6], h: "16" },
+              scale: ["minor", "dorian"], bpm: [150, 170], line: ["skitter"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "zip", octave: 12 } },
+  Rock:     { lead: "lead", bass: "rockbass", bassRun: "eighths", stab: "stab", drums: { k: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1,
+              scale: ["major", "minor"], bpm: [105, 125], line: ["stomp"],
+              layer: { tick: "h", fast: "q", kick: "k", snare: "s", pluck: "pluck", octave: 12 } },
+  Ghost:    { lead: "haunt", bass: "low", bassRun: "oneThree", drums: { K: [0], H: [5] },
+              scale: ["minor", "harmonic"], bpm: [90, 110], line: ["fade"],
+              layer: { tick: "c", fast: "x", kick: "K", snare: "t", bass: "low", pluck: "low", octave: 12 } },
+  Dragon:   { lead: "hero", bass: "rockbass", bassRun: "octaves", stab: "brass", drums: { K: [0, 3, 4], s: [2, 6], h: "all" }, deep: true, doubles: 1, holds: true,
+              scale: ["harmonic"], bpm: [130, 150], line: ["twister"],
+              layer: { tick: "h", fast: "q", kick: "K", snare: "s", pluck: "pluck", octave: 12 } },
+  Dark:     { lead: "ghost", bass: "low", bassRun: "walk", drums: { K: [0, 5], t: [3], s: [4] }, swing: { grid: 8, amt: 0.6 },
+              scale: ["blues", "minor"], bpm: [95, 115], line: ["offbeat", "sides"],
+              layer: { tick: "c", fast: "c", kick: "K", snare: "t", bass: "low", pluck: "low", octave: 0 } },
+  Steel:    { lead: "metal", bass: "sqbass", bassRun: "eighths", arp: "arp", arpRun: "fast16", drums: { k: [0, 4], z: [2, 6], q: "16" },
+              scale: ["minor", "dorian"], bpm: [115, 135], line: ["quarter"],
+              layer: { tick: "z", fast: "q", kick: "k", snare: "z", pluck: "metal", octave: 0 } },
+  Fairy:    { lead: "musicbox", bass: "bass", bassRun: "rootfifth", arp: "musicbox", arpRun: "box", drums: { k: [0, 4], w: "off", r: [2, 6] },
+              scale: ["major"], bpm: [120, 140], line: ["twirl", "bounce"],
+              layer: { tick: "w", fast: "w", kick: "k", snare: "r", pluck: "musicbox", octave: 12 } }
+};
+const TYPES = Object.keys(TYPE_STYLES);
+// A song's band: a Kanto style by name, or a type ("Fire"), or two ("Fire/Flying": Fire's band and drums, Flying's line).
+function styleOf(name) {
+  const [main, second] = String(name || "plain").split("/");
+  const A = STYLES[main] || TYPE_STYLES[main] || STYLES.plain;
+  return second && TYPE_STYLES[second] ? { ...A, line: TYPE_STYLES[second].line, second } : A;
+}
+// The type a song belongs to, for the sound test and the recipe check: its own, its gym's, or its style's.
+const typeOf = song => song.type || (song.gym != null && GYMS[song.gym] ? GYMS[song.gym].type : TYPE_STYLES[String(song.style).split("/")[0]] ? song.style : "");
+
+/* The regions. Each has a verse: a 4-bar motif, that region's piece of the Relic Song. It turns up
+   quietly in the region's gym songs (a part's hint: "arp" or "bass") and plays in full in its champion
+   song's last section (a part with motif: true). The true final Relic Song is all nine in order
+   (finalVerses()). Kanto's is the finale's opening hook, so it fits the song it came from. */
+const KANTO_MOTIF = { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "Em C G D", key: "Em" };
+const REGIONS = [{ id: "kanto", name: "Kanto", gyms: [0, 1, 2, 3], verse: KANTO_MOTIF }];
+// Kanto's songs were written before regions: a gym song or the finale is Kanto's.
+const regionOf = song => REGIONS.find(r => r.id === (song.region || (song.gym != null || song.final ? "kanto" : ""))) || null;
+const finalVerses = () => REGIONS.map(r => r.verse);
+// A key is a root and "m" for minor: "C", "F#m", "Bbm". keyShift: the semitones (-6..5) that move a
+// motif in one key to another, through the relative major or minor when the two differ.
+const keyRoot = key => { const m = /^([A-G])(#|b)?/.exec(key || "C"); return (PC[m[1].toLowerCase()] + (m[2] === "#" ? 1 : m[2] === "b" ? 11 : 0)) % 12; };
+const isMinor = key => /m$/.test(key || "");
+function keyShift(from, to) {
+  if (!from || !to) return 0;
+  const target = (keyRoot(to) + (isMinor(from) === isMinor(to) ? 0 : isMinor(from) ? 9 : 3)) % 12;
+  return ((target - keyRoot(from)) % 12 + 18) % 12 - 6;
+}
+// A form token: a part's name, with "^n" for a key change of n semitones ("H^2").
+const tokenOf = t => { const m = /^(\w+)\^(-?\d+)$/.exec(t); return m ? { name: m[1], up: Number(m[2]) } : { name: t, up: 0 }; };
+// A part as written, or (motif: true) the region's verse motif in its place.
+function partOf(song, name) {
+  const p = song.parts[name];
+  if (!p || !p.motif) return p;
+  const v = regionOf(song).verse;
+  return { ...p, lead: v.lead, chords: v.chords };
+}
 
 // The four verses of Meloetta's song, one per gym. A boss fight sings its gym's
 // verse when the highway breaks; the finale sings all four.
@@ -764,15 +936,15 @@ const PETALS = [[380, 520], [640, 480], [900, 540], [520, 600], [780, 600], [300
 
 const SONGS = [
   // ── Brock, Pewter Gym (Rock) ──
-  { id: "pewter-steps", heat: { ez: 0.06, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
+  { id: "pewter-steps", key: "C", heat: { ez: 0.06, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
     parts: { A: { lead: "c5 - e5 - g5 - e5 - | f5 - a5 - g5 - - - | e5 - g5 - c6 - g5 - | f5 - e5 - d5 - - -", chords: "C F C G" },
              B: { lead: "a4 - c5 - e5 - - - | f5 - e5 - d5 - - - | g4 - b4 - d5 - g5 - | e5 - d5 - c5 - - -", chords: "Am F G C" } },
     form: "A A B B A A B A" },
-  { id: "boulder-march", heat: { ez: 0.12, hd: 0.08 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
+  { id: "boulder-march", key: "Gm", heat: { ez: 0.12, hd: 0.08 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
     parts: { A: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
              B: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D" } },
     form: "A A B A A B B A" },
-  { id: "onix-rising", heat: { ez: 0.24, hd: 0.08, in: 0.14 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
+  { id: "onix-rising", key: "Em", heat: { ez: 0.24, hd: 0.08, in: 0.14 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
     parts: { A: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
              B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
              C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
@@ -796,15 +968,15 @@ const SONGS = [
              { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i], y: 330, rot: 180, only: "hard" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", heat: { ez: 0.44, hd: 0.32 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
+  { id: "cerulean-current", key: "D", heat: { ez: 0.44, hd: 0.32 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
     parts: { A: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
              B: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D" } },
     form: "A A B A B B A A" },
-  { id: "tidepool-waltz", heat: { ez: 0.8, hd: 0.24 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
+  { id: "tidepool-waltz", key: "A", heat: { ez: 0.8, hd: 0.24 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
     parts: { A: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
              B: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A" } },
     form: "A A B A A B B A A A B A A B B A" },
-  { id: "starmie-undertow", heat: { ez: 0.54, hd: 0.34, in: 0.42 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
+  { id: "starmie-undertow", key: "Bm", heat: { ez: 0.54, hd: 0.34, in: 0.42 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
     parts: { A: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
              B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
              C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
@@ -823,15 +995,15 @@ const SONGS = [
            { at: 48, len: 1, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 48, kind: "speed", to: 0.65 }, { at: 49, len: 7, kind: "spin", perBeat: 360 / 7 }, ...riptide(56, 360)] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
-  { id: "vermilion-voltage", heat: { ez: 0.58, hd: 0.12 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
+  { id: "vermilion-voltage", key: "Am", heat: { ez: 0.58, hd: 0.12 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
              B: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "lightning-rod", heat: { ez: 0.6, hd: 0.12 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
+  { id: "lightning-rod", key: "Em", heat: { ez: 0.6, hd: 0.12 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
     parts: { A: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
              B: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true } },
     form: "A A B A A B B A A B B A" },
-  { id: "raichu-overload", heat: { ez: 0.62, hd: 0.06, in: 0.16 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
+  { id: "raichu-overload", key: "Am", heat: { ez: 0.62, hd: 0.06, in: 0.16 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
     parts: { A: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
              B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
              C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
@@ -848,15 +1020,15 @@ const SONGS = [
            ...every(64, 80, 2, (b, i) => [{ at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? 32 : -32, line: 1 }, { at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? -32 : 32, line: 2 }])] },
 
   // ── Erika, Celadon Gym (Grass) ──
-  { id: "celadon-petals", heat: { ez: 0.8, hd: 0.4 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
+  { id: "celadon-petals", key: "F", heat: { ez: 0.8, hd: 0.4 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
     parts: { A: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
              B: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F" } },
     form: "A A B A B B A A" },
-  { id: "gloom-garden", heat: { ez: 0.94, hd: 0.4 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
+  { id: "gloom-garden", key: "Dm", heat: { ez: 0.94, hd: 0.4 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
     parts: { A: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
              B: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm" } },
     form: "A A B A B B A A" },
-  { id: "vileplume-drift", heat: { ez: 0.98, hd: 0.4, in: 0.48 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
+  { id: "vileplume-drift", key: "F", heat: { ez: 0.98, hd: 0.4, in: 0.48 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
     parts: { A: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
              B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
              C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
@@ -879,8 +1051,8 @@ const SONGS = [
            { at: 58, len: 6, kind: "drift", ampX: 140, period: 12, sway: 12, fall: 1 }] },
 
   // ── The finale: Meloetta ──
-  { id: "relic-song", heat: { ez: 0.8, hd: 0.3, in: 0.28, at: 0.26 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
-    parts: { A: { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "Em C G D" },
+  { id: "relic-song", key: "Em", heat: { ez: 0.8, hd: 0.3, in: 0.28, at: 0.26 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
+    parts: { A: { lead: KANTO_MOTIF.lead, chords: KANTO_MOTIF.chords },
              B: { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - - | g5 - a5 - b5 - d6 - | e6 - - - - - . .", chords: "Am Em G Em" },
              C: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | g5 a5 b5 c6 d6 c6 b5 a5 | b5 - - - - - - - | e5 - - - . . . .", chords: "Em D C B", burst: true },
              D: { lead: ". e5 - g5 . b5 - a5 | . g5 - e5 . d5 - - | . c5 - e5 . g5 - b5 | . a5 - - . . . .", chords: "C Em Am D" },
@@ -915,7 +1087,7 @@ const SONGS = [
   // ── Hidden tracks ──
   // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
   // land on beats 1 and 4 every bar, and the B part fires a fast burst.
-  { id: "the-dealer", heat: { ez: 0.56, hd: 0.32, in: 0.32, at: 0.32 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dark", art: 10007, at: true,
+  { id: "the-dealer", key: "Cm", heat: { ez: 0.56, hd: 0.32, in: 0.32, at: 0.32 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dealer", art: 10007, at: true,
     sync: true, chordAt: [0, 6], chordsAlways: true,
     // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
     verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
@@ -940,11 +1112,11 @@ const SONGS = [
     parts: { A: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
              B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G", burst: true } },
     form: "A A B relic A B A", note: "Six beats a bar. The house always counts its own way." },
-  { id: "its-started-go", heat: 0, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true, diffs: ["hd"],
+  { id: "its-started-go", key: "Em", heat: 0, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true, diffs: ["hd"],
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", heat: { ez: 0.88, hd: 0.34, in: 0.38, at: 0.36 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+  { id: "sssssssnakes", key: "Em", heat: { ez: 0.88, hd: 0.34, in: 0.38, at: 0.36 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
     // The break: a long hiss, and then the line slithers in an S for the rest of the song.
     verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
     line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 580, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.55 }, { at: 0, kind: "speed", to: 0.9 },
@@ -959,6 +1131,7 @@ const SONGS = [
              B: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" } },
     form: "A A B A A B relic B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
 ];
+// key is the song's key ("Em" minor, "C" major): for the recipe check and to move a region's verse into it.
 // heat is how much of the filler layer a song takes: gym 1 lowest, the finale and the hidden
 // tracks highest. The level shown on the map and in play is measured from the built chart (rate()).
 for (const s of SONGS) s.diffs = s.diffs || ["ez", "hd"].concat(s.boss || s.hidden ? ["in"] : [], s.final || s.at ? ["at"] : []);
@@ -976,6 +1149,99 @@ const GYMS = [
 ];
 const FINAL = { name: "Meloetta", type: ["Normal", "Psychic"], pirouette: ["Normal", "Fighting"] };
 
+/* ── The song recipe (docs/relic-song-songs.md) ────────────────────────── */
+// Every new song follows it; recipeCheck() says where one doesn't (scripts/relic-song-table.mjs prints it
+// for every song). Parts by name: I the intro, H the hook, O the outro, any other letter a section
+// (intro: true, hook: true, outro: true on a part says the same for another name).
+const RECIPE = {
+  // Seconds, by role. Hidden tracks keep their own lengths.
+  seconds: { song: [75, 105], boss: [90, 120], champion: [105, 135], final: [150, Infinity] },
+  intro: 2, hook: 4, hookAtLeast: 3,   // bars, bars, and how often the hook comes round
+  sameBarsInRow: 4,                    // the most times one bar (melody and chord) may play in a row
+  range: 19,                           // the melody's widest span, in semitones (about an octave and a half)
+  regionKeys: 3, regionTempoSpread: 30, // per region: at least this many keys, and this much between its slowest and fastest BPM
+  // Level targets per role and difficulty: what a region's charts should measure, roughly (rate()).
+  levels: { song: { ez: 2, hd: 6 }, boss: { ez: 3, hd: 7, in: 11 }, champion: { ez: 4, hd: 9, in: 12, at: 14 }, final: { ez: 4, hd: 10, in: 13, at: 15 } }
+};
+const roleOf = song => song.final ? "final" : song.champion ? "champion" : song.boss ? "boss" : song.hidden ? "hidden" : "song";
+const partRole = (song, name) => { const p = song.parts[name] || {}; return name === "I" || p.intro ? "intro" : name === "H" || p.hook ? "hook" : name === "O" || p.outro ? "outro" : "section"; };
+const clock = secs => Math.floor(secs / 60) + ":" + String(Math.round(secs % 60)).padStart(2, "0");
+function recipeCheck(song) {
+  const B = built(song, song.diffs.includes("hd") ? "hd" : song.diffs[0]), role = roleOf(song), toks = song.form.split(/\s+/), flags = [];
+  const parts = toks.filter(t => t !== "relic" && t !== "flip").map(tokenOf), bars = name => partOf(song, name).lead.split("|").length;
+  const secs = Math.round(B.seconds), lim = RECIPE.seconds[role];
+  if (lim && (secs < lim[0] || secs > lim[1])) flags.push("length " + clock(secs) + " (a " + role + " is " + clock(lim[0]) + (lim[1] === Infinity ? "+" : "-" + clock(lim[1])) + ")");
+  const first = parts[0], last = parts[parts.length - 1];
+  if (!first || partRole(song, first.name) !== "intro" || bars(first.name) !== RECIPE.intro) flags.push("no " + RECIPE.intro + "-bar intro");
+  const hooks = parts.filter(p => partRole(song, p.name) === "hook");
+  if (!hooks.length || hooks.some(p => bars(p.name) !== RECIPE.hook)) flags.push("no " + RECIPE.hook + "-bar hook");
+  else if (hooks.length < RECIPE.hookAtLeast) flags.push("hook only " + hooks.length + "x");
+  const sections = [...new Set(parts.filter(p => partRole(song, p.name) === "section").map(p => p.name))], need = role === "song" || role === "hidden" ? 2 : 3;
+  if (sections.length < need) flags.push("sections " + (sections.join("/") || "none") + " (wants " + (need === 3 ? "A/B/C" : "A/B") + ")");
+  if (!last || partRole(song, last.name) !== "outro") flags.push("no outro");
+  if (role !== "song" && role !== "hidden" && !toks.includes("relic")) flags.push("no relic break");
+  if (role === "champion") {
+    if (toks.filter(t => t === "flip").length < 2) flags.push("fewer than 2 flips");
+    if (!hooks.length || !hooks[hooks.length - 1].up) flags.push("no key change into the last hook");
+  }
+  // One bar is its melody and chord, and its key change: the most times one plays in a row.
+  const seq = parts.flatMap(p => { const pt = partOf(song, p.name), cs = pt.chords.split(/\s+/); return pt.lead.split("|").map((l, i) => l.trim().replace(/\s+/g, " ") + "/" + cs[i % cs.length] + "/" + p.up); });
+  let run = 1, most = 1;
+  for (let i = 1; i < seq.length; i++) { run = seq[i] === seq[i - 1] ? run + 1 : 1; most = Math.max(most, run); }
+  if (most > RECIPE.sameBarsInRow) flags.push("one bar " + most + "x in a row");
+  const pitches = parts.flatMap(p => partOf(song, p.name).lead.split(/\s+/).map(midiOf).filter(m => m != null).map(m => m + p.up)), range = pitches.length ? Math.max(...pitches) - Math.min(...pitches) : 0;
+  if (range > RECIPE.range) flags.push("melody spans " + range + " semitones");
+  if (sections.includes("B") && !partOf(song, "B").answer && !styleOf(song.style).arp) flags.push("B has no answer (call and response)");
+  if (!song.key) flags.push("no key");
+  const ts = TYPE_STYLES[typeOf(song)];
+  if (ts && TYPE_STYLES[String(song.style).split("/")[0]] && (song.bpm < ts.bpm[0] || song.bpm > ts.bpm[1])) flags.push("BPM outside " + typeOf(song) + "'s " + ts.bpm.join("-"));
+  return { id: song.id, title: song.title, region: song.region || "kanto", role, type: typeOf(song), key: song.key || "", bpm: song.bpm, bars: B.end / song.bar, seconds: secs,
+    hookRepeats: hooks.length, range, sameBars: most, flags };
+}
+// A region's variety: no two songs share key and BPM, at least three keys, a spread of tempos.
+function regionCheck(id, songs) {
+  const flags = [], seen = new Map();
+  for (const s of songs) { const k = s.key + " " + s.bpm; if (seen.has(k)) flags.push(seen.get(k) + " and " + s.id + " share " + k); else seen.set(k, s.id); }
+  const keys = new Set(songs.map(s => s.key).filter(Boolean)), bpms = songs.map(s => s.bpm);
+  if (keys.size < RECIPE.regionKeys) flags.push("only " + keys.size + " keys");
+  if (Math.max(...bpms) - Math.min(...bpms) < RECIPE.regionTempoSpread) flags.push("tempos only " + Math.min(...bpms) + "-" + Math.max(...bpms));
+  return { id, songs: songs.length, keys: [...keys], tempos: [Math.min(...bpms), Math.max(...bpms)], flags };
+}
+
+/* ── Style demos: one short boss song per type ─────────────────────────── */
+// Made from the type's style alone (its first scale, its middle BPM, a key of its own) with a stock
+// melody on the scale and the scale's own chords, in the recipe's shape: intro, a hook that comes back,
+// A (with the verse's quiet hint), B (a call and response), the break, C, outro. The sound test plays
+// them so a style can be heard before a song is written in it; the table script checks their lines.
+const NAMES = ["c", "c#", "d", "eb", "e", "f", "f#", "g", "ab", "a", "bb", "b"], CHORD_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const noteName = m => NAMES[m % 12] + (Math.floor(m / 12) - 1);
+function demoSong(type) {
+  const st = TYPE_STYLES[type], i = TYPES.indexOf(type), sc = SCALES[st.scale[0]], minor = sc.includes(3) && !sc.includes(4);
+  const root = [0, 7, 2, 9, 4, 11, 5, 10, 3, 8, 1, 6][i % 12], top = 72 + root - (root > 5 ? 12 : 0);
+  // Degrees are written for a 7-note scale; a pentatonic or whole-tone one takes the nearest of its own.
+  const pitch = d7 => { const d = Math.round(d7 * sc.length / 7); return top + 12 * Math.floor(d / sc.length) + sc[((d % sc.length) + sc.length) % sc.length]; };
+  const line = (rhythm, degs) => { let k = 0; return rhythm.split("|").map(bar => bar.trim().split(/\s+/).map(c => c === "x" ? noteName(pitch(degs[k++ % degs.length])) : c).join(" ")).join(" | "); };
+  const parent = sc.length === 7 ? sc : SCALES[minor ? "minor" : "major"];
+  const prog = ds => ds.map(d => { const r = parent[d % 7], t = (parent[(d + 2) % 7] - r + 12) % 12; return CHORD_NAMES[(root + r) % 12] + (t === 3 ? "m" : ""); }).join(" ");
+  const parts = {
+    I: { lead: line("x - - - x - - - | x - - - - - . .", [0, 4, 2]), chords: prog([0, 4]) },
+    H: { lead: line("x - x - x x - - | x - x - x - - - | x - x x - x - - | x - - - - - . .", [0, 2, 4, 5, 4, 2, 4, 5, 7, 5, 4, 0]), chords: prog([0, 5, 3, 4]) },
+    A: { lead: line("x - - x - - x - | x - x - x - . . | x - - x - - x - | x - - - x - - -", [2, 1, 0, -1, 0, 2, 4, 3, 2, 1, -3]), chords: prog([5, 3, 0, 4]), hint: "arp" },
+    B: { lead: line("x - x - . . . . | x - x - . . . . | x - x - . . . . | x - - - . . . .", [4, 5, 5, 7, 7, 5, 4]),
+         answer: line(". . . . x x x - | . . . . x x x - | . . . . x x x - | . . . . x x - -", [7, 6, 4, 8, 7, 5, 9, 7, 5, 7, 4]), chords: prog([3, 4, 5, 4]) },
+    C: { lead: line("x x x x x - x - | x - x - x - - - | x x x x x - x - | x - - - - - . .", [0, 1, 2, 3, 4, 2, 5, 4, 2, 1, 2, 3, 4, 5, 4, 0]), chords: prog([0, 3, 4, 0]), burst: true },
+    O: { lead: line("x - - - x - - - | x - - - - - - -", [4, 2, 0]), chords: prog([4, 0]) }
+  };
+  // About a boss's length: more A/H and B/H before the break the faster it goes.
+  const bpm = Math.round((st.bpm[0] + st.bpm[1]) / 2 / 2) * 2, want = Math.round(100 * bpm / 240), pre = ["I", "H", "A", "H", "B", "H"], post = ["relic", "C", "H", "C", "H", "O"];
+  const size = t => t === "relic" ? 4 : parts[t].lead.split("|").length;
+  for (let k = 0; pre.concat(post).reduce((n, t) => n + size(t), 0) < want; k++) pre.push(k % 2 ? "B" : "A", "H");
+  return { id: "style-" + type.toLowerCase(), key: CHORD_NAMES[root] + (minor ? "m" : ""), title: type + " style", demo: true, type, style: type, region: "kanto", bpm, bar: 4, boss: true,
+    heat: { ez: 0.25, hd: 0.2, in: 0.25 }, diffs: ["ez", "hd", "in"], parts, form: pre.concat(post).join(" "), line: "auto" };
+}
+let demoCache = null;
+const DEMOS = () => demoCache || (demoCache = TYPES.map(demoSong));
+
 /* ── Building a song: the audio events and the chart, on one grid ────────── */
 // Times are in beats from beat 0. A step is an eighth note (half a beat).
 // The chart is laid in three layers, in this order so the tune always wins:
@@ -987,7 +1253,7 @@ const FINAL = { name: "Meloetta", type: ["Normal", "Psychic"], pirouette: ["Norm
 // A small hash of the song, difficulty and beat stands in for chance, so a chart is the same every load.
 const hash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
 function build(song, diff = "hd") {
-  const style = STYLES[song.style], D = CHART_DIFFS[diff], steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
+  const style = styleOf(song.style), D = CHART_DIFFS[diff], steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
   const heat = (typeof song.heat === "object" ? song.heat[diff] ?? song.heat.hd : song.heat) || 0, roll = (b, salt = 0) => hash(song.id + ":" + diff + ":" + salt + ":" + b.toFixed(3));
   const ev = [], tune = [], spots = new Map(), chordSpots = [], segments = [], barsOn = [], lay = style.layer;
   // A filler spot, on a sixteenth grid, scored by what the band plays there.
@@ -999,7 +1265,8 @@ function build(song, diff = "hd") {
   };
   let beat = 0, mode = "highway", form = "aria";
   const { tokens, moved } = formFor(song, diff);
-  const addPart = (name, part, chartOn, verse) => {
+  // up: semitones the part is moved (a key change, "H^2" in the form).
+  const addPart = (name, part, chartOn, verse, up = 0) => {
     const lead = parseLine(part.lead, steps, song.id + " " + name);
     const bars = lead.length / steps;
     const chords = part.chords.split(/\s+/);
@@ -1007,8 +1274,9 @@ function build(song, diff = "hd") {
     // The melody, and the chart's first layer from it: the lane walks up and down with the pitch.
     let lane = L / 2 - 1, lastPitch = null, lastBeat = -9;
     for (let i = 0; i < lead.length; i++) {
-      const m = midiOf(lead[i]);
-      if (m == null) continue;
+      const m0 = midiOf(lead[i]);
+      if (m0 == null) continue;
+      const m = m0 + up;
       let len = 1;
       while (i + len < lead.length && lead[i + len] === "-") len++;
       const b = at + i / 2;
@@ -1020,24 +1288,49 @@ function build(song, diff = "hd") {
       const hold = !song.noHolds && len >= D.holdMin + (style.holds ? 0 : 1) ? (len - 1) / 2 : 0;
       tune.push({ b, lane, len: hold, mode });
     }
+    // The answer (call and response): a second line on the arp's voice in the lead's gaps. The band
+    // plays it and the filler may chart it; the melody's notes stay the chart's first layer.
+    if (part.answer) parseLine(part.answer, steps, song.id + " " + name + " answer").forEach((tok, i, line) => {
+      const m = midiOf(tok);
+      if (m == null) return;
+      let len = 1; while (line[i + len] === "-") len++;
+      ev.push({ b: at + i / 2, kind: "tone", inst: style.arp || "arp", midi: m + up, dur: len / 2 });
+      if (chartOn) spot(at + i / 2, mode, 3, burst, six);
+    });
+    // The region's verse, quietly, under a gym song's part (hint: "arp" or "bass"), in the song's key.
+    if (part.hint && regionOf(song)) {
+      const v = regionOf(song).verse, vl = parseLine(v.lead, steps, song.id + " hint"), shift = keyShift(v.key, song.key) + up;
+      for (let i = 0; i < bars * steps; i++) {
+        const m = midiOf(vl[i % vl.length]);
+        if (m == null) continue;
+        let len = 1; while (len < 8 && vl[(i + len) % vl.length] === "-") len++;
+        ev.push({ b: at + i / 2, kind: "tone", inst: part.hint === "bass" ? "hintbass" : "hint", midi: m + shift + (part.hint === "bass" ? -24 : 12), dur: len / 2 });
+      }
+    }
     // Chords: bass, stabs and arpeggios.
     for (let bar = 0; bar < bars; bar++) {
-      const [r, t, f] = chordOf(chords[bar % chords.length]), b0 = at + bar * song.bar, n = song.bar;
+      const [r, t, f] = chordOf(chords[bar % chords.length], up), b0 = at + bar * song.bar, n = song.bar;
       const bassNote = r - 12;
+      // The type styles' runs: sixteenth bass (Electric, Bug), half time (Ground), a walk (Dark).
+      if (style.bassRun === "sixteenths") for (let k = 0; k < n * 4; k++) ev.push({ b: b0 + k / 4, kind: "tone", inst: style.bass, midi: bassNote + (k % 8 === 6 ? 12 : 0), dur: 0.2 });
+      if (style.bassRun === "half") ev.push({ b: b0, kind: "tone", inst: style.bass, midi: bassNote - 12, dur: n - 0.3 }, { b: b0 + n / 2 + 1.5, kind: "tone", inst: style.bass, midi: bassNote - 5, dur: 0.4 });
+      if (style.bassRun === "walk") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: style.bass, midi: bassNote + [0, 3, 5, 7, 10, 7][k % 6], dur: 0.8 });
       if (style.bassRun === "eighths") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: style.bass, midi: bassNote, dur: 0.4 });
       if (style.bassRun === "rootfifth") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: style.bass, midi: k % 2 ? bassNote + 7 : bassNote, dur: 0.9 });
       if (style.bassRun === "octaves") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: style.bass, midi: bassNote + (k % 2 ? 12 : 0), dur: 0.35 });
       if (style.bassRun === "oneThree") for (let k = 0; k < n; k += 2) ev.push({ b: b0 + k, kind: "tone", inst: style.bass, midi: bassNote, dur: 1.6 });
-      if (style.stab) for (let k = 0; k < n; k += 2) for (const p of [r, t, f]) ev.push({ b: b0 + k, kind: "tone", inst: style.stab, midi: p + 12, dur: 0.45 });
+      if (style.stab) for (let k = 0; k < n; k += style.stabEvery || 2) for (const p of [r, t, f]) ev.push({ b: b0 + k, kind: "tone", inst: style.stab, midi: p + 12, dur: 0.45 });
       if (style.arp) {
-        const tones = [r, t, f, r + 12].map(p => p + 12);
-        const run = style.arpRun;
-        const per = run === "flow16" ? 4 : run === "up8" ? 2 : 1;
+        // The type styles add: fast16 (sixteenths straight up), wide (two octaves, airy), box (a music box
+        // up and down two octaves), sparse (one high note every two beats).
+        const run = style.arpRun, wide = run === "wide" || run === "box";
+        const tones = (wide ? [r, f, r + 12, t + 12, f + 12, r + 24] : [r, t, f, r + 12]).map(p => p + 12);
+        const per = run === "flow16" || run === "fast16" ? 4 : run === "up8" || wide ? 2 : run === "sparse" ? 0.5 : 1;
         for (let k = 0; k < n * per; k++) {
           if (run === "sway" && k % 2 === 0) continue;   // off-beats only
-          const idx = run === "flow16" ? [0, 1, 2, 3, 2, 1][k % 6] : k % 4;
+          const idx = run === "flow16" ? [0, 1, 2, 3, 2, 1][k % 6] : run === "box" ? [0, 1, 2, 3, 4, 5, 4, 3][k % 8] : wide ? k % 6 : run === "sparse" ? [3, 2][k % 2] : k % 4;
           const b = b0 + k / per;
-          ev.push({ b, kind: "tone", inst: style.arp, midi: tones[idx] + (run === "up8" ? 12 : 0), dur: 0.9 / per });
+          ev.push({ b, kind: "tone", inst: style.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per });
           if (chartOn) spot(b, mode, per === 4 && k % 2 ? 1 : 2, burst, six);
           // A burst part's arpeggio is the chart's speed run (drag notes on the line).
           if (chartOn && burst && run !== "sway" && k % (per === 4 ? 2 : 1) === 0)
@@ -1050,7 +1343,7 @@ function build(song, diff = "hd") {
         const stepsList = when === "all" ? [...Array(n * 2).keys()] : when === "off" ? [...Array(n).keys()].map(k => k * 2 + 1) : when === "16" ? [...Array(n * 4).keys()].map(k => k / 2) : when;
         for (const s of stepsList) if (s < n * 2) {
           ev.push({ b: b0 + s / 2, kind: "drum", hit });
-          if (chartOn) spot(b0 + s / 2, mode, "kKst".includes(hit) ? 3 : 1, burst, six);
+          if (chartOn) spot(b0 + s / 2, mode, "kKstbz".includes(hit) ? 3 : 1, burst, six);
         }
       }
       // A fill on the part's last bar.
@@ -1082,9 +1375,10 @@ function build(song, diff = "hd") {
   let verseAt = 0;
   for (const tok of tokens) {
     if (tok === "relic") {
-      const start = beat;
-      const sung = song.verse ? [song.verse] : song.final ? VERSES : [VERSES[song.gym]];
-      for (const v of sung) addPart("verse", v, false, true);
+      const start = beat, reg = regionOf(song);
+      // A hidden track sings its own; the finale all four; a region's boss its region's verse (in its key); Kanto's gym bosses their gym's.
+      const sung = song.verse ? [song.verse] : song.final ? VERSES : song.region && reg ? [reg.verse] : [VERSES[song.gym]];
+      for (const v of sung) addPart("verse", v, false, true, reg && v === reg.verse ? keyShift(v.key, song.key) : 0);
       segments.push({ from: start, to: beat, kind: "relic" });
       mode = "line"; form = "pirouette"; verseAt = beat;
       segments.push({ from: beat, mode, form });
@@ -1099,7 +1393,8 @@ function build(song, diff = "hd") {
       segments.push({ from: beat, mode, form });
       continue;
     }
-    addPart(tok, song.parts[tok], true, false);
+    const { name, up } = tokenOf(tok), p = song.parts[name];
+    addPart(name, partOf(song, name), true, false, up + (p.motif ? keyShift(regionOf(song).verse.key, song.key) : 0));
   }
 
   // ── Laying the chart ──
@@ -1203,6 +1498,14 @@ function build(song, diff = "hd") {
     ev.push({ b, kind: "tone", inst: lay.pluck, midi: bar.tones[Math.min(3, Math.floor(ns[0].lane * 4 / L))] + lay.octave, dur: Math.min(0.45, Math.max(0.1, next - b)) });
   });
   ev.sort((a, b) => a.b - b.b);
+  // Swing (a type style's, or the song's own): every off-beat eighth (or sixteenth) lands late, the
+  // notes on it too, so they stay on their sounds. A hold's tail moves with the step it ends on.
+  const sw = song.swing === undefined ? style.swing : song.swing;
+  if (sw && sw.amt) {
+    const g = sw.grid === 16 ? 0.5 : 1, late = b => { const k = Math.floor(b / g + 1e-9), f = b - k * g; return Math.abs(f - g / 2) < 1e-6 ? k * g + g / 2 + sw.amt * g / 6 : b; };
+    for (const e of ev) e.b = late(e.b);
+    for (const n of chart) { const tail = late(n.b + n.len); n.b = late(n.b); if (n.len) n.len = tail - n.b; }
+  }
   const end = beat;
   const B = { song, diff, ev, chart, segments, end, verseAt, lanes: L, spb, seconds: end * spb };
   choreograph(B, lineFor(song, diff, moved));
@@ -1388,13 +1691,95 @@ const floorAt = (fl, beat) => { if (beat <= 0) return beat; let p = fl[0]; for (
 function formFor(song, diff) {
   const tokens = song.form.split(/\s+/), r = tokens.indexOf("relic");
   if (r < 0 || (diff !== "in" && diff !== "at")) return { tokens, moved: 0 };
-  const beats = t => t === "flip" ? song.bar : t === "relic" ? 0 : song.parts[t].lead.split("|").length * song.bar;
+  const beats = t => t === "flip" ? song.bar : t === "relic" ? 0 : partOf(song, tokenOf(t).name).lead.split("|").length * song.bar;
   const total = tokens.reduce((n, t) => n + beats(t), 0);
   let j = r, best = Infinity;
   for (let k = 1, at = beats(tokens[0]); k <= r; at += beats(tokens[k]), k++) if (Math.abs(at - total / 3) < best) { best = Math.abs(at - total / 3); j = k; }
   const moved = tokens.slice(j, r).reduce((n, t) => n + beats(t), 0);
   return { tokens: [...tokens.slice(0, j), "relic", ...tokens.slice(j, r), ...tokens.slice(r + 1)], moved };
 }
+/* ── Line gimmicks: what a type's boss does with the moving line ─────────── */
+// A song with line: "auto" gets its script made here from its style's gimmicks (TYPE_STYLES[..].line;
+// a dual type's second type). Each gimmick can set where the line sits (base: a gimmick that turns
+// the line all the way round needs it near the middle and its notes slower, so they stay on screen),
+// add steps over each stretch the line is out (span), and steps for a bar (bar: the gimmicks with
+// one take turns, a bar each). EZ tames all of it the same way as a written script (lineFor), and
+// fair() and the readability rules hold for these as for any other.
+const LOW = { x: 640, y: 560, rot: 0, w: 0.8, speed: 1 }, MID = { x: 640, y: 440, rot: 0, w: 0.55, speed: 0.6 };
+const GIMMICKS = {
+  // Normal: hops on the half notes.
+  hop: { bar: b => [0, 2].flatMap(k => [{ at: b + k, len: 0.5, kind: "fly", dy: -34 }, { at: b + k + 0.5, len: 0.5, kind: "fly", dy: 34 }]) },
+  // Fire: it flickers somewhere new each bar, and jumps up mid-bar.
+  flicker: { bar: (b, i) => [{ at: b - 0.25, len: 0.5, kind: "teleport", x: [480, 800, 600, 720][i % 4] }, { at: b + 1, len: 0.16, kind: "snap", rot: i % 2 ? 8 : -8 }] },
+  jump: { bar: (b, i, n) => [{ at: b + n / 2, len: 0.25, kind: "snap", dy: -40 }, { at: b + n / 2 + 0.25, len: n / 2 - 0.5, kind: "fly", dy: 40, rot: 0 }] },
+  // Water: tide waves.
+  tide: { span: (from, to) => [{ at: from, len: to - from, kind: "tide", amp: 26, period: 8, tilt: 6 }] },
+  // Grass: it sways, and drifts across.
+  sway: { span: (from, to) => [{ at: from, len: to - from, kind: "drift", ampX: 150, period: 16, sway: 12, fall: 0 }] },
+  drift: { bar: (b, i, n) => i % 2 ? [] : [{ at: b, len: 2 * n, kind: "fly", x: [560, 720, 620, 680][(i / 2) % 4] }] },
+  // Electric: zaps (a snap and a flash on every chord) and teleports.
+  zap: { span: (from, to) => [{ at: from, len: to - from, kind: "flash", on: "chords" }],
+         bar: (b, i, n) => [{ at: b, len: 0.16, kind: "snap", rot: i % 2 ? -12 : 12 }, { at: b + n / 2, len: 0.16, kind: "snap", rot: i % 2 ? 12 : -12, dx: i % 2 ? -40 : 40 }] },
+  teleport: { jumps: true, bar: (b, i) => [{ at: b - 0.25, len: 0.5, kind: "teleport", x: [500, 780, 620, 700][i % 4], y: [560, 580, 545, 600][i % 4] }] },
+  // Ice: a long frictionless glide, then it freezes still for a bar.
+  glide: { bar: (b, i, n) => [{ at: b, len: n * 0.75, kind: "fly", x: i % 4 < 2 ? 460 : 820, rot: i % 4 < 2 ? -6 : 6 }] },
+  freeze: { bar: b => [{ at: b, kind: "flash" }] },
+  // Fighting: quick jabs out and back on beats 1 and 3.
+  jab: { bar: b => [0, 2].flatMap((k, j) => [{ at: b + k, len: 0.1, kind: "snap", dx: j ? -50 : 50 }, { at: b + k + 0.5, len: 0.4, kind: "fly", dx: j ? 50 : -50 }]) },
+  // Poison: it wobbles, and drips lower bar by bar, then pulls back up.
+  wobble: { span: (from, to) => [{ at: from, len: to - from, kind: "tide", amp: 8, period: 2, tilt: 7 }] },
+  drip: { bar: (b, i, n) => [i % 4 === 3 ? { at: b, len: n / 2, kind: "fly", y: 540 } : { at: b, len: n, kind: "fly", dy: 14 }] },
+  // Ground: slams down with a shake, and climbs back.
+  slam: { bar: (b, i, n) => [{ at: b, len: 0.08, kind: "snap", dy: 46 }, { at: b, kind: "shake" }, { at: b + 0.5, len: n - 1, kind: "fly", dy: -46 }] },
+  // Flying: a swooping arc out to one side and back.
+  swoop: { bar: (b, i, n) => [{ at: b, len: n / 2, kind: "fly", x: i % 2 ? 860 : 420, y: 590, rot: i % 2 ? 12 : -12 }, { at: b + n / 2, len: n / 2, kind: "fly", x: 640, y: 545, rot: 0 }] },
+  // Psychic: a twin, mirrored above the middle, upside down; notes go to each in turn.
+  twin: { still: true, span: (from, to, n) => [{ at: from, len: to - from, kind: "mirror", of: 0, cx: 640, cy: 380, line: 1 }, { at: from, kind: "width", w: 0.6, line: 1 },
+    { at: from, kind: "speed", to: 0.7, line: 1 }, { at: from, len: 2, kind: "fade", to: 1, line: 1 }, { at: from + 2 * n, len: to - from - 3 * n, kind: "notes", lines: [0, 1], by: "turn" },
+    { at: to - n, len: 2, kind: "fade", to: 0, line: 1 }] },
+  // Bug: it skitters, a zig-zag on every half beat.
+  skitter: { bar: (b, i, n) => every(b, b + n, 0.5, (k, j) => ({ at: k, len: 0.12, kind: "snap", dx: j % 2 ? -36 : 36, drot: j % 2 ? -5 : 5 })) },
+  // Rock: stomps.
+  stomp: { bar: (b, i, n) => [{ at: b, len: 0.3, kind: "snap", dy: 30 }, { at: b, kind: "shake" }, { at: b + 0.5, len: n - 1, kind: "fly", dy: -30 }] },
+  // Ghost: it fades into the dark and back.
+  fade: { bar: (b, i, n) => [{ at: b, len: 1, kind: "fade", to: 0.3 }, { at: b + n / 2, len: 1, kind: "fade", to: 1 }] },
+  // Dragon: twisters, a whole turn a bar, back the other way the next.
+  twister: { base: MID, bar: (b, i, n) => [{ at: b, len: n, kind: "spin", perBeat: (i % 2 ? -360 : 360) / n }] },
+  // Dark: snaps on the off-beats, and notes from both sides.
+  offbeat: { bar: b => [{ at: b + 0.5, len: 0.12, kind: "snap", rot: 10 }, { at: b + 2.5, len: 0.12, kind: "snap", rot: -10 }] },
+  sides: { base: MID, span: (from, to, n) => [{ at: from + n, len: to - from - 2 * n, kind: "sides" }] },
+  // Steel: precise quarter turns, a bar each.
+  quarter: { base: MID, bar: (b, i) => [{ at: b, len: 1, kind: "fly", rot: [0, 90, 0, -90][i % 4] }] },
+  // Fairy: a twirl, and soft bounces.
+  twirl: { base: MID, bar: b => [{ at: b, len: 3, kind: "spin", perBeat: 120 }] },
+  bounce: { bar: b => [0, 2].flatMap(k => [{ at: b + k, len: 0.5, kind: "fly", dy: -24 }, { at: b + k + 0.5, len: 0.5, kind: "fly", dy: 24 }]) }
+};
+// A song's line script from its style's gimmicks, over each stretch the line is out (the break to the end,
+// less any flips back to the highway, where the line lands flat a beat and a half early, as the finale's does).
+function autoLine(song) {
+  const n = song.bar, G = (styleOf(song.style).line || ["tide"]).map(k => GIMMICKS[k]).filter(Boolean);
+  const base = { ...LOW, ...((G.find(g => g.base) || {}).base || {}) }, bars = G.filter(g => g.bar), still = G.some(g => g.still);
+  const toks = song.form.split(/\s+/), size = t => t === "flip" ? n : partOf(song, tokenOf(t).name).lead.split("|").length * n;
+  const out = [], spans = [];
+  let at = 0, from = 0, onLine = true;
+  for (const t of toks.slice(toks.indexOf("relic") + 1)) {
+    if (t === "flip") { if (onLine) spans.push([from, at]); else from = at + n; onLine = !onLine; }
+    at += size(t);
+  }
+  if (onLine) spans.push([from, at]);
+  spans.forEach(([a, z], k) => {
+    out.push({ at: a, len: 2, kind: "fly", x: base.x, y: base.y, rot: base.rot }, { at: a, len: 2, kind: "width", w: base.w }, { at: a, kind: "speed", to: base.speed });
+    for (const g of G) if (g.span) out.push(...g.span(a + n, z, n));
+    // The gimmicks start on the span's second bar; a twin's span keeps teleports out (they'd jump it).
+    for (let b = a + n, i = 0; b < z - 1e-9; b += n, i++) {
+      const g = bars.filter(x => !(still && x.jumps))[i % Math.max(1, bars.filter(x => !(still && x.jumps)).length)];
+      if (g) out.push(...g.bar(b, i, n).filter(x => x.at < z));
+    }
+    if (k < spans.length - 1 || z < at) out.push({ at: z - 1.5, len: 1, kind: "fly", x: 640, y: 540, rot: 0 }, { at: z - 1.5, len: 1, kind: "width", w: 1 }, { at: z - 1.5, kind: "speed", to: 1 });
+  });
+  return out;
+}
+
 // The script a difficulty plays. HD plays it as written. EZ is tame: half the swing, slower, no
 // spins, flips, extra lines, speed changes or shakes, and snaps become short glides. IN and AT swing
 // and tilt wider and faster, and play the script's opening over the parts the break jumped ahead of.
@@ -1420,7 +1805,7 @@ function lineFor(song, diff, moved) {
   };
   const keep = g => g.diffs && !g.diffs.includes(diff) ? false : gentle ? g.ez !== false && !g.line && !["spin", "flip", "speed", "notes", "sides", "shake", "orbit"].includes(g.kind) && (!g.only || g.only === "ez")
     : hard ? g.only !== "ez" && g.hard !== false : !g.only;
-  let line = song.line.filter(keep).map(tune);
+  let line = (song.line === "auto" ? autoLine(song) : song.line).filter(keep).map(tune);
   if (moved) {
     // The moved parts come first: the script's opening (song.loop, or its first four bars) played
     // over and over on line 0, speeds and all, until the script itself starts.
@@ -1589,8 +1974,8 @@ const SKINS = [
   { id: "crown", name: "Crown", ok: () => storyCleared().y2, why: "Clear Year 2 of Poké Idle's Story Mode." }
 ];
 const skin = () => { const s = SKINS.find(k => k.id === opts.skin); return s && s.ok() ? s.id : "classic"; };
-function seg(box, value, set) {
-  for (const b of box.querySelectorAll("button")) { b.classList.toggle("on", b.dataset.v === String(value)); b.onclick = () => { set(b.dataset.v); drawOpts(); }; }
+function seg(box, value, set, redraw = drawOpts) {
+  for (const b of box.querySelectorAll("button")) { b.classList.toggle("on", b.dataset.v === String(value)); b.onclick = () => { set(b.dataset.v); redraw(); }; }
 }
 function drawOpts() {
   $("#opts").hidden = false;
@@ -1662,6 +2047,62 @@ $("#b-opts").onclick = drawOpts;
 $("#b-lesson").onclick = () => lessonCard(0);
 $("#o-lesson").onclick = () => { $("#opts").hidden = true; drawMap(); lessonCard(0); };
 $("#o-bosscard").onclick = () => bossCard(null);
+$("#o-sound-test").onclick = () => { $("#sound").hidden = false; drawSound(); };
+
+/* ── The sound test ────────────────────────────────────────────────────── */
+// Every song that's open (hidden tracks once found; everything in test mode) and the 18 type styles'
+// demos, music only, on the same synth and clock a song plays on. The arrangement is the difficulty
+// whose band plays (IN and AT add layers); a song without it plays the nearest one it has.
+let juke = null, jukeDiff = "hd";
+const jukeArrangement = song => { const order = ["ez", "hd", "in", "at"], want = order.indexOf(jukeDiff); return song.diffs.filter(d => order.indexOf(d) <= want).pop() || song.diffs[0]; };
+function jukePlay(song) {
+  jukeStop();
+  const c = audio(); c.resume();
+  const B = built(song, jukeArrangement(song));
+  juke = { song, B, i: 0, t0: c.currentTime + 0.15, timer: 0 };
+  const tick = () => {
+    if (!juke) return;
+    const horizon = c.currentTime + 0.3;
+    for (; juke.i < B.ev.length; juke.i++) {
+      const e = B.ev[juke.i], when = juke.t0 + e.b * B.spb;
+      if (when > horizon) break;
+      if (when < c.currentTime - 0.02) continue;
+      if (e.kind === "tone") tone(e.inst, e.midi, when, e.dur * B.spb * 0.95); else DRUMS[e.hit](when);
+    }
+    const at = c.currentTime - juke.t0;
+    $("#st-now").textContent = "Playing " + song.title + " (" + DIFF_NAME[B.diff] + ") · " + clock(Math.max(0, at)) + " / " + clock(B.seconds);
+    if (at > B.seconds + 1.5) { jukeStop(); drawSound(); return; }
+    juke.timer = setTimeout(tick, 60);
+  };
+  tick();
+  drawSound();
+}
+function jukeStop() {
+  if (!juke) return;
+  clearTimeout(juke.timer); juke = null;
+  cut();
+  $("#st-now").textContent = "Stopped.";
+}
+function drawSound() {
+  seg($("#st-diff"), jukeDiff, v => { jukeDiff = v; if (juke) jukePlay(juke.song); }, drawSound);
+  const list = $("#st-list"); list.replaceChildren();
+  const head = text => { const r = el("tr", "head"); const td = el("td", "", text); td.colSpan = 5; r.append(td); list.append(r); };
+  const row = song => {
+    const r = el("tr", juke && juke.song === song ? "on" : ""), b = el("button", "play", juke && juke.song === song ? "Stop" : "Play");
+    b.type = "button"; b.onclick = () => { if (juke && juke.song === song) { jukeStop(); drawSound(); } else jukePlay(song); };
+    const td = el("td"); td.append(b);
+    r.append(el("td", "", song.title), el("td", "dim", typeOf(song) || "-"), el("td", "dim", song.bpm + " BPM"), el("td", "dim", clock(built(song, jukeArrangement(song)).seconds)), td);
+    list.append(r);
+  };
+  head("Kanto");
+  for (const s of SONGS.filter(s => !s.hidden && open(s))) row(s);
+  const found = SONGS.filter(s => s.hidden && hiddenOpen(s));
+  if (found.length) { head("Hidden tracks"); found.forEach(row); }
+  head("Type styles (demos)");
+  DEMOS().forEach(row);
+}
+$("#st-stop").onclick = () => { jukeStop(); drawSound(); };
+$("#st-close").onclick = () => { jukeStop(); $("#sound").hidden = true; };
 $("#o-tips").onclick = e => { opts.tips = {}; keepOpts(); e.currentTarget.textContent = "Tips reset"; };
 $("#o-close").onclick = () => { $("#opts").hidden = true; drawMap(); };
 $("#o-cal").onclick = calibrate;
@@ -1752,7 +2193,7 @@ function bossOf(song) {
 
 // The backdrop: a sprite, huge and blurred, and a tint. Aria green-teal, Pirouette orange-brown, or a gym's type.
 const TINT = { aria: "#1d9a86", pirouette: "#c4652b", Rock: "#8c6f45", Water: "#2a62b4", Electric: "#c4a31c", Grass: "#3f8c3c",
-  dark: "#5b3f8f", plain: "#3d6a98", snake: "#4f7d3a" };
+  dark: "#5b3f8f", dealer: "#5b3f8f", plain: "#3d6a98", snake: "#4f7d3a" };
 const TYPE_COLOR = { Normal: "#c6c6a7", Fire: "#f08030", Water: "#6890f0", Grass: "#78c850", Electric: "#f8d030", Ice: "#98d8d8",
   Fighting: "#d0503a", Poison: "#a040a0", Ground: "#e0c068", Flying: "#a890f0", Psychic: "#f85888", Bug: "#a8b820", Rock: "#b8a038",
   Ghost: "#8a70b8", Dragon: "#7c5cf8", Dark: "#8a7060", Steel: "#b8b8d0", Fairy: "#ee99ac" };
@@ -2140,7 +2581,10 @@ function stop() {
   P.done = true;
   clearTimeout(P.timer);
   cancelAnimationFrame(P.raf);
-  // Cut whatever is still sounding: a fresh master for the next song.
+  cut();
+}
+// Cut whatever is still sounding: a fresh master for the next song.
+function cut() {
   try { master.disconnect(); } catch {}
   master = ctx.createGain(); master.connect(ctx.destination); setVolume();
   if (ctx.state === "suspended") ctx.resume();
@@ -2148,11 +2592,22 @@ function stop() {
 function retry() { const s = P && P.song, d = P && P.B.diff, g = P && P.given; stop(); if (s) start(s, d, g); }
 
 /* ── Results, coins and the board ──────────────────────────────────────── */
-const clearPayOf = B => PAY.clear[B.diff];
-// What the hub needs to pay and top up: the table, and which songs are bosses.
-const payTable = () => ({ table: PAY, bosses: Object.fromEntries(SONGS.filter(s => s.boss && !s.final).map(s => [s.id, s.gym])), final: (SONGS.find(s => s.final) || {}).id });
-// Everything a full save pays: every chart's clear and S, the four badges and the finale.
-const fullPay = () => SONGS.reduce((t, s) => t + s.diffs.reduce((u, d) => u + PAY.clear[d] + ["b", "a", "s"].reduce((v, r) => v + Math.round(PAY.rank[r] * PAY.mult[d]), 0), 0), 0) + 4 * PAY.badge + PAY.finale;
+const clearPayOf = B => clearPay(B.level);
+// What the hub needs to pay: every chart's amounts by its level, the bonuses, and which songs are
+// bosses, champions and the finale. topUp: false, so nothing already in the ledger pays again.
+let payCache = null;
+function payTable() {
+  if (!payCache) payCache = {
+    table: { charts: Object.fromEntries(SONGS.flatMap(s => s.diffs.map(d => { const lv = levelOf(s, d); return [s.id + ":" + d, { clear: clearPay(lv), a: rankPay(lv, d, "a"), s: rankPay(lv, d, "s") }]; }))),
+      badge: PAY.badge, champion: PAY.champion, finale: PAY.finale, lesson: PAY.lesson, topUp: false },
+    bosses: Object.fromEntries(SONGS.filter(s => s.boss && !s.final && !s.champion).map(s => [s.id, s.gym])), final: (SONGS.find(s => s.final) || {}).id,
+    champions: Object.fromEntries(SONGS.filter(s => s.champion).map(s => [s.id, s.region]))
+  };
+  return payCache;
+}
+// Everything a full save pays: every chart's clear and ranks, the badges, champions, the finale and the lesson.
+const fullPay = () => { const t = payTable(); return Object.values(t.table.charts).reduce((n, c) => n + c.clear + c.a + c.s, 0)
+  + Object.keys(t.bosses).length * PAY.badge + Object.keys(t.champions).length * PAY.champion + PAY.finale + PAY.lesson; };
 function finish(reachedEnd) {
   if (P.finished) return;
   P.finished = true;
@@ -2208,11 +2663,11 @@ function showResult({ song, diff, s, rank, won, why }) {
   // Coins: the first clear, then each new rank step. The hub's ledger makes every one pay once.
   if (G) {
     let paid = null;
-    try { paid = G.pay({ song: song.id, diff: diff, rank: rank.toLowerCase(), badge: song.boss && !song.final ? song.gym : null, finale: !!song.final, ...payTable() }); }
+    try { paid = G.pay({ song: song.id, diff: diff, rank: rank.toLowerCase(), badge: song.boss && !song.final && !song.champion ? song.gym : null, champion: song.champion ? song.region : null, finale: !!song.final, ...payTable() }); }
     catch (error) { console.log("Relic Song: no payout.", error && error.message); }
     if (paid && paid.ok && paid.paid.total > 0) {
       const p = paid.paid;
-      $("#r-pay").textContent = "+" + fmt(p.total) + " coins (" + [p.clear && "first clear " + p.clear, p.rank && "rank up " + p.rank, p.badge && "badge " + p.badge,
+      $("#r-pay").textContent = "+" + fmt(p.total) + " coins (" + [p.clear && "first clear " + p.clear, p.rank && "rank up " + p.rank, p.badge && "badge " + p.badge, p.champion && "champion " + p.champion,
         p.finale && "finale " + p.finale, p.top && "back pay " + p.top].filter(Boolean).join(", ") + "). You have " + fmt(paid.coins) + ".";
     }
     else $("#r-pay").textContent = "No coins this time: this song and rank have already paid.";
@@ -2362,6 +2817,7 @@ addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
+  if (!$("#sound").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#st-close").click(); } return; }
   // The boss card and the lesson's text boxes: Enter (or Space) goes on, Esc skips the lesson.
   if (!$("#bosscard").hidden) { if (e.key === "Enter" || e.key === " " || e.key === "Escape") { e.preventDefault(); $("#bc-go").click(); } return; }
   if (!$("#lesson").hidden) {
@@ -2409,12 +2865,14 @@ window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Obj
 // For the console and tests: every song's length, note count and payout.
 window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
   opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; },
+  // The template: styles, demos, the recipe check and the pay table (scripts/relic-song-table.mjs reads these).
+  TYPE_STYLES, SCALES, GIMMICKS, REGIONS, RECIPE, DEMOS, autoLine, keyShift, finalVerses, recipeCheck, regionCheck, roleOf, typeOf, clearPay, rankPay, payTable,
   songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length, clearPay: clearPayOf(b) }; }),
   // Every chart: lanes, notes, length, level and what the level was measured from.
   // For tests: render a stretch of a chart's music offline (no speakers) and measure it: the peak, the
   // loudness (RMS) and the share of samples that clip.
   render: async (id, diff, from = 0, secs = 8) => {
-    const song = SONGS.find(s => s.id === id), B = built(song, diff), live = [ctx, master, noiseBuf, { ...waves }];
+    const song = SONGS.concat(DEMOS()).find(s => s.id === id), B = built(song, diff), live = [ctx, master, noiseBuf, { ...waves }];
     const off = new OfflineAudioContext(1, Math.round(44100 * secs), 44100);
     ctx = off; master = off.createGain(); master.gain.value = 0.32 * 0.7; master.connect(off.destination); voices(off);
     try {
@@ -2426,7 +2884,7 @@ window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s
     } finally { [ctx, master, noiseBuf] = live; Object.assign(waves, live[3]); }
   },
   charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
-    seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), ...b.stats }; })) };
+    seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), rankPay: rankPay(b.level, d, "a") + rankPay(b.level, d, "s"), ...b.stats }; })) };
 }
 </script>
 </body>
