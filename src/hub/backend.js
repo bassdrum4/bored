@@ -325,12 +325,6 @@ export async function ensureProfile(preferred) {
   return handle;
 }
 
-export async function renameHandle(name) {
-  if (!(await freshSession())) throw new Error('Sign in again first.');
-  handle = await claimHandle(name, false);
-  return handle;
-}
-
 export function authErrorMessage(err) {
   const message = String(err?.message || err);
   if (/invalid login credentials/i.test(message)) return 'Wrong email or password.';

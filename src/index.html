@@ -275,7 +275,7 @@ try {
     <p id="auth-blurb">Save your scores so they follow you around, and see who is beating you.</p>
     <label id="auth-email-row">Email<input id="auth-email" type="email" autocomplete="email" required></label>
     <label id="auth-pass-row">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label>
-    <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required></label>
+    <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required aria-describedby="auth-name-note"><small id="auth-name-note">Your name cannot be changed after creating your account.</small></label>
     <label id="auth-invite-row" hidden>Invite code (optional)<input id="auth-invite" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="123"></label>
     <p id="auth-message" role="status" aria-live="polite"></p>
     <div class="dialog-actions">
