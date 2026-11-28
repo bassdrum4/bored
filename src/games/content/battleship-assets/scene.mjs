@@ -14,8 +14,8 @@ function turn(a, b, t) {
 const host = $('scene');
 const flashEl = $('cineFlash');
 const scene = new T.Scene();
-scene.background = new T.Color(0x9db8c2);
-scene.fog = new T.FogExp2(0x9db8c2, .0036);
+scene.background = new T.Color(0x92a0a2);
+scene.fog = new T.FogExp2(0x92a0a2, .0031);
 const camera = new T.PerspectiveCamera(44, innerWidth / innerHeight, .1, 1800);
 const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
@@ -31,25 +31,82 @@ function setRatio(r) {
 }
 renderer.setPixelRatio(pixelRatio);
 renderer.toneMapping = T.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.04;
+renderer.toneMappingExposure = 1.02;
 host.appendChild(renderer.domElement);
 $('error')?.remove();
 
-const sun = new T.DirectionalLight(0xffe0a3, 2.2);
-sun.position.set(-80, 45, -35);
-// Fill from the camera side so ships never read as flat silhouettes against the glare.
-const fill = new T.DirectionalLight(0xcfe2ea, .95);
+// Late sun off the port bow: a warm key raking across the water, cool sky fill, and a
+// glitter path running out to the horizon behind the enemy grid.
+const sun = new T.DirectionalLight(0xffbe78, 2.4);
+sun.position.set(-104, 40, -166);
+const fill = new T.DirectionalLight(0x9fc2d6, .62);
 fill.position.set(70, 34, 95);
-scene.add(sun, fill, new T.HemisphereLight(0xdcefff, 0x233b4a, 1.2));
+scene.add(sun, fill, new T.HemisphereLight(0xb9d2df, 0x1a2b34, 1.0));
 
-const sky = new T.Mesh(new T.SphereGeometry(700, 32, 20), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, uniforms: {}, vertexShader: `varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`, fragmentShader: `varying vec3 p;void main(){vec3 d=normalize(p);float h=max(d.y,0.);vec3 c=mix(vec3(.72,.79,.77),vec3(.19,.37,.52),pow(h,.45));vec2 uv=d.xz/(h+.22);float cl=sin(uv.x*4.+sin(uv.y*3.))*cos(uv.y*3.1+sin(uv.x*2.3));cl+=.42*sin(uv.x*9.2+uv.y*4.6)+.18*cos(uv.y*22.-uv.x*9.);c=mix(c,vec3(.87,.88,.83),smoothstep(.48,1.05,cl)*smoothstep(.03,.3,h)*.65);float s=pow(max(dot(d,normalize(vec3(-.8,.35,-.4))),0.),100.);c+=vec3(1.,.7,.35)*s;gl_FragColor=vec4(c,1.);}` }));
+const sky = new T.Mesh(new T.SphereGeometry(700, 32, 20), new T.ShaderMaterial({
+  side: T.BackSide, depthWrite: false, uniforms: { time: { value: 0 } },
+  vertexShader: `varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader: `
+uniform float time;varying vec3 p;
+void main(){
+  vec3 d=normalize(p);
+  float h=max(d.y,0.);
+  // Deep steel overhead falling to warm dust at the waterline.
+  vec3 c=mix(vec3(.58,.52,.46),vec3(.08,.17,.25),pow(h,.42));
+  vec3 sd=normalize(vec3(-.52,.20,-.83));
+  float s=max(dot(d,sd),0.);
+  c+=vec3(1.,.55,.22)*pow(s,6.)*.34;
+  c+=vec3(1.,.84,.56)*pow(s,60.)*1.1;
+  c+=vec3(1.,.96,.84)*pow(s,4000.)*2.4;
+  // Cloud banks drifting east, lit from underneath by the low sun.
+  vec2 uv=d.xz/(h+.17);
+  float cl=sin(uv.x*2.1+sin(uv.y*1.5+time*.06)*1.3+time*.04)*cos(uv.y*1.8-time*.03);
+  cl+=.5*sin(uv.x*5.3-uv.y*2.9+time*.05)+.2*cos(uv.y*11.+uv.x*4.);
+  float band=smoothstep(.3,1.,cl)*smoothstep(.015,.19,h);
+  band*=1.-smoothstep(.72,1.,h)*.55;
+  vec3 cloud=mix(vec3(.30,.32,.34),vec3(.98,.86,.72),smoothstep(.1,.75,s));
+  c=mix(c,cloud,band*.55);
+  gl_FragColor=vec4(c,1.);
+}`
+}));
 scene.add(sky);
 
-const sea = new T.Mesh(new T.PlaneGeometry(1600, 1600, 220, 220), new T.ShaderMaterial({ uniforms: { time: { value: 0 } }, vertexShader: `uniform float time;varying vec3 w;void main(){vec3 p=position;p.z=.45*sin(p.x*.18+time*1.2)+.24*cos(p.y*.32-time*.9)+.12*sin((p.x+p.y)*.7+time);w=(modelMatrix*vec4(p,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}`, fragmentShader: `uniform float time;varying vec3 w;void main(){float d=length(cameraPosition.xz-w.xz);float near=1.-smoothstep(35.,260.,d);float a=sin(w.x*.18+time*1.2), b=cos(w.z*.32+time*.9), c0=sin((w.x-w.z)*.7+time);float s1=sin(dot(w.xz,vec2(1.7,-1.1))+time*1.7);float s2=sin(dot(w.xz,vec2(-3.3,2.6))-time*2.3);float s3=sin(dot(w.xz,vec2(2.9,3.4))+time*2.1);float s4=sin(dot(w.xz,vec2(-5.2,-4.1))+time*3.1);vec3 n=normalize(vec3(-.081*cos(w.x*.18+time*1.2)-.084*c0-.016*s1*near-.008*s2*near-.005*s4*near,1.,.077*sin(w.z*.32+time*.9)+.084*c0+.015*s3*near+.007*s4*near));vec3 v=normalize(cameraPosition-w);float f=pow(1.-max(dot(n,v),0.),3.);float spec=pow(max(dot(reflect(-normalize(vec3(-.8,.55,-.4)),n),v),0.),26.);vec3 c=mix(vec3(.018,.18,.24),vec3(.47,.62,.65),f)+vec3(.8,.66,.41)*spec*.5;float foam=smoothstep(.95,1.,a*.65+b*.35)*.1;c+=foam+s1*.003*near;c=mix(c,vec3(.6,.68,.71),clamp((1.-exp(-d*.004))*.8+smoothstep(50.,300.,d)*.55,0.,.95));gl_FragColor=vec4(c,1.);}` }));
+const sea = new T.Mesh(new T.PlaneGeometry(1600, 1600, 220, 220), new T.ShaderMaterial({ uniforms: { time: { value: 0 } }, vertexShader: `uniform float time;varying vec3 w;void main(){vec3 p=position;p.z=.45*sin(p.x*.18+time*1.2)+.24*cos(p.y*.32-time*.9)+.06*sin((p.x+p.y)*.7+time);w=(modelMatrix*vec4(p,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}`, fragmentShader: `
+uniform float time;varying vec3 w;
+void main(){
+  float d=length(cameraPosition.xz-w.xz);
+  float near=1.-smoothstep(30.,300.,d);
+  float a=sin(w.x*.18+time*1.2), b=cos(w.z*.32-time*.9), c0=sin((w.x-w.z)*.7+time);
+  float s1=sin(dot(w.xz,vec2(1.7,-1.1))+time*1.7);
+  float s2=sin(dot(w.xz,vec2(-3.3,2.6))-time*2.3);
+  float s3=sin(dot(w.xz,vec2(2.9,3.4))+time*2.1);
+  float s4=sin(dot(w.xz,vec2(-5.2,-4.1))-time*3.1);
+  // Chop only where it can be seen; the far sea stays glassy so the glitter path reads.
+  vec3 n=normalize(vec3(-.081*cos(w.x*.18+time*1.2)-.045*c0-.028*s1*near-.014*s2*near-.009*s4*near,1.,.077*sin(w.z*.32+time*.9)+.045*c0+.026*s3*near+.013*s4*near));
+  vec3 v=normalize(cameraPosition-w);
+  vec3 sd=normalize(vec3(-.52,.20,-.83));
+  vec3 hv=normalize(sd+v);
+  float fres=pow(1.-max(dot(n,v),0.),3.);
+  float glint=pow(max(dot(n,hv),0.),150.);
+  float sheen=pow(max(dot(n,hv),0.),12.);
+  // Sea stays sea: cool reflection everywhere, warm light only in the sun path.
+  vec3 c=mix(vec3(.016,.09,.115),mix(vec3(.26,.36,.40),vec3(.38,.38,.36),smoothstep(40.,340.,d)),fres*.9);
+  // Twinkle the path so it breaks into points of light instead of one flat sheen.
+  float tw=.72+.28*sin(w.x*.42+time*1.3)*sin(w.z*.37-time*1.1);
+  // A long road of light laid toward the sun, the way low sunlight sits on a swell.
+  float path=pow(max(dot(normalize(cameraPosition.xz-w.xz),normalize(-sd.xz)),0.),26.);
+  float reach=smoothstep(12.,240.,d);
+  c+=vec3(1.,.76,.48)*(glint*1.5*tw+sheen*.06+path*reach*(.045+.1*tw));
+  c+=smoothstep(.96,1.,a*.65+b*.35)*.07;
+  // Cloud shadows drift across the swell.
+  c*=1.-smoothstep(.1,.9,sin(w.x*.012+time*.05)*cos(w.z*.014-time*.04))*.1;
+  c=mix(c,vec3(.38,.44,.46),clamp((1.-exp(-d*.0032))*.38+smoothstep(90.,380.,d)*.34,0.,.72));
+  gl_FragColor=vec4(c,1.);
+}` }));
 sea.rotation.x = -Math.PI / 2;
 scene.add(sea);
 // Flat ocean out to the horizon so the detailed swell never ends inside the frame.
-const farSea = new T.Mesh(new T.PlaneGeometry(9000, 9000), new T.MeshBasicMaterial({ color: 0x31596a }));
+const farSea = new T.Mesh(new T.PlaneGeometry(9000, 9000), new T.MeshBasicMaterial({ color: 0x2b4e58 }));
 farSea.rotation.x = -Math.PI / 2;
 farSea.position.y = -1.25;
 scene.add(farSea);
@@ -139,6 +196,9 @@ let turnAim = false, aimYaw = null, aimRoom = false, holdPose = null;
 const aimPos = new T.Vector3(), aimFocus = new T.Vector3();
 const particles = [], billows = [], rings = [], flashes = [], scorches = [], burns = [];
 const burnPulse = { at: 0, index: 0 };
+// Delayed beats inside a shot (a plume that keeps building, a wave that keeps running).
+const later = [];
+function after(sec, fn) { later.push({ at: elapsed + sec, fn }) }
 
 function pos(i) { return new T.Vector3(originX + (i % 10) * cell, .7, originZ + Math.floor(i / 10) * cell) }
 
@@ -222,7 +282,7 @@ fxctx.fillStyle = grad; fxctx.fillRect(0, 0, 128, 128);
 const puffTexture = new T.CanvasTexture(fxCanvas);
 let atlasTexture = null;
 
-const flashLight = new T.PointLight(0xffb066, 0, 110, 2);
+const flashLight = new T.PointLight(0xffa45c, 0, 150, 2);
 scene.add(flashLight);
 
 function puff(at, opts = {}) {
@@ -247,43 +307,87 @@ function puff(at, opts = {}) {
 
 function sparks(at, amount = 70, hot = true, speed = 1) {
   for (let i = 0; i < amount; i++) {
-    const color = hot ? (i % 3 === 0 ? 0xffd27b : i % 3 === 1 ? 0xe66c31 : 0x38434a) : (i % 3 ? 0xc7e8ee : 0xffffff);
+    const color = hot ? (i % 3 === 0 ? 0xffd27b : i % 3 === 1 ? 0xe66c31 : 0x4c545a) : (i % 3 ? 0xc7e8ee : 0xffffff);
     const m = new T.Mesh(particleGeo, new T.MeshBasicMaterial({ color, transparent: true, opacity: .95 }));
     m.position.copy(at);
-    m.scale.setScalar(.12 + Math.random() * .34);
+    m.scale.setScalar(.08 + Math.random() * .2);
     scene.add(m);
     const a = Math.random() * Math.PI * 2, r = Math.random() * (hot ? 10 : 5) * speed;
     particles.push({ mesh: m, v: new T.Vector3(Math.cos(a) * r, 3 + Math.random() * (hot ? 12 : 22) * speed, Math.sin(a) * r), life: 1.2 + Math.random() * 1.4, max: 2.6, gravity: hot ? 7 : 16 });
   }
 }
 
-function ring(at, color = 0xffa962, from = 2, to = 16, life = .9, y = .9) {
-  const material = new T.MeshBasicMaterial({ color, transparent: true, opacity: .85, side: T.DoubleSide, depthWrite: false });
+function ring(at, color = 0xffa962, from = 2, to = 16, life = .9, y = .9, opacity = .85) {
+  const material = new T.MeshBasicMaterial({ color, transparent: true, opacity, side: T.DoubleSide, depthWrite: false });
   const mesh = new T.Mesh(new T.RingGeometry(.94, 1, 48), material);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.copy(at); mesh.position.y = y;
   scene.add(mesh);
-  rings.push({ mesh, t: 0, life, from, to });
+  rings.push({ mesh, t: 0, life, from, to, opacity });
+}
+
+// The hit is layered like a real one: a white-hot core, a rolling orange fireball,
+// embers that cool as they fall, then a plume that keeps climbing after the flash is gone.
+function fireball(at) {
+  const tones = [0xfff6dc, 0xffb45e, 0xd3601f];
+  for (let i = 0; i < 3; i++) {
+    const s = new T.Sprite(new T.SpriteMaterial({ map: puffTexture, color: tones[i], transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .95 }));
+    s.position.copy(at).add(new T.Vector3(0, .5 + i * .7, 0));
+    s.scale.setScalar(3 + i * 2.4);
+    scene.add(s);
+    flashes.push({ sprite: s, t: 0, life: .22 + i * .16, size: 8 + i * 6, alpha: [1, .8, .5][i], grow: 1.7 });
+  }
+}
+function embers(at, amount = 28) {
+  for (let i = 0; i < amount; i++) {
+    const m = new T.Sprite(new T.SpriteMaterial({ map: puffTexture, color: i % 3 ? 0xffb066 : 0xffd9a0, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .9 }));
+    m.position.copy(at).add(new T.Vector3((Math.random() - .5) * 5, Math.random() * 3, (Math.random() - .5) * 5));
+    m.scale.setScalar(.3 + Math.random() * .5);
+    scene.add(m);
+    const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * 13;
+    particles.push({ mesh: m, v: new T.Vector3(Math.cos(a) * r, 8 + Math.random() * 16, Math.sin(a) * r), life: 1.5 + Math.random() * 1.6, max: 3.1, gravity: -1.4 });
+  }
+}
+// A pale disc left on the surface after a near miss, spreading and thinning out.
+function foam(at, size = 8, life = 2.6) {
+  const m = new T.Mesh(new T.CircleGeometry(1, 28), new T.MeshBasicMaterial({ color: 0xd8edf0, transparent: true, opacity: .22, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.copy(at).setY(.92);
+  scene.add(m);
+  rings.push({ mesh: m, t: 0, life, from: size * .45, to: size, opacity: .22 });
+}
+// A fire that outlives the shot, so a burning hit reads from the board too.
+function fireGlow(at) {
+  const s = new T.Sprite(new T.SpriteMaterial({ map: puffTexture, color: 0xff9848, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .4 }));
+  s.position.copy(at);
+  s.scale.setScalar(2.6);
+  scene.add(s);
+  return s;
 }
 
 function explode(at) {
-  sparks(at, 80, true);
-  debris(at, 12);
-  waterColumn(at.clone().setY(.3), .7);
-  for (let j = 0; j < 14; j++) puff(at, { atlas: atlasTexture && j < 8, frame: j, color: j < 8 ? 0xffac55 : 0x4a5359, hit: true, additive: j < 8, size: j < 8 ? 4 : 3, life: 1.5 + j * .14, rise: 3 + Math.random() * 5, gravity: 1.2, grow: 2.4 });
-  ring(at, 0xffb070, 2, 30, 1.1);
-  ring(at, 0xffe6bb, 1, 12, .45, 1.1);
-  flashLight.position.copy(at).setY(4);
-  flashLight.intensity = 260;
-  shake = .55;
+  sparks(at, 70, true);
+  embers(at, 30);
+  debris(at, 10);
+  fireball(at);
+  after(.03, () => waterColumn(at.clone().setY(.3), 1.25));
+  for (let j = 0; j < 16; j++) puff(at, { atlas: atlasTexture && j < 8, frame: j, color: j < 8 ? 0xffac55 : 0x4a5359, hit: true, additive: j < 8, size: j < 8 ? 4 : 3, life: 1.5 + j * .16, rise: 3 + Math.random() * 5, gravity: 1.2, grow: 2.4 });
+  flashLight.position.copy(at).setY(5);
+  flashLight.intensity = 420;
+  shake = .7;
+  after(.16, () => {
+    for (let j = 0; j < 9; j++) puff(at, { color: j < 3 ? 0x8f5a34 : 0x39434a, size: 3.4, life: 2.6 + Math.random() * 1.4, rise: 4 + Math.random() * 5, spread: 2.4, gravity: -.5, grow: 2.8, opacity: .34 });
+  });
 }
 
 function splash(at) {
+  sparks(at, 48, false, 1);
   for (let j = 0; j < 18; j++) puff(at, { color: j % 4 ? 0xdff2f7 : 0xffffff, additive: j % 2 === 0, size: 1.2, life: .85 + Math.random() * .55, rise: 15 + Math.random() * 12, spread: 1.8, gravity: 16, grow: .9, opacity: .5 });
-  waterColumn(at, 1);
+  waterColumn(at, 1.2);
+  foam(at, 11, 3);
   ring(at, 0xbfe4ec, 2, 16, .9);
   ring(at, 0xe8fbff, 1, 6, .45, 1.05);
-  shake = .18;
+  shake = .22;
 }
 
 // Debris: plates and frames thrown off the hull, spinning until they hit the water.
@@ -293,12 +397,12 @@ function debris(at, amount = 10) {
   for (let i = 0; i < amount; i++) {
     const m = new T.Mesh(debrisGeo, debrisMats[i % 2]);
     m.position.copy(at).add(new T.Vector3((Math.random() - .5) * 3, Math.random() * 2, (Math.random() - .5) * 3));
-    m.scale.set(.3 + Math.random() * .8, .1 + Math.random() * .26, .45 + Math.random() * 1.6);
+    m.scale.set(.2 + Math.random() * .5, .07 + Math.random() * .14, .3 + Math.random() * .7);
     m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
     scene.add(m);
-    const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 20;
+    const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 24;
     particles.push({
-      mesh: m, shared: true, splash: true, life: 1.8 + Math.random() * 1.6, max: 3.4, gravity: 24,
+      mesh: m, shared: true, splash: true, life: 1.8 + Math.random() * 1.6, max: 3.4, gravity: 26,
       v: new T.Vector3(Math.cos(a) * r, 9 + Math.random() * 19, Math.sin(a) * r),
       spin: new T.Vector3((Math.random() - .5) * 14, (Math.random() - .5) * 14, (Math.random() - .5) * 14)
     });
@@ -312,7 +416,7 @@ function waterColumn(at, power = 1) {
     puff(at.clone().add(new T.Vector3(Math.cos(a) * r, .2, Math.sin(a) * r)), {
       color: j % 4 ? 0xe4f6fa : 0xffffff, additive: j < 4, opacity: .46,
       size: (1.6 + Math.random() * 1.6) * power, life: 1.15 + Math.random() * .7,
-      rise: 18 + Math.random() * 14, spread: 5, gravity: 24, grow: 1.7, sx: 1.5, sy: 3.6
+      rise: 24 + Math.random() * 16, spread: 5, gravity: 22, grow: 1.7, sx: 1.5, sy: 4.2
     })
   }
 }
@@ -347,13 +451,13 @@ function updateFx(dt) {
   for (let i = rings.length - 1; i >= 0; i--) {
     const r = rings[i]; r.t += dt; const u = clamp(r.t / r.life, 0, 1);
     r.mesh.scale.setScalar(r.from + (r.to - r.from) * u);
-    r.mesh.material.opacity = (1 - u) * .55;
+    r.mesh.material.opacity = (1 - u) * (r.opacity ?? .55);
     if (u >= 1) { scene.remove(r.mesh); r.mesh.material.dispose(); r.mesh.geometry.dispose(); rings.splice(i, 1) }
   }
   for (let i = flashes.length - 1; i >= 0; i--) {
     const f = flashes[i]; f.t += dt; const u = f.t / f.life;
     f.sprite.material.opacity = (1 - u) * (f.alpha ?? .9);
-    f.sprite.scale.setScalar(f.size * (.4 + u * 1.6));
+    f.sprite.scale.setScalar(f.size * (.4 + u * (f.grow ?? 1.6)));
     if (u >= 1) { scene.remove(f.sprite); f.sprite.material.dispose(); flashes.splice(i, 1) }
   }
   flashLight.intensity *= Math.exp(-dt * 4.5);
@@ -361,15 +465,20 @@ function updateFx(dt) {
 }
 
 function muzzleFlash(at) {
-  const material = new T.SpriteMaterial({ map: puffTexture, color: 0xffd79a, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .95 });
-  const sprite = new T.Sprite(material);
-  sprite.position.copy(at); sprite.scale.setScalar(3);
-  scene.add(sprite);
-  flashes.push({ sprite, t: 0, life: .2, size: 4 });
-  for (let j = 0; j < 9; j++) puff(at, { color: j < 4 ? 0xffc070 : 0x8b9297, additive: j < 4, size: 2.2, life: .7 + Math.random() * .8, rise: 1 + Math.random() * 3, spread: 4, gravity: -.6, grow: 2.6, opacity: .55 });
+  // Two sprites: a white core and a wide orange bloom, both gone in a third of a second.
+  for (let i = 0; i < 2; i++) {
+    const sprite = new T.Sprite(new T.SpriteMaterial({ map: puffTexture, color: i ? 0xffb15e : 0xfff3d0, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: i ? .8 : 1 }));
+    sprite.position.copy(at);
+    sprite.scale.setScalar(i ? 6 : 2.4);
+    scene.add(sprite);
+    flashes.push({ sprite, t: 0, life: i ? .34 : .1, size: i ? 13 : 5, alpha: i ? .55 : 1, grow: i ? 1.5 : 2.2 });
+  }
+  for (let j = 0; j < 14; j++) puff(at, { color: j < 5 ? 0xffc070 : 0x8b9297, additive: j < 5, size: 2.2, life: .8 + Math.random() * 1.1, rise: 1 + Math.random() * 3.6, spread: 5, gravity: -.6, grow: 2.8, opacity: .5 });
+  // The pressure of the report runs out across the water under the guns.
+  ring(at.clone().setY(.9), 0xffc98a, 2, 36, .55);
   flashLight.position.copy(at).setY(at.y + 1);
-  flashLight.intensity = 90;
-  shake = Math.max(shake, .18);
+  flashLight.intensity = 240;
+  shake = Math.max(shake, .3);
 }
 
 /* -------------------------------------------------------------- reticles */
@@ -513,7 +622,7 @@ function impact(s) {
       sc.rotation.x = -Math.PI / 2;
       sc.position.copy(s.target).setY(s.target.y - .5);
       scene.add(sc); scorches.push(sc);
-      burns.push({ at: s.target.clone().setY(1.4) });
+      burns.push({ at: s.target.clone().setY(1.4), fire: fireGlow(s.target.clone().setY(1.1)) });
     }
     if (s.sunk) {
       caption(cellName(s.cell) + ' · ' + NAMES[s.sunk.index].toLowerCase() + ' lost', 'sunk');
@@ -530,7 +639,7 @@ function impact(s) {
   mark.rotation.x = -Math.PI / 2;
   mark.position.copy(s.target); mark.position.y = 1;
   marks.add(mark);
-  if (s.hit) burns.push({ at: s.target.clone().setY(.6) });
+  if (s.hit) burns.push({ at: s.target.clone().setY(.6), fire: fireGlow(s.target.clone().setY(.9)) });
   if (s.sunk) {
     caption(cellName(s.cell) + ' · ' + NAMES[s.sunk.index].toLowerCase() + ' sunk', 'sunk');
     const g = makeShip(s.sunk.cells.length * cell * .87);
@@ -552,6 +661,7 @@ function finishShot() {
   // Park on the last frame so the pause after a hit keeps its smoke, not the overview.
   holdPose = { p: camPos.clone(), l: look.clone(), until: elapsed + 1.4 };
   shot = null;
+  later.length = 0;
   slow = 1; fovKick = 0; whip = 0; blowout = 0;
   if (flashEl) flashEl.style.opacity = '0';
   projectile.visible = false;
@@ -570,6 +680,7 @@ function skip() {
   battery.visible = false;
   grid.visible = true;
   if (shot) shot = null;
+  later.length = 0;
   slow = 1; fovKick = 0; whip = 0; blowout = 0;
   if (flashEl) flashEl.style.opacity = '0';
   if (finish) { finish(); finish = null }
@@ -580,7 +691,8 @@ function setup() {
   marks.clear();
   for (const s of scorches) { scene.remove(s); s.geometry.dispose(); s.material.dispose() }
   scorches.length = 0;
-  burns.length = 0; burnPulse.index = 0;
+  for (const b of burns) if (b.fire) { scene.remove(b.fire); b.fire.material.dispose() }
+  burns.length = 0; burnPulse.index = 0; later.length = 0;
   slow = 1; fovKick = 0; whip = 0; blowout = 0;
   if (flashEl) flashEl.style.opacity = '0';
   projectile.visible = false;
@@ -613,6 +725,31 @@ function ensureAudio() {
     kit.noise = noiseBuffer(2);
   }
   return kit.master;
+}
+// A bed of low surf under everything, so a shot has silence to break.
+let amb = null;
+function ambience() {
+  if (!soundOn || amb) return;
+  try {
+    const out = ensureAudio();
+    const src = ac.createBufferSource(); src.buffer = kit.noise; src.loop = true;
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 460; f.Q.value = .3;
+    const g = ac.createGain(); g.gain.value = .0001;
+    src.connect(f).connect(g).connect(out);
+    src.start();
+    g.gain.setTargetAtTime(.045, ac.currentTime, 2);
+    const lfo = ac.createOscillator(); lfo.frequency.value = .06;
+    const lg = ac.createGain(); lg.gain.value = 150;
+    lfo.connect(lg).connect(f.frequency); lfo.start();
+    amb = { g };
+  } catch { }
+}
+function duckAmbience() {
+  if (!amb) return;
+  try {
+    amb.g.gain.setTargetAtTime(.008, ac.currentTime, .12);
+    amb.g.gain.setTargetAtTime(.045, ac.currentTime + 1.2, 2.4);
+  } catch { }
 }
 function noiseLayer({ at = 0, dur = .5, type = 'lowpass', from = 1200, to = 200, q = .7, gain = .3, attack = .005 }) {
   if (!soundOn) return;
@@ -647,17 +784,23 @@ function toneLayer({ at = 0, dur = .6, from = 90, to = 32, gain = .5, type = 'si
 }
 function sound(key) {
   if (!soundOn) return;
+  ambience();
   const url = audioUrls[key];
   if (url) { const a = new Audio(url); a.volume = key === 'fire' ? .45 : .5; a.play().catch(() => { }) }
   if (key === 'fire') {
     toneLayer({ dur: .9, from: 120, to: 28, gain: .5 });
     noiseLayer({ dur: .55, from: 1800, to: 180, gain: .28, q: .8 });
     noiseLayer({ at: .02, dur: 2.2, from: 320, to: 90, gain: .1 });
+    // The shell's fall: a thin tone dropping away from the muzzle.
+    toneLayer({ at: .02, dur: 1.9, from: 1300, to: 330, gain: .04 });
   } else if (key === 'hit') {
     toneLayer({ dur: 1.5, from: 92, to: 26, gain: .55 });
     noiseLayer({ dur: 1.1, from: 2600, to: 160, gain: .3, q: .6 });
     noiseLayer({ at: .04, dur: .5, from: 5200, to: 900, gain: .1, type: 'highpass', q: .4 });
     noiseLayer({ at: .06, dur: 2.6, from: 240, to: 70, gain: .09 });
+    noiseLayer({ at: .18, dur: 3.4, from: 160, to: 45, gain: .07 });
+    toneLayer({ at: .01, dur: 2.6, from: 3150, to: 2950, gain: .02 });
+    duckAmbience();
   } else {
     noiseLayer({ dur: .9, from: 3600, to: 420, gain: .24, q: .5 });
     noiseLayer({ at: .02, dur: .45, from: 1400, to: 300, gain: .09, type: 'bandpass', q: 1.2 });
@@ -677,6 +820,8 @@ function update(now = 0) {
   const sdt = dt * slow;
   elapsed += sdt;
   sea.material.uniforms.time.value = elapsed;
+  sky.material.uniforms.time.value = elapsed;
+  while (later.length && later[0].at <= elapsed) later.shift().fn();
   updateFx(sdt);
   if (flashEl) {
     blowout = blowout > .002 ? blowout * Math.exp(-dt * 9) : 0;
@@ -700,6 +845,8 @@ function update(now = 0) {
       if (st > 22) g.visible = false;
       continue;
     }
+    // A ship abeam of the turn camera would clip the edge of the frame; keep it out of the lens.
+    g.visible = !(turnAim && !shot && g.position.distanceTo(camera.position) < 58);
     g.position.y = waveAt(g.position.x, g.position.z) * .9;
     g.rotation.z = .03 * Math.sin(elapsed * .85 + g.position.z * .04);
   }
@@ -722,13 +869,16 @@ function update(now = 0) {
     const b = burns[burnPulse.index++ % burns.length];
     puff(b.at.clone().add(new T.Vector3((Math.random() - .5) * 2.4, 1 + Math.random() * 2, (Math.random() - .5) * 2.4)), { color: 0x2b3237, size: 2.4, life: 3.6, rise: 3.6 + Math.random() * 2.6, spread: 1.5, gravity: -.5, grow: 2.2, opacity: .24 });
   }
+  for (const b of burns) if (b.fire) b.fire.material.opacity = .24 + .16 * Math.sin(elapsed * 7.5 + b.at.x * .7) + Math.random() * .06;
 
   let desired = baseCam.clone(), focus = baseLook.clone(), lambda = 3.4, fovGoal = 44, bank = 0, action = 0, snap = false;
   if (turnAim && aimRoom && !shot && cineMode !== 'off') {
     /* --- your turn: hold on the ship, guns sweeping the enemy water ------ */
     // A slow arc so the framing breathes without drifting off the target water.
     const a = Math.sin(elapsed * .17) * .05;
-    const ox = aimPos.x - player.position.x, oz = aimPos.z - player.position.z;
+    // A slow push-in over the hold, so the frame is never quite still.
+    const push = 1 - .018 * (1 - Math.cos(elapsed * .11));
+    const ox = (aimPos.x - player.position.x) * push, oz = (aimPos.z - player.position.z) * push;
     desired.set(player.position.x + ox * Math.cos(a) - oz * Math.sin(a), aimPos.y, player.position.z + ox * Math.sin(a) + oz * Math.cos(a));
     focus.copy(aimFocus);
     lambda = 1.8; fovGoal = 42; action = .4;
@@ -737,7 +887,11 @@ function update(now = 0) {
       if (turret.userData.barrels) for (const b of turret.userData.barrels) b.rotation.x = damp(b.rotation.x, Math.PI / 2 - .3, 1.6, dt);
     }
   } else if (shot) {
-    const s = shot; s.t += sdt * (s.rate || 1); const t = s.t; action = 1; holdPose = null;
+    const s = shot;
+    // The shell hangs in its last half-second: the clock eases down as it nears the target.
+    const hang = s.kind === 'out' && s.t > T_HIT - .55 && s.t < T_HIT ? .52 + .48 * clamp((T_HIT - s.t) / .55, 0, 1) : 1;
+    s.t += sdt * (s.rate || 1) * hang;
+    const t = s.t; action = 1; holdPose = null;
     for (const turret of (s.gun.userData.turrets || [])) {
       turret.rotation.y = turn(turret.rotation.y, s.yaw, 1 - Math.exp(-dt * 5.5));
       if (turret.userData.barrels) for (const b of turret.userData.barrels) b.rotation.x = damp(b.rotation.x, Math.PI / 2 - .2, 4, dt);
@@ -759,8 +913,8 @@ function update(now = 0) {
       const p = bezier(s.start, s.ctrl, s.target, u);
       const tan = tangent(s.start, s.ctrl, s.target, u);
       const side = new T.Vector3().crossVectors(tan, UP).normalize();
-      const shellPos = p.clone().addScaledVector(tan, -6 * clamp(1.3 / camera.aspect, 1, 1.5)).addScaledVector(UP, 4.4 - u * 1.4).addScaledVector(side, 5);
-      const shellFocus = p.clone().lerp(s.target, .42 + u * .25);
+      const shellPos = p.clone().addScaledVector(tan, -3.2 * clamp(1.3 / camera.aspect, 1, 1.4)).addScaledVector(UP, 2.2 - u * .7).addScaledVector(side, 2.6);
+      const shellFocus = p.clone().lerp(s.target, .36 + u * .3);
 
       const k = clamp((t - T_HIT) / (T_END - T_HIT), 0, 1);
       const a = .55 + k * 1.35, orbit = (42 - k * 8) * clamp(1.3 / camera.aspect, 1, 1.6);
@@ -774,7 +928,7 @@ function update(now = 0) {
       desired.copy(gunPos).lerp(shellPos, onShell).lerp(hitPos, onHit);
       focus.copy(gunFocus).lerp(shellFocus, onShell).lerp(hitFocus, onHit);
       lambda = 2.6 + 5.4 * onShell * (1 - onHit);
-      fovGoal = 42 + 13 * onShell * (1 - onHit) + 8 * onHit;
+      fovGoal = 42 + 7 * onShell * (1 - onHit) + 8 * onHit;
       bank = .1 * onShell * (1 - onHit);
 
       reticle.visible = t < T_FIRE;
@@ -785,7 +939,7 @@ function update(now = 0) {
       }
       if (t >= T_FIRE && t < T_HIT) {
         if (!s.fired) {
-          s.fired = true; whip = .8; fovKick = -3.5;
+          s.fired = true; whip = .8; fovKick = -3.5; blowout = .14;
           muzzleFlash(s.start);
           sound('fire');
           for (const turret of (s.gun.userData.turrets || [])) {
@@ -801,8 +955,8 @@ function update(now = 0) {
           const sprite = new T.Sprite(trailGlow.clone());
           sprite.position.copy(p).addScaledVector(tan, -.75);
           scene.add(sprite);
-          flashes.push({ sprite, t: 0, life: .16, size: .42, alpha: .3 });
-          if (Math.random() < .4) puff(p.clone().addScaledVector(tan, -.95), { color: 0xd9d6c4, size: .38, life: .6, rise: 0, spread: .5, gravity: 1.1, grow: 2.6, opacity: .13 });
+          flashes.push({ sprite, t: 0, life: .55, size: 1.5, alpha: .22, grow: 2.4 });
+          if (Math.random() < .6) puff(p.clone().addScaledVector(tan, -1.2), { color: 0xe2dfcd, size: .7, life: 1.2, rise: .4, spread: .5, gravity: .8, grow: 4, opacity: .18 });
         }
       }
       if (t >= T_HIT) {
@@ -827,7 +981,7 @@ function update(now = 0) {
       /* --- chase cam behind the shell ------------------------------------- */
       const u = clamp((t - T_FIRE) / (T_HIT - T_FIRE), 0, 1);
       if (!s.fired) {
-        s.fired = true; snap = true; whip = 1; fovKick = -3.5;
+        s.fired = true; snap = true; whip = 1; fovKick = -3.5; blowout = .16;
         muzzleFlash(s.start);
         sound('fire');
         for (const turret of (s.gun.userData.turrets || [])) {
@@ -847,8 +1001,8 @@ function update(now = 0) {
         const sprite = new T.Sprite(trailGlow.clone());
         sprite.position.copy(p).addScaledVector(tan, -.75);
         scene.add(sprite);
-        flashes.push({ sprite, t: 0, life: .16, size: .42, alpha: .3 });
-        if (Math.random() < .4) puff(p.clone().addScaledVector(tan, -.95), { color: 0xd9d6c4, size: .38, life: .6, rise: 0, spread: .5, gravity: 1.1, grow: 2.6, opacity: .13 });
+        flashes.push({ sprite, t: 0, life: .55, size: 1.5, alpha: .22, grow: 2.4 });
+        if (Math.random() < .6) puff(p.clone().addScaledVector(tan, -1.2), { color: 0xe2dfcd, size: .7, life: 1.2, rise: .4, spread: .5, gravity: .8, grow: 4, opacity: .18 });
       }
 
       desired.copy(p).addScaledVector(tan, -6 * clamp(1.3 / camera.aspect, 1, 1.5)).addScaledVector(UP, 4.4 - u * 1.4).addScaledVector(side, 5);
