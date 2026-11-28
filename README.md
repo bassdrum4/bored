@@ -114,8 +114,7 @@ Browser tests should continue mocking analytics requests as defense in depth.
 
 - Start with a four-card game shelf. For a new visitor, **Start playing** suggests
   popular offline games or simple fallback picks; returning players get **Jump Back In**
-  with recent games and saved favorites. **Browse favorites** jumps to the
-  library filtered to them.
+  with recent games and saved favorites. Use the Favorites filter to browse all saved games.
 - A compact **Daily challenge** follows the shelf, retaining its goal, verified
   completion and Play button.
 - **Leaderboard** is a separate view, linked in the masthead. The account strip
@@ -123,13 +122,10 @@ Browser tests should continue mocking analytics requests as defense in depth.
   guest score-to-account invitation appears only once per browser.
 - Search names, categories, descriptions, controls (for example `touch` or
   `keyboard`), pace, and session estimates; press **/** to focus search.
-- Filter by **Quick games**, **2 players** (local or supported Bored Together),
-  **Relaxing**, **New**, **Favorites**, **Arcade**, **Puzzle**, **Strategy**,
-  **Sandbox**, or **Online**. Search includes game names, descriptions and controls.
-- Sort by seven-day **Popular**, **Newest** or **A–Z**.
+- Filter by **Vettels!**, **All**, **2 players**, **Favorites**, **Arcade**, or **Puzzle & Strategy**.
+- Change game order in Settings; the choice is saved on this device.
 - Star games to save favorites and revisit the last four recently played games.
-- **Surprise me** chooses from the current results. Remote entries are excluded
-  unless you deliberately select **Online**.
+- **Surprise me** chooses from the current results.
 - The **waffle menu** in the top-left holds **Give feedback**, **Restart**, and
   **All games**. Feedback from a game opens a small dialog and records which game it concerns. **Esc** closes the menu first, then leaves an offline game.
   Remote pages run on another origin, so use the menu when they have focus.
@@ -254,8 +250,6 @@ Regular launches and saved high scores do not count. Restart or retry freely;
 a completed result remains saved for its date. Individual in-progress game runs
 are not resumed after closing the player.
 
-Use **Copy result** after completion to share the game, goal, date, and verified
-result. If clipboard access is blocked, a selectable text box provides a fallback.
 The challenge works without a connection once its game has been opened once.
 With storage blocked, completion survives within the
 current page session but not a reload.

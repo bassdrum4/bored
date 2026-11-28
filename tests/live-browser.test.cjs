@@ -194,7 +194,7 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   for (let i = 0; i < 40 && (await env.admin('select civ from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].civ !== 'rome'; i++) await sleep(100);
   assert.equal((await env.admin('select civ from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].civ, 'rome');
   // Ben sees the invitation in Your Games, with who is in it, and joins.
-  await ben.evaluate(() => document.querySelector('#together-refresh').click());
+  await ben.evaluate(() => window.dispatchEvent(new Event('online')));
   await waitPage(ben, id => document.querySelector('[data-live-id="' + id + '"]'), room.id);
   assert.match(await ben.$eval('[data-live-id]', e => e.textContent), /Invited[\s\S]*WackyPenguin[\s\S]*BananaWizard \(you\)/);
   await rowButton(ben, '^Join$');
@@ -266,7 +266,7 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   await waitPage(ben, () => document.querySelector('#player').hidden);
   await ann.evaluate('0');
   await annGame.evaluate('onAction("end-confirm")');
-  await ben.evaluate(() => document.querySelector('#together-refresh').click());
+  await ben.evaluate(() => window.dispatchEvent(new Event('online')));
   await waitPage(ben, id => !document.querySelector('#together').hasAttribute('aria-busy') && /Live/.test(document.querySelector('[data-live-id="' + id + '"]')?.textContent || ''), room.id);
   const row = await ben.$eval('[data-live-id]', e => e.textContent);
   assert.match(row, /Live/);
