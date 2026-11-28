@@ -1,6 +1,6 @@
 # Bored global chat
 
-Chat is a single, public, text-only room. Guests can read, verified accounts can send. No ordinary messages are stored in Supabase. Render keeps up to 200 messages for at most 24 hours, and reconnects retrieve at most 50 messages. Restarting the server clears history. Chat subscribes only when the panel is open; it uses its own on-demand SSE/long-poll request on the existing Render service so opting out of presence does not opt a user out of chat. No WebSockets, typing indicators, notifications or media uploads.
+Chat is a single, public, text-only room. Guests can read, verified accounts can send. No ordinary messages are stored in Supabase. Render keeps up to 200 messages for at most 24 hours, and reconnects retrieve at most 50 messages. Restarting the server clears history. Chat subscribes only when the panel is open; it uses its own on-demand SSE/long-poll request on the existing Render service so opting out of presence does not opt a user out of chat. No WebSockets, typing indicators or media uploads. Case-insensitive @display-name mentions notify participating online accounts through their existing presence stream; the red dot clears on opening chat and read state is browser-local. No extra polling, database writes or offline delivery. The latest mention marker is bounded, in-memory, and expires after 24 hours or a server restart.
 
 ## Deploy and enable
 

@@ -23,3 +23,6 @@
 .bored-chat-reports {max-height:35%;overflow:auto;font-size:.8rem;border:1px solid currentColor;padding:.4rem}
 .bored-chat-reports p {overflow-wrap:anywhere}
 @media(max-width:520px){.bored-chat{right:.4rem;left:.4rem;width:auto;top:3.7rem;bottom:.4rem;max-height:none}}
+
+.bored-chat-toggle.has-mention {position:relative}
+.bored-chat-toggle.has-mention::after {content:'';position:absolute;right:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#d92735;pointer-events:none}

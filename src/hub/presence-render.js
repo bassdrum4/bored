@@ -103,6 +103,7 @@ export function mountRenderPresence(){
     if(m?.t==='renew'||m?.t==='idle')return;
     if(m?.t!=='ok'||!Number.isInteger(m.a)||!Number.isInteger(m.g)||m.a<0||m.g<0||m.a+m.g>1000||typeof m.cursor!=='string')throw Error('Invalid presence frame');
     cursor=m.cursor;counts={a:m.a,g:m.g};ready=true;pollFail=0;
+    if(id!==GUEST&&typeof m.mention==='string')window.dispatchEvent(new CustomEvent('bored:chat-mention',{detail:{account:id,mention:m.mention}}));
     if(id!==GUEST&&details.open&&Array.isArray(m.n)){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}
     render();
   }

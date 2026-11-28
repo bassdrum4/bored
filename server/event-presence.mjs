@@ -5,6 +5,7 @@ import { UUID } from './core.mjs';
 export function createEventPresence({roster,verify,changed,hideAccount,reply,readBody,origins,clientSource,maxClients=1000,maxIp=800,waitMs=25000,ttlMs=90000,keepaliveMs=25000,authMs=18*60000,streamMs=12*60000}) {
   const sessions=new Map(), auth=new Map(), pending=new Map();
   let generation=0, closed=false;
+  const mentions=new Map();
   const tokenKey=t=>createHash('sha256').update(t).digest('hex');
   async function profile(token){
     const key=tokenKey(token),now=Date.now(),cached=auth.get(key);
@@ -28,6 +29,8 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
   function snapshot(s){
     const value={t:'ok',...roster.counts()};
     if(!s.identity.guest&&s.watch)value.n=roster.names();
+    const mention=!s.identity.guest&&mentions.get(s.identity.id);
+    if(mention&&Date.now()-mention.at<86400000)value.mention=mention.id;
     const cursor=tokenKey(JSON.stringify(value)).slice(0,24);
     return {...value,cursor};
   }
@@ -53,13 +56,35 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     let countsFrame,namedFrame;
     for(const s of sessions.values()){
       const c=s.connection;if(!c)continue;
-      const frame=s.watch?(namedFrame??=snapshot(s)):(countsFrame??=snapshot(s));
+      const frame=!s.identity.guest&&mentions.has(s.identity.id)?snapshot(s):s.watch?(namedFrame??=snapshot(s)):(countsFrame??=snapshot(s));
       if(frame.cursor===c.cursor)continue;
       c.cursor=frame.cursor;
       if(c.mode==='poll')detach(s,frame);
       else if(c.res.writableLength>65536){c.res.destroy();} 
       else c.res.write('data: '+JSON.stringify(frame)+'\n\n');
     }
+  }
+  function mention(message){
+    const text=message.text.normalize('NFKC').toLowerCase();
+    if(!text.includes('@'))return;
+    const checked=new Set();
+    for(const s of sessions.values()){
+      const {id,name,guest}=s.identity;
+      if(guest||id===message.author||checked.has(id))continue;
+      checked.add(id);
+      const needle='@'+name.normalize('NFKC').toLowerCase();
+      let from=0,matched=false;
+      while(true){
+        const at=text.indexOf(needle,from);
+        if(at<0)break;
+        from=at+needle.length;
+        if(!/[\p{L}\p{N}_@]/u.test(text.slice(0,at).slice(-1))&&!/[\p{L}\p{N}_]/u.test(text.slice(from,from+1))){matched=true;break;}
+      }
+      if(!matched)continue;
+      if(mentions.size>=1000&&!mentions.has(id))mentions.delete(mentions.keys().next().value);
+      mentions.set(id,{id:message.id,at:message.at});
+    }
+    changed();
   }
   async function handle(req,res){
     const origin=req.headers.origin;
@@ -118,6 +143,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
       }else if(now-s.at>ttlMs||(!s.identity.guest&&s.identity.expires<=now))remove(s);
     }
     for(const [key,value] of auth)if(value.until<=now)auth.delete(key);
+    for(const [id,value] of mentions)if(now-value.at>=86400000)mentions.delete(id);
   },Math.min(5000,keepaliveMs));sweep.unref?.();
-  return {handle,flush,evict,close(){closed=true;clearInterval(sweep);for(const s of sessions.values())remove(s);auth.clear();}};
+  return {handle,flush,evict,mention,close(){closed=true;clearInterval(sweep);for(const s of sessions.values())remove(s);auth.clear();}};
 }

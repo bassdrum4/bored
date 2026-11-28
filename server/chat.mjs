@@ -29,7 +29,7 @@ export async function moderate(text,{key=process.env.OPENAI_API_KEY,fetcher=fetc
   if(typeof result?.flagged!=='boolean')throw Error('Moderation unavailable');
   return !result.flagged;
 }
-export function createChat({verify,isAdmin,store,configured,moderateText=moderate,reply,readBody,origins,source,waitMs=25000,keepaliveMs=25000}){
+export function createChat({verify,isAdmin,store,configured,moderateText=moderate,reply,readBody,origins,source,onMention=()=>{},waitMs=25000,keepaliveMs=25000}){
   const messages=[],events=[],peers=new Set(),auth=new Map(),rates=new Map(),ipRates=new Map(),inflight=new Set();
   const epoch=randomUUID();let seq=0,state=null,stateAt=0,loading=null,flushTimer=null,closed=false;
   const hash=t=>createHash('sha256').update(t).digest('hex');
@@ -146,7 +146,7 @@ export function createChat({verify,isAdmin,store,configured,moderateText=moderat
         if(!current.enabled||blocked(a.id,current))return out(403,{error:'Chat is unavailable.'});
         const parent=messages.find(x=>x.id===m.reply);
         const msg={id:randomUUID(),author:a.id,handle,text,at:Date.now(),reply:parent?{id:parent.id,handle:parent.handle}:null};
-        messages.push(msg);publish('message',{message:publicMessage(msg)});return out(200,{ok:true,id:msg.id});
+        messages.push(msg);publish('message',{message:publicMessage(msg)});try{onMention(msg);}catch{}return out(200,{ok:true,id:msg.id});
       }catch{return out(503,{error:'Moderation unavailable. Message not sent.'});}finally{inflight.delete(a.id);}
     }
     if(!['sse','poll'].includes(mode))return out(400,{error:'Invalid mode'});

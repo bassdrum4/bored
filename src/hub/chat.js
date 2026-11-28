@@ -1,11 +1,36 @@
 import {PRESENCE_ORIGIN} from './presence-endpoint.js';
-import {freshSession,hasIdentity} from './backend.js';
+import {freshSession,hasIdentity,getSession} from './backend.js';
 const origin=(()=>{try{const u=new URL(PRESENCE_ORIGIN);return u.protocol==='https:'&&u.hostname.endsWith('.onrender.com')&&!u.username&&!u.password&&!u.port&&u.pathname==='/'&&!u.search&&!u.hash?u.origin:'';}catch{return '';}})();
 const $=id=>document.getElementById(id);
 const button=$('bored-chat-toggle'),panel=$('bored-chat'),close=$('bored-chat-close'),list=$('bored-chat-list'),form=$('bored-chat-form'),input=$('bored-chat-input'),send=$('bored-chat-send'),status=$('bored-chat-status'),replyBar=$('bored-chat-reply'),adminBar=$('bored-chat-admin');
 if(button&&panel&&origin&&location.hostname==='bassdrum4.github.io'&&/^\/bored(?:\/|$)/.test(location.pathname))mount();
 function mount(){
   let opened=false,controller=null,cursor='',mode='sse',messages=new Map(),retry=null,failures=0,admin=false,enabled=false,replyTo=null,posting=false,generation=0;
+  let mentionAccount=null,latestMention='',seenMention='';
+  function paintMention(unread){button.classList.toggle('has-mention',unread);button.setAttribute('aria-label',unread?'Chat, unread mention':'Chat');}
+  function syncMentionAccount(){
+    const id=hasIdentity()?getSession()?.user?.id:null;
+    if(id===mentionAccount)return;
+    mentionAccount=id;latestMention='';seenMention='';
+    try{if(id)seenMention=localStorage.getItem('bored.chat.mention.seen.'+id)||'';}catch{}
+    paintMention(false);
+  }
+  function clearMention(){
+    if(!mentionAccount||!latestMention)return;
+    seenMention=latestMention;
+    try{localStorage.setItem('bored.chat.mention.seen.'+mentionAccount,seenMention);}catch{}
+    paintMention(false);
+  }
+  syncMentionAccount();
+  window.addEventListener('bored:chat-mention',e=>{
+    syncMentionAccount();
+    if(!mentionAccount||e.detail?.account!==mentionAccount||typeof e.detail.mention!=='string')return;
+    latestMention=e.detail.mention;
+    if(opened)clearMention();else paintMention(latestMention!==seenMention);
+  });
+  window.addEventListener('storage',e=>{
+    if(mentionAccount&&e.key==='bored.chat.mention.seen.'+mentionAccount){seenMention=e.newValue||'';paintMention(Boolean(latestMention&&latestMention!==seenMention));}
+  });
   function notice(text){status.textContent=text;}
   function updateForm(){input.disabled=send.disabled=!opened||!enabled||!hasIdentity()||posting;input.placeholder=hasIdentity()?'Say something…':'Sign in to send messages';}
   async function token(){return hasIdentity()?(await freshSession())?.access_token:null;}
@@ -92,7 +117,7 @@ function mount(){
       if(enabled)void connect();else notice('Chat is disabled.');
     }catch(e){if(opened&&g===generation){notice(e.message);renderAdmin();}}
   }
-  function setOpen(value){opened=value;panel.hidden=!value;button.setAttribute('aria-expanded',String(value));if(value){mode='sse';failures=0;void restart();}else{generation++;cancel();enabled=false;updateForm();setReply(null);panel.querySelectorAll('.bored-chat-reports').forEach(el=>el.remove());button.focus();}}
+  function setOpen(value){opened=value;panel.hidden=!value;button.setAttribute('aria-expanded',String(value));if(value){clearMention();mode='sse';failures=0;void restart();}else{generation++;cancel();enabled=false;updateForm();setReply(null);panel.querySelectorAll('.bored-chat-reports').forEach(el=>el.remove());button.focus();}}
   button.hidden=false;button.addEventListener('click',()=>setOpen(!opened));close.addEventListener('click',()=>setOpen(false));
   panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();setOpen(false);}});
   form.addEventListener('submit',async e=>{
@@ -101,6 +126,6 @@ function mount(){
     try{const jwt=await token();if(!jwt)throw Error('Sign in first.');await post({mode:'send',jwt,text,reply:replyTo?.id},AbortSignal.timeout(15000));input.value='';setReply(null);}
     catch(err){notice(err.message);}finally{posting=false;updateForm();if(opened)input.focus();}
   });
-  window.addEventListener('bored:identity',()=>{if(opened){messages.clear();cursor='';setReply(null);void restart();}});
+  window.addEventListener('bored:identity',()=>{syncMentionAccount();if(opened){messages.clear();cursor='';setReply(null);void restart();}});
   window.addEventListener('pagehide',()=>{cancel();opened=false;generation++;panel.hidden=true;button.setAttribute('aria-expanded','false');});
 }

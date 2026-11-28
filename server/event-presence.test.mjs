@@ -17,7 +17,7 @@ async function fixture(t){
   t.after(()=>{events.close();server.closeAllConnections();server.close();});
   const post=(body,signal)=>fetch(url,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body),signal});
   const guest={t:'guest',id:randomUUID(),sid:randomUUID()},account={t:'auth',jwt,sid:randomUUID()};
-  return {post,guest,account,roster,checks:()=>checks};
+  return {post,guest,account,roster,events,id,checks:()=>checks};
 }
 test('SSE sends counts and roster changes; guest receives no names',async t=>{
   const f=await fixture(t),ac=new AbortController();
@@ -60,4 +60,23 @@ test('long poll returns on change, otherwise idle; account auth cached and names
   assert.equal(f.roster.counts().a,0);
   const off=await (await f.post({...second,mode:'poll'})).json();
   assert.equal(off.t,'off');
+});
+
+test('mentions use existing presence frames and never reach guests or self',async t=>{
+  const f=await fixture(t);
+  await f.post({...f.account,mode:'poll'});
+  const g=await (await f.post({...f.guest,mode:'poll'})).json();
+  const base=await (await f.post({...f.account,mode:'poll'})).json();
+  const cursor=base.cursor;
+  for(const text of ['@Penguins','email@Penguin','@@Penguin'])f.events.mention({text,author:randomUUID(),id:randomUUID(),at:Date.now()});
+  f.events.mention({text:'@Penguin',author:f.id,id:randomUUID(),at:Date.now()});
+  assert.equal((await (await f.post({...f.account,mode:'poll',cursor})).json()).t,'idle');
+  const pending=f.post({...f.account,mode:'poll',cursor});
+  const id=randomUUID();
+  f.events.mention({text:'Hi @pEnGuIn!',author:randomUUID(),id,at:Date.now()});
+  const frame=await (await pending).json();
+  assert.equal(frame.mention,id);
+  const guest=await (await f.post({...f.guest,mode:'poll',cursor:g.cursor})).json();
+  assert.equal(guest.mention,undefined);
+  assert.equal((await (await f.post({...f.account,mode:'poll',cursor:frame.cursor})).json()).t,'idle');
 });
