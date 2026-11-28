@@ -115,7 +115,7 @@ export async function run() {
     if (pr.state !== 'open' || pr.draft || pr.base?.ref !== 'main' ||
         pr.head?.repo?.full_name !== repo || pr.base?.repo?.full_name !== repo ||
         !VETTEL_ACCOUNT_IDS.has(pr.user?.id) ||
-        !VETTEL_ACCOUNT_IDS.has(ci.actor?.id) ||
+        !(VETTEL_ACCOUNT_IDS.has(ci.actor?.id) || ci.actor?.id === 255225351) || // Owner retargets/reruns
         !ci.head_sha || ci.head_sha !== pr.head?.sha) {
       note(`PR #${number}: not an eligible, current Vettel game-only update.`);
       continue;
