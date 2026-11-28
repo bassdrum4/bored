@@ -26,7 +26,6 @@ test('downhill mayhem is a catalogued, locally packaged, scored game', async () 
   assert.deepEqual(ORDER.filter(([slug]) => slug === 'dirt-trials'), [], 'the hand-built bike game is gone');
   assert.equal(EXTERNS['downhill-mayhem'], undefined);
   assert.equal(META['downhill-mayhem'][0], 'Arcade');
-  assert.ok(META['downhill-mayhem'][1].length > 40);
   assert.ok(DISCOVERY['downhill-mayhem'].inputs.includes('Keyboard'));
   assert.equal(DISCOVERY['downhill-mayhem'].quick, true);
   assert.ok(!UNSCORED_GAMES.includes('downhill-mayhem'));

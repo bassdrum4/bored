@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 test('CI scope is narrow and fails closed on shared or unknown changes', async () => {
   const { classify, detect } = await import('../scripts/ci-scope.mjs');
   assert.deepEqual(classify(['src/games/content/relic-song.html', 'tests/relic-song.test.cjs']), {full:false,games:['relic-song']});
+  assert.deepEqual(classify(['src/games/content/relic-song-charts/index.json','src/games/content/relic-song-charts/onix-rising-ez.json','src/games/previews/relic-song.webp']), {full:false,games:['relic-song']});
   assert.deepEqual(classify(['src/games/content/poke-idle.html','src/games/content/pokedoku/sprites/thaw-grunt.png','tests/poke-idle.test.cjs']), {full:false,games:['poke-idle']});
   assert.deepEqual(classify(['src/games/content/shotgun-roulette.html','src/games/content/relic-song.html']), {full:false,games:['relic-song','shotgun-roulette']});
   assert.equal(classify(['src/games/content/pokedoku.html']).full,true);
@@ -15,6 +16,6 @@ test('CI scope is narrow and fails closed on shared or unknown changes', async (
 });
 test('auto-merge permits Relic Song only in its own game scope', async () => {
   const { isAllowedGameFile } = await import('../.github/scripts/auto-merge-vettel.mjs');
-  for(const file of ['src/games/content/relic-song.html','tests/relic-song.test.cjs','src/games/previews/relic-song.svg','docs/relic-song-design.md','src/games/content/pokedoku/sprites/thaw-sleet.png']) assert.ok(isAllowedGameFile(file),file);
-  for(const file of ['src/hub/relic-song.js','src/hub/leaderboard-view.js','sql/relic-song-leaderboard.sql','src/main.js','.github/workflows/ci.yml']) assert.equal(isAllowedGameFile(file),false,file);
+  for(const file of ['src/games/content/relic-song.html','tests/relic-song.test.cjs','src/games/previews/relic-song.svg','src/games/previews/relic-song.webp','src/hub/relic-song.js','src/games/content/relic-song-charts/index.json','src/games/content/relic-song-charts/onix-rising-ez.json','docs/relic-song-design.md','src/games/content/pokedoku/sprites/thaw-sleet.png']) assert.ok(isAllowedGameFile(file),file);
+  for(const file of ['src/games/content/relic-song-charts/script.js','src/games/content/relic-song-charts/nested/chart.json','src/hub/leaderboard-view.js','sql/relic-song-leaderboard.sql','src/main.js','.github/workflows/ci.yml']) assert.equal(isAllowedGameFile(file),false,file);
 });

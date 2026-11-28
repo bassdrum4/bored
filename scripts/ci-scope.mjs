@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 // fall back to the full suite. No contributor identities are used for CI scope.
 const groups = {
   'poke-idle': [/^src\/games\/content\/poke-idle\.html$/, /^tests\/poke-idle\.test\.cjs$/, /^src\/games\/previews\/poke-idle\.svg$/, /^src\/games\/content\/pokedoku\/sprites\/thaw-[a-z0-9-]+\.png$/],
-  'relic-song': [/^src\/games\/content\/relic-song\.html$/, /^tests\/relic-song\.test\.cjs$/, /^src\/games\/previews\/relic-song\.svg$/, /^docs\/relic-song-[^/]+\.md$/],
+  'relic-song': [/^src\/games\/content\/relic-song\.html$/, /^tests\/relic-song\.test\.cjs$/, /^src\/games\/previews\/relic-song\.(?:svg|webp)$/, /^docs\/relic-song-[^/]+\.md$/, /^src\/games\/content\/relic-song-charts\/[a-z0-9-]+\.json$/],
   'shotgun-roulette': [/^src\/games\/content\/shotgun-roulette\.html$/, /^tests\/shotgun-roulette\.test\.cjs$/, /^src\/games\/previews\/shotgun-roulette\.svg$/],
 };
 export function classify(paths) {

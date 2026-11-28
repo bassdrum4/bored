@@ -91,11 +91,14 @@ try {
   // An old save: paid under the old table (HD clear 100, its ranks, the badge at 250, an IN A).
   let old = mergeWallet({});
   for (const [id, c] of [['rs:clear:onix-rising:hd', 100], ['rs:rank:onix-rising:hd:a', 50], ['rs:badge:0', 250], ['rs:clear:onix-rising:in', 200], ['rs:rank:onix-rising:in:a', 100]]) old = grantOnce(old, id, { coins: c }).wallet;
-  const before = coins(old);
+  const before = coins(old), tokenTable = data.payTable.unit === 'chips', chips = w => walletBalance(w).chips || 0;
   r = payRelicSong(old, { song: 'onix-rising', diff: 'hd', rank: 's', badge: 0, ...t });
-  check('an old save keeps its coins, and what it was paid for pays nothing again (HD clear, badge)', r.paid.total === 0 && coins(r.wallet) === before);
+  const hdPay = tokenTable ? charts['onix-rising:hd'].clear + PAY.badge : 0;
+  check('old coins stay unchanged; the HD clear and badge pay fresh tokens only for a token table', r.paid.total === hdPay && coins(r.wallet) === before && chips(r.wallet) === hdPay);
+  check('the HD replay pays nothing', payRelicSong(r.wallet, { song: 'onix-rising', diff: 'hd', rank: 's', badge: 0, ...t }).paid.total === 0);
   r = payRelicSong(old, { song: 'onix-rising', diff: 'in', rank: 's', badge: 0, ...t });
-  check('an old save is paid only what is new: the IN S (' + oz.s + '), not the IN clear or A again', r.paid.total === oz.s && coins(r.wallet) === before + oz.s);
+  const inPay = tokenTable ? oz.clear + oz.a + oz.s : oz.s;
+  check('the IN clear pays only the new rewards in the current currency', r.paid.total === inPay && coins(r.wallet) === before + (tokenTable ? 0 : oz.s) && chips(r.wallet) === (tokenTable ? hdPay + inPay : 0));
   check('loading the game tops up nothing on an old save', topUpRelicSong(old, t).paid === 0);
   r = payRelicSong(mergeWallet({}), { song: 'relic-song', diff: 'at', rank: 's', finale: true, ...t });
   const fz = charts['relic-song:at'];
@@ -104,7 +107,7 @@ try {
   check('a champion\'s first clear pays its bonus (+' + PAY.champion + ') once', r.paid.champion === PAY.champion && payRelicSong(r.wallet, { song: 'champ-test', diff: 'hd', rank: 'a', champion: 'johto', table: { ...data.payTable, charts: { 'champ-test:hd': { clear: 160, a: 0, s: 0 } } } }).paid.total === 0);
 
   // ── Coin totals ──
-  console.log('\nCOINS');
+  console.log(tokenTable ? '\nTOKENS' : '\nCOINS');
   const story = data.songs.filter(s => !s.id.startsWith('style-') && s.role !== 'hidden');
   const sum = (rows, f) => rows.reduce((n, s) => n + f(s), 0);
   const bosses = story.filter(s => s.role === 'boss').length, champs = story.filter(s => s.role === 'champion').length;

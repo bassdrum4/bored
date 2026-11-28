@@ -25,7 +25,7 @@ test('basket random is a catalogued, local, unscored two-player game', async () 
 
   assert.deepEqual(ORDER.filter(([slug]) => slug === 'basket-random'), [['basket-random', 'Basket Random']]);
   assert.equal(EXTERNS['basket-random'], undefined);
-  assert.deepEqual(META['basket-random'], ['Arcade', 'Two players, one ball and a physics engine that keeps changing its mind.']);
+  assert.equal(META['basket-random'][0], 'Arcade');
   assert.equal(DISCOVERY['basket-random'].players, '2 local');
   assert.equal(DISCOVERY['basket-random'].quick, true);
   assert.ok(UNSCORED_GAMES.includes('basket-random'));

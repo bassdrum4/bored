@@ -9,7 +9,9 @@ const allowedExact = new Set([
   'src/games/content/poke-idle.html',
   'src/games/content/poke-gacha.html',
   'src/games/content/relic-song.html',
+  'src/games/previews/relic-song.webp',
   'src/games/previews/relic-song.svg',
+  'src/hub/relic-song.js', // Relic Song-specific rewards; requires full CI
   'tests/relic-song.test.cjs',
   // Shotgun Roulette is sandboxed as an admin-only preview. Contributor changes
   // to its document, preview art and own tests require the normal test job;
@@ -43,7 +45,8 @@ const allowedSprite = /^src\/games\/content\/pokedoku\/sprites\/(?:[a-zA-Z0-9_-]
 export function isAllowedGameFile(filename) {
   return allowedExact.has(filename) || allowedSprite.test(filename) ||
     allowedGachaContent.test(filename) || allowedGachaDocs.test(filename) ||
-    /^docs\/relic-song-[^/]+\.md$/.test(filename);
+    /^docs\/relic-song-[^/]+\.md$/.test(filename) ||
+    /^src\/games\/content\/relic-song-charts\/[a-z0-9-]+\.json$/.test(filename);
 }
 
 const log = message => console.log(message);
@@ -144,14 +147,35 @@ export async function run() {
       warn(`PR #${number} eligible, but BORED_AUTOMERGE_TOKEN secret is not configured. Manual review still applies.`);
       continue;
     }
-    // The bypass-capable owner's token is ONLY used for this one, SHA-locked merge.
+    // Preserve ancestry so stacked game PRs can be retargeted after their parent lands.
+    // The bypass-capable owner's token is used for the SHA-locked merge and safe retargeting.
     // GitHub refuses if the PR head changes after classification or CI.
     const { payload: result } = await api(`pulls/${number}/merge`, mergeToken, 'PUT', {
       sha: pr.head.sha,
-      merge_method: 'squash',
+      merge_method: 'merge',
     });
     if (result.merged !== true) throw new Error(`PR #${number} was not merged: ${result.message || 'Unknown reason'}`);
     note(`Automatically merged vetted game-only PR #${number} after the relevant Check Bored jobs passed.`);
+    // Only retarget trusted same-repo children of this exact merged branch.
+    // Retargeting never merges a child: its own fresh main-targeted CI and full
+    // allowlist check must run before it can merge. The owner token triggers CI.
+    for (let page = 1; page <= 5; page++) {
+      const { payload: children } = await api(`pulls?state=open&base=${encodeURIComponent(pr.head.ref)}&per_page=100&page=${page}`, readToken);
+      for (const child of children) {
+        if (child.draft || child.base?.ref !== pr.head.ref || child.head?.repo?.full_name !== repo ||
+            child.base?.repo?.full_name !== repo || !VETTEL_ACCOUNT_IDS.has(child.user?.id)) continue;
+        const { payload: comparison } = await api(`compare/${pr.head.sha}...${child.head.sha}`, readToken);
+        if (comparison.merge_base_commit?.sha !== pr.head.sha || comparison.status !== 'ahead') continue;
+        const childFiles = await changedFiles(child.number);
+        if (!childFiles.length || childFiles.some(f => f.status === 'removed' || f.status === 'renamed' ||
+            !isAllowedGameFile(f.filename) || (f.previous_filename && !isAllowedGameFile(f.previous_filename)))) continue;
+        try {
+          await api(`pulls/${child.number}`, mergeToken, 'PATCH', { base: 'main' });
+          note(`Retargeted stacked PR #${child.number} to main for fresh CI.`);
+        } catch (error) { warn(`PR #${child.number}: retarget manually: ${error.message}`); }
+      }
+      if (children.length < 100) break;
+    }
   }
 }
 
