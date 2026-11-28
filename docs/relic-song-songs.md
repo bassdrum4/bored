@@ -294,6 +294,32 @@ Perfect) show on the results and the song row, and are kept with the best.
   re-ranked: from its counts if it has them, else its score under the new cutoffs (never below C
   for a clear). Tokens are never taken back.
 
+## Anti-spam
+
+Mashing never beats a chart, and tapping along between notes never costs you. With the keyboard
+zones a whole hand covers a zone, so three rules keep presses honest (`press()`; tune them in `WIN`
+and `SPAM`):
+
+- **Early miss (`WIN.earlyMiss`, 0.25 s):** a press 150-250 ms before a note, earlier than Good,
+  misses that note and uses it up. Only the earliest waiting note the key can take (its lane, or its
+  zone) can miss this way. A press earlier than 250 ms does nothing. This applies to highway lanes
+  and line zones alike.
+- **Hand smash (`SPAM.smash`, 40 ms):** if more separate keys go down within 40 ms than the notes
+  due in the Good window + 1, none of those presses count. Anything they had already hit is taken
+  back (count, combo, boss damage) and missed, along with the notes the rest go for. It works the
+  same for the 4 keyboard regions, Wide lanes and exact keybinds. A real chord always passes: a
+  4-key chord has 4 notes due, so it can take 5 keys.
+- **Ghost taps (`SPAM.ghosts`, `SPAM.span`):** one press with no note in reach does nothing. Four
+  empty presses within 0.5 s break the combo (no Miss is added); in a boss fight your side also
+  takes one Miss worth of damage. "Too many taps" shows in the battle text, bottom left, at most
+  once every 4 s (`SPAM.say`).
+
+**Unchanged:** one press hits one note, a hold needs its key down to the end, and a drag still
+auto-hits while a key is held in its zone (any key on EZ), like Phigros. A press with a drag in
+reach is for that drag: it never early-misses the tap after it and never counts as empty. A press
+within Good of a note it could have taken that's already judged (a double tap, or a late press for a
+note another key took) never early-misses either; it only counts as empty.
+
 ## Key zones on the moving line
 
 The moving line's zones are **regions of the keyboard**, matched by physical key (`e.code`), like
