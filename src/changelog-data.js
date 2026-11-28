@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1057,
+  "count": 1058,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4944f365","date":"2026-11-28","author":"Codebuff","subject":"Grade Battleship's sea for late sun and rebuild the hit"},
   {"sha":"eb5f4098","date":"2026-11-28","author":"Codebuff","subject":"Make Battleship's shot one continuous take"},
   {"sha":"98bba617","date":"2026-11-28","author":"Codebuff","subject":"Give Battleship's your-turn camera a ship and the board back its mouse"},
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
