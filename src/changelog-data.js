@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1067,
+  "count": 1068,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"db41512f","date":"2026-11-28","author":"bassdrum4","subject":"Simplify Bored copy and remove filler notes"},
   {"sha":"93e286a5","date":"2026-11-28","author":"bassdrum4","subject":"Remove Among Us game and imported assets"},
   {"sha":"df0976b2","date":"2026-11-28","author":"Codebuff","subject":"Relight Trackbound without losing its palette"},
   {"sha":"e069086b","date":"2026-11-28","author":"Daniel Lowe","subject":"Add chat mention autocomplete and highlighted names"},
