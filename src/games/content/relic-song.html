@@ -190,14 +190,21 @@
   /* A hold: head, beam and tail cap all the same width as a tap. */
   .nt .beam { position: absolute; left: 0; right: 0; bottom: 5px; background: linear-gradient(to top, rgba(160, 225, 255, .55), var(--beam));
               border: 1px solid rgba(255, 255, 255, .85); border-bottom: 0; border-top-width: 2px; border-radius: 5px 5px 0 0 }
-  /* A line note's zone (HD and up): a small dot in the zone's colour, the same as its keys' labels. */
-  .nt .zone { position: absolute; left: 50%; bottom: 13px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--zc); box-shadow: 0 0 6px var(--zc) }
-  .nt.hold .zone { bottom: 8px }
+  /* A line note's zone (HD and up), in the notes' own glow: muted pastels at 80%, never the note's colour.
+     pip: a small soft dot just above the bar. caps: the bar's two ends tinted, fading into it. A note near a
+     border (either zone's keys count) blends the two zones' colours. */
+  .nt .zone { display: none }
+  .hint-pip .nt.zoned .zone { display: block; position: absolute; left: 50%; bottom: 13px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; opacity: .8;
+    background: var(--zc); box-shadow: 0 0 4px 1px var(--zc), 0 0 9px var(--zc) }
+  .hint-pip .nt.lenient .zone { width: 6px; margin-left: -3px; background: linear-gradient(90deg, var(--zc), var(--zc2)); box-shadow: -2px 0 6px var(--zc), 2px 0 6px var(--zc2) }
+  .hint-caps .nt.zoned .head::before, .hint-caps .nt.zoned .head::after { content: ""; position: absolute; top: 1px; bottom: 1px; width: 16px; opacity: .8; filter: blur(.5px) }
+  .hint-caps .nt.zoned .head::before { left: 1px; border-radius: 4px 0 0 4px; background: linear-gradient(90deg, var(--zc), transparent) }
+  .hint-caps .nt.zoned .head::after { right: 1px; border-radius: 0 4px 4px 0; background: linear-gradient(270deg, var(--zc2), transparent) }
   /* The zones, shown for a bar when the line takes over: borders and each zone's keys. */
   #zonegrid { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .6s }
   #zonegrid.on { opacity: 1; transition: opacity .15s }
-  #zonegrid i { position: absolute; top: 150px; bottom: 0; width: 1px; background: rgba(255, 255, 255, .22) }
-  #zonegrid b { position: absolute; top: 160px; width: 200px; margin-left: -100px; text-align: center; font-size: 20px; font-weight: 400; color: var(--zc) }
+  #zonegrid i { position: absolute; top: 150px; bottom: 0; width: 1px; background: rgba(255, 255, 255, .1) }
+  #zonegrid b { position: absolute; top: 158px; width: 300px; margin-left: -150px; text-align: center; font-size: 12px; font-weight: 400; letter-spacing: .08em; color: var(--zc); opacity: .8 }
   .nt.miss { opacity: 0; transition: opacity .25s }
   .nt.morph { transition: left .7s ease-in-out, width .7s ease-in-out }
   .nt.done { display: none }
@@ -241,7 +248,8 @@
   .spr { opacity: .85; filter: drop-shadow(0 0 6px var(--tint)) drop-shadow(0 0 16px var(--tint)); animation: bob 2.8s ease-in-out infinite }
   .spr.pir { filter: hue-rotate(-60deg) saturate(2) drop-shadow(0 0 6px var(--tint)) drop-shadow(0 0 16px var(--tint)) }
   @keyframes bob { 50% { transform: translateY(-3px) } }
-  #btext { position: absolute; left: 50%; bottom: 44px; width: 600px; margin-left: -300px; text-align: center; font-size: 13px; color: var(--dim); transition: opacity .5s; opacity: 0; z-index: 6 }
+  /* Battle text: bottom left, above the buddy, never over the playfield. */
+  #btext { position: absolute; left: 28px; bottom: 168px; width: 300px; text-align: left; font-size: 12px; color: var(--dim); transition: opacity .5s; opacity: 0; z-index: 6 }
   #btext.on { opacity: 1; transition: none }
   .hurt { animation: hurt .18s }
   @keyframes hurt { 50% { filter: brightness(2.5); transform: translateX(3px) } }
@@ -260,6 +268,8 @@
 
   /* Results */
   #result .big { font: 200 150px/1 var(--sans); color: var(--gold); text-shadow: 0 0 30px rgba(255, 216, 102, .4) }
+  #r-badge { font: 300 26px/1 var(--sans); letter-spacing: .2em; color: var(--great); min-height: 30px; margin-top: 6px; text-shadow: 0 0 14px rgba(159, 220, 255, .5) }
+  #r-badge.ap { color: var(--perfect); text-shadow: 0 0 14px rgba(255, 216, 102, .5) }
   #result .cols { display: grid; grid-template-columns: 260px 1fr; gap: 40px; margin-top: 30px; align-items: start }
   #result table td { padding: 4px 18px 4px 0 }
   #result table td:last-child { font-variant-numeric: tabular-nums }
@@ -277,6 +287,14 @@
   #ed-canvas { display: block; border: 1px solid var(--rule); border-radius: 3px; cursor: crosshair }
   #editor .ehelp { font-size: 11px; color: var(--faint); line-height: 1.4 }
   #ed-errors { font-size: 12px; color: #ff9a9a; max-height: 48px; overflow: auto }
+  /* The keyboard diagram: each key in its region's colour, lit while it's held. */
+  .kbmap { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start }
+  .kbmap .row { display: flex; gap: 4px }
+  .kbmap b { width: 42px; height: 38px; display: grid; place-items: center; border-radius: 4px; font-weight: 400; font-size: 14px; color: rgba(238, 242, 246, .75);
+    background: rgba(255, 255, 255, .04); border: 1px solid color-mix(in srgb, var(--zc, #555) 70%, transparent); transition: background .05s }
+  .kbmap b.on { background: color-mix(in srgb, var(--zc, #888) 80%, transparent); color: #0b0d11 }
+  .kbmap b.off { opacity: .35 }
+  .kbmap .space { width: 300px }
   /* The sound test: every open song (and the type styles' demos), music only. */
   #sound .card { width: 700px; max-height: 680px; padding: 16px 22px }
   #sound .card h2 { margin-bottom: 4px }
@@ -296,12 +314,12 @@
   .caps-keys { display: flex; gap: 6px; margin-top: 12px }
   .caps-keys b { min-width: 38px; height: 36px; padding: 0 8px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .6); border-radius: 3px; font-weight: 400; font-size: 17px }
   .say button { flex: none; margin-left: auto }
-  /* A tip: a small box under the combo for two seconds; the song doesn't stop. */
-  #tip { position: absolute; left: 50%; top: 116px; transform: translateX(-50%); padding: 6px 18px; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel);
-         font-size: 16px; white-space: nowrap; z-index: 10; pointer-events: none; opacity: 0; transition: opacity .3s }
+  /* A tip: a small banner under the combo for two seconds, never over the playfield; the song doesn't stop. */
+  #tip { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); padding: 3px 14px; border-radius: 3px; background: rgba(16, 19, 25, .6);
+         font-size: 13px; letter-spacing: .02em; color: rgba(238, 242, 246, .85); white-space: nowrap; z-index: 10; pointer-events: none; opacity: 0; transition: opacity .4s }
   #tip.on { opacity: 1 }
-  /* The cue over the first moving line: placed on the line each frame, never turned with it. */
-  #cue { position: absolute; left: 0; top: 0; width: 440px; margin-left: -220px; text-align: center; font-size: 22px; font-weight: 300; letter-spacing: .06em; z-index: 6; pointer-events: none }
+  /* The cue for the first moving line: the same banner place, a line lower. */
+  #cue { position: absolute; left: 50%; top: 122px; width: 520px; margin-left: -260px; text-align: center; font-size: 14px; font-weight: 300; letter-spacing: .08em; color: rgba(238, 242, 246, .8); z-index: 6; pointer-events: none }
   /* The boss card's picture: four lanes and notes falling, a flash, then the lanes gone and the line
      tilting and drifting while notes fly at it from above and below. Six seconds, round and round. */
   #bosscard .card { background: rgb(18, 21, 27) }
@@ -370,7 +388,7 @@
   <section class="screen" id="result" hidden>
     <div class="hud caps"><span id="r-title"></span><span class="grow"></span><span id="r-sub"></span></div>
     <div class="cols">
-      <div><div class="big" id="r-rank"></div><p id="r-clear"></p></div>
+      <div><div class="big" id="r-rank"></div><div id="r-badge"></div><p id="r-clear"></p></div>
       <div>
         <table><tbody id="r-table"></tbody></table>
         <p id="r-pay" style="margin-top:14px"></p>
@@ -425,7 +443,7 @@
     <div class="line"><span>Keybinds <span class="dim">(click a key, then press the new one)</span></span><span class="dim" id="o-bind-note"></span></div>
     <div class="line"><span>4 lanes <span class="dim">(EZ, HD)</span></span><span class="binds" id="o-bind4"></span></div>
     <div class="line"><span>6 lanes <span class="dim">(IN, AT)</span></span><span class="binds" id="o-bind6"></span></div>
-    <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
+    <div class="line"><span>Keyboard <span class="dim">(line zones, Wide lanes, key test)</span></span><button id="o-kbd" type="button">Keyboard regions and key test</button></div>
     <p class="dim" style="margin-top:6px">Keys that won't light up together can't be pressed at once. Stick to EZ/HD.</p>
     <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button><button id="o-sound-test" type="button">Sound test</button><button id="o-editor" type="button">Chart editor</button></span></div>
     <div class="line"><span>Test mode <span class="dim">(every song open; no tokens, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
@@ -436,6 +454,16 @@
     <div class="calib-dot" id="c-dot"></div>
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
+
+  <!-- The keyboard: the moving line's regions, Wide lanes, and a key test over the whole keyboard. -->
+  <div class="over" id="kbd" hidden><div class="card" style="width:760px"><h2>Keyboard</h2>
+    <p class="dim">On the moving line, where your hand is on the keyboard is where the note is on screen. IN and AT have 4 regions;
+      HD 2 (the left and right hand); EZ takes any of these keys or Space.</p>
+    <div class="line"><span>Line regions</span><span class="seg" id="k-regions"><button type="button" data-v="default">Default (4 columns)</button> <button type="button" data-v="mirrored">Mirrored</button></span></div>
+    <div class="line"><span>Wide lanes <span class="dim">(the highway's lanes take these regions too)</span></span><span class="seg" id="k-wide"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
+    <div class="kbmap" id="k-map"></div>
+    <p class="dim" id="k-down" style="margin-top:6px">Hold keys down: they light up. If some don't light up together, your keyboard can't press them at once.</p>
+    <div class="btns"><button id="k-close" type="button">Done (Esc)</button></div></div></div>
 
   <!-- Once, after the remaster reset an old save. -->
   <div class="over" id="remaster" hidden><div class="card"><h2>Remastered</h2>
@@ -520,8 +548,15 @@ const rankPay = (level, diff, rank) => PAY.rankDiffs.includes(diff) && PAY.rank[
 /* ── Rules ─────────────────────────────────────────────────────────────── */
 // Seconds either side of a note. Phigros-wide, not osu!mania-strict: keyboards are hard enough.
 const WIN = { perfect: 0.07, great: 0.11, good: 0.15 };
-const VALUE = { Perfect: 300, Great: 200, Good: 100, Miss: 0 };
-const RANKS = [["S", 950000], ["A", 900000], ["B", 800000], ["C", 650000]];
+// Scoring like Phigros: a judgment is worth a share of a note (Great 75%, Good 40%), and the score is 900,000 x
+// accuracy + 100,000 x (max combo / notes). Ranks at Phigros' cutoffs, V on top; under C isn't a clear
+// (a boss still clears on HP). FC (no Miss) and AP (all Perfect) are kept with the best.
+const VALUE = { Perfect: 1, Great: 0.75, Good: 0.4, Miss: 0 };
+const RANKS = [["V", 960000], ["S", 920000], ["A", 880000], ["B", 820000], ["C", 700000]];
+const rankOf = s => (RANKS.find(([, min]) => s >= min) || [null])[0];
+// A score from judgment counts (a stored best's, when it kept them).
+const scoreOf = (counts, maxCombo, judged, edge = false) => !judged ? 0
+  : Math.round((0.9 * ["Perfect", "Great", "Good", "Miss"].reduce((t, j) => t + (counts[j] || 0) * VALUE[j], 0) / judged + 0.1 * maxCombo / judged) * 1000000 * (edge ? EDGE : 1));
 const EDGE = 1.03;   // the buddy's type edge on a boss fight: score only
 const BATTLE = { youHp: 100, missHurt: 5, finalHurt: 6, bossShare: 0.75, crit: 16, critMult: 1.5, charge: 1.5 };
 const DIFF_NAME = { ez: "EZ", hd: "HD", in: "IN", at: "AT" };
@@ -555,6 +590,23 @@ const DEFAULT_BINDS = { 4: ["KeyD", "KeyF", "KeyJ", "KeyK"], 6: ["KeyS", "KeyD",
 // Esc pauses, R retries, Enter continues: never a lane. Ctrl, Alt and the OS key belong to the browser.
 const RESERVED_KEYS = ["Escape", "KeyR", "Enter", "NumpadEnter", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "OSLeft", "OSRight"];
 const keysFor = lanes => opts.binds[lanes === 6 ? 6 : 4];
+// The keyboard by its physical columns (e.code), left to right. The moving line's zones are regions of it, like a
+// tablet: where your hand is on the keyboard is where the note is on screen. 4 regions (IN, AT), 2 (HD: columns
+// 1-5 | 6 on), 6 (Wide lanes on six-lane charts, the outer columns to the outer lanes). "Mirrored" turns them round.
+// Esc, Tab, Caps Lock, Enter, Shift, Ctrl, Alt, the OS keys and the arrows are never in one.
+const KEY_COLUMNS = [["Digit1", "KeyQ", "KeyA", "KeyZ"], ["Digit2", "KeyW", "KeyS", "KeyX"], ["Digit3", "KeyE", "KeyD", "KeyC"], ["Digit4", "KeyR", "KeyF", "KeyV"],
+  ["Digit5", "KeyT", "KeyG", "KeyB"], ["Digit6", "KeyY", "KeyH", "KeyN"], ["Digit7", "KeyU", "KeyJ", "KeyM"], ["Digit8", "KeyI", "KeyK", "Comma"],
+  ["Digit9", "KeyO", "KeyL", "Period"], ["Digit0", "KeyP", "Semicolon", "Slash"], ["Minus", "BracketLeft", "Quote"]];
+const REGION_COLS = { 2: [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9, 10]], 4: [[0, 1, 2], [3, 4], [5, 6], [7, 8, 9, 10]], 6: [[0, 1], [2], [3, 4], [5, 6], [7], [8, 9, 10]] };
+const columnOf = code => KEY_COLUMNS.findIndex(c => c.includes(code));
+function keyRegion(code, n) {
+  const col = columnOf(code); if (col < 0) return -1;
+  const r = REGION_COLS[n].findIndex(g => g.includes(col));
+  return opts.regions === "mirrored" ? n - 1 - r : r;
+}
+// A region's keys as a short label: its top letter row and home row ("Q W E · A S D").
+const regionLabel = (r, n) => { const cols = REGION_COLS[n][opts.regions === "mirrored" ? n - 1 - r : r];
+  return [1, 2].map(row => cols.map(c => keyName(KEY_COLUMNS[c][row] || "")).join(" ")).join(" · "); };
 // Every bound key, either row: any of them plays on the moving line.
 const boundKeys = () => new Set([...opts.binds[4], ...opts.binds[6]]);
 // A key's name as printed on it: "Space", ";", "Shift", "F", "7".
@@ -623,7 +675,7 @@ const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringi
 // lesson: Meloetta's Lesson is finished or skipped. tips: the one-time help already seen (six, lines,
 // below, speed: the tips; boss: the first boss card; flip: the first moving line's two-bar cue).
 const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitKind: "auto", hitVol: 60,
-  calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
+  calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0, regions: "default", wide: 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
 {
   const saved = opts.binds || {}, ok = (row, n) => Array.isArray(row) && row.length === n && new Set(row).size === n
@@ -640,7 +692,18 @@ const keepOpts = () => writeJSON(OPTS_KEY, opts);
 }
 let save = null;
 const slotKey = () => opts.test ? TEST_KEY : SAVE_KEY;
-function loadSave() { save = Object.assign({ best: {}, badges: {} }, readJSON(slotKey()) || {}); }
+function loadSave() {
+  save = Object.assign({ best: {}, badges: {} }, readJSON(slotKey()) || {});
+  // Phigros scoring (save.ranks 2): every stored best re-ranked once, from its judgment counts if it kept them,
+  // else its score under the new cutoffs. A best that was a clear stays at least a C. Tokens are never taken back.
+  if (save.ranks !== 2) {
+    for (const b of Object.values(save.best)) {
+      if (b.counts && b.judged) b.score = scoreOf(b.counts, b.maxCombo || 0, b.judged, b.edge);
+      b.rank = rankOf(b.score) || "C";
+    }
+    save.ranks = 2; writeJSON(slotKey(), save);
+  }
+}
 const keep = () => writeJSON(slotKey(), save);
 loadSave();
 // Poké Idle's Story save, read-only: which years are cleared.
@@ -1553,7 +1616,7 @@ function build(song, diff = "hd") {
       if (lane > L - 1) lane = L - 2; if (lane < 0) lane = 1;
       lastPitch = m; lastBeat = b;
       const hold = !song.noHolds && len >= D.holdMin + (own.holds ? 0 : 1) ? (len - 1) / 2 : 0;
-      tune.push({ b, lane, len: hold, mode });
+      tune.push({ b, lane, len: hold, mode, midi: m });
     }
     // The answer (call and response): a second line on the arp's voice in the lead's gaps. The band
     // plays it and the filler may chart it; the melody's notes stay the chart's first layer.
@@ -1732,7 +1795,7 @@ function build(song, diff = "hd") {
       let lane = order.find(l => fits(e.b, l, len)), hold = len;
       if (lane == null && len) { lane = order.find(l => fits(e.b, l, 0)); hold = 0; }
       if (lane == null) continue;
-      put({ b: e.b, lane, len: hold, mode: m });
+      put({ b: e.b, lane, len: hold, mode: m, midi: e.midi });
     }
   }
   if (band) bandChart(); else {
@@ -1877,16 +1940,28 @@ function choreograph(B, script) {
 // isn't hit again sooner than the highway lets a lane be (a hold keeps its zone until it ends). A note
 // that fits nowhere is left out. Drags take the zone they land in.
 const ZONES = { ez: 1, hd: 2, in: 4, at: 4 };
-const ZONE_COLORS = ["#ff7a90", "#7ee08a", "#6fb4ff", "#c58bff"];
+// How a line note shows its zone: "pip" (a small soft glow just above the bar) or "caps" (its two ends tinted).
+let ZONE_HINT = "pip";
+// Muted pastels for the dark blurred stage (shown at 80%): the zone hints, the keyboard diagram, the zone grid.
+const ZONE_COLORS = ["#e3a6b6", "#a9d8b0", "#a6c4e6", "#c7b4e4"];
 const zoneColor = (z, Z) => ZONE_COLORS[Z === 2 ? z * 2 : z];
 // The zone a hit point is in, or -1 when it's off the play area or within ZONE_EDGE px of a border.
-const ZONE_EDGE = 26;
+// A chart keeps notes ZONE_MARGIN of a zone's width from its borders. Near a border a note is lenient: within
+// LENIENT of it (the middle border, left hand | right hand, MIDDLE) the neighbouring zone's keys count too.
+const ZONE_MARGIN = 0.08, LENIENT = 0.15, MIDDLE = 0.2;
+// Where a hit point is: its zone and how far across it (f, 0-1), or null off the play area or too near a border.
 function zoneAt(x, y, rot, Z) {
-  if (x < 40 || x > 1240 || y < 180 || y > 700) return -1;
+  if (x < 40 || x > 1240 || y < 180 || y > 700) return null;
   const rows = Z === 4 && Math.abs(Math.sin(rot * Math.PI / 180)) > 0.866, size = rows ? 552 / 4 : 1280 / Z;
-  const v = rows ? (y - 160) / size : x / size, k = Math.floor(v), f = v - k, edge = ZONE_EDGE / size;
-  if (k < 0 || k >= Z || (k > 0 && f < edge) || (k < Z - 1 && f > 1 - edge)) return -1;
-  return k;
+  const v = rows ? (y - 160) / size : x / size, k = Math.floor(v), f = v - k;
+  if (k < 0 || k >= Z || (k > 0 && f < ZONE_MARGIN) || (k < Z - 1 && f > 1 - ZONE_MARGIN)) return null;
+  return { k, f };
+}
+// The neighbouring zone whose keys also count for a note at f across zone z (or null).
+function lenientZone(z, f, Z) {
+  if (z > 0 && f < (z === Z / 2 ? MIDDLE : LENIENT)) return z - 1;
+  if (z < Z - 1 && 1 - f < (z + 1 === Z / 2 ? MIDDLE : LENIENT)) return z + 1;
+  return null;
 }
 const hitPoint = (s, lx) => { const th = s.rot * Math.PI / 180; return { x: s.x + lx * Math.cos(th), y: s.y + lx * Math.sin(th) }; };
 function zones(B) {
@@ -1894,9 +1969,13 @@ function zones(B) {
   if (Z < 2 || !B.lines) return;
   const D = { ...CHART_DIFFS[B.diff], ...((B.song.tune || {})[B.diff] || {}) }, L = B.lanes, jack = D.jack / B.spb, d = 0.15 / B.spb;
   const pref = n => Z === 4 ? (L === 6 ? [0, 0, 1, 2, 3, 3][n.lane] : n.lane) : n.lane < L / 2 ? 0 : 1;
-  // Where across its zone a note tries first (on 2 zones its lane picks a side of its half), then the rest of the zone.
-  const spots = n => { const first = Z === 2 ? (L === 6 ? [0.25, 0.5, 0.75] : [0.32, 0.68])[n.lane % (L / 2)] : 0.5;
-    return [first, 0.5, 0.3, 0.7, 0.15, 0.85, 0.06, 0.94].filter((f, i, a) => a.indexOf(f) === i); };
+  // Where across its zone a note goes: anywhere in it, by the music (higher notes further right, its lane where it
+  // has no pitch), with a little spread so repeats don't stack; then the rest of the zone if that spot won't do.
+  const pitches = B.chart.filter(n => n.midi != null).map(n => n.midi), lo = Math.min(...pitches), hi = Math.max(...pitches);
+  const spots = n => {
+    const t = n.midi != null && hi > lo ? (n.midi - lo) / (hi - lo) : (n.lane + 0.5) / L, jitter = (hash(B.song.id + ":" + n.b.toFixed(3) + ":" + n.lane) - 0.5) * 0.14;
+    const first = Math.max(ZONE_MARGIN + 0.02, Math.min(0.98 - ZONE_MARGIN, 0.1 + 0.8 * t + jitter));
+    return [first, 0.5, 0.3, 0.7, 0.18, 0.82, 0.11, 0.89].filter((f, i, a) => a.indexOf(f) === i); };
   // Along the line to a spot in zone z (f: how far across its column, or down its row on a steep line), within the bar.
   const along = (s, z, f) => {
     const th = s.rot * Math.PI / 180, rows = Z === 4 && Math.abs(Math.sin(th)) > 0.866;
@@ -1930,14 +2009,14 @@ function zones(B) {
         for (const f of spots(n)) {
           const lx = along(s, z, f);
           if (lx == null) continue;
-          const now = hitPoint(s, lx), then = hitPoint(was, lx);
-          if (zoneAt(now.x, now.y, s.rot, Z) !== z || zoneAt(then.x, then.y, was.rot, Z) !== z || !inView(n, lx)) continue;
-          got = { z, lx }; break;
+          const now = hitPoint(s, lx), then = hitPoint(was, lx), at = zoneAt(now.x, now.y, s.rot, Z), before = zoneAt(then.x, then.y, was.rot, Z);
+          if (!at || at.k !== z || !before || before.k !== z || !inView(n, lx)) continue;
+          got = { z, lx, f: at.f }; break;
         }
         if (got) break;
       }
       if (!got) continue;
-      n.zone = got.z; n.lx = got.lx; keep.push(n);
+      n.zone = got.z; n.lx = got.lx; n.zf = got.f; n.alt = lenientZone(got.z, got.f, Z); keep.push(n);
       if (n.kind !== "drag") { used.add(got.z); busy[got.z] = n.b + n.len + jack; }
     }
     i = j;
@@ -2299,7 +2378,7 @@ function hiddenOpen(song) {
   return false;
 }
 const total = () => Object.values(save.best).reduce((t, b) => t + (b.score || 0), 0);
-const rankIndex = r => ["C", "B", "A", "S"].indexOf(r);
+const rankIndex = r => ["C", "B", "A", "S", "V"].indexOf(r);
 
 /* ── The map ───────────────────────────────────────────────────────────── */
 function say(text, num = MELOETTA, pir = false) {
@@ -2330,7 +2409,7 @@ function songRow(song, label) {
     c.onclick = () => { if (!free) return; picked[song.id] = d; drawMap(); };
     pick.append(c);
   }
-  meta.append(pick, el("span", "best" + (b ? "" : " dim"), !ok ? (song.gym === 0 && !lessonOk() ? "after the lesson" : "locked") : b ? b.rank + " · " + fmt(b.score) : "-"));
+  meta.append(pick, el("span", "best" + (b ? "" : " dim"), !ok ? (song.gym === 0 && !lessonOk() ? "after the lesson" : "locked") : b ? b.rank + " · " + fmt(b.score) + (b.ap ? " · AP" : b.fc ? " · FC" : "") : "-"));
   row.append(t, meta);
   return row;
 }
@@ -2433,7 +2512,7 @@ function drawOpts() {
 // The key test: hold your lane keys (both rows) and see which ones the keyboard reports together.
 const keyHeld = new Set();
 function drawKeyTest() {
-  const box = $("#o-keys"); box.replaceChildren();
+  const box = $("#o-keys"); if (!box) return; box.replaceChildren();
   for (const code of boundKeys()) box.append(el("b", keyHeld.has(code) ? "on" : "", keyName(code)));
   box.append(el("span", "", keyHeld.size + " down"));
 }
@@ -2476,6 +2555,26 @@ $("#b-lesson").onclick = () => lessonCard(0);
 $("#o-lesson").onclick = () => { $("#opts").hidden = true; drawMap(); lessonCard(0); };
 $("#o-bosscard").onclick = () => bossCard(null);
 $("#o-sound-test").onclick = () => { $("#sound").hidden = false; drawSound(); };
+$("#o-kbd").onclick = () => { $("#kbd").hidden = false; drawKbd(); };
+$("#k-close").onclick = () => { $("#kbd").hidden = true; kbdHeld.clear(); };
+// The keyboard overlay: the regions (as the line plays them: 4 columns, coloured), Wide lanes, and the key test.
+const kbdHeld = new Set();
+const KBD_ROWS = [["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus"],
+  ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft"],
+  ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote"],
+  ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"]];
+function drawKbd() {
+  seg($("#k-regions"), opts.regions, v => { opts.regions = v; keepOpts(); }, drawKbd);
+  seg($("#k-wide"), opts.wide, v => { opts.wide = Number(v); keepOpts(); }, drawKbd);
+  const map = $("#k-map"); map.replaceChildren();
+  KBD_ROWS.forEach((row, i) => {
+    const r = el("div", "row"); r.style.paddingLeft = i * 14 + "px";
+    for (const code of row) { const z = keyRegion(code, 4), k = el("b", kbdHeld.has(code) ? "on" : "", keyName(code)); k.style.setProperty("--zc", ZONE_COLORS[z]); r.append(k); }
+    map.append(r);
+  });
+  const sp = el("div", "row"); sp.style.paddingLeft = "160px"; sp.append(el("b", "space" + (kbdHeld.has("Space") ? " on" : ""), "Space (EZ)")); map.append(sp);
+  $("#k-down").textContent = kbdHeld.size ? kbdHeld.size + " down: " + [...kbdHeld].map(keyName).join(" ") : "Hold keys down: they light up. If some don't light up together, your keyboard can't press them at once.";
+}
 $("#o-editor").onclick = () => openEditor(ED.song || SONGS[0], ED.diff);
 
 /* ── The sound test ────────────────────────────────────────────────────── */
@@ -2706,16 +2805,16 @@ function start(song, diff = pickedDiff(song), given = null) {
     $("#boss-hp").style.setProperty("--hp", TYPE_COLOR[boss.types[boss.types.length - 1]] || "#fff");
     say2(song.before ? "Blue: \u201c" + song.before + "\u201d" : edge ? "Type edge on " + boss.name + ": +3% score" : you.buddy ? "" : "No buddy? Set one in Poké Gacha.", song.before ? 4000 : 1500);
   }
-  $("#play").className = "screen skin-" + skin();
+  $("#play").className = "screen skin-" + skin() + " hint-" + ZONE_HINT;
   backdrop(songArt(song), songTint(song));
   $("#songname").textContent = song.title + (P.test ? " · test" : "");
   $("#songlv").textContent = song.lesson ? "Lesson · " + song.step + " of 6" : DIFF_NAME[B.diff] + " Lv." + B.level;
   $("#tip").className = ""; $("#cue").hidden = true;
-  $("#cue").textContent = P.zones > 1 ? "Zones! Hit the side it lands on." : "Any key! Watch the line.";
+  $("#cue").textContent = P.zones > 1 ? "Zones! The keyboard side where it lands." : "Any key! Watch the line.";
   // The first time line notes have zones: a tip, once (kept apart from tipsFor's list).
   const zoned = notes.find(n => n.mode === "line" && n.zone != null);
   if (P.zones > 1 && zoned && !opts.tips.zones) {
-    P.tips.push({ id: "zones", at: Math.max(-lead + 0.5, zoned.t - 3), text: "On HD and up, the line has zones. Hit the key for the side the note lands on." });
+    P.tips.push({ id: "zones", at: Math.max(-lead + 0.5, zoned.t - 3), text: "Zones! Hit any key on the side of the keyboard where the note lands." });
     P.tips.sort((a, b) => a.at - b.at);
     for (let i = 1; i < P.tips.length; i++) P.tips[i].at = Math.max(P.tips[i].at, P.tips[i - 1].at + 2.2);
   }
@@ -2723,7 +2822,7 @@ function start(song, diff = pickedDiff(song), given = null) {
   const grid = $("#zonegrid"); grid.replaceChildren(); grid.className = "";
   if (P.zones > 1) for (let z = 0; z < P.zones; z++) {
     if (z) { const i = el("i"); i.style.left = z * 1280 / P.zones + "px"; grid.append(i); }
-    const label = el("b", "", zoneKeys(z).map(keyName).join(" ")); label.style.left = (z + 0.5) * 1280 / P.zones + "px"; label.style.setProperty("--zc", zoneColor(z, P.zones)); grid.append(label);
+    const label = el("b", "", regionLabel(z, P.zones)); label.style.left = (z + 0.5) * 1280 / P.zones + "px"; label.style.setProperty("--zc", zoneColor(z, P.zones)); grid.append(label);
   }
   $("#beatdot").hidden = !!opts.sound;
   // Lanes: faint lines between them, a glow per lane while its key is down, and the keys under the line.
@@ -2739,7 +2838,7 @@ function start(song, diff = pickedDiff(song), given = null) {
   if (lineFirst) P.mode = "line";
   P.keys.forEach((k, i) => {
     const d = el("div"); d.style.left = (640 + laneX(i, L)) + "px"; d.style.width = W + "px"; d.style.marginLeft = -W / 2 + "px";
-    const label = el("b", "", keyName(k)); label.style.color = ZONE_COLORS[L === 6 ? [0, 0, 1, 2, 3, 3][i] : i]; d.append(label);
+    const label = el("b", "", opts.wide ? regionLabel(i, L === 6 ? 6 : 4).split(" · ")[1] : keyName(k)); label.style.color = ZONE_COLORS[L === 6 ? [0, 0, 1, 2, 3, 3][i] : i]; d.append(label);
     const m = i - (L - 4) / 2;
     if (P.battle && m >= 0 && m < 4) d.append(el("span", "", P.battle.you.moves[m]));
     keys.append(d);
@@ -2759,7 +2858,11 @@ function start(song, diff = pickedDiff(song), given = null) {
     const d = el("div", "nt" + (n.dbl ? " dbl" : "") + (n.kind === "drag" ? " drag" : "") + (n.kind === "hold" ? " hold" : ""));
     if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.mode === "line" && B.floors ? floorAt(B.floors[n.line], n.rel + n.len) - floorAt(B.floors[n.line], n.rel) : n.len) * pxBeat + "px"; d.append(beam); }
     d.append(el("div", "head"));
-    if (n.zone != null && P.zones > 1) { const z = el("i", "zone"); z.style.setProperty("--zc", zoneColor(n.zone, P.zones)); d.append(z); }
+    if (n.zone != null && P.zones > 1) {
+      d.classList.add("zoned"); if (n.alt != null) d.classList.add("lenient");
+      const [a, b] = n.alt == null ? [n.zone, n.zone] : [Math.min(n.zone, n.alt), Math.max(n.zone, n.alt)];
+      d.style.setProperty("--zc", zoneColor(a, P.zones)); d.style.setProperty("--zc2", zoneColor(b, P.zones)); d.append(el("i", "zone"));
+    }
     d.style.display = "none";
     P.lines[n.line].append(d);
     n.el = d;
@@ -2865,7 +2968,6 @@ function frame() {
   if (P.cue) {
     const on = rel >= -0.25 && rel < P.cue.to, c = $("#cue");
     c.hidden = !on;
-    if (on) { const s = B.lines ? lineAt(B.lines[0], Math.max(0, rel), 0) : LINE0; c.style.transform = "translate(" + Math.max(240, Math.min(1040, s.x)) + "px," + Math.max(180, Math.min(640, s.y - 70)) + "px)"; }
     if (P.cue.real && rel >= 0 && !opts.tips.flip) { opts.tips.flip = 1; keepOpts(); }
   }
   while (P.tips.length && t >= P.tips[0].at) { const tp = P.tips.shift(); showTip(tp.text); opts.tips[tp.id] = 1; keepOpts(); }
@@ -2918,12 +3020,14 @@ function hitWindow(dt) {
   const a = Math.abs(dt);
   return a <= WIN.perfect ? "Perfect" : a <= WIN.great ? "Great" : a <= WIN.good ? "Good" : null;
 }
-// The keys of zone z (this chart's row: 4 or 6), and a key's zone (-1: not one of them).
-const zoneKeys = z => P.keys.filter((c, i) => keyZoneAt(i) === z);
-const keyZoneAt = i => { const L = P.keys.length; return P.zones === 4 ? (L === 6 ? [0, 0, 1, 2, 3, 3][i] : i) : i < L / 2 ? 0 : 1; };
-const keyZone = code => { const i = P.keys.indexOf(code); return i < 0 ? -1 : keyZoneAt(i); };
+// A line note takes a key from its keyboard region (or, near a border, the neighbouring one's).
+const zoneTakes = (n, code) => { const z = keyRegion(code, P.zones); return z >= 0 && (z === n.zone || z === n.alt); };
 // A drag is caught by any key held in its zone (any key at all on EZ, or by autoplay).
-const heldIn = n => P.zones < 2 || n.mode !== "line" ? P.held.size > 0 : [...P.held].some(c => c === "auto" || keyZone(c) === n.zone);
+const heldIn = n => P.zones < 2 || n.mode !== "line" ? P.held.size > 0 : [...P.held].some(c => c === "auto" || zoneTakes(n, c));
+// The highway lane a key plays: its bind, or with Wide lanes its keyboard region.
+const laneOfKey = code => opts.wide ? keyRegion(code, P.keys.length === 6 ? 6 : 4) : P.keys.indexOf(code);
+// A key the moving line takes on EZ: any region key, Space, or a bound key.
+const lineKey = code => keyRegion(code, 4) >= 0 || code === "Space" || boundKeys().has(code);
 function press(lane, code) {
   if (!P || P.paused || P.done) return;
   const t = now();
@@ -2936,7 +3040,7 @@ function press(lane, code) {
     if (n.t - t > WIN.good) break;
     if (n.mode !== P.mode) continue;
     if (P.mode === "highway" && n.lane !== lane) continue;
-    if (P.mode === "line" && P.zones > 1 && n.zone !== keyZone(code)) continue;
+    if (P.mode === "line" && P.zones > 1 && !zoneTakes(n, code)) continue;
     if (Math.abs(n.t - t) <= WIN.good) { best = n; break; }
   }
   if (!best) return;
@@ -3022,9 +3126,7 @@ function battle(n, j, tail) {
 const moveOf = lane => P.battle.you.moves[((lane - (P.B.lanes - 4) / 2) % 4 + 4) % 4];
 function flinch(sel) { const i = $(sel); i.classList.remove("hurt"); void i.offsetWidth; i.classList.add("hurt"); }
 function score() {
-  if (!P.judged) return 0;
-  const acc = P.points / (P.judged * 300), combo = P.maxCombo / P.judged;
-  return Math.round((0.9 * acc + 0.1 * combo) * 1000000 * (P.edge ? EDGE : 1));
+  return scoreOf(P.counts, P.maxCombo, P.judged, P.edge);
 }
 function hud() {
   $("#score").textContent = String(score()).padStart(7, "0");
@@ -3136,7 +3238,7 @@ function finish(reachedEnd) {
     won = reachedEnd && P.battle.youHp > 0 && P.battle.bossHp <= 0;
     if (won && !rank) rank = "C";
     why = !reachedEnd || P.battle.youHp <= 0 ? "Your side fainted." : P.battle.bossHp > 0 ? P.boss.name + " held on. Hit more notes to wear it down." : "";
-  } else if (!rank) why = "Below 650,000. A clear needs rank C or better.";
+  } else if (!rank) why = "Below 700,000. A clear needs rank C or better.";
   if (!won) rank = null;
   stop();
   showResult({ song, diff, s, rank, won, why });
@@ -3146,22 +3248,27 @@ function showResult({ song, diff, s, rank, won, why }) {
   const key = song.id + ":" + diff, old = save.best[key] || null;
   $("#r-title").textContent = song.title + " · " + DIFF_NAME[diff];
   $("#r-sub").textContent = P.test ? "Test mode: no tokens, no board" : "";
+  const fc = P.counts.Miss === 0, ap = fc && P.counts.Great === 0 && P.counts.Good === 0;
   $("#r-rank").textContent = won ? rank : "—";
+  $("#r-badge").textContent = won && ap ? "AP" : won && fc ? "FC" : ""; $("#r-badge").className = ap ? "ap" : "";
   $("#r-clear").textContent = won ? (song.champion ? "Blue hands back Kanto's verse." : song.boss ? (song.final ? "Kanto's verse, sung whole." : GYMS[song.gym].badge + "!") : "Cleared.") : "Not cleared. " + why;
   const rows = $("#r-table"); rows.replaceChildren();
   const add = (a, b) => { const r = el("tr"); r.append(el("td", "", a), el("td", "", b)); rows.append(r); };
   add("Score", fmt(s) + (P.edge ? " (type edge +3%)" : ""));
-  add("Accuracy", (P.n ? 100 * P.points / (P.n * 300) : 0).toFixed(2) + "%");
+  add("Accuracy", (P.n ? 100 * P.points / P.n : 0).toFixed(2) + "%");
   add("Max combo", P.maxCombo + " / " + P.judged);
   for (const j of ["Perfect", "Great", "Good", "Miss"]) add(j, P.counts[j]);
-  if (old) add("Best", fmt(old.score) + " · " + old.rank);
+  if (old) add("Best", fmt(old.score) + " · " + old.rank + (old.ap ? " · AP" : old.fc ? " · FC" : ""));
   $("#r-pay").textContent = ""; $("#r-note").textContent = !won ? "" : song.after ? "Blue: \u201c" + song.after + "\u201d" : song.note || "";
   $("#r-ps").hidden = !(won && song.ps); $("#r-ps").textContent = song.ps || "";
   if (!won) return;
   // Save the best; a boss win is the gym's badge and its verse.
   const better = !old || s > old.score;
   const rankUp = !old || rankIndex(rank) > rankIndex(old.rank);
-  if (better || rankUp) save.best[key] = { score: Math.max(s, old ? old.score : 0), rank: rankUp ? rank : old.rank };
+  // The best keeps its judgment counts (so a later change to the scoring can re-rank it), and FC/AP once earned.
+  if (better || rankUp || (fc && !(old && old.fc)) || (ap && !(old && old.ap)))
+    save.best[key] = { ...(better ? { score: s, counts: { ...P.counts }, maxCombo: P.maxCombo, judged: P.judged, edge: P.edge } : old),
+      rank: rankUp ? rank : old.rank, fc: fc || !!(old && old.fc), ap: ap || !!(old && old.ap) };
   if (song.champion) save.champion = 1;
   else if (song.boss) save.badges[song.final ? 4 : song.gym] = 1;
   keep();
@@ -3171,7 +3278,7 @@ function showResult({ song, diff, s, rank, won, why }) {
   // Tokens: the first clear, then each new rank step. The hub's ledger makes every one pay once.
   if (G) {
     let paid = null;
-    try { paid = G.pay({ song: song.id, diff: diff, rank: rank.toLowerCase(), badge: song.boss && !song.final && !song.champion ? song.gym : null, champion: song.champion ? song.region : null, finale: !!song.final, ...payTable() }); }
+    try { paid = G.pay({ song: song.id, diff: diff, rank: (rank === "V" ? "S" : rank).toLowerCase(), badge: song.boss && !song.final && !song.champion ? song.gym : null, champion: song.champion ? song.region : null, finale: !!song.final, ...payTable() }); }
     catch (error) { console.log("Relic Song: no payout.", error && error.message); }
     if (paid && paid.ok && paid.paid.total > 0) {
       const p = paid.paid;
@@ -3589,6 +3696,7 @@ addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
+  if (!$("#kbd").hidden) { e.preventDefault(); if (e.key === "Escape") $("#k-close").click(); else { kbdHeld.add(e.code); drawKbd(); } return; }
   if (!$("#remaster").hidden) { if (e.key === "Enter" || e.key === "Escape" || e.key === " ") { e.preventDefault(); $("#rm-ok").click(); } return; }
   if (!$("#sound").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#st-close").click(); } return; }
   // The boss card and the lesson's text boxes: Enter (or Space) goes on, Esc skips the lesson.
@@ -3603,9 +3711,9 @@ addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); pause(!P.paused); return; }
     if (P.paused) { if (e.code === "KeyR" && !e.shiftKey) retry(); return; }
     if (e.repeat) { e.preventDefault(); return; }
-    const lane = P.keys.indexOf(e.code);
+    const lane = laneOfKey(e.code);
     // The highway wants its lane keys; on the moving line any bound key plays (either row).
-    if (lane >= 0 || (P.mode === "line" && boundKeys().has(e.code))) { e.preventDefault(); press(lane, e.code); }
+    if (P.mode === "line" ? lineKey(e.code) : lane >= 0) { e.preventDefault(); press(P.mode === "line" ? -1 : lane, e.code); }
     return;
   }
   if (!$("#result").hidden) {
@@ -3618,9 +3726,10 @@ addEventListener("keydown", e => {
 });
 addEventListener("keyup", e => {
   if (!$("#editor").hidden) { if (ED.rec) edRecord(e.code, false); return; }
+  if (!$("#kbd").hidden) { kbdHeld.delete(e.code); drawKbd(); return; }
   if (!$("#opts").hidden) keyTest(e, false);
   if (!P || P.done) return;
-  release(P.keys.indexOf(e.code), e.code);
+  release(laneOfKey(e.code), e.code);
 });
 // Losing the window lets go of every key, and pauses a song in play.
 addEventListener("blur", () => { if (keyHeld.size) { keyHeld.clear(); drawKeyTest(); } if (P && !P.done && !P.paused && !$("#play").hidden) { for (const code of [...P.held]) release(-1, code); pause(true); } });
@@ -3643,7 +3752,7 @@ window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Obj
   finished: !!(P && P.finished), real: !opts.test, badges: badges() });
 // For the console and tests: every song's length, note count and payout.
 window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
-  opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; }, ED, openEditor, edExport, HAND_CHARTS,
+  opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; }, ED, openEditor, edExport, HAND_CHARTS, keyRegion, setHint: h => { ZONE_HINT = h; }, scoreOf, rankOf,
   // The template: styles, demos, the recipe check and the pay table (scripts/relic-song-table.mjs reads these).
   hitKinds: () => Object.keys(HITSOUNDS), autoHit, ZONES, CHART_DIFFS, clock: () => (P && ctx ? now() : null),
   TYPE_STYLES, SCALES, GIMMICKS, REGIONS, RECIPE, DEMOS, autoLine, keyShift, finalVerses, recipeCheck, regionCheck, roleOf, typeOf, clearPay, rankPay, payTable,
