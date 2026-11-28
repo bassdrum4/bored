@@ -7,7 +7,7 @@ import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, dailyResultC
 import { readStored, writeStored, writeRaw, removeStored, readStoredPrefix } from './hub/store.js';
 import {
   backendReady, request, getSession, getHandle, setHandle, loadRules, scoreRules, ANON_TOKEN,
-  freshSession, ensureProfile, renameHandle, authErrorMessage, suggestedHandle,
+  freshSession, ensureProfile, authErrorMessage, suggestedHandle,
   signIn, signUp, signOut, adoptToken, hasIdentity
 } from './hub/backend.js';
 import {
