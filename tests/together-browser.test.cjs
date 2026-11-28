@@ -370,6 +370,8 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await a.click('#together-back');await a.evaluate(()=>openGame('connect-four'));
   game=await frame(a,'.connect');assert.equal(await game.$eval('#actions',e=>e.hidden),false);
   await game.select('select[aria-label="Opponent"]','friend');
+  // The iframe can render before the hub's loading overlay releases pointer input.
+  await a.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
   await game.locator('button[aria-label="Drop in column 1"]').click();
   await game.waitForFunction(() => document.querySelectorAll('.disc.p1').length === 1);
   assert.equal(await game.$$eval('.disc.p1',x=>x.length),1);
