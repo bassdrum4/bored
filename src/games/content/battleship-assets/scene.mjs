@@ -19,7 +19,17 @@ scene.fog = new T.FogExp2(0x9db8c2, .0036);
 const camera = new T.PerspectiveCamera(44, innerWidth / innerHeight, .1, 1800);
 const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
+// The scene is a backdrop for a DOM board. Shots render at full scale; while the board
+// is in charge it renders smaller and slower so hover and clicks stay ahead of the waves.
+const maxRatio = Math.min(devicePixelRatio || 1, 1.6), restRatio = Math.min(devicePixelRatio || 1, 1.25);
+let pixelRatio = maxRatio;
+function setRatio(r) {
+  if (Math.abs(r - pixelRatio) < .01) return;
+  pixelRatio = r;
+  renderer.setPixelRatio(r);
+  renderer.setSize(innerWidth, innerHeight);
+}
+renderer.setPixelRatio(pixelRatio);
 renderer.toneMapping = T.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.04;
 host.appendChild(renderer.domElement);
@@ -125,6 +135,8 @@ let ships = [], occupied = new Map(), busy = false, cinematic = true, soundOn = 
 let ownModels = [], ownKey = '', clock = new T.Clock(), elapsed = 0, ac = null, shake = 0;
 // slow: the world clock during an impact. whip / fovKick / blowout are the camera and flash impulses.
 let slow = 1, fovKick = 0, whip = 0, blowout = 0, cineMode = 'full', lastFlash = -1;
+let turnAim = false, aimYaw = null, aimRoom = false;
+const aimPos = new T.Vector3(), aimFocus = new T.Vector3();
 const particles = [], billows = [], rings = [], flashes = [], scorches = [], burns = [];
 const burnPulse = { at: 0, index: 0 };
 
@@ -133,6 +145,37 @@ function pos(i) { return new T.Vector3(originX + (i % 10) * cell, .7, originZ + 
 // My own fleet sits on its own grid, nearer the camera. Same swell runs under both.
 const OWN_Z = 83;
 function ownPos(i) { return new T.Vector3(originX + (i % 10) * cell, 0, OWN_Z + Math.floor(i / 10) * cell) }
+
+/* ------------------------------------------------------------ your turn */
+// While it is your turn the board owns the lower screen, so the camera settles into the
+// strip above it: low off the port quarter, looking down the line of fire, guns out.
+// The framing is derived from the space the board actually leaves, so it holds at any size.
+function aimFraming() {
+  const cmd = document.querySelector('main .command');
+  const raw = cmd ? cmd.getBoundingClientRect().top : innerHeight * .3;
+  // On a phone, or a laptop that has no strip left above the board, stay wide.
+  aimRoom = raw >= 120;
+  if (!aimRoom) return;
+  const band = clamp(raw, innerHeight * .18, innerHeight * .62);
+  const tanH = Math.tan(camera.fov * Math.PI / 360);
+  // Low off the port quarter, close enough that the hull and guns read at this size.
+  // Narrow screens see less sideways, so back off until the hull still fits, but never
+  // past the own fleet's grid (z 83) or its ships sail into the shot.
+  const dist = clamp(20.4 * innerHeight / band * clamp(1.5 / camera.aspect, 1, 1.9), 40, 80);
+  const az = 57 * Math.PI / 180, el = 13 * Math.PI / 180;
+  aimPos.set(
+    player.position.x - Math.sin(az) * Math.cos(el) * dist,
+    Math.sin(el) * dist,
+    player.position.z + Math.cos(az) * Math.cos(el) * dist
+  );
+  const row = clamp(band * .28, innerHeight * .06, innerHeight * .45);
+  const dx = player.position.x - aimPos.x, dz = player.position.z - aimPos.z;
+  const elev = Math.atan2(8.6 - aimPos.y, Math.hypot(dx, dz));
+  const pitch = elev - Math.atan(((innerHeight / 2 - row) / (innerHeight / 2)) * tanH);
+  // Aim a touch left of the hull so the ship sits right of centre with its target water beside it.
+  const bearing = Math.atan2(dx, -dz) - .07;
+  aimFocus.set(aimPos.x + Math.sin(bearing) * 200, aimPos.y + Math.tan(pitch) * 200, aimPos.z - Math.cos(bearing) * 200);
+}
 const waveAt = (x, z) => .45 * Math.sin(x * .18 + elapsed * 1.2) + .24 * Math.cos(z * .32 + elapsed * .9) + .12 * Math.sin((x - z) * .7 + elapsed);
 function floatShip(g, amp = 1) {
   g.position.y = waveAt(g.position.x, g.position.z) * amp;
@@ -545,6 +588,7 @@ function setup() {
   camPos.copy(baseCam); look.copy(baseLook); camera.up.copy(UP);
   camera.fov = 44; camera.updateProjectionMatrix();
   if (shot) { shot = null; if (finish) { finish(); finish = null } }
+  turnAim = false;
   busy = false;
 }
 
@@ -620,7 +664,8 @@ function sound(key) {
 /* ----------------------------------------------------------------- loop */
 function update(now = 0) {
   requestAnimationFrame(update);
-  if (document.hidden || now - lastFrame < 29) return;
+  // Board frames get a lighter budget than shot frames; the swell reads fine at 20 fps.
+  if (document.hidden || now - lastFrame < (shot ? 29 : 50)) return;
   lastFrame = now;
   const dt = Math.min(clock.getDelta(), .1);
   // Slow motion on impact: the sea, smoke, debris and the shell all run on this clock.
@@ -675,7 +720,19 @@ function update(now = 0) {
   }
 
   let desired = baseCam.clone(), focus = baseLook.clone(), lambda = 3.4, fovGoal = 44, bank = 0, action = 0, snap = false;
-  if (shot) {
+  if (turnAim && aimRoom && !shot && cineMode !== 'off') {
+    /* --- your turn: hold on the ship, guns sweeping the enemy water ------ */
+    // A slow arc so the framing breathes without drifting off the target water.
+    const a = Math.sin(elapsed * .17) * .05;
+    const ox = aimPos.x - player.position.x, oz = aimPos.z - player.position.z;
+    desired.set(player.position.x + ox * Math.cos(a) - oz * Math.sin(a), aimPos.y, player.position.z + ox * Math.sin(a) + oz * Math.cos(a));
+    focus.copy(aimFocus);
+    lambda = 1.8; fovGoal = 42; action = .4;
+    for (const turret of (player.userData.turrets || [])) {
+      turret.rotation.y = turn(turret.rotation.y, aimYaw ?? Math.sin(elapsed * .23) * .13, 1 - Math.exp(-dt * 1.7));
+      if (turret.userData.barrels) for (const b of turret.userData.barrels) b.rotation.x = damp(b.rotation.x, Math.PI / 2 - .3, 1.6, dt);
+    }
+  } else if (shot) {
     const s = shot; s.t += sdt * (s.rate || 1); const t = s.t; action = 1;
     for (const turret of (s.gun.userData.turrets || [])) {
       turret.rotation.y = turn(turret.rotation.y, s.yaw, 1 - Math.exp(-dt * 5.5));
@@ -783,6 +840,7 @@ function update(now = 0) {
   camera.lookAt(look);
   // Whip: a short yaw kick on the cuts and on firing, gone in a fraction of a second.
   if (whip > .002) camera.rotateY(whip * .05);
+  setRatio(shot ? maxRatio : restRatio);
   renderer.render(scene, camera);
 }
 
@@ -938,6 +996,7 @@ if ($('sound')) $('sound').onclick = () => {
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  if (turnAim) aimFraming();
 });
 
 setup();
@@ -971,8 +1030,14 @@ window.ironTide = {
   fire,
   incoming,
   aim(i) {
-    const target = pos(i); reticle.position.copy(target); reticle.visible = true;
-    bearingLine.visible = true; layBearing(player.position, target);
+    // The square under the cursor: the ship's turrets train on it while you choose.
+    const target = Number.isInteger(i) && i >= 0 ? pos(i) : null;
+    aimYaw = target ? Math.atan2(-(target.x - player.position.x), -(target.z - player.position.z)) : null;
+    return aimYaw;
+  },
+  turn(on) {
+    if (!!on !== turnAim) { turnAim = !!on; if (turnAim) aimFraming(); }
+    return turnAim;
   },
   status() {
     const bs = new T.Box3().setFromObject(battery).getSize(new T.Vector3());
