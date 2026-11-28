@@ -101,6 +101,13 @@ test('discovery keeps its controls and fits small screens', async t => {
   await t.test('one filter row under the search box narrows the grid', async () => {
     assert.equal(await page.$('#collections'), null, 'the duplicate row above the search box is gone');
     assert.ok(await page.$('#filters'), 'the filter row below the search box stays');
+    assert.equal(await page.$eval('#filters > button:first-child', node => node.dataset.filter), 'Vettel');
+    await page.click('[data-filter="Vettel"]');
+    const vettel = ['ashcrown', 'pokedoku', 'poke-idle', 'poke-gacha', 'relic-song', 'shotgun-roulette'];
+    assert.deepEqual((await page.$eval('#grid .card', cards => cards.map(card => card.dataset.slug))).sort(), vettel.sort());
+    await page.type('#q', 'relic');
+    assert.deepEqual(await page.$eval('#grid .card', cards => cards.map(card => card.dataset.slug)), ['relic-song']);
+    await page.evaluate(() => { const q = document.querySelector('#q'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); });
     await page.click('[data-filter="Puzzle"]');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.filter), 'Puzzle', 'the filter keeps keyboard focus');
     const actual = await page.$$eval('#grid .card', cards => cards.map(card => card.dataset.slug));

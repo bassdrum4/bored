@@ -85,7 +85,11 @@ export const COLLECTIONS = [
   { id: 'relax', name: 'Relax & Unwind', note: 'Unhurried puzzles, cards, and worlds to tinker with.' }
 ];
 
+// Matches the developer's red-hover games, including the Civ Lite collaboration.
+export const VETTEL_GAMES = Object.freeze(['ashcrown', 'pokedoku', 'poke-idle', 'poke-gacha', 'relic-song', 'shotgun-roulette']);
+
 export function inCollection(slug, collection) {
+  if (collection === 'vettel') return VETTEL_GAMES.includes(slug);
   const game = DISCOVERY[slug];
   if (!game) return false;
   switch (collection) {

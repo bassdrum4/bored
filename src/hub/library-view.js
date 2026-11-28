@@ -270,6 +270,7 @@ function renderLibrary() {
       (!filter || [name, slug, ...meta, gameMeta(slug), ...(DISCOVERY[slug]?.inputs || [])].join(' ').toLowerCase().includes(filter)) &&
       (state.category === 'All' || (state.category === 'New' ? FRESH_GAMES.includes(slug) :
         state.category === 'Favorites' ? state.favorites.has(slug) :
+        state.category === 'Vettel' ? inCollection(slug, 'vettel') :
         state.category === 'Quick' ? inCollection(slug, 'quick') :
         state.category === 'Friends' ? (Boolean(TOGETHER_GAMES[slug]) ||
           (DISCOVERY[slug]?.players || '').includes('2 local')) :
