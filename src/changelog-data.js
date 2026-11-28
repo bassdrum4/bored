@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1040,
+  "count": 1041,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
+  {"sha":"68a08e37","date":"2026-11-27","author":"Daniel Lowe","subject":"Shorten Poké Idle portable save codes","pr":388},
   {"sha":"54341a41","date":"2026-11-27","author":"PenguinV360","subject":"Relic Song: fairer timing and a difficulty unlock chain","pr":386},
   {"sha":"cb120744","date":"2026-11-27","author":"PenguinV360","subject":"Relic Song: the music matches the notes on every difficulty, and hitsounds","pr":385},
   {"sha":"acc198a2","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros choreography on the moving line"},
