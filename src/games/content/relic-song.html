@@ -190,6 +190,14 @@
   /* A hold: head, beam and tail cap all the same width as a tap. */
   .nt .beam { position: absolute; left: 0; right: 0; bottom: 5px; background: linear-gradient(to top, rgba(160, 225, 255, .55), var(--beam));
               border: 1px solid rgba(255, 255, 255, .85); border-bottom: 0; border-top-width: 2px; border-radius: 5px 5px 0 0 }
+  /* A line note's zone (HD and up): a small dot in the zone's colour, the same as its keys' labels. */
+  .nt .zone { position: absolute; left: 50%; bottom: 13px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--zc); box-shadow: 0 0 6px var(--zc) }
+  .nt.hold .zone { bottom: 8px }
+  /* The zones, shown for a bar when the line takes over: borders and each zone's keys. */
+  #zonegrid { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .6s }
+  #zonegrid.on { opacity: 1; transition: opacity .15s }
+  #zonegrid i { position: absolute; top: 150px; bottom: 0; width: 1px; background: rgba(255, 255, 255, .22) }
+  #zonegrid b { position: absolute; top: 160px; width: 200px; margin-left: -100px; text-align: center; font-size: 20px; font-weight: 400; color: var(--zc) }
   .nt.miss { opacity: 0; transition: opacity .25s }
   .nt.morph { transition: left .7s ease-in-out, width .7s ease-in-out }
   .nt.done { display: none }
@@ -340,7 +348,7 @@
     <div id="mecol" hidden><img class="spr" id="me-img" alt=""><div class="nm" id="me-name"></div><div class="thin"><i id="me-hp"></i></div></div>
     <div id="songname"></div><div id="songlv"></div>
     <div id="relicfx"><img id="relic-img" alt=""><p id="relic-name">Relic Song</p><small id="relic-sub"></small></div>
-    <div id="tip"></div><div id="cue" hidden>Any key! Watch the line.</div>
+    <div id="tip"></div><div id="cue" hidden>Any key! Watch the line.</div><div id="zonegrid"></div>
     <div id="whiteflash"></div><div id="hitflash"></div>
     <div class="over" id="pausebox" hidden><div class="card"><h2>Paused</h2><p class="dim">The music waits with you.</p>
       <div class="btns"><button id="b-quit" type="button">Back to the map</button><button id="b-retry" type="button">Retry (R)</button><button id="b-resume" type="button">Resume (Esc)</button></div></div></div>
@@ -367,7 +375,8 @@
 
   <div class="over" id="opts" hidden><div class="card"><h2>Options</h2>
     <div class="line"><span>Sound</span><span class="mix"><span class="seg" id="o-sound"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Muted</button></span><input id="o-vol" type="range" min="0" max="100" step="5" aria-label="Volume"></span></div>
-    <div class="line"><span>Hitsounds</span><span class="mix hitmix"><span class="seg" id="o-hits"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Off</button></span><span class="seg" id="o-hitkind" aria-label="Hitsound"><button type="button" data-v="tick">Tick</button> <button type="button" data-v="wood">Wood</button> <button type="button" data-v="clap">Clap</button></span><input id="o-hitvol" type="range" min="0" max="100" step="5" aria-label="Hitsound volume"></span></div>
+    <div class="line"><span>Hitsounds <span class="dim">(a click when you hit)</span></span><span class="mix"><span class="seg" id="o-hits"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Off</button></span><input id="o-hitvol" type="range" min="0" max="100" step="5" aria-label="Hitsound volume"></span></div>
+    <div class="line"><span>Hitsound</span><span class="mix hitmix"><span class="seg" id="o-hitkind" aria-label="Hitsound"><button type="button" data-v="auto">Auto (match the song)</button> <button type="button" data-v="tick">Tick</button> <button type="button" data-v="wood">Wood</button> <button type="button" data-v="clap">Clap</button></span><button id="o-hitprev" type="button">Preview</button></span></div>
     <div class="line"><span>Audio offset <b id="o-off-v"></b></span><input id="o-off" type="range" min="-250" max="250" step="1"></div>
     <div class="line"><span class="dim">Notes late? Raise it. Early? Lower it.</span><button id="o-cal" type="button">Tap to calibrate</button></div>
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
@@ -397,7 +406,7 @@
 
   <!-- The sound test: music only, for reviewing songs. -->
   <div class="over" id="sound" hidden><div class="card"><h2>Sound test</h2>
-    <div class="now"><span id="st-now" class="dim">Pick a song. Music only, no notes.</span><span>Arrangement <span class="seg" id="st-diff"><button type="button" data-v="ez">EZ</button> <button type="button" data-v="hd">HD</button> <button type="button" data-v="in">IN</button> <button type="button" data-v="at">AT</button></span></span></div>
+    <div class="now"><span id="st-now" class="dim">Pick a song. Music only, no notes. Hold Shift to hear its hitsound on the beat.</span><span>Arrangement <span class="seg" id="st-diff"><button type="button" data-v="ez">EZ</button> <button type="button" data-v="hd">HD</button> <button type="button" data-v="in">IN</button> <button type="button" data-v="at">AT</button></span></span></div>
     <div class="list"><table><tbody id="st-list"></tbody></table></div>
     <div class="btns"><button id="st-stop" type="button">Stop</button><button id="st-close" type="button">Done (Esc)</button></div></div></div>
 
@@ -409,7 +418,7 @@
 
   <!-- Before the first boss ever (and from Options): what the break does. -->
   <div class="over" id="bosscard" hidden><div class="card"><h2>Boss fight!</h2>
-    <p>Halfway through, Meloetta sings Relic Song and the lanes break. Notes fly at a moving line. Any key hits them.</p>
+    <p>Halfway through, Meloetta sings Relic Song and the lanes break. Notes fly at a moving line. Any key hits them. On HD and up, use the key for the side the note lands on.</p>
     <div class="demo" aria-hidden="true">
       <span class="dcap">Lanes: each key its own lane</span><span class="dcap">The moving line: any key, only timing</span>
       <i class="dl" style="left:184px"></i><i class="dl" style="left:284px"></i><i class="dl" style="left:384px"></i>
@@ -570,7 +579,7 @@ const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringi
 // Reduce motion starts on when the system asks for less motion.
 // lesson: Meloetta's Lesson is finished or skipped. tips: the one-time help already seen (six, lines,
 // below, speed: the tips; boss: the first boss card; flip: the first moving line's two-bar cue).
-const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitKind: "tick", hitVol: 60,
+const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitKind: "auto", hitVol: 60,
   calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
 {
@@ -631,7 +640,28 @@ function setVolume() { if (master) master.gain.value = opts.sound ? 0.32 * opts.
 // calibration (its clicks are the beat to tap to). A chord's keys land within a few ms of each other,
 // so a click within 35 ms of the last one is skipped: one click a chord. `level` is 1 for Perfect and
 // Great, less for Good, least for a drag. Three clicks to pick from, none of them pitched or swept
-// (a sweep is a chirp): a noise tick, a woodblock, a clap.
+// (a sweep is a chirp): a noise tick, a woodblock, a clap; and with Auto (the default), the song's own
+// (AUTO_HITS: its type's, every one under 40 ms and soft).
+// A pitched click at a fixed pitch: sine partials [Hz, level], a 1 ms attack and an exponential fall to `ms`.
+const ping = (parts, ms, type = "sine") => (out, w, level) => {
+  for (const [f, a] of parts) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(a * level, w + 0.001); g.gain.exponentialRampToValueAtTime(0.001, w + ms / 1000);
+    o.connect(g); g.connect(out); o.start(w); o.stop(w + ms / 1000 + 0.01);
+  }
+};
+// A burst of noise through a filter: [type, Hz, Q], level, how long, and when after w (s).
+const hiss = (filter, a, ms, after = 0, attack = 0) => (out, w, level) => {
+  const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), t = w + after;
+  s.buffer = noiseBuf; f.type = filter[0]; f.frequency.value = filter[1]; f.Q.value = filter[2] || 0.8;
+  g.gain.setValueAtTime(attack ? 0.0001 : a * level, t); if (attack) g.gain.exponentialRampToValueAtTime(a * level, t + attack / 1000);
+  g.gain.exponentialRampToValueAtTime(0.001, t + ms / 1000);
+  s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + ms / 1000 + 0.01);
+};
+const both = (...fs) => (out, w, level) => fs.forEach(f => f(out, w, level));
+// The tick, quieter (a) and later (after, s): Psychic's echo and Ghost's tail are copies of it.
+function HIT_TICK(a, after = 0) { return hiss(["bandpass", 5200, 0.9], 1.6 * a, 12, after); }
 const HITSOUNDS = {
   // Tick: 12 ms of noise through a band high up, like a rhythm game's.
   tick: (out, w, level) => {
@@ -656,17 +686,52 @@ const HITSOUNDS = {
     g.gain.setValueAtTime(3 * level, w); g.gain.exponentialRampToValueAtTime(0.6 * level, w + 0.006);
     g.gain.setValueAtTime(2.6 * level, w + 0.008); g.gain.exponentialRampToValueAtTime(0.001, w + 0.05);
     s.connect(f); f.connect(g); g.connect(out); s.start(w, Math.random() * 0.5); s.stop(w + 0.06);
-  }
+  },
+  // The type styles' own (Auto). Fixed pitches only; an echo or a tail is a few quieter copies inside 40 ms.
+  crackle: both(hiss(["highpass", 3000], 1.2, 5), hiss(["highpass", 3600], 0.8, 5, 0.006), hiss(["highpass", 2600], 0.6, 6, 0.013)),   // Fire
+  droplet: ping([[1480, 0.7], [2960, 0.12]], 16),                                                                                     // Water
+  shaker: hiss(["bandpass", 7200, 1], 1.4, 30, 0, 5),                                                                                 // Grass
+  zap: both(ping([[1100, 0.5]], 14, "sawtooth"), hiss(["bandpass", 3200, 2], 2, 8)),                                               // Electric
+  glass: ping([[2640, 0.45], [5410, 0.16]], 36),                                                                                      // Ice
+  thump: both(ping([[118, 1.1]], 34), hiss(["bandpass", 1500, 1], 0.5, 6)),                                                           // Fighting
+  wobble: (out, w, level) => {                                                                                                        // Poison: a muted blip with a fast shiver
+    const o = ctx.createOscillator(), lfo = ctx.createOscillator(), depth = ctx.createGain(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = "triangle"; o.frequency.value = 520; lfo.frequency.value = 55; depth.gain.value = 18; lfo.connect(depth); depth.connect(o.frequency);
+    f.type = "lowpass"; f.frequency.value = 1400; g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(0.7 * level, w + 0.002); g.gain.exponentialRampToValueAtTime(0.001, w + 0.032);
+    o.connect(f); f.connect(g); g.connect(out); for (const x of [o, lfo]) { x.start(w); x.stop(w + 0.04); }
+  },
+  lowtock: ping([[330, 0.9], [660, 0.2]], 26),                                                                                        // Ground
+  puff: hiss(["lowpass", 1100, 0.7], 1.8, 32, 0, 4),                                                                                  // Flying
+  echo: both(HIT_TICK(1), HIT_TICK(0.4, 0.016), HIT_TICK(0.16, 0.031)),                                                               // Psychic
+  bugtick: both(hiss(["highpass", 6200], 1.3, 3), hiss(["highpass", 6800], 0.9, 3, 0.007)),                                           // Bug
+  stone: both(ping([[720, 0.7], [1530, 0.15]], 22), hiss(["bandpass", 1100, 1.2], 0.5, 9)),                                           // Rock
+  ghost: both(HIT_TICK(0.55), HIT_TICK(0.25, 0.009), HIT_TICK(0.12, 0.019), HIT_TICK(0.05, 0.03)),                                    // Ghost
+  dragon: both(ping([[160, 1], [480, 0.3]], 30), hiss(["bandpass", 900, 1], 0.45, 8)),                                                // Dragon
+  snap: hiss(["bandpass", 1800, 2.2], 3.6, 11),                                                                                       // Dark
+  clink: ping([[3150, 0.3], [4730, 0.18], [6920, 0.08]], 30, "square"),                                                               // Steel
+  musicbox: ping([[2093, 0.5], [4186, 0.12]], 36),                                                                                    // Fairy
+  bell: ping([[1319, 0.5], [2637, 0.14], [3956, 0.05]], 38)                                                                           // Meloetta (the final)
 };
+// Auto: the song's type's hitsound (a dual type, its first). Champions clap; the final is Meloetta's bell.
+const AUTO_HITS = { Normal: "tick", Fire: "crackle", Water: "droplet", Grass: "shaker", Electric: "zap", Ice: "glass", Fighting: "thump", Poison: "wobble",
+  Ground: "lowtock", Flying: "puff", Psychic: "echo", Bug: "bugtick", Rock: "stone", Ghost: "ghost", Dragon: "dragon", Dark: "snap", Steel: "clink", Fairy: "musicbox" };
+const autoHit = song => !song ? "tick" : song.final ? "bell" : song.champion ? "clap" : AUTO_HITS[String(typeOf(song)).split("/")[0]]
+  || { dealer: "snap", snake: "wobble", relic: "bell" }[song.style] || "tick";
+const hitKindFor = song => opts.hitKind === "auto" || !HITSOUNDS[opts.hitKind] ? autoHit(song) : opts.hitKind;
 let hitOut = null, lastHit = -1;
 function hitsound(level, at = null) {
-  if (!ctx || !noiseBuf || !opts.sound || !opts.hits || cal) return;
+  if (!opts.hits) return;
+  playHit(hitKindFor(P && P.song), level, at);
+}
+// One hitsound of a kind, now or at `at` (the preview and the sound test call this directly).
+function playHit(kind, level, at = null) {
+  if (!ctx || !noiseBuf || !opts.sound || cal) return;
   const w = at == null ? ctx.currentTime : at;
-  if (w - lastHit < 0.035) return;
+  if (w - lastHit < 0.035 && w >= lastHit) return;
   lastHit = w;
   if (!hitOut) { hitOut = ctx.createGain(); hitOut.connect(ctx.destination); }
   hitOut.gain.value = 0.5 * opts.hitVol / 100;
-  (HITSOUNDS[opts.hitKind] || HITSOUNDS.tick)(hitOut, w, level);
+  (HITSOUNDS[kind] || HITSOUNDS.tick)(hitOut, w, level);
 }
 const hz = midi => 440 * Math.pow(2, (midi - 69) / 12);
 // An instrument: wave, envelope (seconds), level, and optional vibrato, detune pair and filter,
@@ -998,7 +1063,7 @@ const SONGS = [
                   answer: ". . . . g4 a4 bb4 - | . . . . a4 bb4 c5 - | . . . . bb4 c5 d5 - | . . . . a4 bb4 c5 -", chords: "Gm Cm Bb D" },
              O: { lead: "d5 - c5 - bb4 - a4 - | g4 - - - - - . .", chords: "D Gm" } },
     form: "I H A H B H A H B A H O" },
-  { id: "onix-rising", region: "kanto", key: "Em", heat: { ez: 0.3, hd: 0.1, in: 0.14 }, gym: 0, boss: true, title: "Onix Rising", bpm: 124, bar: 4, style: "Rock",
+  { id: "onix-rising", region: "kanto", key: "Em", heat: { ez: 0.52, hd: 0.12, in: 0.16 }, gym: 0, boss: true, title: "Onix Rising", bpm: 124, bar: 4, style: "Rock",
     parts: { I: { lead: "e4 - - - b4 - - - | e4 - g4 - b4 - . .", chords: "Em B" },
              H: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
              A: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D", hint: "arp" },
@@ -1026,7 +1091,7 @@ const SONGS = [
              { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i % 3], y: 330, rot: 180, only: "hard" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", region: "kanto", key: "D", heat: { ez: 0.54, hd: 0.28 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "Water",
+  { id: "cerulean-current", region: "kanto", key: "D", heat: { ez: 0.56, hd: 0.28 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "Water",
     parts: { I: { lead: "d5 - - - a4 - - - | d5 - - - f#5 - . .", chords: "D A" },
              H: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
              A: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D", hint: "arp" },
@@ -1034,7 +1099,7 @@ const SONGS = [
                   answer: ". . . . f#5 e5 d5 - | . . . . a5 g5 f#5 - | . . . . d5 c#5 b4 - | . . . . a4 b4 c#5 -", chords: "Bm G A D" },
              O: { lead: "e5 - - - c#5 - - - | d5 - - - - - . .", chords: "A D" } },
     form: "I H A H B H A H B H O" },
-  { id: "tidepool-waltz", region: "kanto", key: "A", heat: { ez: 0.42, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 116, bar: 3, style: "Water",
+  { id: "tidepool-waltz", region: "kanto", key: "A", heat: { ez: 0.44, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 116, bar: 3, style: "Water",
     parts: { I: { lead: "a4 - - - e5 - | a4 - - - - -", chords: "A E" },
              H: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
              A: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A", hint: "bass" },
@@ -1042,7 +1107,7 @@ const SONGS = [
                   answer: ". . . . a5 g#5 | . . . . b5 a5 | . . . . g#5 f#5 | . . . . e5 -", chords: "A D E A" },
              O: { lead: "e5 - - - c#5 - | a4 - - - - -", chords: "E A" } },
     form: "I H A H B H A H B H A H B H O" },
-  { id: "starmie-undertow", region: "kanto", key: "Bm", heat: { ez: 0.6, hd: 0.32, in: 0.4 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "Water",
+  { id: "starmie-undertow", region: "kanto", key: "Bm", heat: { ez: 0.76, hd: 0.32, in: 0.4 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "Water",
     parts: { I: { lead: "b4 - - - f#5 - - - | b4 - - - d5 - . .", chords: "Bm F#" },
              H: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
              A: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm", hint: "arp" },
@@ -1066,7 +1131,7 @@ const SONGS = [
            { at: 64, len: 8, kind: "tide", amp: 20, period: 8, tilt: 4 }] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
-  { id: "vermilion-voltage", region: "kanto", key: "Am", heat: { ez: 0.9, hd: 0.16 }, gym: 2, title: "Vermilion Voltage", bpm: 152, bar: 4, style: "Electric",
+  { id: "vermilion-voltage", region: "kanto", key: "Am", heat: { ez: 0.92, hd: 0.16 }, gym: 2, title: "Vermilion Voltage", bpm: 152, bar: 4, style: "Electric",
     parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E" },
              H: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
              A: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true, hint: "bass" },
@@ -1074,7 +1139,7 @@ const SONGS = [
                   answer: ". . . . a5 g5 e5 . | . . . . g5 f5 d5 . | . . . . e5 d5 c5 . | . . . . e5 d5 b4 .", chords: "Am Dm F E" },
              O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am" } },
     form: "I H A H B H A H B H A H B H O" },
-  { id: "lightning-rod", region: "kanto", key: "Em", heat: { ez: 0.62, hd: 0.16 }, gym: 2, title: "Lightning Rod", bpm: 162, bar: 4, style: "Electric",
+  { id: "lightning-rod", region: "kanto", key: "Em", heat: { ez: 0.64, hd: 0.16 }, gym: 2, title: "Lightning Rod", bpm: 162, bar: 4, style: "Electric",
     parts: { I: { lead: "e5 . . . b4 . . . | e5 . g5 . b5 . . .", chords: "Em B" },
              H: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
              A: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true, hint: "arp" },
@@ -1082,7 +1147,7 @@ const SONGS = [
                   answer: ". . . . b4 c5 d5 . | . . . . c5 d5 e5 . | . . . . d5 e5 f#5 . | . . . . a4 b4 d#5 .", chords: "Em Am G B" },
              O: { lead: "f#5 . d#5 . b4 . . . | e5 - - - - - . .", chords: "B Em" } },
     form: "I H A H B H A H B H A H B H A H O" },
-  { id: "raichu-overload", region: "kanto", key: "Am", heat: { ez: 1.14, hd: 0.14, in: 0.22 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 170, bar: 4, style: "Electric",
+  { id: "raichu-overload", region: "kanto", key: "Am", heat: { ez: 1.36, hd: 0.2, in: 0.265 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 170, bar: 4, style: "Electric",
     parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E" },
              H: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
              A: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true, hint: "bass" },
@@ -1105,7 +1170,7 @@ const SONGS = [
            { at: 80, len: 2, kind: "fade", to: 0, line: 1 }, { at: 80, len: 2, kind: "fade", to: 0, line: 2 }] },
 
   // ── Erika, Celadon Gym (Grass) ──
-  { id: "celadon-petals", region: "kanto", key: "F", heat: { ez: 1, hd: 0.38 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "Grass",
+  { id: "celadon-petals", region: "kanto", key: "F", heat: { ez: 1, hd: 0.36 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "Grass",
     parts: { I: { lead: ". f5 - - . c5 - - | . f5 - a5 . c6 - -", chords: "F C" },
              H: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
              A: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F", hint: "arp" },
@@ -1113,7 +1178,7 @@ const SONGS = [
                   answer: ". . . . . d5 f5 g5 | . . . . . c5 e5 f5 | . . . . . bb4 d5 e5 | . . . . . c5 d5 e5", chords: "F Gm Dm C" },
              O: { lead: ". g5 - e5 . c5 - - | . f5 - - - - . .", chords: "C F" } },
     form: "I H A H B H A H O" },
-  { id: "gloom-garden", region: "kanto", key: "Dm", heat: { ez: 0.56, hd: 0.42 }, tune: { ez: { fillChords: 0.8, chords: 0.8 } }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "Grass",
+  { id: "gloom-garden", region: "kanto", key: "Dm", heat: { ez: 0.56, hd: 0.4 }, tune: { ez: { fillChords: 0.8, chords: 0.8 } }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "Grass",
     parts: { I: { lead: ". d5 - - . a4 - - | . d5 . f5 . a5 - -", chords: "Dm A" },
              H: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
              A: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm", hint: "bass" },
@@ -1121,7 +1186,7 @@ const SONGS = [
                   answer: ". . . . . a5 g5 f5 | . . . . . g5 f5 e5 | . . . . . f5 e5 d5 | . . . . . e5 f5 g5", chords: "Dm C Bb A" },
              O: { lead: ". e5 - c#5 . a4 - - | . d5 - - - - . .", chords: "A Dm" } },
     form: "I H A H B H A H B H O" },
-  { id: "vileplume-drift", region: "kanto", key: "F", heat: { ez: 0.56, hd: 0.42, in: 0.48 }, tune: { ez: { fillChords: 0.8, chords: 0.8 } }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "Grass",
+  { id: "vileplume-drift", region: "kanto", key: "F", heat: { ez: 0.64, hd: 0.44, in: 0.48 }, tune: { ez: { fillChords: 0.8, chords: 0.8 } }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "Grass",
     parts: { I: { lead: ". c5 - - . f5 - - | . a5 - g5 . f5 - -", chords: "F C" },
              H: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
              A: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C", hint: "arp" },
@@ -1150,7 +1215,7 @@ const SONGS = [
   // ── Champion Blue, Indigo Plateau ──
   // Each section in one of the four gyms' bands, Pidgeot's swoops on the line, two flips (line, highway,
   // line again), the last hook a tone up, and Kanto's whole verse as the last section.
-  { id: "champion-blue", region: "kanto", key: "G", heat: { ez: 0.6, hd: 0.26, in: 0.36, at: 0.28 }, tune: { ez: { step: 0.16, chords: 0.6 }, in: { step: 0.13 } }, champion: true, boss: true, at: true, title: "Sky Over Indigo", bpm: 128, bar: 4,
+  { id: "champion-blue", region: "kanto", key: "G", heat: { ez: 0.68, hd: 0.36, in: 0.34, at: 0.28 }, tune: { ez: { step: 0.16, chords: 0.6 }, in: { step: 0.13 } }, champion: true, boss: true, at: true, title: "Sky Over Indigo", bpm: 128, bar: 4,
     style: "Normal/Flying", type: "Normal", art: 18, foe: { num: 18, name: "Blue's Pidgeot", types: ["Normal", "Flying"] }, line: "auto",
     parts: { I: { lead: "g4 - - - d5 - - - | g4 - b4 - d5 - . .", chords: "G D" },
              H: { lead: "g4 - b4 - d5 - g5 - | f#5 - e5 - d5 - - - | e5 - c5 - a4 - d5 - | b4 - - - . . . .", chords: "G D C G" },
@@ -1168,7 +1233,7 @@ const SONGS = [
   // ── The finale: Meloetta ──
   // For now the ending, until all nine regions are in: built on Kanto's verse (the hook), with room
   // for the other eight at the break (finalVerses()).
-  { id: "relic-song", region: "kanto", key: "Em", heat: { ez: 0.28, hd: 0.3, in: 0.26, at: 0.26 }, tune: { ez: { step: 0.2 } }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 130, bar: 4, style: "relic",
+  { id: "relic-song", region: "kanto", key: "Em", heat: { ez: 0.44, hd: 0.32, in: 0.28, at: 0.28 }, tune: { ez: { step: 0.2 } }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 130, bar: 4, style: "relic",
     parts: { I: { lead: "e5 - - - b4 - - - | e5 - g5 - b5 - . .", chords: "Em B" },
              H: { lead: KANTO_MOTIF.lead, chords: KANTO_MOTIF.chords },
              B: { lead: "c6 - b5 - . . . . | a5 - e5 - . . . . | g5 - b5 - . . . . | e6 - - - . . . .",
@@ -1208,7 +1273,7 @@ const SONGS = [
   // ── Hidden tracks ──
   // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
   // land on beats 1 and 4 every bar, and the A part fires a fast burst.
-  { id: "the-dealer", region: "kanto", key: "Cm", heat: { ez: 0.56, hd: 0.32, in: 0.32, at: 0.32 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dealer", art: 10007, at: true,
+  { id: "the-dealer", region: "kanto", key: "Cm", heat: { ez: 0.84, hd: 0.32, in: 0.32, at: 0.28 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dealer", art: 10007, at: true,
     sync: true, chordAt: [0, 6], chordsAlways: true,
     // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
     verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
@@ -1242,7 +1307,7 @@ const SONGS = [
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", region: "kanto", key: "Em", heat: { ez: 0.88, hd: 0.34, in: 0.38, at: 0.36 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+  { id: "sssssssnakes", region: "kanto", key: "Em", heat: { ez: 0.88, hd: 0.36, in: 0.36, at: 0.395 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
     // The break: a long hiss, and then the line slithers in an S for the rest of the song.
     verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
     line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 600, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.55 }, { at: 0, kind: "speed", to: 0.9 },
@@ -1666,16 +1731,102 @@ function choreograph(B, script) {
     B.softened = fair(script, [0, 1, 2, 3].map(k => ns.filter(n => n.rel >= 0 && n.line === k).map(n => n.rel)));
     B.lines = lines(script); B.floors = floorsOf(script);
     for (const n of ns) if (n.rel >= 0) n.w = lineAt(B.lines[n.line], n.rel, n.line).w;
+  }
+  // Where a note sits across its line: its lane, a little jitter, times the line's spread.
+  for (const n of ns) n.lx = ((n.lane - (L - 1) / 2) * (L === 6 ? 115 : 150) + ((n.i * 37) % 5 - 2) * 14) * n.w;
+  // On HD and up the line has key zones: each line note is moved along its line into its zone, or left out.
+  if (script) zones(B);
+  if (script) {
+    const kept = B.chart;
     for (const g of script.filter(g => g.kind === "flash" || g.kind === "shake")) {
       if (!g.on) { B.fx.push({ b: B.verseAt + g.at, kind: g.kind }); continue; }
       const at = new Map();
-      for (const n of ns) if (n.kind !== "drag" && inSpan(g, n.rel)) at.set(n.b, (at.get(n.b) || 0) + 1);
+      for (const n of kept) if (n.kind !== "drag" && inSpan(g, n.rel)) at.set(n.b, (at.get(n.b) || 0) + 1);
       for (const [b, c] of at) if (g.on === "hits" || c > 1) B.fx.push({ b, kind: g.kind });
     }
     B.fx.sort((a, b) => a.b - b.b);
   }
-  // Where a note sits across its line: its lane, a little jitter, times the line's spread.
-  for (const n of ns) n.lx = ((n.lane - (L - 1) / 2) * (L === 6 ? 115 : 150) + ((n.i * 37) % 5 - 2) * 14) * n.w;
+}
+
+/* ── Key zones on the moving line ──────────────────────────────────────── */
+// On EZ any bound key hits a line note. On HD the screen has 2 zones (left half: the left keys, D or
+// F; right half: J or K), on IN and AT 4 (columns, left to right D F J K; while the line is steeper
+// than 60 degrees, rows of the play area, top to bottom). A note's zone is where its hit point is.
+// On six lanes S joins the first zone and L the last. The keys are the player's binds.
+// The chart decides it: each line note is moved along its line so its hit point lands in a zone (its
+// lane's, or the nearest that works), well inside it at the hit and a moment before (no note crosses
+// a border as it lands), on screen all the way in; no two notes of one moment share a zone, and a zone
+// isn't hit again sooner than the highway lets a lane be (a hold keeps its zone until it ends). A note
+// that fits nowhere is left out. Drags take the zone they land in.
+const ZONES = { ez: 1, hd: 2, in: 4, at: 4 };
+const ZONE_COLORS = ["#ff7a90", "#7ee08a", "#6fb4ff", "#c58bff"];
+const zoneColor = (z, Z) => ZONE_COLORS[Z === 2 ? z * 2 : z];
+// The zone a hit point is in, or -1 when it's off the play area or within ZONE_EDGE px of a border.
+const ZONE_EDGE = 26;
+function zoneAt(x, y, rot, Z) {
+  if (x < 40 || x > 1240 || y < 180 || y > 700) return -1;
+  const rows = Z === 4 && Math.abs(Math.sin(rot * Math.PI / 180)) > 0.866, size = rows ? 552 / 4 : 1280 / Z;
+  const v = rows ? (y - 160) / size : x / size, k = Math.floor(v), f = v - k, edge = ZONE_EDGE / size;
+  if (k < 0 || k >= Z || (k > 0 && f < edge) || (k < Z - 1 && f > 1 - edge)) return -1;
+  return k;
+}
+const hitPoint = (s, lx) => { const th = s.rot * Math.PI / 180; return { x: s.x + lx * Math.cos(th), y: s.y + lx * Math.sin(th) }; };
+function zones(B) {
+  const Z = ZONES[B.diff] || 1;
+  if (Z < 2 || !B.lines) return;
+  const D = { ...CHART_DIFFS[B.diff], ...((B.song.tune || {})[B.diff] || {}) }, L = B.lanes, jack = D.jack / B.spb, d = 0.15 / B.spb;
+  const pref = n => Z === 4 ? (L === 6 ? [0, 0, 1, 2, 3, 3][n.lane] : n.lane) : n.lane < L / 2 ? 0 : 1;
+  // Where across its zone a note tries first (on 2 zones its lane picks a side of its half), then the rest of the zone.
+  const spots = n => { const first = Z === 2 ? (L === 6 ? [0.25, 0.5, 0.75] : [0.32, 0.68])[n.lane % (L / 2)] : 0.5;
+    return [first, 0.5, 0.3, 0.7, 0.15, 0.85, 0.06, 0.94].filter((f, i, a) => a.indexOf(f) === i); };
+  // Along the line to a spot in zone z (f: how far across its column, or down its row on a steep line), within the bar.
+  const along = (s, z, f) => {
+    const th = s.rot * Math.PI / 180, rows = Z === 4 && Math.abs(Math.sin(th)) > 0.866;
+    let lx = rows ? (160 + (z + f) * 138 - s.y) / Math.sin(th) : ((z + f) * 1280 / Z - s.x) / Math.cos(th);
+    if (!Number.isFinite(lx)) return null;
+    const most = Math.min(520, (s.l || 3200) / 2 - 24);
+    return Math.max(-most, Math.min(most, lx));
+  };
+  // On screen all the way in (the readability rule's box), at 1.0x.
+  const inView = (n, lx) => {
+    const fl = B.floors[n.line];
+    for (let dt = 0.04; dt <= 0.6001; dt += 0.04) {
+      const r = n.rel - dt / B.spb, s = lineAt(B.lines[n.line], r, n.line), th = s.rot * Math.PI / 180;
+      const ly = -n.side * (floorAt(fl, n.rel) - floorAt(fl, r)) * B.spb * 520, x = s.x + lx * Math.cos(th) - ly * Math.sin(th), y = s.y + lx * Math.sin(th) + ly * Math.cos(th);
+      if (x < 14 || x > 1266 || y < 164 || y > 708) return false;
+    }
+    return true;
+  };
+  const busy = Array(Z).fill(-Infinity), keep = [], ns = B.chart;
+  for (let i = 0; i < ns.length;) {
+    let j = i;
+    while (j < ns.length && Math.abs(ns[j].b - ns[i].b) < 1e-6) j++;
+    const used = new Set();
+    for (let k = i; k < j; k++) {
+      const n = ns[k];
+      if (n.mode !== "line" || n.rel < 0) { keep.push(n); continue; }
+      const s = lineAt(B.lines[n.line], n.rel, n.line), was = lineAt(B.lines[n.line], n.rel - d, n.line), p = pref(n);
+      let got = null;
+      for (const z of [...Array(Z).keys()].sort((a, b) => Math.abs(a - p) - Math.abs(b - p) || a - b)) {
+        if (n.kind !== "drag" && (used.has(z) || busy[z] > n.b + 1e-6)) continue;
+        for (const f of spots(n)) {
+          const lx = along(s, z, f);
+          if (lx == null) continue;
+          const now = hitPoint(s, lx), then = hitPoint(was, lx);
+          if (zoneAt(now.x, now.y, s.rot, Z) !== z || zoneAt(then.x, then.y, was.rot, Z) !== z || !inView(n, lx)) continue;
+          got = { z, lx }; break;
+        }
+        if (got) break;
+      }
+      if (!got) continue;
+      n.zone = got.z; n.lx = got.lx; keep.push(n);
+      if (n.kind !== "drag") { used.add(got.z); busy[got.z] = n.b + n.len + jack; }
+    }
+    i = j;
+  }
+  B.left = ns.length - keep.length;
+  keep.forEach((n, k) => { n.i = k; });
+  B.chart = keep;
 }
 
 /* ── A chart's level, measured from the chart ──────────────────────────── */
@@ -1689,9 +1840,12 @@ function choreograph(B, script) {
 // A Lv.10 here should feel like a Phigros Lv.10, not a 12 or 13.
 const BANDS = { ez: [1, 5], hd: [1, 10], in: [9, 13], at: [13, 15] };
 const KEYBOARD = 1.2;
+// A line note counts by its zones: any key (EZ) is the easiest, 2 zones (HD) more, 4 (IN, AT) the same
+// as a highway note.
+const LINE_WEIGHT = { 1: 0.6, 2: 0.8, 4: 1 };
 function rate(B) {
-  const ns = B.chart, secs = Math.max(1, B.seconds), spb = B.spb, song = B.song;
-  const w = n => n.kind === "drag" ? 0.25 : n.kind === "hold" ? 1.25 : 1;
+  const ns = B.chart, secs = Math.max(1, B.seconds), spb = B.spb, song = B.song, Z = ZONES[B.diff] || 1;
+  const w = n => (n.kind === "drag" ? 0.25 : n.kind === "hold" ? 1.25 : 1) * (n.mode === "line" ? LINE_WEIGHT[Z] : 1);
   const presses = ns.filter(n => n.kind !== "drag");
   const avg = ns.reduce((t, n) => t + w(n), 0) / secs;
   let peak = 0, run = 0;
@@ -1709,12 +1863,15 @@ function rate(B) {
   const drags = (ns.length - presses.length) / Math.max(1, ns.length);
   // Jacks: each note's gap to the last note in its lane (from a hold's tail), worth more the closer
   // it is: nothing at 0.4 s, full at 0.15 s (the tightest AT allows).
+  // On the line a "lane" is the note's zone; with any key there are no jacks at all.
   const lastIn = new Map();
   let jacks = 0;
   for (const n of presses) {
-    const gap = lastIn.has(n.lane) ? (n.b - lastIn.get(n.lane)) * spb : 9;
+    if (n.mode === "line" && Z < 2) continue;
+    const at = n.mode === "line" ? "z" + n.zone : n.lane;
+    const gap = lastIn.has(at) ? (n.b - lastIn.get(at)) * spb : 9;
     jacks += Math.max(0, Math.min(1, (0.4 - gap) / 0.25));
-    lastIn.set(n.lane, n.b + n.len);
+    lastIn.set(at, n.b + n.len);
   }
   jacks /= Math.max(1, presses.length);
   const big = sizes.filter(s => s > 2).reduce((t, s) => t + s, 0) / Math.max(1, presses.length);
@@ -2131,9 +2288,11 @@ function drawOpts() {
   seg($("#o-jtext"), opts.jtext, v => { opts.jtext = Number(v); keepOpts(); });
   seg($("#o-calm"), opts.calm, v => { opts.calm = Number(v); keepOpts(); });
   seg($("#o-hits"), opts.hits, v => { opts.hits = Number(v); keepOpts(); });
-  // Picking a hitsound plays it, at its volume.
-  seg($("#o-hitkind"), HITSOUNDS[opts.hitKind] ? opts.hitKind : "tick", v => { opts.hitKind = v; keepOpts(); audio().resume(); lastHit = -1; hitsound(1); });
-  $("#o-hitvol").value = opts.hitVol; $("#o-hitvol").oninput = e => { opts.hitVol = Number(e.target.value); keepOpts(); audio().resume(); hitsound(1); };
+  // Picking a hitsound plays it, at its volume; Preview plays the current pick (Auto: the Normal one).
+  const previewHit = () => { audio().resume(); lastHit = -1; playHit(opts.hitKind === "auto" || !HITSOUNDS[opts.hitKind] ? AUTO_HITS.Normal : opts.hitKind, 1); };
+  seg($("#o-hitkind"), opts.hitKind === "auto" || !HITSOUNDS[opts.hitKind] ? "auto" : opts.hitKind, v => { opts.hitKind = v; keepOpts(); previewHit(); });
+  $("#o-hitprev").onclick = e => { e.currentTarget.blur(); previewHit(); };
+  $("#o-hitvol").value = opts.hitVol; $("#o-hitvol").oninput = e => { opts.hitVol = Number(e.target.value); keepOpts(); audio().resume(); lastHit = -1; playHit(hitKindFor(null), 1); };
   seg($("#o-test"), opts.test, v => { opts.test = Number(v); keepOpts(); loadSave(); });
   $("#o-vol").value = opts.vol; $("#o-vol").oninput = e => { opts.vol = Number(e.target.value); setVolume(); keepOpts(); };
   $("#o-off").value = opts.offset; $("#o-off-v").textContent = (opts.offset > 0 ? "+" : "") + opts.offset + " ms";
@@ -2203,16 +2362,24 @@ $("#o-sound-test").onclick = () => { $("#sound").hidden = false; drawSound(); };
 // Every song that's open (hidden tracks once found; everything in test mode) and the 18 type styles'
 // demos, music only, on the same synth and clock a song plays on. The arrangement is the difficulty
 // whose band plays (IN and AT add layers); a song without it plays the nearest one it has.
-let juke = null, jukeDiff = "hd";
+let juke = null, jukeDiff = "hd", shiftDown = false;
+addEventListener("keydown", e => { if (e.key === "Shift") shiftDown = true; });
+addEventListener("keyup", e => { if (e.key === "Shift") shiftDown = false; });
+addEventListener("blur", () => { shiftDown = false; });
 const jukeArrangement = song => { const order = ["ez", "hd", "in", "at"], want = order.indexOf(jukeDiff); return song.diffs.filter(d => order.indexOf(d) <= want).pop() || song.diffs[0]; };
 function jukePlay(song) {
   jukeStop();
   const c = audio(); c.resume();
   const B = built(song, jukeArrangement(song));
-  juke = { song, B, i: 0, t0: c.currentTime + 0.15, timer: 0 };
+  juke = { song, B, i: 0, beat: 0, t0: c.currentTime + 0.15, timer: 0 };
   const tick = () => {
     if (!juke) return;
     const horizon = c.currentTime + 0.3;
+    // Holding Shift: the song's own hitsound (Auto's pick) on every beat, to hear them all quickly.
+    for (; juke.t0 + juke.beat * B.spb < horizon; juke.beat++) {
+      const when = juke.t0 + juke.beat * B.spb;
+      if (shiftDown && when >= c.currentTime - 0.01 && juke.beat * B.spb < B.seconds) playHit(autoHit(song), 1, when);
+    }
     for (; juke.i < B.ev.length; juke.i++) {
       const e = B.ev[juke.i], when = juke.t0 + e.b * B.spb;
       if (when > horizon) break;
@@ -2236,12 +2403,12 @@ function jukeStop() {
 function drawSound() {
   seg($("#st-diff"), jukeDiff, v => { jukeDiff = v; if (juke) jukePlay(juke.song); }, drawSound);
   const list = $("#st-list"); list.replaceChildren();
-  const head = text => { const r = el("tr", "head"); const td = el("td", "", text); td.colSpan = 5; r.append(td); list.append(r); };
+  const head = text => { const r = el("tr", "head"); const td = el("td", "", text); td.colSpan = 6; r.append(td); list.append(r); };
   const row = song => {
     const r = el("tr", juke && juke.song === song ? "on" : ""), b = el("button", "play", juke && juke.song === song ? "Stop" : "Play");
     b.type = "button"; b.onclick = () => { if (juke && juke.song === song) { jukeStop(); drawSound(); } else jukePlay(song); };
     const td = el("td"); td.append(b);
-    r.append(el("td", "", song.title), el("td", "dim", typeOf(song) || "-"), el("td", "dim", song.bpm + " BPM"), el("td", "dim", clock(built(song, jukeArrangement(song)).seconds)), td);
+    r.append(el("td", "", song.title), el("td", "dim", typeOf(song) || "-"), el("td", "dim", autoHit(song)), el("td", "dim", song.bpm + " BPM"), el("td", "dim", clock(built(song, jukeArrangement(song)).seconds)), td);
     list.append(r);
   };
   head("Kanto");
@@ -2396,7 +2563,7 @@ function start(song, diff = pickedDiff(song), given = null) {
   const judged = notes.reduce((t, n) => t + (n.kind === "hold" ? 2 : 1), 0);
   const lead = 4 * B.spb + 0.6;
   P = { song, B, given, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead, next: 0, done: false, paused: false,
-        cue: cue ? { to: cue, real: !song.lesson } : null, tips: tipsFor(song, B, notes, lead),
+        cue: cue ? { to: cue, real: !song.lesson } : null, tips: tipsFor(song, B, notes, lead), zones: song.lesson ? 1 : ZONES[B.diff] || 1,
         counts: { Perfect: 0, Great: 0, Good: 0, Miss: 0 }, points: 0, n: 0, combo: 0, maxCombo: 0, streak: 0,
         held: new Set(), mode: "highway", form: "aria", seg: 0, lastBeat: -99, raf: 0, broke: false, finished: false };
   // The count-in: four clicks before beat 0.
@@ -2422,6 +2589,20 @@ function start(song, diff = pickedDiff(song), given = null) {
   $("#songname").textContent = song.title + (P.test ? " · test" : "");
   $("#songlv").textContent = song.lesson ? "Lesson · " + song.step + " of 6" : DIFF_NAME[B.diff] + " Lv." + B.level;
   $("#tip").className = ""; $("#cue").hidden = true;
+  $("#cue").textContent = P.zones > 1 ? "Zones! Hit the side it lands on." : "Any key! Watch the line.";
+  // The first time line notes have zones: a tip, once (kept apart from tipsFor's list).
+  const zoned = notes.find(n => n.mode === "line" && n.zone != null);
+  if (P.zones > 1 && zoned && !opts.tips.zones) {
+    P.tips.push({ id: "zones", at: Math.max(-lead + 0.5, zoned.t - 3), text: "On HD and up, the line has zones. Hit the key for the side the note lands on." });
+    P.tips.sort((a, b) => a.at - b.at);
+    for (let i = 1; i < P.tips.length; i++) P.tips[i].at = Math.max(P.tips[i].at, P.tips[i - 1].at + 2.2);
+  }
+  // The zone grid: borders and keys, for a bar when the line takes over (HD and up).
+  const grid = $("#zonegrid"); grid.replaceChildren(); grid.className = "";
+  if (P.zones > 1) for (let z = 0; z < P.zones; z++) {
+    if (z) { const i = el("i"); i.style.left = z * 1280 / P.zones + "px"; grid.append(i); }
+    const label = el("b", "", zoneKeys(z).map(keyName).join(" ")); label.style.left = (z + 0.5) * 1280 / P.zones + "px"; label.style.setProperty("--zc", zoneColor(z, P.zones)); grid.append(label);
+  }
   $("#beatdot").hidden = !!opts.sound;
   // Lanes: faint lines between them, a glow per lane while its key is down, and the keys under the line.
   // On six lanes the middle four keep the move names; S and L only show their key.
@@ -2435,7 +2616,7 @@ function start(song, diff = pickedDiff(song), given = null) {
   if (lineFirst) P.mode = "line";
   P.keys.forEach((k, i) => {
     const d = el("div"); d.style.left = (640 + laneX(i, L)) + "px"; d.style.width = W + "px"; d.style.marginLeft = -W / 2 + "px";
-    d.append(el("b", "", keyName(k)));
+    const label = el("b", "", keyName(k)); label.style.color = ZONE_COLORS[L === 6 ? [0, 0, 1, 2, 3, 3][i] : i]; d.append(label);
     const m = i - (L - 4) / 2;
     if (P.battle && m >= 0 && m < 4) d.append(el("span", "", P.battle.you.moves[m]));
     keys.append(d);
@@ -2455,6 +2636,7 @@ function start(song, diff = pickedDiff(song), given = null) {
     const d = el("div", "nt" + (n.dbl ? " dbl" : "") + (n.kind === "drag" ? " drag" : "") + (n.kind === "hold" ? " hold" : ""));
     if (n.kind === "hold") { const beam = el("div", "beam"); beam.style.height = (n.mode === "line" && B.floors ? floorAt(B.floors[n.line], n.rel + n.len) - floorAt(B.floors[n.line], n.rel) : n.len) * pxBeat + "px"; d.append(beam); }
     d.append(el("div", "head"));
+    if (n.zone != null && P.zones > 1) { const z = el("i", "zone"); z.style.setProperty("--zc", zoneColor(n.zone, P.zones)); d.append(z); }
     d.style.display = "none";
     P.lines[n.line].append(d);
     n.el = d;
@@ -2545,6 +2727,7 @@ function frame() {
   if (at.mode !== P.mode && !at.show) {
     P.mode = at.mode;
     $("#guides").className = $("#keys").className = P.mode === "highway" ? "" : "out";
+    if (P.mode === "line" && P.zones > 1) { const g = $("#zonegrid"); g.className = "on"; clearTimeout(g._t); g._t = setTimeout(() => { g.className = ""; }, P.song.bar * B.spb * 1000); }
   }
   // The lines: the highway's spot until the break, then the song's script. A line's alpha fades its
   // bar; its notes stay solid down to half of it (a teleport's dip never hides them).
@@ -2587,7 +2770,7 @@ function frame() {
     const ahead = b => fl ? (floorAt(fl, b) - floorAt(fl, rel)) * B.spb * px : (b - rel) * B.spb * px;
     const dy = ahead(n.rel);
     if (n.state === 0 && t - n.t > WIN.good) { judge(n, "Miss"); if (n.kind === "hold") judgeTail(n, "Miss"); continue; }
-    if (n.kind === "drag" && n.state === 0 && t >= n.t - 0.01 && P.held.size) { judge(n, "Perfect"); continue; }
+    if (n.kind === "drag" && n.state === 0 && t >= n.t - 0.01 && heldIn(n)) { judge(n, "Perfect"); continue; }
     if (n.state === 1) {   // a hold being held: the head sits on the line and the beam drains into it
       if (t >= n.tEnd) { judgeTail(n, "Perfect"); continue; }
       const left = Math.max(0, ahead(n.rel + n.len));
@@ -2612,6 +2795,12 @@ function hitWindow(dt) {
   const a = Math.abs(dt);
   return a <= WIN.perfect ? "Perfect" : a <= WIN.great ? "Great" : a <= WIN.good ? "Good" : null;
 }
+// The keys of zone z (this chart's row: 4 or 6), and a key's zone (-1: not one of them).
+const zoneKeys = z => P.keys.filter((c, i) => keyZoneAt(i) === z);
+const keyZoneAt = i => { const L = P.keys.length; return P.zones === 4 ? (L === 6 ? [0, 0, 1, 2, 3, 3][i] : i) : i < L / 2 ? 0 : 1; };
+const keyZone = code => { const i = P.keys.indexOf(code); return i < 0 ? -1 : keyZoneAt(i); };
+// A drag is caught by any key held in its zone (any key at all on EZ, or by autoplay).
+const heldIn = n => P.zones < 2 || n.mode !== "line" ? P.held.size > 0 : [...P.held].some(c => c === "auto" || keyZone(c) === n.zone);
 function press(lane, code) {
   if (!P || P.paused || P.done) return;
   const t = now();
@@ -2624,6 +2813,7 @@ function press(lane, code) {
     if (n.t - t > WIN.good) break;
     if (n.mode !== P.mode) continue;
     if (P.mode === "highway" && n.lane !== lane) continue;
+    if (P.mode === "line" && P.zones > 1 && n.zone !== keyZone(code)) continue;
     if (Math.abs(n.t - t) <= WIN.good) { best = n; break; }
   }
   if (!best) return;
@@ -3023,6 +3213,7 @@ window.__boredSnapshot = () => ({ slug: "relic-song", total: opts.test ? 0 : Obj
 window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s.id === id), diff), SONGS, PAY, fullPay, CHART_DIFFS, build, built, rate, lineAt, floorAt,
   opts, LESSON_STEPS, lessonPart, tipsFor, get play() { return P; },
   // The template: styles, demos, the recipe check and the pay table (scripts/relic-song-table.mjs reads these).
+  hitKinds: () => Object.keys(HITSOUNDS), autoHit, ZONES, CHART_DIFFS, clock: () => (P && ctx ? now() : null),
   TYPE_STYLES, SCALES, GIMMICKS, REGIONS, RECIPE, DEMOS, autoLine, keyShift, finalVerses, recipeCheck, regionCheck, roleOf, typeOf, clearPay, rankPay, payTable,
   songs: () => SONGS.map(s => { const b = built(s); return { id: s.id, seconds: Math.round(b.seconds), notes: b.chart.length, clearPay: clearPayOf(b) }; }),
   // Every chart: lanes, notes, length, level and what the level was measured from.

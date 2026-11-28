@@ -176,6 +176,59 @@ chords: Em C G D            key: Em
 
 For now, the final is the ending. It opens after Champion Blue, and Sssssssnakes opens after it.
 
+## Key zones on the moving line
+
+On **EZ** any bound key hits a line note. On **HD** the screen has 2 zones: the left half takes the
+left keys (D or F), the right half the right keys (J or K). On **IN and AT** it has 4: columns,
+left to right D F J K, or rows of the play area (top to bottom) while the line is steeper than 60°.
+On six lanes, S joins the first zone and L the last. A note's zone is where its hit point is, and
+the keys are the player's binds.
+
+The chart builder (`zones()`) moves each line note along its line so its hit point lands in its
+lane's zone, or the nearest one that works:
+- **Inside the zone:** at least 26 px from a border, at the hit and 0.15 s before, so no note
+  crosses a border as it lands.
+- **On screen:** all the way in.
+- **Chords:** no two notes of one moment share a zone.
+- **Jacks:** a zone isn't hit again sooner than the highway lets a lane be, and a hold keeps its
+  zone until it ends.
+
+A note that fits nowhere is left out; the music under it still plays. Drags take the zone they
+land in, and any key held in that zone catches them.
+
+**On screen:**
+- **Markers:** each zoned note has a dot in its zone's colour, the same colours as the highway's
+  key labels.
+- **Grid:** the zones' borders and keys flash for a bar when the line takes over.
+- **Tip:** a one-time tip explains it the first time.
+
+**Levels:** line notes count by their zones (`LINE_WEIGHT`): any key 0.6, 2 zones 0.8, 4 zones
+like a highway note. Jacks on the line are counted per zone. Every chart was re-tuned to the same
+levels.
+
+## Hitsounds
+
+Options picks one: **Auto (match the song)**, the default, or Tick, Wood or Clap. Preview plays
+the current pick (Auto plays the Normal one).
+- **Auto:** plays the song's type's hitsound (`AUTO_HITS`; a dual type uses its first). Champions
+  clap, and the final plays Meloetta's soft bell.
+- **What they are:** every hitsound is under 40 ms, at a fixed pitch (nothing sweeps).
+- **Rules:** one click a chord, quieter on Good, softest on drags, their own volume, none in muted
+  mode or during the calibration.
+- **Sound test:** hold Shift to hear a song's Auto hitsound on every beat.
+
+| Type | Auto hitsound | Type | Auto hitsound |
+|---|---|---|---|
+| Normal | tick | Psychic | tick with a short echo |
+| Fire | crackle | Bug | clicky tick |
+| Water | droplet | Rock | stone tock |
+| Grass | shaker | Ghost | quiet tick, short tail |
+| Electric | zap tick | Dragon | low punchy tock |
+| Ice | glass ping | Dark | dull snap |
+| Fighting | low thump | Steel | metallic clink |
+| Poison | muted wobble | Fairy | music-box ping |
+| Ground | low tock | Flying | air puff |
+
 ## 4. Tokens
 
 Relic Song pays **tokens**: `chips`, the arcade's collection tokens that Shotgun Roulette bets and
