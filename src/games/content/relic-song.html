@@ -55,7 +55,7 @@
   .say img { flex: none }
   .say p { max-width: 900px; color: var(--ink) }
   /* The song itself: four verses on one staff, filled in as they come back. */
-  .verses { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); height: 22px; margin-bottom: 12px; border-radius: 3px; overflow: hidden }
+  .verses { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--rule); height: 22px; margin-bottom: 12px; border-radius: 3px; overflow: hidden }
   .verses span { border-right: 1px solid var(--rule); font-size: 11px; letter-spacing: .1em; text-align: center; line-height: 20px; color: var(--dim) }
   .verses span:last-child { border-right: 0 }
   .verses span.got { background: var(--accent); color: #fff }
@@ -94,7 +94,10 @@
                             repeating-linear-gradient(-60deg, transparent 0 14px, rgba(200, 225, 240, .08) 14px 15px), rgba(170, 205, 225, .05) }
   .gym.thawed::after { opacity: 0 }
   .gym.locked > * { opacity: .4 }
-  .finale { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
+  .finale { margin-top: 12px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px }
+  /* Champion Blue's card: twice a gym's width, in gold. */
+  .gym.champ { border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(255, 216, 102, .35) }
+  .gym.champ h2 { color: var(--gold) }
   .finale .gym { min-height: 0 }
   .finale .gym .row { margin-top: 4px }
   .hidden-list h2 { font-size: 17px }
@@ -384,6 +387,12 @@
     <p id="c-read" class="dim" style="text-align:center"></p>
     <div class="btns"><button id="c-close" type="button">Cancel</button></div></div></div>
 
+  <!-- Once, after the remaster reset an old save. -->
+  <div class="over" id="remaster" hidden><div class="card"><h2>Remastered</h2>
+    <p>Relic Song got remastered! Your progress was reset so everyone starts fresh.</p>
+    <p class="dim" style="margin-top:8px">Your options, keybinds, note skin and audio offset are kept. Coins you've earned stay yours, and the new charts pay again.</p>
+    <div class="btns"><button id="rm-ok" type="button">OK (Enter)</button></div></div></div>
+
   <!-- The sound test: music only, for reviewing songs. -->
   <div class="over" id="sound" hidden><div class="card"><h2>Sound test</h2>
     <div class="now"><span id="st-now" class="dim">Pick a song. Music only, no notes.</span><span>Arrangement <span class="seg" id="st-diff"><button type="button" data-v="ez">EZ</button> <button type="button" data-v="hd">HD</button> <button type="button" data-v="in">IN</button> <button type="button" data-v="at">AT</button></span></span></div>
@@ -449,6 +458,9 @@ const PAY = {
   // Finishing Meloetta's Lesson, the tutorial, the first time.
   lesson: 50
 };
+// The ledger version of the charts' entries (rs:r2:clear:..., src/hub/relic-song.js): the Kanto remaster rewrote
+// every chart, so each pays again once under its new entry. Entries paid before stay paid; nobody loses coins.
+const LEDGER = "r2";
 const toRound = v => Math.round(v / PAY.round) * PAY.round;
 const clearPay = level => Math.max(PAY.round, toRound(PAY.perLevel * level * level));
 const rankPay = (level, diff, rank) => PAY.rankDiffs.includes(diff) && PAY.rank[rank] ? toRound(clearPay(level) * PAY.rank[rank]) : 0;
@@ -541,7 +553,11 @@ const hub = () => { try { return G ? G.state() : null; } catch { return null; } 
 
 /* ── Saves ─────────────────────────────────────────────────────────────── */
 // bored.relic-song.save.v1: bests and badges. Test mode keeps its own slot so it never touches the real one.
-const SAVE_KEY = "bored.relic-song.save.v1", TEST_KEY = "bored.relic-song.test.v1", OPTS_KEY = "bored.relic-song.opts.v1";
+// v2 is the Kanto remaster: every chart was rewritten, so a v1 save's progress (bests, ranks, clears, badges and
+// with them the difficulty chain) is let go once, on the first load after it. The options save is kept whole:
+// keybinds, note skin, audio offset, the lesson and the tips.
+const SAVE_KEY = "bored.relic-song.save.v2", TEST_KEY = "bored.relic-song.test.v2", OPTS_KEY = "bored.relic-song.opts.v1";
+const OLD_SAVES = ["bored.relic-song.save.v1", "bored.relic-song.test.v1"];
 // The flag Poké Idle reads (a Story Mail letter): set once the finale is cleared, outside test mode.
 const EGG_KEY = "bored.relic-song.eggs.v1";
 const STORY_KEY = "bored.poke-idle.story";
@@ -560,6 +576,12 @@ const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, o
 }
 if (!opts.tips || typeof opts.tips !== "object") opts.tips = {};
 const keepOpts = () => writeJSON(OPTS_KEY, opts);
+// The remaster's reset: an old save goes, and the map says why, once (opts.remastered 1 until it's read, then 2).
+{
+  const old = OLD_SAVES.filter(k => readJSON(k));
+  for (const k of old) { try { localStorage.removeItem(k); } catch {} }
+  if (old.length && !readJSON(SAVE_KEY) && !opts.remastered) { opts.remastered = 1; keepOpts(); }
+}
 let save = null;
 const slotKey = () => opts.test ? TEST_KEY : SAVE_KEY;
 function loadSave() { save = Object.assign({ best: {}, badges: {} }, readJSON(slotKey()) || {}); }
@@ -902,19 +924,14 @@ function partOf(song, name) {
   return { ...p, lead: v.lead, chords: v.chords };
 }
 
-// The four verses of Meloetta's song, one per gym. A boss fight sings its gym's
-// verse when the highway breaks; the finale sings all four.
-const VERSES = [
-  { lead: "e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - -", chords: "Em C" },
-  { lead: "d5 - e5 - g5 - - a5 | b5 - a5 - g5 - - -", chords: "G D" },
-  { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - -", chords: "Am Em" },
-  { lead: "g5 - a5 - b5 - d6 - | e6 - - - - - - -", chords: "G Em" }
-];
-
 /* Songs. bar = beats a bar (8 eighth-note steps in 4/4). form is the order of
    parts; "relic" is where Meloetta sings and the highway breaks into the line,
-   "flip" (the finale) is one bar where she changes form and the mode swaps back.
-   line is the movement script for the judgment line, in beats from the break. */
+   "flip" is one bar where she changes form and the mode swaps back.
+   line is the movement script for the judgment line, in beats from the break.
+   Every song is written to the recipe (docs/relic-song-songs.md): I a 2-bar intro, H a 4-bar
+   hook that comes round at least three times, A and B (and C for bosses) sections with a call and
+   response in B, O an outro. A gym song carries Kanto's verse quietly (hint), a boss sings it at
+   the break. The Kanto remaster (v2) kept each song's old tune as its hook. */
 // Choreography helpers for the line scripts (see "The line's movement scripts" below).
 // every(from, to, step, make): make(beat, i) for each beat, its steps flattened.
 const every = (from, to, step, make) => { const out = []; for (let b = from, i = 0; b < to - 1e-9; b += step, i++) out.push(...[].concat(make(b, i))); return out; };
@@ -936,54 +953,78 @@ const PETALS = [[380, 520], [640, 480], [900, 540], [520, 600], [780, 600], [300
 
 const SONGS = [
   // ── Brock, Pewter Gym (Rock) ──
-  { id: "pewter-steps", key: "C", heat: { ez: 0.06, hd: 0 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "rock",
-    parts: { A: { lead: "c5 - e5 - g5 - e5 - | f5 - a5 - g5 - - - | e5 - g5 - c6 - g5 - | f5 - e5 - d5 - - -", chords: "C F C G" },
-             B: { lead: "a4 - c5 - e5 - - - | f5 - e5 - d5 - - - | g4 - b4 - d5 - g5 - | e5 - d5 - c5 - - -", chords: "Am F G C" } },
-    form: "A A B B A A B A" },
-  { id: "boulder-march", key: "Gm", heat: { ez: 0.12, hd: 0.08 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "rock",
-    parts: { A: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
-             B: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D" } },
-    form: "A A B A A B B A" },
-  { id: "onix-rising", key: "Em", heat: { ez: 0.24, hd: 0.08, in: 0.14 }, gym: 0, boss: true, title: "Onix Rising", bpm: 126, bar: 4, style: "rock",
-    parts: { A: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
-             B: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D" },
-             C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" } },
-    form: "A A B A relic C C B C",
+  { id: "pewter-steps", region: "kanto", key: "C", heat: { ez: 0.12, hd: 0.04 }, gym: 0, title: "Pewter Steps", bpm: 108, bar: 4, style: "Rock",
+    parts: { I: { lead: "c5 - - - g4 - - - | c5 - e5 - g5 - . .", chords: "C G" },
+             H: { lead: "c5 - e5 - g5 - e5 - | f5 - a5 - g5 - - - | e5 - g5 - c6 - g5 - | f5 - e5 - d5 - - -", chords: "C F C G" },
+             A: { lead: "a4 - c5 - e5 - - - | f5 - e5 - d5 - - - | g4 - b4 - d5 - g5 - | e5 - d5 - c5 - - -", chords: "Am F G C", hint: "arp" },
+             B: { lead: "e5 - g5 - . . . . | f5 - a5 - . . . . | g5 - e5 - . . . . | d5 - - - . . . .",
+                  answer: ". . . . c5 d5 e5 - | . . . . d5 e5 f5 - | . . . . c5 d5 e5 - | . . . . b4 c5 d5 -", chords: "Am F C G" },
+             O: { lead: "e5 - d5 - c5 - g4 - | c5 - - - - - . .", chords: "G C" } },
+    form: "I H A H B H A H B H O" },
+  { id: "boulder-march", region: "kanto", key: "Gm", heat: { ez: 0.32, hd: 0.08 }, gym: 0, title: "Boulder March", bpm: 120, bar: 4, style: "Rock",
+    parts: { I: { lead: "g4 - - - d5 - - - | g4 - bb4 - d5 - . .", chords: "Gm D" },
+             H: { lead: "g4 - g4 - bb4 - c5 - | d5 - - - c5 - bb4 - | g4 - g4 - bb4 - d5 - | f5 - - - d5 - - -", chords: "Gm Gm Eb F" },
+             A: { lead: "eb5 - d5 - c5 - bb4 - | c5 - d5 - - - . . | eb5 - f5 - g5 - f5 - | d5 - - - - - . .", chords: "Eb F Gm D", hint: "bass" },
+             B: { lead: "bb4 - d5 - . . . . | c5 - eb5 - . . . . | d5 - f5 - . . . . | d5 - - - . . . .",
+                  answer: ". . . . g4 a4 bb4 - | . . . . a4 bb4 c5 - | . . . . bb4 c5 d5 - | . . . . a4 bb4 c5 -", chords: "Gm Cm Bb D" },
+             O: { lead: "d5 - c5 - bb4 - a4 - | g4 - - - - - . .", chords: "D Gm" } },
+    form: "I H A H B H A H B A H O" },
+  { id: "onix-rising", region: "kanto", key: "Em", heat: { ez: 0.3, hd: 0.1, in: 0.14 }, gym: 0, boss: true, title: "Onix Rising", bpm: 124, bar: 4, style: "Rock",
+    parts: { I: { lead: "e4 - - - b4 - - - | e4 - g4 - b4 - . .", chords: "Em B" },
+             H: { lead: "e4 - e4 - g4 - a4 - | b4 - a4 - g4 - e4 - | e4 - e4 - g4 - b4 - | d5 - - - b4 - - -", chords: "Em C D Em" },
+             A: { lead: "g4 - a4 - b4 - d5 - | e5 - - - d5 - b4 - | c5 - b4 - a4 - g4 - | a4 - - - - - . .", chords: "G D C D", hint: "arp" },
+             B: { lead: "e4 - g4 - . . . . | a4 - b4 - . . . . | g4 - e4 - . . . . | b4 - - - . . . .",
+                  answer: ". . . . b4 a4 g4 - | . . . . d5 c5 b4 - | . . . . a4 g4 a4 - | . . . . e4 f#4 g4 -", chords: "Em Am C B" },
+             C: { lead: "e5 - b4 - e5 - g5 - | f#5 - - - e5 - d5 - | c5 - d5 - e5 - g5 - | b4 - - - - - . .", chords: "Em D C B" },
+             O: { lead: "b4 - a4 - g4 - f#4 - | e4 - - - - - . .", chords: "B Em" } },
+    form: "I H A H B H A H relic C H C H O",
     // Onix stomps: on each bar's kick the line comes down with a thud, then climbs back somewhere else.
     // It's the first boss, so on EZ and HD that's all it does: slow stomps on the ground, a few degrees
     // of tilt, every note from above, one line, one speed. On IN and AT the stomps slam and jolt, it
     // tilts up to 20 degrees halfway, and near the end it rises and flips, so the last notes come up
     // from below and the stomps go up.
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 500, rot: 0 },
-           ...every(4, 64, 4, (b, i) => [{ at: b, len: 0.3, kind: "snap", dy: 30, drot: i % 2 ? 4 : -4, diffs: ["ez", "hd"] }, { at: b, kind: "shake", diffs: ["hd"] },
+           ...every(4, 72, 4, (b, i) => [{ at: b, len: 0.3, kind: "snap", dy: 30, drot: i % 2 ? 4 : -4, diffs: ["ez", "hd"] }, { at: b, kind: "shake", diffs: ["hd"] },
              { at: b + 0.5, len: 3, kind: "fly", x: [560, 720, 640, 520, 760, 640, 600][i % 7], y: 500, rot: i >= 7 && i < 11 ? (i % 2 ? 6 : -6) : 0, diffs: ["ez", "hd"] }]),
            { at: 30, len: 2, kind: "width", w: 0.7 },
            ...every(4, 32, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 44, drot: i % 2 ? 6 : -6, only: "hard" }, { at: b, kind: "shake", only: "hard" },
              { at: b + 0.5, len: 3, kind: "fly", x: [560, 720, 640, 520, 760, 640, 600][i], y: 500, rot: 0, only: "hard" }]),
            ...every(32, 48, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: 40, only: "hard" }, { at: b, kind: "shake", only: "hard" },
              { at: b + 0.5, len: 3, kind: "fly", x: i % 2 ? 740 : 540, y: 540, rot: i % 2 ? 20 : -20, only: "hard" }]),
-           { at: 47, kind: "speed", to: 0.55, only: "hard" }, { at: 48, len: 3, kind: "fly", x: 640, y: 330, rot: 0, only: "hard" }, { at: 48, len: 3, kind: "width", w: 1, only: "hard" },
+           { at: 47, kind: "speed", to: 0.55, only: "hard" }, { at: 48, len: 3, kind: "fly", x: 640, y: 330, rot: 0, only: "hard" }, { at: 48, len: 3, kind: "width", w: 0.45, only: "hard" },
            { at: 51, len: 1, kind: "flip", only: "hard" }, { at: 51, kind: "flash", only: "hard" }, { at: 53, kind: "speed", to: 1, only: "hard" },
-           ...every(52, 64, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: -40, drot: i % 2 ? 6 : -6, only: "hard" }, { at: b, kind: "shake", only: "hard" },
-             { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i], y: 330, rot: 180, only: "hard" }])] },
+           ...every(52, 72, 4, (b, i) => [{ at: b, len: 0.08, kind: "snap", dy: -40, drot: i % 2 ? 6 : -6, only: "hard" }, { at: b, kind: "shake", only: "hard" },
+             { at: b + 0.5, len: 3, kind: "fly", x: [640, 560, 720][i % 3], y: 330, rot: 180, only: "hard" }])] },
 
   // ── Misty, Cerulean Gym (Water) ──
-  { id: "cerulean-current", key: "D", heat: { ez: 0.44, hd: 0.32 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "water",
-    parts: { A: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
-             B: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D" } },
-    form: "A A B A B B A A" },
-  { id: "tidepool-waltz", key: "A", heat: { ez: 0.8, hd: 0.24 }, gym: 1, title: "Tidepool Waltz", bpm: 132, bar: 3, style: "water",
-    parts: { A: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
-             B: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A" } },
-    form: "A A B A A B B A A A B A A B B A" },
-  { id: "starmie-undertow", key: "Bm", heat: { ez: 0.54, hd: 0.34, in: 0.42 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "water",
-    parts: { A: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
-             B: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm" },
-             C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" } },
-    form: "A A B A relic C C B C",
+  { id: "cerulean-current", region: "kanto", key: "D", heat: { ez: 0.54, hd: 0.28 }, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "Water",
+    parts: { I: { lead: "d5 - - - a4 - - - | d5 - - - f#5 - . .", chords: "D A" },
+             H: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G" },
+             A: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D", hint: "arp" },
+             B: { lead: "a4 - b4 - . . . . | d5 - e5 - . . . . | f#5 - e5 - . . . . | d5 - - - . . . .",
+                  answer: ". . . . f#5 e5 d5 - | . . . . a5 g5 f#5 - | . . . . d5 c#5 b4 - | . . . . a4 b4 c#5 -", chords: "Bm G A D" },
+             O: { lead: "e5 - - - c#5 - - - | d5 - - - - - . .", chords: "A D" } },
+    form: "I H A H B H A H B H O" },
+  { id: "tidepool-waltz", region: "kanto", key: "A", heat: { ez: 0.42, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 116, bar: 3, style: "Water",
+    parts: { I: { lead: "a4 - - - e5 - | a4 - - - - -", chords: "A E" },
+             H: { lead: "a4 - - - c#5 - | e5 - - - - - | f#5 - - - e5 - | c#5 - - - - -", chords: "A A D E" },
+             A: { lead: "d5 - - - f#5 - | a5 - - - - - | g#5 - - - e5 - | a5 - - - - -", chords: "D D E A", hint: "bass" },
+             B: { lead: "e5 - c#5 - . . | f#5 - d5 - . . | e5 - b4 - . . | a4 - - - . .",
+                  answer: ". . . . a5 g#5 | . . . . b5 a5 | . . . . g#5 f#5 | . . . . e5 -", chords: "A D E A" },
+             O: { lead: "e5 - - - c#5 - | a4 - - - - -", chords: "E A" } },
+    form: "I H A H B H A H B H A H B H O" },
+  { id: "starmie-undertow", region: "kanto", key: "Bm", heat: { ez: 0.6, hd: 0.32, in: 0.4 }, gym: 1, boss: true, title: "Starmie Undertow", bpm: 110, bar: 4, style: "Water",
+    parts: { I: { lead: "b4 - - - f#5 - - - | b4 - - - d5 - . .", chords: "Bm F#" },
+             H: { lead: "b4 - - - d5 - f#5 - | e5 - - - - - d5 - | c#5 - - - e5 - a5 - | f#5 - - - - - . .", chords: "Bm G A F#" },
+             A: { lead: "d5 - - - e5 - f#5 - | g5 - - - - - f#5 - | e5 - - - c#5 - d5 - | b4 - - - - - . .", chords: "G A F# Bm", hint: "arp" },
+             B: { lead: "b4 - d5 - . . . . | c#5 - e5 - . . . . | d5 - f#5 - . . . . | e5 - - - . . . .",
+                  answer: ". . . . f#5 e5 d5 - | . . . . g5 f#5 e5 - | . . . . a5 g5 f#5 - | . . . . c#5 d5 e5 -", chords: "Bm A G F#" },
+             C: { lead: "f#5 - - - - - b5 - | a5 - - - - - f#5 - | g5 - - - - - e5 - | f#5 - - - - - . .", chords: "Bm A G F#" },
+             O: { lead: "c#5 - - - a#4 - - - | b4 - - - - - . .", chords: "F# Bm" } },
+    form: "I H A H B H relic C H C H O",
     // Starmie: in the calm it spins (a turn every eight beats, back the other way the next time),
     // slowed so the notes stay on screen; then a riptide: it drops low and the notes crawl, then
-    // rush in on the beat. In the B part a second line faces it from above.
+    // rush in on the beat. In the second hook a second line faces it from above. The outro is a tide.
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.5 }, { at: 0, kind: "speed", to: 0.65 },
            { at: 0, len: 2, kind: "fly", x: 640, y: 540, only: "ez" },
            { at: 2, len: 6, kind: "spin", perBeat: 60 }, ...riptide(8, 360),
@@ -992,47 +1033,74 @@ const SONGS = [
            { at: 24, len: 2, kind: "width", w: 0.6, line: 1 },
            { at: 32, len: 16, kind: "notes", lines: [0, 1] }, { at: 32, len: 16, kind: "tide", amp: 26, period: 8, tilt: 6 },
            { at: 36, len: 12, kind: "tide", amp: 26, period: 8, tilt: 6, line: 1 }, { at: 48, len: 2, kind: "fade", to: 0, line: 1 },
-           { at: 48, len: 1, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 48, kind: "speed", to: 0.65 }, { at: 49, len: 7, kind: "spin", perBeat: 360 / 7 }, ...riptide(56, 360)] },
+           { at: 48, len: 1, kind: "fly", x: 640, y: 432, rot: 0 }, { at: 48, kind: "speed", to: 0.65 }, { at: 49, len: 7, kind: "spin", perBeat: 360 / 7 }, ...riptide(56, 360),
+           { at: 64, len: 8, kind: "tide", amp: 20, period: 8, tilt: 4 }] },
 
   // ── Lt. Surge, Vermilion Gym (Electric) ──
-  { id: "vermilion-voltage", key: "Am", heat: { ez: 0.58, hd: 0.12 }, gym: 2, title: "Vermilion Voltage", bpm: 150, bar: 4, style: "electric",
-    parts: { A: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
-             B: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true } },
-    form: "A A B A A B B A A B B A" },
-  { id: "lightning-rod", key: "Em", heat: { ez: 0.6, hd: 0.12 }, gym: 2, title: "Lightning Rod", bpm: 160, bar: 4, style: "electric",
-    parts: { A: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
-             B: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true } },
-    form: "A A B A A B B A A B B A" },
-  { id: "raichu-overload", key: "Am", heat: { ez: 0.62, hd: 0.06, in: 0.16 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 168, bar: 4, style: "electric",
-    parts: { A: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
-             B: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true },
-             C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true } },
-    form: "A A B A B relic C B C B C",
+  { id: "vermilion-voltage", region: "kanto", key: "Am", heat: { ez: 0.9, hd: 0.16 }, gym: 2, title: "Vermilion Voltage", bpm: 152, bar: 4, style: "Electric",
+    parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E" },
+             H: { lead: "a4 . a4 . c5 . e5 . | d5 . c5 . a4 - - - | g4 . g4 . b4 . d5 . | e5 - - - . . . .", chords: "Am Am G G" },
+             A: { lead: "a5 a5 g5 e5 g5 - e5 - | d5 d5 c5 a4 c5 - - - | e5 e5 d5 b4 d5 - b4 - | a4 - - - . . . .", chords: "F G Am Am", burst: true, hint: "bass" },
+             B: { lead: "e5 . g5 . . . . . | d5 . f5 . . . . . | c5 . e5 . . . . . | a4 - - - . . . .",
+                  answer: ". . . . a5 g5 e5 . | . . . . g5 f5 d5 . | . . . . e5 d5 c5 . | . . . . e5 d5 b4 .", chords: "Am Dm F E" },
+             O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am" } },
+    form: "I H A H B H A H B H A H B H O" },
+  { id: "lightning-rod", region: "kanto", key: "Em", heat: { ez: 0.62, hd: 0.16 }, gym: 2, title: "Lightning Rod", bpm: 162, bar: 4, style: "Electric",
+    parts: { I: { lead: "e5 . . . b4 . . . | e5 . g5 . b5 . . .", chords: "Em B" },
+             H: { lead: "e5 . b4 . e5 . g5 . | f#5 . e5 . d5 . b4 . | c5 . e5 . g5 . c6 . | b5 - - - . . . .", chords: "Em Bm C B" },
+             A: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | e5 - - - b4 - - - | c5 d5 e5 f#5 g5 f#5 e5 d5 | b4 - - - . . . .", chords: "Em Bm C B", burst: true, hint: "arp" },
+             B: { lead: "g5 . e5 . . . . . | a5 . f#5 . . . . . | b5 . g5 . . . . . | f#5 - - - . . . .",
+                  answer: ". . . . b4 c5 d5 . | . . . . c5 d5 e5 . | . . . . d5 e5 f#5 . | . . . . a4 b4 d#5 .", chords: "Em Am G B" },
+             O: { lead: "f#5 . d#5 . b4 . . . | e5 - - - - - . .", chords: "B Em" } },
+    form: "I H A H B H A H B H A H B H A H O" },
+  { id: "raichu-overload", region: "kanto", key: "Am", heat: { ez: 1.14, hd: 0.14, in: 0.22 }, gym: 2, boss: true, title: "Raichu Overload", bpm: 170, bar: 4, style: "Electric",
+    parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E" },
+             H: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
+             A: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true, hint: "bass" },
+             B: { lead: "a4 . c5 . . . . . | g4 . b4 . . . . . | f4 . a4 . . . . . | e5 - - - . . . .",
+                  answer: ". . . . e5 d5 c5 . | . . . . d5 c5 b4 . | . . . . c5 b4 a4 . | . . . . g#4 a4 b4 .", chords: "Am G F E" },
+             C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true },
+             O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am" } },
+    form: "I H A H B H A H B H A H relic C H C H C O",
     // Raichu: every bar the line teleports somewhere new; mid-bar it zig-zags the other way. Every
-    // chord flashes. In the last part two more lines cross it like lightning, swapping angles.
-    line: [{ at: 0, len: 1, kind: "fly", x: 640, y: 560, rot: 0 }, { at: 0, len: 1, kind: "width", w: 0.8 }, { at: 0, len: 80, kind: "flash", on: "chords" },
-           ...every(4, 80, 4, (b, i) => { const [x, y, r] = [[470, 540, 12], [810, 580, -12], [560, 600, 10], [740, 550, -10], [640, 560, 8]][i % 5];
+    // chord flashes. In the last stretch two more lines cross it like lightning, swapping angles,
+    // and fade for the outro.
+    line: [{ at: 0, len: 1, kind: "fly", x: 640, y: 560, rot: 0 }, { at: 0, len: 1, kind: "width", w: 0.8 }, { at: 0, len: 88, kind: "flash", on: "chords" },
+           ...every(4, 88, 4, (b, i) => { const [x, y, r] = [[470, 540, 12], [810, 580, -12], [560, 600, 10], [740, 550, -10], [640, 560, 8]][i % 5];
              return [{ at: b - 0.25, len: 0.5, kind: "teleport", x, y }, { at: b, len: 0.16, kind: "snap", rot: r }, { at: b + 2, len: 0.16, kind: "snap", rot: -r, dx: r > 0 ? 40 : -40 }]; }),
            { at: 56, kind: "snap", x: 500, y: 470, rot: 32, line: 1 }, { at: 56, kind: "snap", x: 780, y: 470, rot: -32, line: 2 },
            { at: 56, len: 1, kind: "width", w: 0.5, line: 1 }, { at: 56, len: 1, kind: "width", w: 0.5, line: 2 },
            { at: 56, kind: "speed", to: 0.7, line: 1 }, { at: 56, kind: "speed", to: 0.7, line: 2 },
            { at: 57, len: 2, kind: "fade", to: 1, line: 1 }, { at: 57, len: 2, kind: "fade", to: 1, line: 2 }, { at: 64, len: 16, kind: "notes", lines: [0, 1, 2], by: "turn" },
-           ...every(64, 80, 2, (b, i) => [{ at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? 32 : -32, line: 1 }, { at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? -32 : 32, line: 2 }])] },
+           ...every(64, 80, 2, (b, i) => [{ at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? 32 : -32, line: 1 }, { at: b + 1.5, len: 0.5, kind: "fly", rot: i % 2 ? -32 : 32, line: 2 }]),
+           { at: 80, len: 2, kind: "fade", to: 0, line: 1 }, { at: 80, len: 2, kind: "fade", to: 0, line: 2 }] },
 
   // ── Erika, Celadon Gym (Grass) ──
-  { id: "celadon-petals", key: "F", heat: { ez: 0.8, hd: 0.4 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "grass",
-    parts: { A: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
-             B: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F" } },
-    form: "A A B A B B A A" },
-  { id: "gloom-garden", key: "Dm", heat: { ez: 0.94, hd: 0.4 }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "grass",
-    parts: { A: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
-             B: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm" } },
-    form: "A A B A B B A A" },
-  { id: "vileplume-drift", key: "F", heat: { ez: 0.98, hd: 0.4, in: 0.48 }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "grass",
-    parts: { A: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
-             B: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C" },
-             C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" } },
-    form: "A A B A relic C B C C",
+  { id: "celadon-petals", region: "kanto", key: "F", heat: { ez: 1, hd: 0.38 }, gym: 3, title: "Celadon Petals", bpm: 92, bar: 4, style: "Grass",
+    parts: { I: { lead: ". f5 - - . c5 - - | . f5 - a5 . c6 - -", chords: "F C" },
+             H: { lead: ". f5 - a5 . c6 - a5 | . g5 - bb5 . a5 - - | . f5 - a5 . c6 - d6 | . c6 - a5 . g5 - -", chords: "F Bb F C" },
+             A: { lead: ". d5 - f5 . a5 - g5 | . f5 - e5 . f5 - - | . bb4 - d5 . f5 - e5 | . f5 - - - - . .", chords: "Dm Bb C F", hint: "arp" },
+             B: { lead: ". a5 - c6 . . . . | . g5 - bb5 . . . . | . f5 - a5 . . . . | . e5 - - . . . .",
+                  answer: ". . . . . d5 f5 g5 | . . . . . c5 e5 f5 | . . . . . bb4 d5 e5 | . . . . . c5 d5 e5", chords: "F Gm Dm C" },
+             O: { lead: ". g5 - e5 . c5 - - | . f5 - - - - . .", chords: "C F" } },
+    form: "I H A H B H A H O" },
+  { id: "gloom-garden", region: "kanto", key: "Dm", heat: { ez: 0.56, hd: 0.42 }, tune: { ez: { fillChords: 0.8, chords: 0.8 } }, gym: 3, title: "Gloom Garden Sway", bpm: 100, bar: 4, style: "Grass",
+    parts: { I: { lead: ". d5 - - . a4 - - | . d5 . f5 . a5 - -", chords: "Dm A" },
+             H: { lead: ". a4 . d5 . f5 - e5 | . d5 . a4 . c5 - - | . bb4 . d5 . f5 - g5 | . a5 - - . . . .", chords: "Dm Am Bb A" },
+             A: { lead: ". f5 . e5 . d5 - c5 | . d5 . c5 . a4 - - | . g4 . bb4 . d5 - c5 | . d5 - - . . . .", chords: "Bb F Gm Dm", hint: "bass" },
+             B: { lead: ". d5 . f5 . . . . | . c5 . e5 . . . . | . bb4 . d5 . . . . | . a4 - - . . . .",
+                  answer: ". . . . . a5 g5 f5 | . . . . . g5 f5 e5 | . . . . . f5 e5 d5 | . . . . . e5 f5 g5", chords: "Dm C Bb A" },
+             O: { lead: ". e5 - c#5 . a4 - - | . d5 - - - - . .", chords: "A Dm" } },
+    form: "I H A H B H A H B H O" },
+  { id: "vileplume-drift", region: "kanto", key: "F", heat: { ez: 0.56, hd: 0.42, in: 0.48 }, tune: { ez: { fillChords: 0.8, chords: 0.8 } }, gym: 3, boss: true, title: "Vileplume Drift", bpm: 104, bar: 4, style: "Grass",
+    parts: { I: { lead: ". c5 - - . f5 - - | . a5 - g5 . f5 - -", chords: "F C" },
+             H: { lead: ". c5 - f5 . a5 - g5 | . f5 - c5 . d5 - - | . bb4 - d5 . f5 - a5 | . g5 - - . . . .", chords: "F Dm Bb C" },
+             A: { lead: ". a5 - bb5 . c6 - a5 | . g5 - f5 . g5 - - | . f5 - g5 . a5 - f5 | . e5 - - . . . .", chords: "F C Dm C", hint: "arp" },
+             B: { lead: ". f5 - a5 . . . . | . e5 - g5 . . . . | . d5 - f5 . . . . | . c5 - - . . . .",
+                  answer: ". . . . . c6 bb5 a5 | . . . . . bb5 a5 g5 | . . . . . a5 g5 f5 | . . . . . g5 a5 bb5", chords: "Dm C Bb C" },
+             C: { lead: ". d6 - c6 . a5 - f5 | . g5 - a5 . bb5 - - | . a5 - f5 . d5 - f5 | . f5 - - - - . .", chords: "Bb F C F" },
+             O: { lead: ". g5 - e5 . c5 - - | . f5 - - - - . .", chords: "C F" } },
+    form: "I H A H B H relic C H C H O",
     // Vileplume: the line falls slowly and sways like a leaf; then petals: it shrinks and three more
     // short lines fade in beside it, scatter across the screen and fade out again.
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 510, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.8 }, { at: 0, kind: "speed", to: 0.9 },
@@ -1048,20 +1116,43 @@ const SONGS = [
              return { at: b, len: 2, kind: "fly", x, y, rot: ((i + k) % 3 - 1) * 24, line: k, only: "hard" }; })),
            ...[1, 2, 3].map(k => ({ at: 56, len: 2, kind: "fade", to: 0, line: k })),
            { at: 56, len: 2, kind: "fly", x: 640, y: 510, rot: 0 }, { at: 56, len: 2, kind: "width", l: 3200, w: 0.8 }, { at: 56, kind: "speed", to: 0.9 },
-           { at: 58, len: 6, kind: "drift", ampX: 140, period: 12, sway: 12, fall: 1 }] },
+           { at: 58, len: 14, kind: "drift", ampX: 140, period: 12, sway: 12, fall: 0.5 }] },
+
+  // ── Champion Blue, Indigo Plateau ──
+  // Each section in one of the four gyms' bands, Pidgeot's swoops on the line, two flips (line, highway,
+  // line again), the last hook a tone up, and Kanto's whole verse as the last section.
+  { id: "champion-blue", region: "kanto", key: "G", heat: { ez: 0.6, hd: 0.26, in: 0.36, at: 0.28 }, tune: { ez: { step: 0.16, chords: 0.6 }, in: { step: 0.13 } }, champion: true, boss: true, at: true, title: "Sky Over Indigo", bpm: 128, bar: 4,
+    style: "Normal/Flying", type: "Normal", art: 18, foe: { num: 18, name: "Blue's Pidgeot", types: ["Normal", "Flying"] }, line: "auto",
+    parts: { I: { lead: "g4 - - - d5 - - - | g4 - b4 - d5 - . .", chords: "G D" },
+             H: { lead: "g4 - b4 - d5 - g5 - | f#5 - e5 - d5 - - - | e5 - c5 - a4 - d5 - | b4 - - - . . . .", chords: "G D C G" },
+             A: { lead: "b4 - b4 - d5 - e5 - | d5 - b4 - a4 - - - | c5 - c5 - e5 - g5 - | f#5 - - - d5 - - -", chords: "G D C D", style: "Rock", hint: "bass" },
+             B: { lead: "d5 - - - b4 - . . | e5 - - - c5 - . . | d5 - - - a4 - . . | b4 - - - . . . .",
+                  answer: ". . . . . . g5 f#5 | . . . . . . a5 g5 | . . . . . . f#5 e5 | . . . . d5 e5 f#5 -", chords: "G C D G", style: "Water" },
+             C: { lead: "g5 . f#5 . d5 . b4 . | c5 . e5 . g5 . a5 . | b5 . a5 . g5 . d5 . | e5 - - - . . . .", chords: "Em C G D", style: "Electric", burst: true },
+             D: { lead: ". d5 - g5 . b5 - a5 | . g5 - d5 . e5 - - | . c5 - e5 . g5 - f#5 | . d5 - - . . . .", chords: "G Em C D", style: "Grass" },
+             E: { motif: true, lead: "", chords: "" },
+             O: { lead: "d5 - - - a4 - - - | g4 - - - - - . .", chords: "D G" } },
+    form: "I H A H B H relic C H flip D H flip C H^2 E O",
+    before: "Ugh, that tune's been stuck in my head for weeks.", after: "Fine. It's yours. Take your verse back, and get it out of my head.",
+    ps: "Meloetta: That's one verse back. Eight more out there." },
 
   // ── The finale: Meloetta ──
-  { id: "relic-song", key: "Em", heat: { ez: 0.8, hd: 0.3, in: 0.28, at: 0.26 }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 140, bar: 4, style: "relic",
-    parts: { A: { lead: KANTO_MOTIF.lead, chords: KANTO_MOTIF.chords },
-             B: { lead: "c6 - b5 - a5 - g5 - | a5 - - - e5 - - - | g5 - a5 - b5 - d6 - | e6 - - - - - . .", chords: "Am Em G Em" },
+  // For now the ending, until all nine regions are in: built on Kanto's verse (the hook), with room
+  // for the other eight at the break (finalVerses()).
+  { id: "relic-song", region: "kanto", key: "Em", heat: { ez: 0.28, hd: 0.3, in: 0.26, at: 0.26 }, tune: { ez: { step: 0.2 } }, gym: 4, boss: true, final: true, title: "Relic Song", bpm: 130, bar: 4, style: "relic",
+    parts: { I: { lead: "e5 - - - b4 - - - | e5 - g5 - b5 - . .", chords: "Em B" },
+             H: { lead: KANTO_MOTIF.lead, chords: KANTO_MOTIF.chords },
+             B: { lead: "c6 - b5 - . . . . | a5 - e5 - . . . . | g5 - b5 - . . . . | e6 - - - . . . .",
+                  answer: ". . . . a5 g5 e5 - | . . . . c5 d5 e5 - | . . . . d6 c6 b5 - | . . . . b5 a5 g5 -", chords: "Am Em G Em" },
              C: { lead: "e5 f#5 g5 a5 b5 a5 g5 f#5 | g5 a5 b5 c6 d6 c6 b5 a5 | b5 - - - - - - - | e5 - - - . . . .", chords: "Em D C B", burst: true },
              D: { lead: ". e5 - g5 . b5 - a5 | . g5 - e5 . d5 - - | . c5 - e5 . g5 - b5 | . a5 - - . . . .", chords: "C Em Am D" },
-             E: { lead: "e5 - - - - - - - | g5 - - - - - - - | f#5 - - - - - - - | b5 - - - - - . .", chords: "Em G D B" } },
-    form: "A A B B relic C D C D flip E B flip C D E A",
+             E: { lead: "e5 - - - - - - - | g5 - - - - - - - | f#5 - - - - - - - | b5 - - - - - . .", chords: "Em G D B" },
+             O: { lead: "b5 - a5 - g5 - f#5 - | e5 - - - - - . .", chords: "B Em" } },
+    form: "I H B H D H C H B H relic C D C H flip E B flip C D H E O",
     // Everything at once. Meloetta is in Pirouette on the line: sharp snaps, teleports, the notes
     // rushing in. At each flip point she spins and flips, and lands back on the highway, where Aria's
-    // line flows. The last section has four lines that end by merging into one.
-    // The line is out for beats 0-64 and 104-168 from the break (the highway has 68-100).
+    // line flows. The last section has four lines that end by merging into one, for the outro.
+    // The line is out for beats 0-64 and 104-176 from the break (the highway has 68-100).
     line: [{ at: 0, len: 2, kind: "fly", x: 640, y: 540, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.8 }, { at: 0, len: 64, kind: "flash", on: "chords" },
            ...pirouette(2, 16), ...surge(16, 32), ...pirouette(32, 48), ...surge(48, 64),
            // Flip point: up, two turns and a flip, back down onto the highway at exactly 0 degrees.
@@ -1082,12 +1173,13 @@ const SONGS = [
            // The merge: every line glides onto the first, then the others fade into it.
            ...[1, 2, 3].flatMap(k => [{ at: 160, len: 4, kind: "fly", x: 640, y: 560, rot: k === 3 ? 360 : 0, line: k }, { at: 160, len: 4, kind: "width", w: 1, line: k },
              { at: 164, len: 2, kind: "fade", to: 0, line: k }]),
-           { at: 160, len: 4, kind: "fly", x: 640, y: 560, rot: 0 }, { at: 160, len: 4, kind: "width", w: 1 }, { at: 164, kind: "flash" }] },
+           { at: 160, len: 4, kind: "fly", x: 640, y: 560, rot: 0 }, { at: 160, len: 4, kind: "width", w: 1 }, { at: 164, kind: "flash" },
+           { at: 166, len: 10, kind: "tide", amp: 12, period: 8, tilt: 2 }] },
 
   // ── Hidden tracks ──
   // Giratina's table: six chambers a bar. Taps sit on the off-beats between the chambers, chords
-  // land on beats 1 and 4 every bar, and the B part fires a fast burst.
-  { id: "the-dealer", key: "Cm", heat: { ez: 0.56, hd: 0.32, in: 0.32, at: 0.32 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dealer", art: 10007, at: true,
+  // land on beats 1 and 4 every bar, and the A part fires a fast burst.
+  { id: "the-dealer", region: "kanto", key: "Cm", heat: { ez: 0.56, hd: 0.32, in: 0.32, at: 0.32 }, hidden: "dealer", title: "The Dealer", bpm: 100, bar: 6, style: "dealer", art: 10007, at: true,
     sync: true, chordAt: [0, 6], chordsAlways: true,
     // The break: the house deals, and the line becomes the cylinder, a chamber round every bar.
     verse: { lead: "c5 - - - b4 - - - g4 - - - | c4 - - - - - - - . . . .", chords: "Cm G" }, breakName: "Six chambers", breakSub: "The cylinder turns",
@@ -1096,40 +1188,49 @@ const SONGS = [
            // The cylinder: a chamber round (60 degrees) every bar, all song.
            { at: 0, len: 48, kind: "chamber", every: 6, step: 60, snap: 0.35, diffs: ["ez", "hd"] },
            { at: 0, len: 48, kind: "chamber", every: 6, step: 60, snap: 0.6, diffs: ["in", "at"] },
-           // B: notes from both sides, and on beat 6 of every bar the cylinder flips over. IN flips every other
-           // bar and AT not at all: their charts are already at their levels without it.
+           // Then notes from both sides, and on beat 6 of every bar the cylinder flips over. IN flips every
+           // other bar and AT not at all: their charts are already at their levels without it.
            { at: 24, len: 24, kind: "sides" }, { at: 24, len: 24, kind: "flash", on: "chords" },
            ...every(24, 48, 6, (b, i) => [{ at: b + 5, len: 1, kind: "flip", diffs: i % 2 ? ["hd"] : ["hd", "in"] }, { at: b + 5, kind: "shake", diffs: i % 2 ? ["hd"] : ["hd", "in"] }]),
            // The barrel: two lines on opposite sides of the cylinder, turning together a chamber a bar.
            // The second line rides opposite the first through the barrel's middle: hidden on top of it until
-           // the barrel opens out to its radius.
-           { at: 37, len: 35, kind: "mirror", of: 0, cx: 640, cy: 440, line: 1 }, { at: 37, kind: "width", w: 0.5, line: 1 }, { at: 37, kind: "speed", to: 0.55, line: 1 },
+           // the barrel opens out to its radius. It plays out over the last hook and the outro.
+           { at: 37, len: 47, kind: "mirror", of: 0, cx: 640, cy: 440, line: 1 }, { at: 37, kind: "width", w: 0.5, line: 1 }, { at: 37, kind: "speed", to: 0.55, line: 1 },
            { at: 38, len: 2, kind: "fade", to: 1, line: 1 },
            { at: 46, len: 2, kind: "width", w: 0.5 }, { at: 48, kind: "speed", to: 0.55 },
-           { at: 48, len: 24, kind: "orbit", cx: 640, cy: 440, r: 60, every: 6, step: 60, snap: 0.35, diffs: ["hd"] },
-           { at: 48, len: 24, kind: "orbit", cx: 640, cy: 440, r: 60, every: 6, step: 60, snap: 0.6, diffs: ["in", "at"] },
-           { at: 48, len: 24, kind: "notes", lines: [0, 1] }],
-    parts: { A: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
-             B: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G", burst: true } },
-    form: "A A B relic A B A", note: "Six beats a bar. The house always counts its own way." },
-  { id: "its-started-go", key: "Em", heat: 0, hidden: "started", title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true, diffs: ["hd"],
+           { at: 48, len: 36, kind: "orbit", cx: 640, cy: 440, r: 60, every: 6, step: 60, snap: 0.35, diffs: ["hd"] },
+           { at: 48, len: 36, kind: "orbit", cx: 640, cy: 440, r: 60, every: 6, step: 60, snap: 0.6, diffs: ["in", "at"] },
+           { at: 48, len: 36, kind: "notes", lines: [0, 1] }],
+    parts: { I: { lead: "c4 - - - - - g3 - - - - - | c4 - - - eb4 - g4 - - - . .", chords: "Cm G" },
+             H: { lead: "c4 - - - eb4 - - - g4 - f4 - | eb4 - - - d4 - - - c4 - - - | ab3 - - - c4 - - - eb4 - d4 - | b3 - - - - - - - . . . .", chords: "Cm Cm Ab G" },
+             A: { lead: "g4 - ab4 - g4 - f4 - eb4 - d4 - | eb4 - - - - - c4 - - - . . | f4 - g4 - ab4 - bb4 - c5 - b4 - | c5 - - - - - - - . . . .", chords: "Cm Ab Fm G", burst: true },
+             B: { lead: "c4 - - - . . . . . . . . | eb4 - - - . . . . . . . . | f4 - - - . . . . . . . . | g4 - - - . . . . . . . .",
+                  answer: ". . . . g4 - f4 - eb4 - . . | . . . . ab4 - g4 - f4 - . . | . . . . bb4 - ab4 - g4 - . . | . . . . b4 - c5 - d5 - . .", chords: "Cm Ab Fm G" },
+             O: { lead: "g4 - - - f4 - - - d4 - - - | c4 - - - - - - - - - . .", chords: "G Cm" } },
+    form: "I H A H B H relic H B H O", note: "Six beats a bar. The house always counts its own way." },
+  // The joke: a few notes and gone. Exempt from the recipe.
+  { id: "its-started-go", key: "Em", heat: 0, hidden: "started", exempt: true, title: "It's started. Go.", bpm: 90, bar: 4, style: "plain", art: 648, noHolds: true, diffs: ["hd"],
     parts: { A: { lead: "e5 - - - g5 - - - | b5 - - - - - - - | . . . . . . . . | . . . . . . . .", chords: "Em C G D" } },
     form: "A", ps: "P.S. it was three words, not two." },
   // Eight beats a bar: one for every s in his signature (Sssssssnakes, the letters in Poké Idle's mail).
-  { id: "sssssssnakes", key: "Em", heat: { ez: 0.88, hd: 0.34, in: 0.38, at: 0.36 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
+  { id: "sssssssnakes", region: "kanto", key: "Em", heat: { ez: 0.88, hd: 0.34, in: 0.38, at: 0.36 }, hidden: "snakes", title: "Sssssssnakes", bpm: 132, bar: 8, style: "snake", art: 497, at: true,
     // The break: a long hiss, and then the line slithers in an S for the rest of the song.
     verse: { lead: "e5 - - - d#5 - - - e5 - - - b4 - - - | e4 - - - - - - - . . . . . . . .", chords: "Em B" }, breakName: "Sssss", breakSub: "It slithers",
-    line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 580, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.55 }, { at: 0, kind: "speed", to: 0.9 },
-           { at: 4, len: 92, kind: "slither", ampX: 220, ampY: 40, period: 8, tilt: 14 },
+    line: [{ at: 0, len: 4, kind: "fly", x: 640, y: 600, rot: 0 }, { at: 0, len: 2, kind: "width", w: 0.55 }, { at: 0, kind: "speed", to: 0.9 },
+           { at: 4, len: 108, kind: "slither", ampX: 220, ampY: 40, period: 8, tilt: 14 },
            // The strike, every two bars: it coils (the notes crawl), then lunges (they rush in).
-           ...every(0, 96, 16, b => [{ at: b + 12, kind: "speed", to: 0.55 }, { at: b + 14, kind: "speed", to: 1.3 }, { at: b + 14, kind: "shake" }, { at: b + 15, kind: "speed", to: 0.9 }]),
-           // A second snake from above, half a wave behind the first, for the middle two B parts.
+           ...every(0, 112, 16, b => [{ at: b + 12, kind: "speed", to: 0.55 }, { at: b + 14, kind: "speed", to: 1.2 }, { at: b + 14, kind: "shake" }, { at: b + 15, kind: "speed", to: 0.9 }]),
+           // A second snake from above, half a wave behind the first, through the middle of it.
            { at: 36, kind: "snap", x: 640, y: 320, rot: 180, line: 1 }, { at: 36, kind: "width", w: 0.55, line: 1 }, { at: 36, kind: "speed", to: 0.8, line: 1 },
            { at: 37, len: 2, kind: "fade", to: 1, line: 1 }, { at: 40, len: 44, kind: "slither", ampX: 220, ampY: 40, period: 8, tilt: 14, line: 1 },
            { at: 48, len: 32, kind: "notes", lines: [0, 1] }, { at: 80, len: 2, kind: "fade", to: 0, line: 1 }],
-    parts: { A: { lead: "e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - a4 - g4 - f#4 - - - . . . .", chords: "Em Em" },
-             B: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" } },
-    form: "A A B A A B relic B A A B B A", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
+    parts: { I: { lead: "e4 - - - - - - - b4 - - - - - - - | e4 - - - g4 - - - b4 - - - - - . .", chords: "Em B" },
+             H: { lead: "e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - a4 - g4 - f#4 - - - . . . . | e4 - f4 - e4 - . . g4 - f#4 - f4 - e4 - | b4 - - - c5 - b4 - e4 - - - . . . .", chords: "Em Em Em B" },
+             A: { lead: "e5 . d#5 . e5 . b4 . c5 . b4 . a4 . g4 . | f#4 - - - g4 - - - a4 - - - b4 - - -", chords: "C B" },
+             B: { lead: "e5 - - - b4 - - - . . . . . . . . | d5 - - - a4 - - - . . . . . . . .",
+                  answer: ". . . . . . . . g4 a4 b4 - a4 g4 f#4 - | . . . . . . . . f#4 g4 a4 - b4 - - -", chords: "Em D" },
+             O: { lead: "b4 - - - a4 - - - g4 - - - f#4 - - - | e4 - - - - - - - - - - - - - . .", chords: "B Em" } },
+    form: "I H A H B H relic A H B H O", note: "Eight beats a bar. Count the s's in Sssssssnakes." }
 ];
 // key is the song's key ("Em" minor, "C" major): for the recipe check and to move a region's verse into it.
 // heat is how much of the filler layer a song takes: gym 1 lowest, the finale and the hidden
@@ -1253,7 +1354,9 @@ const DEMOS = () => demoCache || (demoCache = TYPES.map(demoSong));
 // A small hash of the song, difficulty and beat stands in for chance, so a chart is the same every load.
 const hash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
 function build(song, diff = "hd") {
-  const style = styleOf(song.style), D = CHART_DIFFS[diff], steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
+  // song.tune: a song's own changes to a difficulty's rules (step, jack, chords, fillChords): a champion's EZ
+  // can sit closer together than a first gym's, and still be EZ (two keys at most, the same holds).
+  const style = styleOf(song.style), D = { ...CHART_DIFFS[diff], ...((song.tune || {})[diff] || {}) }, steps = song.bar * 2, L = D.lanes, spb = 60 / song.bpm;
   const heat = (typeof song.heat === "object" ? song.heat[diff] ?? song.heat.hd : song.heat) || 0, roll = (b, salt = 0) => hash(song.id + ":" + diff + ":" + salt + ":" + b.toFixed(3));
   const ev = [], tune = [], spots = new Map(), chordSpots = [], segments = [], barsOn = [], lay = style.layer;
   // A filler spot, on a sixteenth grid, scored by what the band plays there.
@@ -1266,7 +1369,9 @@ function build(song, diff = "hd") {
   let beat = 0, mode = "highway", form = "aria";
   const { tokens, moved } = formFor(song, diff);
   // up: semitones the part is moved (a key change, "H^2" in the form).
+  // A part can play in another style's band (part.style: Champion Blue's sections are each a gym's).
   const addPart = (name, part, chartOn, verse, up = 0) => {
+    const own = part.style ? styleOf(part.style) : style;
     const lead = parseLine(part.lead, steps, song.id + " " + name);
     const bars = lead.length / steps;
     const chords = part.chords.split(/\s+/);
@@ -1280,12 +1385,12 @@ function build(song, diff = "hd") {
       let len = 1;
       while (i + len < lead.length && lead[i + len] === "-") len++;
       const b = at + i / 2;
-      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : style.lead, midi: m, dur: len / 2 });
+      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : own.lead, midi: m, dur: len / 2 });
       if (!chartOn) continue;
       if (lastPitch != null) lane += m > lastPitch ? 1 : m < lastPitch ? -1 : (b - lastBeat < 0.75 ? (lane >= 2 ? -1 : 1) : 0);
       if (lane > L - 1) lane = L - 2; if (lane < 0) lane = 1;
       lastPitch = m; lastBeat = b;
-      const hold = !song.noHolds && len >= D.holdMin + (style.holds ? 0 : 1) ? (len - 1) / 2 : 0;
+      const hold = !song.noHolds && len >= D.holdMin + (own.holds ? 0 : 1) ? (len - 1) / 2 : 0;
       tune.push({ b, lane, len: hold, mode });
     }
     // The answer (call and response): a second line on the arp's voice in the lead's gaps. The band
@@ -1294,12 +1399,13 @@ function build(song, diff = "hd") {
       const m = midiOf(tok);
       if (m == null) return;
       let len = 1; while (line[i + len] === "-") len++;
-      ev.push({ b: at + i / 2, kind: "tone", inst: style.arp || "arp", midi: m + up, dur: len / 2 });
+      ev.push({ b: at + i / 2, kind: "tone", inst: own.arp || "arp", midi: m + up, dur: len / 2 });
       if (chartOn) spot(at + i / 2, mode, 3, burst, six);
     });
     // The region's verse, quietly, under a gym song's part (hint: "arp" or "bass"), in the song's key.
     if (part.hint && regionOf(song)) {
-      const v = regionOf(song).verse, vl = parseLine(v.lead, steps, song.id + " hint"), shift = keyShift(v.key, song.key) + up;
+      // The motif is written in 4/4: it runs on as eighths across a waltz's (or any) bars.
+      const v = regionOf(song).verse, vl = parseLine(v.lead, 8, song.id + " hint"), shift = keyShift(v.key, song.key) + up;
       for (let i = 0; i < bars * steps; i++) {
         const m = midiOf(vl[i % vl.length]);
         if (m == null) continue;
@@ -1312,25 +1418,25 @@ function build(song, diff = "hd") {
       const [r, t, f] = chordOf(chords[bar % chords.length], up), b0 = at + bar * song.bar, n = song.bar;
       const bassNote = r - 12;
       // The type styles' runs: sixteenth bass (Electric, Bug), half time (Ground), a walk (Dark).
-      if (style.bassRun === "sixteenths") for (let k = 0; k < n * 4; k++) ev.push({ b: b0 + k / 4, kind: "tone", inst: style.bass, midi: bassNote + (k % 8 === 6 ? 12 : 0), dur: 0.2 });
-      if (style.bassRun === "half") ev.push({ b: b0, kind: "tone", inst: style.bass, midi: bassNote - 12, dur: n - 0.3 }, { b: b0 + n / 2 + 1.5, kind: "tone", inst: style.bass, midi: bassNote - 5, dur: 0.4 });
-      if (style.bassRun === "walk") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: style.bass, midi: bassNote + [0, 3, 5, 7, 10, 7][k % 6], dur: 0.8 });
-      if (style.bassRun === "eighths") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: style.bass, midi: bassNote, dur: 0.4 });
-      if (style.bassRun === "rootfifth") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: style.bass, midi: k % 2 ? bassNote + 7 : bassNote, dur: 0.9 });
-      if (style.bassRun === "octaves") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: style.bass, midi: bassNote + (k % 2 ? 12 : 0), dur: 0.35 });
-      if (style.bassRun === "oneThree") for (let k = 0; k < n; k += 2) ev.push({ b: b0 + k, kind: "tone", inst: style.bass, midi: bassNote, dur: 1.6 });
-      if (style.stab) for (let k = 0; k < n; k += style.stabEvery || 2) for (const p of [r, t, f]) ev.push({ b: b0 + k, kind: "tone", inst: style.stab, midi: p + 12, dur: 0.45 });
-      if (style.arp) {
+      if (own.bassRun === "sixteenths") for (let k = 0; k < n * 4; k++) ev.push({ b: b0 + k / 4, kind: "tone", inst: own.bass, midi: bassNote + (k % 8 === 6 ? 12 : 0), dur: 0.2 });
+      if (own.bassRun === "half") ev.push({ b: b0, kind: "tone", inst: own.bass, midi: bassNote - 12, dur: n - 0.3 }, { b: b0 + n / 2 + 1.5, kind: "tone", inst: own.bass, midi: bassNote - 5, dur: 0.4 });
+      if (own.bassRun === "walk") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, midi: bassNote + [0, 3, 5, 7, 10, 7][k % 6], dur: 0.8 });
+      if (own.bassRun === "eighths") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.bass, midi: bassNote, dur: 0.4 });
+      if (own.bassRun === "rootfifth") for (let k = 0; k < n; k++) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, midi: k % 2 ? bassNote + 7 : bassNote, dur: 0.9 });
+      if (own.bassRun === "octaves") for (let k = 0; k < n * 2; k++) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.bass, midi: bassNote + (k % 2 ? 12 : 0), dur: 0.35 });
+      if (own.bassRun === "oneThree") for (let k = 0; k < n; k += 2) ev.push({ b: b0 + k, kind: "tone", inst: own.bass, midi: bassNote, dur: 1.6 });
+      if (own.stab) for (let k = 0; k < n; k += own.stabEvery || 2) for (const p of [r, t, f]) ev.push({ b: b0 + k, kind: "tone", inst: own.stab, midi: p + 12, dur: 0.45 });
+      if (own.arp) {
         // The type styles add: fast16 (sixteenths straight up), wide (two octaves, airy), box (a music box
         // up and down two octaves), sparse (one high note every two beats).
-        const run = style.arpRun, wide = run === "wide" || run === "box";
+        const run = own.arpRun, wide = run === "wide" || run === "box";
         const tones = (wide ? [r, f, r + 12, t + 12, f + 12, r + 24] : [r, t, f, r + 12]).map(p => p + 12);
         const per = run === "flow16" || run === "fast16" ? 4 : run === "up8" || wide ? 2 : run === "sparse" ? 0.5 : 1;
         for (let k = 0; k < n * per; k++) {
           if (run === "sway" && k % 2 === 0) continue;   // off-beats only
           const idx = run === "flow16" ? [0, 1, 2, 3, 2, 1][k % 6] : run === "box" ? [0, 1, 2, 3, 4, 5, 4, 3][k % 8] : wide ? k % 6 : run === "sparse" ? [3, 2][k % 2] : k % 4;
           const b = b0 + k / per;
-          ev.push({ b, kind: "tone", inst: style.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per });
+          ev.push({ b, kind: "tone", inst: own.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per });
           if (chartOn) spot(b, mode, per === 4 && k % 2 ? 1 : 2, burst, six);
           // A burst part's arpeggio is the chart's speed run (drag notes on the line).
           if (chartOn && burst && run !== "sway" && k % (per === 4 ? 2 : 1) === 0)
@@ -1338,7 +1444,7 @@ function build(song, diff = "hd") {
         }
       }
       // Drums
-      const dr = style.drums;
+      const dr = own.drums;
       for (const [hit, when] of Object.entries(dr)) {
         const stepsList = when === "all" ? [...Array(n * 2).keys()] : when === "off" ? [...Array(n).keys()].map(k => k * 2 + 1) : when === "16" ? [...Array(n * 4).keys()].map(k => k / 2) : when;
         for (const s of stepsList) if (s < n * 2) {
@@ -1347,20 +1453,20 @@ function build(song, diff = "hd") {
         }
       }
       // A fill on the part's last bar.
-      if (bar === bars - 1 && style.drums.s) for (const s of [n * 2 - 2, n * 2 - 1.5, n * 2 - 1]) ev.push({ b: b0 + s / 2, kind: "drum", hit: style.deep ? "t" : "s" });
+      if (bar === bars - 1 && own.drums.s) for (const s of [n * 2 - 2, n * 2 - 1.5, n * 2 - 1]) ev.push({ b: b0 + s / 2, kind: "drum", hit: own.deep ? "t" : "s" });
       if (!chartOn) continue;
       barsOn.push({ b0, n, tones: [r, t, f, r + 12] });
       // The band gets busier with the chart: on IN ticks on every eighth and the bass moving on the
       // off-beats (an octave where it already plays eighths); on AT ticks on the sixteenths too, a kick
       // on the "and" of every other beat and a snare pickup before each backbeat.
       if (D.layer >= 1) for (let k = 0; k < n * 2; k++) {
-        ev.push({ b: b0 + k / 2, kind: "drum", hit: lay.tick });
-        if (k % 2) ev.push({ b: b0 + k / 2, kind: "tone", inst: lay.bass || style.bass, midi: bassNote + (style.bassRun === "eighths" || style.bassRun === "octaves" || k % 4 === 3 ? 12 : 7), dur: 0.3 });
+        ev.push({ b: b0 + k / 2, kind: "drum", hit: own.layer.tick });
+        if (k % 2) ev.push({ b: b0 + k / 2, kind: "tone", inst: own.layer.bass || own.bass, midi: bassNote + (own.bassRun === "eighths" || own.bassRun === "octaves" || k % 4 === 3 ? 12 : 7), dur: 0.3 });
       }
       if (D.layer >= 2) for (let k = 0; k < n * 2; k++) {
-        ev.push({ b: b0 + k / 2 + 0.25, kind: "drum", hit: lay.fast });
-        if (k % 4 === 3) ev.push({ b: b0 + k / 2, kind: "drum", hit: lay.kick });
-        if (k % 4 === 1) ev.push({ b: b0 + k / 2 + 0.25, kind: "drum", hit: lay.snare });
+        ev.push({ b: b0 + k / 2 + 0.25, kind: "drum", hit: own.layer.fast });
+        if (k % 4 === 3) ev.push({ b: b0 + k / 2, kind: "drum", hit: own.layer.kick });
+        if (k % 4 === 1) ev.push({ b: b0 + k / 2 + 0.25, kind: "drum", hit: own.layer.snare });
       }
       // The grid itself: every eighth is a spot (off-beats count double on a syncopated song),
       // and in a burst (or on IN and AT) every sixteenth.
@@ -1376,8 +1482,8 @@ function build(song, diff = "hd") {
   for (const tok of tokens) {
     if (tok === "relic") {
       const start = beat, reg = regionOf(song);
-      // A hidden track sings its own; the finale all four; a region's boss its region's verse (in its key); Kanto's gym bosses their gym's.
-      const sung = song.verse ? [song.verse] : song.final ? VERSES : song.region && reg ? [reg.verse] : [VERSES[song.gym]];
+      // A hidden track sings its own; the finale every region's verse there is; any other boss its region's (in its key).
+      const sung = song.verse ? [song.verse] : song.final ? finalVerses() : [reg.verse];
       for (const v of sung) addPart("verse", v, false, true, reg && v === reg.verse ? keyShift(v.key, song.key) : 0);
       segments.push({ from: start, to: beat, kind: "relic" });
       mode = "line"; form = "pirouette"; verseAt = beat;
@@ -1873,7 +1979,9 @@ const gymSongs = g => SONGS.filter(s => s.gym === g);
 function open(song) {
   if (opts.test) return true;
   if (song.hidden) return hiddenOpen(song);
-  if (song.final) return badges() === 4;
+  // Champion Blue after the four badges; the finale (for now) after Blue.
+  if (song.champion) return badges() === 4;
+  if (song.final) return !!save.champion;
   if (song.gym > 0 && !save.badges[song.gym - 1]) return false;
   const list = gymSongs(song.gym), i = list.indexOf(song);
   if (song.gym === 0 && i === 0) return lessonOk();
@@ -1930,8 +2038,10 @@ function drawMap() {
   $("#m-badges").textContent = badges() + "/4";
   $("#m-total").textContent = fmt(total());
   $("#m-test").hidden = !opts.test;
+  // Kanto's verse: a bar from each gym leader, and Blue, who has the tune stuck in his head.
   const v = $("#verses"); v.replaceChildren();
-  GYMS.forEach((g, i) => v.append(el("span", save.badges[i] ? "got" : "", "Verse " + (i + 1) + (save.badges[i] ? "" : " · " + g.name))));
+  GYMS.forEach((g, i) => v.append(el("span", save.badges[i] ? "got" : "", "Bar " + (i + 1) + " · " + g.name)));
+  v.append(el("span", save.champion ? "got" : "", "The verse · Blue"));
   const gyms = $("#gyms"); gyms.replaceChildren();
   GYMS.forEach((g, i) => {
     const card = el("div", "gym" + (save.badges[i] ? " thawed" : "") + (open(gymSongs(i)[0]) ? "" : " locked"));
@@ -1941,10 +2051,18 @@ function drawMap() {
     card.append(top);
     const [s1, s2, boss] = gymSongs(i);
     card.append(songRow(s1), songRow(s2), songRow(boss, "Boss: " + boss.title));
-    card.append(el("div", "badge" + (save.badges[i] ? " got" : ""), save.badges[i] ? g.badge + " · earned · verse " + (i + 1) + " back" : g.badge + " · not earned"));
+    card.append(el("div", "badge" + (save.badges[i] ? " got" : ""), save.badges[i] ? g.badge + " · earned · bar " + (i + 1) + " back" : g.badge + " · not earned"));
     gyms.append(card);
   });
   const fin = $("#finale"); fin.replaceChildren();
+  // Champion Blue: wider than a gym, in gold.
+  const blue = SONGS.find(s => s.champion);
+  const cc = el("div", "gym champ" + (save.champion ? " thawed" : "") + (open(blue) ? "" : " locked"));
+  const ctop = el("div", "top"), cpic = el("span", "pic"), cimg = el("img"); pix(cimg, sprite(blue.art), 80); cimg.alt = "Pidgeot"; cpic.append(cimg);
+  const cwho = el("div"); cwho.append(el("h2", "", "Champion Blue"), el("div", "dim", "Indigo Plateau · Normal/Flying · Kanto's verse"));
+  ctop.append(cpic, cwho); cc.append(ctop, songRow(blue, "Champion: " + blue.title));
+  cc.append(el("div", "badge" + (save.champion ? " got" : ""), save.champion ? "Kanto's verse · back" : "Blue: \u201c" + blue.before + "\u201d"));
+  fin.append(cc);
   const final = SONGS.find(s => s.final);
   const fc = el("div", "gym" + (save.badges[4] ? " thawed" : "") + (open(final) ? "" : " locked"));
   const top = el("div", "top"), pic = el("span", "pic"), img = el("img"); pix(img, sprite(MELOETTA), 80); img.alt = "Meloetta"; pic.append(img);
@@ -1959,10 +2077,11 @@ function drawMap() {
   }
   fin.append(hc);
   const next = GYMS.findIndex((g, i) => !save.badges[i]);
-  if (save.badges[4]) say("You gave me my whole song back. Thank you. I'll keep singing it, for the ones who are still cold.");
-  else if (next < 0) say("All four verses! Now let me sing the whole thing. Come and keep up with me, if you can.", MELOETTA, true);
-  else if (!lessonOk()) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? First, a short lesson: Pewter Steps opens after it.");
-  else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart and Kanto's gym leaders each kept a verse. Help me win them back? Hit " + opts.binds[4].map(keyName).join(" ") + " as the notes reach the line. " + GYMS[0].hello);
+  if (save.badges[4]) say("Kanto's verse, sung whole. Thank you. Eight more are out there, somewhere I haven't been yet.");
+  else if (save.champion) say("That's one verse back. Eight more out there. For now, let me sing what I have. Keep up with me, if you can.", MELOETTA, true);
+  else if (next < 0) say("All four bars! Blue has the rest of the verse stuck in his head. That Pidgey didn't stay small.");
+  else if (!lessonOk()) say("I'm Meloetta. My song came apart, and Kanto's gym leaders each kept a bar of its verse. Help me win them back? First, a short lesson: Pewter Steps opens after it.");
+  else if (next === 0 && !Object.keys(save.best).length) say("I'm Meloetta. My song came apart, and Kanto's gym leaders each kept a bar of its verse. Help me win them back? Hit " + opts.binds[4].map(keyName).join(" ") + " as the notes reach the line. " + GYMS[0].hello);
   else say(GYMS[next].hello);
   $("#b-lesson").hidden = lessonOk();
 }
@@ -2265,7 +2384,7 @@ function start(song, diff = pickedDiff(song), given = null) {
     const youTypes = you.buddy && G ? G.typesOf(you.num) : ["Psychic"];
     $("#me-hp").style.setProperty("--hp", TYPE_COLOR[youTypes[0]] || "#fff");
     $("#boss-hp").style.setProperty("--hp", TYPE_COLOR[boss.types[boss.types.length - 1]] || "#fff");
-    say2(edge ? "Type edge on " + boss.name + ": +3% score" : you.buddy ? "" : "No buddy? Set one in Poké Gacha.");
+    say2(song.before ? "Blue: \u201c" + song.before + "\u201d" : edge ? "Type edge on " + boss.name + ": +3% score" : you.buddy ? "" : "No buddy? Set one in Poké Gacha.", song.before ? 4000 : 1500);
   }
   $("#play").className = "screen skin-" + skin();
   backdrop(songArt(song), songTint(song));
@@ -2527,11 +2646,11 @@ function count(j) {
   hud();
 }
 // The battle's running commentary: small, centred under the lanes, gone after a second and a half.
-function say2(text) {
+function say2(text, ms = 1500) {
   const b = $("#btext");
   b.textContent = text; b.className = text ? "on" : "";
   clearTimeout(b._t);
-  if (text) b._t = setTimeout(() => { b.className = ""; }, 1500);
+  if (text) b._t = setTimeout(() => { b.className = ""; }, ms);
 }
 // Hits deal damage, misses cost HP; a full hold is a charge move, a Perfect streak crits.
 function battle(n, j, tail) {
@@ -2599,7 +2718,7 @@ let payCache = null;
 function payTable() {
   if (!payCache) payCache = {
     table: { charts: Object.fromEntries(SONGS.flatMap(s => s.diffs.map(d => { const lv = levelOf(s, d); return [s.id + ":" + d, { clear: clearPay(lv), a: rankPay(lv, d, "a"), s: rankPay(lv, d, "s") }]; }))),
-      badge: PAY.badge, champion: PAY.champion, finale: PAY.finale, lesson: PAY.lesson, topUp: false },
+      badge: PAY.badge, champion: PAY.champion, finale: PAY.finale, lesson: PAY.lesson, topUp: false }, ledger: LEDGER,
     bosses: Object.fromEntries(SONGS.filter(s => s.boss && !s.final && !s.champion).map(s => [s.id, s.gym])), final: (SONGS.find(s => s.final) || {}).id,
     champions: Object.fromEntries(SONGS.filter(s => s.champion).map(s => [s.id, s.region]))
   };
@@ -2640,7 +2759,7 @@ function showResult({ song, diff, s, rank, won, why }) {
   $("#r-title").textContent = song.title + " · " + DIFF_NAME[diff];
   $("#r-sub").textContent = P.test ? "Test mode: no coins, no board" : "";
   $("#r-rank").textContent = won ? rank : "—";
-  $("#r-clear").textContent = won ? (song.boss ? (song.final ? "Meloetta's whole song." : GYMS[song.gym].badge + "!") : "Cleared.") : "Not cleared. " + why;
+  $("#r-clear").textContent = won ? (song.champion ? "Blue hands back Kanto's verse." : song.boss ? (song.final ? "Kanto's verse, sung whole." : GYMS[song.gym].badge + "!") : "Cleared.") : "Not cleared. " + why;
   const rows = $("#r-table"); rows.replaceChildren();
   const add = (a, b) => { const r = el("tr"); r.append(el("td", "", a), el("td", "", b)); rows.append(r); };
   add("Score", fmt(s) + (P.edge ? " (type edge +3%)" : ""));
@@ -2648,14 +2767,15 @@ function showResult({ song, diff, s, rank, won, why }) {
   add("Max combo", P.maxCombo + " / " + P.judged);
   for (const j of ["Perfect", "Great", "Good", "Miss"]) add(j, P.counts[j]);
   if (old) add("Best", fmt(old.score) + " · " + old.rank);
-  $("#r-pay").textContent = ""; $("#r-note").textContent = song.note && won ? song.note : "";
+  $("#r-pay").textContent = ""; $("#r-note").textContent = !won ? "" : song.after ? "Blue: \u201c" + song.after + "\u201d" : song.note || "";
   $("#r-ps").hidden = !(won && song.ps); $("#r-ps").textContent = song.ps || "";
   if (!won) return;
   // Save the best; a boss win is the gym's badge and its verse.
   const better = !old || s > old.score;
   const rankUp = !old || rankIndex(rank) > rankIndex(old.rank);
   if (better || rankUp) save.best[key] = { score: Math.max(s, old ? old.score : 0), rank: rankUp ? rank : old.rank };
-  if (song.boss) save.badges[song.final ? 4 : song.gym] = 1;
+  if (song.champion) save.champion = 1;
+  else if (song.boss) save.badges[song.final ? 4 : song.gym] = 1;
   keep();
   // The finale's flag, for Poké Idle's Story Mail. Real saves only.
   if (song.final && !P.test) { const e = eggs(); if (!e.finale) { e.finale = 1; writeJSON(EGG_KEY, e); } }
@@ -2705,7 +2825,7 @@ const LESSON_STEPS = [
     part: { bars: 4, line: true, notes: [[0, 1], ...beats(1, 4, [0, 1, 2, 3], 0.5).map(([b, l]) => [b, l, 0, true]), [4, 2], ...beats(5, 8, [3, 2, 1, 0], 0.5).map(([b, l]) => [b, l, 0, true]),
       [8, 0], ...beats(9, 12, [1, 2, 3, 2], 0.5).map(([b, l]) => [b, l, 0, true]), [12, 3], [13, 1]] } },
   { n: 6, say: "In boss fights, hitting notes damages the boss. Missing hurts you. Hit 0 HP and you lose.",
-    part: { bars: 4, foe: { num: 95, name: "Brock's Onix (practice)", types: ["Rock"] }, notes: [...beats(0, 14, [0, 2, 1, 3, 1, 2, 0, 3, 2, 1, 3, 0, 1, 2]), [4, 3], [8, 1], [12, 3]] } },
+    part: { bars: 4, foe: { num: 16, name: "Blue's Pidgey (practice)", types: ["Normal", "Flying"] }, notes: [...beats(0, 14, [0, 2, 1, 3, 1, 2, 0, 3, 2, 1, 3, 0, 1, 2]), [4, 3], [8, 1], [12, 3]] } },
   { done: true, say: "That's all of it. Pewter Steps is open, and Brock is waiting. Listen for me in the boss fights." }
 ];
 // A practice as a built chart: the same shape build() makes, so start() plays it like any song.
@@ -2723,7 +2843,7 @@ function lessonPart(step) {
     for (let k = 0; k < n; k++) ev.push({ b: b0 + k + 0.5, kind: "drum", hit: "h" });
   }
   if (r != null) {
-    const v = VERSES[0], lead = parseLine(v.lead, 2 * n, "lesson verse");
+    const v = { lead: KANTO_MOTIF.lead.split("|").slice(0, 2).join("|"), chords: "Em C" }, lead = parseLine(v.lead, 2 * n, "lesson verse");
     lead.forEach((tok, i) => { const m = midiOf(tok); if (m == null) return; let len = 1; while (lead[i + len] === "-") len++; ev.push({ b: r + i / 2, kind: "tone", inst: "voice", midi: m, dur: len / 2 }); });
     v.chords.split(/\s+/).forEach((c, i) => ev.push({ b: r + i * n, kind: "tone", inst: "bass", midi: chordOf(c)[0] - 12, dur: n - 0.4 }));
     segments.push({ from: r, to: verseAt, kind: "relic" }, { from: verseAt, mode: "line", form: "pirouette" });
@@ -2817,6 +2937,7 @@ addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (cal) { e.preventDefault(); if (e.key === "Escape") endCal(); else if (!e.repeat) calTap(); return; }
   if (!$("#first").hidden) return;
+  if (!$("#remaster").hidden) { if (e.key === "Enter" || e.key === "Escape" || e.key === " ") { e.preventDefault(); $("#rm-ok").click(); } return; }
   if (!$("#sound").hidden) { if (e.key === "Escape") { e.preventDefault(); $("#st-close").click(); } return; }
   // The boss card and the lesson's text boxes: Enter (or Space) goes on, Esc skips the lesson.
   if (!$("#bosscard").hidden) { if (e.key === "Enter" || e.key === " " || e.key === "Escape") { e.preventDefault(); $("#bc-go").click(); } return; }
@@ -2855,8 +2976,13 @@ if (!opts.asked) $("#first").hidden = false;
 // Old payouts brought up to today's PAY table, once each (the hub skips anything already settled).
 if (G && G.topUp) { try { G.topUp(payTable()); } catch (error) { console.log("Relic Song: no top-up.", error && error.message); } }
 drawMap();
-// The first time: Meloetta's Lesson, before Pewter Steps (after the sound question, if that's up).
-if (opts.asked && lessonDue()) lessonCard(0);
+// After the remaster's reset, its note first; the first time, Meloetta's Lesson, before Pewter Steps
+// (after the sound question, if that's up).
+$("#rm-ok").onclick = () => { $("#remaster").hidden = true; opts.remastered = 2; keepOpts(); if (opts.asked && lessonDue()) lessonCard(0); };
+if (opts.remastered === 1) $("#remaster").hidden = false;
+else if (opts.asked && lessonDue()) lessonCard(0);
+// And the arcade's cached Relic Song best from before the remaster, once a browser (sql/relic-song-reset.sql does the board).
+if (G && G.resetBoard) { try { G.resetBoard(LEDGER); } catch (error) { console.log("Relic Song: no board reset.", error && error.message); } }
 
 // The hub reads this. total is the sum of best scores, one per song and
 // difficulty; test mode reports real: false and never counts.

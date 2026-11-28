@@ -17,9 +17,14 @@ difficulty, the clear pay and the most its ranks pay. Each row lists what's off 
 the songs come each region's variety, the demos (held to the recipe and to the moving line's
 readability rules), the pay rules run through the hub's ledger, and the coin totals.
 
-Kanto's songs were written before this template. They keep their own styles (`STYLES`: rock,
-water, electric, grass, relic, plain, snake, dealer), are listed by the script, and are never
-failed.
+**Kanto follows the recipe too** (the Kanto remaster, save v2). All 12 gym songs, Champion Blue,
+the final, The Dealer and Sssssssnakes were rewritten to it; each kept its old tune as its hook.
+`--strict` holds every song with a `region` to the recipe. Two things are exempt:
+- **"It's started. Go."** is an 11-second joke (`exempt: true`, no region): listed, never failed.
+- **Meloetta's Lesson** isn't a song (its practices are written by hand in `LESSON_STEPS`).
+
+The gym songs use the type styles (`"Rock"`, `"Water"`, `"Electric"`, `"Grass"`). The finale and
+the hidden tracks keep their own bands (`STYLES`: relic, plain, snake, dealer).
 
 ## 1. The 18 type styles
 
@@ -86,7 +91,7 @@ where a song doesn't follow it.
 | champion | 1:45-2:15 |
 | final | 2:30+ |
 
-Hidden tracks keep their own lengths.
+Hidden tracks keep their own lengths, but follow the rest of the recipe.
 
 **Structure.** Parts are named in `parts`; `form` is their order.
 - `I`: the intro, 2 bars, first.
@@ -128,6 +133,14 @@ A song object:
 // a champion:     champion: true, two "flip"s, "H^2" for the last hook, and a part with motif: true
 ```
 
+Two more knobs:
+- **`style` on a part** plays that part in another style's band. Champion Blue's sections are
+  each a Kanto gym's: `A: { style: "Rock" }`, `B: { style: "Water" }` and so on. The song's own
+  style still sets the line.
+- **`tune: { ez: { step, jack, chords, fillChords } }`** changes a difficulty's chart rules for
+  one song. Use it when `heat` alone can't reach a level target. EZ still never has more than two
+  keys at once. Champion Blue's EZ uses it to sit at Lv.5, and the Grass bosses' EZ to reach Lv.4.
+
 `key` is the song's key: a root, plus `m` for minor (`"Em"`, `"C"`, `"F#m"`, `"Bb"`). The recipe
 check reads it, and it moves the region's verse into the song's key.
 
@@ -151,8 +164,16 @@ lead:   e5 - - g5 a5 - b5 - | a5 - g5 - e5 - - - | d5 - e5 - g5 - - a5 | b5 - a5
 chords: Em C G D            key: Em
 ```
 
-The finale still sings the four gym verses of Kanto's story (`VERSES`). Moving it to
-`finalVerses()` waits until there are nine.
+**In Kanto:**
+- **The gym leaders** each keep a bar of the verse (the map's strip: "Bar 1 · Brock" … "The
+  verse · Blue").
+- **Every gym song** carries it as a `hint`.
+- **Every boss** sings it at the break.
+- **Champion Blue** plays it whole as his last section.
+- **The final** sings `finalVerses()`: only Kanto's for now, with the other eight added there as
+  their regions come.
+
+For now, the final is the ending. It opens after Champion Blue, and Sssssssnakes opens after it.
 
 ## 4. Coins
 
@@ -187,6 +208,21 @@ Ledger entries:
 | `rs:finale` | the final boss's first clear |
 | `rs:lesson` | Meloetta's Lesson |
 
+**Ledger versions.** A chart's entries can carry a version: `rs:r2:clear:<song>:<diff>`. The game
+sends `ledger: LEDGER` (now `"r2"`, the Kanto remaster). A rewritten chart then pays again once
+under its new entry, while the old entries stay paid. Bump `LEDGER` only when charts are rewritten
+and the save is reset with them. Badges, champions, the finale and the lesson have no version.
+
+**The remaster reset (v2).**
+- **The save** moved to `bored.relic-song.save.v2`. On the first load, a v1 save is deleted
+  (bests, ranks, clears, badges, and with them the difficulty chain). The map then says
+  "Relic Song got remastered! Your progress was reset so everyone starts fresh." once.
+- **Kept:** the options save (keybinds, note skin, offset, the lesson, the tips).
+- **Coins:** none are taken back.
+- **The board:** the arcade lets go of its cached Relic Song best once per browser
+  (`resetBoard` in `src/hub/relic-song.js`). `sql/relic-song-reset.sql` empties the board and
+  each account's cloud copy of the best. Run it by hand, before the deploy.
+
 ## 5. Adding a region
 
 Fill in:
@@ -196,7 +232,9 @@ Fill in:
    at the end.
 2. **`GYMS`:** one entry per gym: `name`, `place`, `type`, `badge`, `ace` (dex number), `aceName`,
    `style` (a type, or `"Main/Second"` for a dual type), and `hello` (Meloetta's line on the map).
-3. **`SONGS`:** per gym, two songs and a boss (`boss: true`), then a champion (`champion: true`).
+3. **`SONGS`:** per gym, two songs and a boss (`boss: true`), then a champion
+   (`champion: true`, with `foe` for the boss sprite, and `before`/`after` lines; see Champion
+   Blue).
    Every song sets `region`, `gym`, `key`, `bpm`, `style` and `heat`, and follows the recipe.
    - Gym songs carry the verse as a `hint`.
    - The boss has `relic` and `line: "auto"` (or its own line).
@@ -215,9 +253,20 @@ Fill in:
    variety), run `tests/relic-song.test.cjs` (charts playable, lines readable, levels in their
    bands), and listen to it in the sound test.
 
-The map still draws Kanto's four gyms; showing more than one region on it is part of adding the
-second region.
+The map still draws Kanto's four gyms and the champion card; showing more than one region on it is
+part of adding the second region.
+
+**Kanto's level path (the remaster).**
+
+| Gym | Songs (EZ / HD) | Boss (EZ / HD / IN) |
+|---|---|---|
+| Brock | 1 / 2, 2 / 3 | 2 / 4 / 9 |
+| Misty | 2 / 4, 3 / 5 | 3 / 6 / 10 |
+| Lt. Surge | 3 / 5, 3 / 6 | 4 / 7 / 11 |
+| Erika | 3 / 6, 4 / 7 | 4 / 8 / 12 |
+
+Champion Blue is 5 / 9 / 12 / 14, and the final 4 / 10 / 13 / 15.
 
 **Coins a region adds.** Projected by the script from the level targets: about 840 for its story
-on EZ and about 4,835 for 100% of it, against Kanto's 1,115 and 8,060 today (the lesson and the
-finale included).
+on EZ and about 4,835 for 100% of it, against the remastered Kanto's 1,505 and 9,570 (the lesson,
+Blue and the finale included).

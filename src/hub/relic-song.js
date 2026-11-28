@@ -9,6 +9,9 @@
 //   rs:finale                       the final boss's first clear
 //   rs:champion:<region>            a region champion's first clear
 //   rs:lesson                       finishing Meloetta's Lesson, the tutorial (once, however often it's replayed)
+// A ledger version (the page's `ledger`, e.g. r2 for the Kanto remaster) goes in front of a chart's
+// entries: rs:r2:clear:<song>:<diff>, rs:r2:rank:<song>:<diff>:<rank>. Charts that were rewritten pay
+// again under their new entries; the old ones stay paid. Badges, the finale and the lesson have none.
 //   rs:top:<entry without rs:>      once only: the rest of an entry that paid under today's table
 // A rank reached again, or a lower one, finds its entry already there and pays nothing.
 // The amounts come from the game's PAY table; this side caps each one.
@@ -19,6 +22,7 @@
 // topUp: false: an entry already in the ledger, under any table, is paid and pays nothing more,
 // so nobody loses coins and nothing is paid twice; only new entries pay, at today's amounts.
 import { readWallet, writeWallet, grantOnce, walletBalance } from './rewards.js';
+import { readStored, writeStored, removeStored, readStoredPrefix } from './store.js';
 import { storedBuddy } from './gacha.js';
 import { DEX, DEX_TYPES, DEX_CHART } from './gacha-dex.js';
 import { rouletteGames } from './roulette.js';
@@ -32,16 +36,18 @@ export const RELIC = Object.freeze({
   diffs: Object.freeze(['ez', 'hd', 'in', 'at'])
 });
 const SONG = /^[a-z0-9-]{1,32}$/;
+const LEDGER = /^r\d{1,3}$/;
+// A chart's entry, with or without a ledger version: [, version, clear|rank, song, diff, rank].
+const CHART_ENTRY = /^rs:(?:(r\d{1,3}):)?(clear|rank):([a-z0-9-]+):(ez|hd|in|at)(?::(b|a|s))?$/;
 const coinsIn = n => Math.max(0, Math.min(RELIC.maxPay, Math.floor(Number(n) || 0)));
 
 // What an entry is worth under the page's table (either shape, above).
 function worth(table, id) {
   const t = table || {};
   const chart = (song, diff) => (t.charts && t.charts[song + ':' + diff]) || {};
-  let m = /^rs:clear:([a-z0-9-]+):(ez|hd|in|at)$/.exec(id);
-  if (m) return coinsIn(t.charts ? chart(m[1], m[2]).clear : (t.clear || {})[m[2]]);
-  m = /^rs:rank:([a-z0-9-]+):(ez|hd|in|at):(b|a|s)$/.exec(id);
-  if (m) return coinsIn(t.charts ? chart(m[1], m[2])[m[3]] : Math.round(((t.rank || {})[m[3]] || 0) * ((t.mult || {})[m[2]] || 0)));
+  const m = CHART_ENTRY.exec(id);
+  if (m && m[2] === 'clear' && !m[5]) return coinsIn(t.charts ? chart(m[3], m[4]).clear : (t.clear || {})[m[4]]);
+  if (m && m[2] === 'rank' && m[5]) return coinsIn(t.charts ? chart(m[3], m[4])[m[5]] : Math.round(((t.rank || {})[m[5]] || 0) * ((t.mult || {})[m[4]] || 0)));
   if (/^rs:badge:[0-3]$/.test(id)) return coinsIn(t.badge);
   if (/^rs:champion:[a-z0-9-]{1,32}$/.test(id)) return coinsIn(t.champion);
   if (id === 'rs:finale') return coinsIn(t.finale);
@@ -74,10 +80,10 @@ function settle(wallet, id, table, now) {
 export function topUpRelicSong(wallet, { table, bosses = {}, final = '', champions = {} } = {}, { now = Date.now() } = {}) {
   let next = wallet;
   let paid = 0;
-  const ids = Object.keys((next && next.entries) || {}).filter(id => /^rs:(clear|rank):/.test(id));
+  const ids = Object.keys((next && next.entries) || {}).filter(id => CHART_ENTRY.test(id));
   const due = new Set(ids);
   for (const id of ids) {
-    const song = id.split(':')[2];
+    const song = CHART_ENTRY.exec(id)[3];
     if (Object.prototype.hasOwnProperty.call(bosses, song)) due.add('rs:badge:' + bosses[song]);
     if (song && song === final) due.add('rs:finale');
     if (Object.prototype.hasOwnProperty.call(champions, song) && SONG.test(String(champions[song]))) due.add('rs:champion:' + champions[song]);
@@ -92,13 +98,14 @@ export function topUpRelicSong(wallet, { table, bosses = {}, final = '', champio
  * boss's first clear, the finale's bonus. Older, smaller entries are topped up on the way.
  * Returns the wallet and what was paid this time ({ clear, rank, badge, finale, top, total }).
  */
-export function payRelicSong(wallet, { song, diff, rank, table, badge = null, finale = false, champion = null, bosses = {}, final = '', champions = {} } = {}, { now = Date.now() } = {}) {
+export function payRelicSong(wallet, { song, diff, rank, table, badge = null, finale = false, champion = null, bosses = {}, final = '', champions = {}, ledger = '' } = {}, { now = Date.now() } = {}) {
   let next = wallet;
   const paid = { clear: 0, rank: 0, badge: 0, champion: 0, finale: 0, top: 0, total: 0 };
   const r = RELIC.ranks.indexOf(rank);
   if (!SONG.test(String(song || '')) || !RELIC.diffs.includes(diff) || r < 0) return { wallet: next, ok: false, reason: 'song', paid };
-  const run = [['clear', 'rs:clear:' + song + ':' + diff]];
-  for (let k = 1; k <= r; k++) run.push(['rank', 'rs:rank:' + song + ':' + diff + ':' + RELIC.ranks[k]]);
+  const at = 'rs:' + (LEDGER.test(String(ledger)) ? ledger + ':' : '');
+  const run = [['clear', at + 'clear:' + song + ':' + diff]];
+  for (let k = 1; k <= r; k++) run.push(['rank', at + 'rank:' + song + ':' + diff + ':' + RELIC.ranks[k]]);
   if (Number.isInteger(badge) && badge >= 0 && badge <= 3) run.push(['badge', 'rs:badge:' + badge]);
   if (champion && SONG.test(String(champion))) run.push(['champion', 'rs:champion:' + champion]);
   if (finale) run.push(['finale', 'rs:finale']);
@@ -159,6 +166,20 @@ export function relicBridge({ onChange = () => {} } = {}) {
       const result = payRelicLesson(readWallet(), options || {});
       if (result.paid > 0) { writeWallet(result.wallet); try { onChange(); } catch {} }
       return { ok: true, paid: result.paid, coins: walletBalance(readWallet()).coins || 0 };
+    },
+    // The remaster's fresh board, once a browser: this hub's cached Relic Song best, and its record of
+    // what the board last accepted, are let go, so an old total doesn't come back on the next sync
+    // or stop a new, lower one from posting. sql/relic-song-reset.sql clears the board and the
+    // account's cloud copy. `version` names the reset; the same one never runs twice.
+    resetBoard: version => {
+      const mark = 'bored.relic-song.board-reset';
+      if (!/^r\d{1,3}$/.test(String(version)) || readStored(mark, null) === version) return { reset: false };
+      removeStored('bored.high.relic-song');
+      for (const [user, sent] of Object.entries(readStoredPrefix('bored.submitted.'))) {
+        if (sent && typeof sent === 'object' && 'relic-song' in sent) { delete sent['relic-song']; writeStored('bored.submitted.' + user, sent); }
+      }
+      writeStored(mark, version);
+      return { reset: true };
     },
     // On load: old payouts brought up to today's table, once.
     topUp: options => {
