@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1078,
+  "count": 1079,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -11,6 +11,7 @@ export const CHANGELOG_META = {
 export const CHANGELOG = [
   {"sha":"156a51b4","date":"2026-11-28","author":"Daniel Lowe","subject":"Permit owner-triggered CI for Vettel stack retargets"},
   {"sha":"95100d41","date":"2026-11-28","author":"Daniel Lowe","subject":"Fix brittle CI copy assertions and support stacked Relic Song automerge"},
+  {"sha":"2582820a","date":"2026-11-28","author":"Claude","subject":"Relic Song: key zones on the moving line, and hitsounds that match the song"},
   {"sha":"c0ec290c","date":"2026-11-28","author":"Claude","subject":"Relic Song: pay in tokens, and real click hitsounds"},
   {"sha":"c959d0e8","date":"2026-11-28","author":"bassdrum4","subject":"Broadcast new leaderboard leaders through existing presence stream"},
   {"sha":"4c0cd787","date":"2026-11-28","author":"bassdrum4","subject":"Improve announcement composer and poll preview"},
