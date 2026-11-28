@@ -82,12 +82,12 @@ test('Relic Song boots, has playable charts and uses the shared leaderboard cont
   await page.keyboard.press('Escape');
   assert.deepEqual(await page.evaluate(()=>[document.querySelector('#lesson').hidden,window.__relicSong.opts.lesson]),[true,1]);
   assert.equal(await pewter(),false);
-  // The first moving line: two quiet bars and the cue, once; the boss card first, once.
+  // The first moving line: identical scored charts with or without the one-time cue.
   const first=await page.evaluate(()=>{const R=window.__relicSong;R.start('onix-rising','hd');const card=!document.querySelector('#bosscard').hidden;
-    document.querySelector('#bc-go').click();const P=R.play,quiet=P.notes.filter(n=>n.mode==='line'&&n.rel<8).length,cue=P.cue&&P.cue.to;
-    R.opts.tips.flip=1;document.querySelector('#b-quit').click();R.start('onix-rising','hd');const again=[!document.querySelector('#bosscard').hidden,R.play.cue,R.play.notes.filter(n=>n.mode==='line'&&n.rel<8).length>0];
-    document.querySelector('#b-quit').click();return {card,quiet,cue,again};});
-  assert.deepEqual(first,{card:true,quiet:0,cue:8,again:[false,null,true]});
+    document.querySelector('#bc-go').click();const P=R.play,firstChart=P.notes.map(n=>[n.b,n.lane,n.kind,n.len]),judged=P.judged,cue=P.cue&&P.cue.to;
+    R.opts.tips.flip=1;document.querySelector('#b-quit').click();R.start('onix-rising','hd');const again=[!document.querySelector('#bosscard').hidden,R.play.cue,JSON.stringify(R.play.notes.map(n=>[n.b,n.lane,n.kind,n.len]))===JSON.stringify(firstChart),R.play.judged===judged];
+    document.querySelector('#b-quit').click();return {card,cue,again};});
+  assert.deepEqual(first,{card:true,cue:8,again:[false,null,true,true]});
   // Tips: queued once each, before the thing they're about.
   const tips=await page.evaluate(()=>{const R=window.__relicSong,s=R.SONGS.find(x=>x.id==='starmie-undertow'),B=R.built(s,'in');const notes=B.chart.map(n=>({...n,t:n.b*B.spb}));
     const t=R.tipsFor(s,B,notes,3);for(const x of t)R.opts.tips[x.id]=1;return {ids:t.map(x=>x.id).sort(),again:R.tipsFor(s,B,notes,3).length};});

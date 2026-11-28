@@ -549,7 +549,7 @@ const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 // Reduce motion starts on when the system asks for less motion.
 // lesson: Meloetta's Lesson is finished or skipped. tips: the one-time help already seen (six, lines,
-// below, speed: the tips; boss: the first boss card; flip: the first moving line's quiet two bars).
+// below, speed: the tips; boss: the first boss card; flip: the first moving line's two-bar cue).
 const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitVol: 60,
   calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
@@ -2233,10 +2233,10 @@ function start(song, diff = pickedDiff(song), given = null) {
   // The buddy's edge: super effective on the boss (either form in the finale) is +3% score.
   let edge = false;
   if (boss && G) { const h = hub(); if (h && h.buddy) edge = G.typeEdge(h.buddy.species, boss.types) > 1 || (boss.pirTypes && G.typeEdge(h.buddy.species, boss.pirTypes) > 1); }
-  // The first moving line ever: its first two bars come with no notes, and "Any key! Watch the line."
+  // The first moving line ever: show "Any key! Watch the line." for two bars without altering the scored chart.
   // over it. (The lesson's line section has its gap written in, and shows the cue every time.)
   const cue = song.lesson ? song.cue : B.lines && !opts.tips.flip ? 2 * song.bar : 0;
-  const notes = B.chart.filter(n => song.lesson || !cue || n.mode !== "line" || n.rel >= cue)
+  const notes = B.chart
     .map((n, i) => ({ ...n, i, t: n.b * B.spb, tEnd: (n.b + n.len) * B.spb, state: 0, hit: null, tail: null, key: null }));
   // Gold: every note that shares its moment with another, in any lane or on either line.
   // A note alone at its moment is cyan; drags keep their own look and don't count.
