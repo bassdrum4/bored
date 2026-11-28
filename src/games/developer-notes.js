@@ -1,6 +1,15 @@
 // Add a note here using its exact game slug from catalog.js.
 // Notes are first-person stories, separate from searchable META blurbs.
 export const DEVELOPER_NOTES = Object.freeze({
+  'sudoku': "For my friend, russell",
+  'crossword': "For Elizabeth, who has the same name as my sister",
+  'shotgun-roulette': "Russian roulette",
+  'getaway-shootout': "I finally found out how to decompile binary!",
+  'ballistic-chickens': "Nostalgic",
+  'squaretato': "Reminds me of Blooket",
+  'relic-song': "Another great game by vettel. Go music",
+  'duck-life-3': "For Emilia!",
+  'battleship': "My first time working with assets! I tried to make this look as cinematic as possible.",
   'clicker': "This was made for andrew. Personally I think its a waste of time, but the customer knows best I guess. I added another button!",
   'block-blast': "An easier version of Tetris. I remember watching Danielle playing this at a drumline party. It's very satisfying. I'm working on making this more like actual Block Blast.",
   'void-runner': "My first game I made. It's honestly not that great and I almost cut it, but I saved it solely because it was the first.",
