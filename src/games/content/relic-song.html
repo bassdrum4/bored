@@ -547,7 +547,12 @@ const rankPay = (level, diff, rank) => PAY.rankDiffs.includes(diff) && PAY.rank[
 
 /* ── Rules ─────────────────────────────────────────────────────────────── */
 // Seconds either side of a note. Phigros-wide, not osu!mania-strict: keyboards are hard enough.
-const WIN = { perfect: 0.07, great: 0.11, good: 0.15 };
+// earlyMiss: a press up to this far before a note (earlier than Good) misses it and uses it up.
+const WIN = { perfect: 0.07, great: 0.11, good: 0.15, earlyMiss: 0.25 };
+// Mashing never beats a chart (see press()). smash: more separate keys down within this many seconds than the notes due
+// + 1 count for nothing, and the notes they'd have hit miss. ghosts: that many empty presses within span s break the
+// combo (a boss also hits back, like a Miss); "Too many taps" shows at most once every say s.
+const SPAM = { smash: 0.04, ghosts: 4, span: 0.5, say: 4 };
 // Scoring like Phigros: a judgment is worth a share of a note (Great 75%, Good 40%), and the score is 900,000 x
 // accuracy + 100,000 x (max combo / notes). Ranks at Phigros' cutoffs, V on top; under C isn't a clear
 // (a boss still clears on HP). FC (no Miss) and AP (all Perfect) are kept with the best.
@@ -2785,7 +2790,7 @@ function start(song, diff = pickedDiff(song), given = null) {
   P = { song, B, given, notes, judged, boss, edge, test: !!opts.test, keys: keysFor(B.lanes), start: c.currentTime + lead - from * B.spb, next: 0, done: false, paused: false,
         cue: cue ? { to: cue, real: !song.lesson } : null, tips: tipsFor(song, B, notes, lead), zones: song.lesson ? 1 : ZONES[B.diff] || 1,
         counts: { Perfect: 0, Great: 0, Good: 0, Miss: 0 }, points: 0, n: 0, combo: 0, maxCombo: 0, streak: 0,
-        held: new Set(), mode: "highway", form: "aria", seg: 0, lastBeat: -99, raf: 0, broke: false, finished: false };
+        held: new Set(), smash: null, ghosts: [], saidTaps: -99, mode: "highway", form: "aria", seg: 0, lastBeat: -99, raf: 0, broke: false, finished: false };
   // The count-in: four clicks before beat 0.
   P.ev = [0, 1, 2, 3].map(k => ({ b: from + k - 4, kind: "drum", hit: "r" })).concat(from ? B.ev.filter(e => e.b >= from - 0.01) : B.ev);
   // The battle layer
@@ -3027,35 +3032,82 @@ const heldIn = n => P.zones < 2 || n.mode !== "line" ? P.held.size > 0 : [...P.h
 const laneOfKey = code => opts.wide ? keyRegion(code, P.keys.length === 6 ? 6 : 4) : P.keys.indexOf(code);
 // A key the moving line takes on EZ: any region key, Space, or a bound key.
 const lineKey = code => keyRegion(code, 4) >= 0 || code === "Space" || boundKeys().has(code);
-// Which mode a key plays: the mode of the first note still waiting within the Good window, else the screen's. So a
+// Which mode a key plays: the mode of the first note still waiting within the early-miss window, else the screen's. So a
 // note right on a switch (the first line note, as the break ends) takes an early press, and the last highway note a late one.
 function pressMode() {
   const t = now();
   for (const n of P.notes) {
     if (n.state !== 0 || n.kind === "drag" || t - n.t > WIN.good) continue;
-    return n.t - t <= WIN.good ? n.mode : P.mode;
+    return n.t - t <= WIN.earlyMiss ? n.mode : P.mode;
   }
   return P.mode;
 }
+// One press, one note. The highway judges the lane; the line judges the key's zone (any key on EZ), by time.
+// The note a key goes for is the first still waiting that it can take: within Good it's judged; earlier, up to
+// WIN.earlyMiss, it's a Miss and used up; earlier still, or no note at all, the press is empty (ghost()). A press with a
+// drag it can take within Good is for that drag (held keys catch drags): it never early-misses and isn't empty. Nor does a
+// press within Good of a note it could have taken that's already judged (a late press for a note another key took).
 function press(lane, code, mode = P.mode) {
   if (!P || P.paused || P.done) return;
   const t = now();
   P.held.add(code);
   if (mode === "highway" && lane >= 0) document.querySelectorAll("#guides .glow")[lane].classList.add("down");
-  // The highway judges the lane; the line judges any key, by time alone.
-  let best = null;
+  let best = null, early = null, drag = false, after = false;
   for (const n of P.notes) {
-    if (n.state !== 0 || n.kind === "drag") continue;
-    if (n.t - t > WIN.good) break;
-    if (n.mode !== mode) continue;
+    if (n.t - t > WIN.earlyMiss) break;
+    if (n.mode !== mode || t - n.t > WIN.good) continue;
     if (mode === "highway" && n.lane !== lane) continue;
     if (mode === "line" && P.zones > 1 && !zoneTakes(n, code)) continue;
-    if (Math.abs(n.t - t) <= WIN.good) { best = n; break; }
+    const near = n.t - t <= WIN.good;
+    if (n.kind === "drag") { drag = drag || near; continue; }
+    if (n.state !== 0) { after = after || near; continue; }
+    if (near) best = n; else early = n;
+    break;
   }
-  if (!best) return;
-  const j = hitWindow(best.t - t);
-  judge(best, j);
-  if (best.kind === "hold") { best.state = 1; best.key = code; best.el.style.display = ""; }
+  // A hand on the keyboard: more separate keys within SPAM.smash than the notes due + 1, and none of them count.
+  if (smashed(code, t)) { if (best) missNote(best); return; }
+  if (best) {
+    judge(best, hitWindow(best.t - t));
+    P.smash.hits.push(best);
+    if (best.kind === "hold") { best.state = 1; best.key = code; best.el.style.display = ""; }
+  } else if (drag) return;
+  else if (early && !after) missNote(early);
+  else ghost(t);
+}
+const missNote = n => { judge(n, "Miss"); if (n.kind === "hold") judgeTail(n, "Miss"); };
+// The keys down since the first of this burst (SPAM.smash): once they outnumber the notes due (within Good of its
+// start: drags, and the notes still waiting or hit by this burst) + 1, the burst is a smash: what it hit is taken back and missed,
+// and every press left in it misses what it goes for.
+function smashed(code, t) {
+  let s = P.smash;
+  if (!s || t - s.t0 > SPAM.smash) s = P.smash = { t0: t, keys: new Set(), hits: [], on: false, maxCombo: P.maxCombo };
+  s.keys.add(code);
+  if (s.on) return true;
+  const due = P.notes.filter(n => Math.abs(n.t - s.t0) <= WIN.good && (n.kind === "drag" || n.state === 0 || s.hits.includes(n))).length;
+  if (s.keys.size <= due + 1) return false;
+  s.on = true;
+  for (const n of s.hits) if (!n.tail) { unjudge(n); missNote(n); }
+  P.maxCombo = s.maxCombo;
+  return true;
+}
+// A hit taken back (a smash): its count, its points and its damage.
+function unjudge(n) {
+  P.counts[n.hit]--; P.n--; P.points -= VALUE[n.hit];
+  if (P.battle && n.dmg) { P.battle.bossHp = Math.min(P.battle.bossMax, P.battle.bossHp + n.dmg); n.dmg = 0; }
+  n.state = 0; n.hit = null; n.key = null; n.el.classList.remove("done");
+}
+// An empty press does nothing; SPAM.ghosts of them within SPAM.span break the combo (no Miss), and a boss hits back.
+function ghost(t) {
+  P.ghosts = P.ghosts.filter(g => t - g < SPAM.span).concat(t);
+  if (P.ghosts.length < SPAM.ghosts) return;
+  P.ghosts = []; P.combo = 0; P.streak = 0; hud();
+  const b = P.battle;
+  if (b) {
+    b.youHp = Math.max(P.song.lesson ? 10 : 0, b.youHp - b.hurt);
+    flinch("#me-img"); $("#me-hp").style.width = (100 * b.youHp / BATTLE.youHp) + "%";
+    if (b.youHp <= 0 && !P.finished) setTimeout(() => finish(false), 300);
+  }
+  if (t - P.saidTaps >= SPAM.say) { P.saidTaps = t; say2("Too many taps"); }
 }
 function release(lane, code) {
   if (!P) return;
@@ -3122,6 +3174,7 @@ function battle(n, j, tail) {
     const base = { Perfect: 1, Great: 0.8, Good: 0.5 }[j] * (n.kind === "drag" ? 0.5 : 1);
     const crit = P.streak >= BATTLE.crit;
     const dmg = tail ? (j === "Perfect" ? 1 + BATTLE.charge : 0.5) : base * (crit ? BATTLE.critMult : 1);
+    if (!tail) n.dmg = Math.min(b.bossHp, dmg);   // kept, so a smash can take it back
     b.bossHp = Math.max(0, b.bossHp - dmg);
     flinch("#boss-img");
     if (b.bossHp <= 0) say2(P.boss.name + " is out of breath!");
