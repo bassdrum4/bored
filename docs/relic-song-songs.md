@@ -262,13 +262,78 @@ The game reads the index at start. A chart that checks out (the right song and d
 lanes in range, kinds tap/hold/drag) takes the place of the built one, and its level is still
 measured from it.
 
+## Scoring (like Phigros)
+
+**Judgments** (windows: Perfect ±70 ms, Great ±110, Good ±150):
+
+| Judgment | Worth |
+|---|---|
+| Perfect | 100% of a note |
+| Great | 75% |
+| Good | 40% |
+| Miss | 0 |
+
+**Score** = 900,000 × accuracy + 100,000 × (max combo / notes).
+
+**Ranks:**
+
+| Rank | Score |
+|---|---|
+| V | 960,000 |
+| S | 920,000 |
+| A | 880,000 |
+| B | 820,000 |
+| C | 700,000 |
+
+Under C isn't a clear, though a boss still clears on HP. **FC** (no Miss) and **AP** (all
+Perfect) show on the results and the song row, and are kept with the best.
+
+- **Rank tokens:** still on A and S, IN/AT only. V pays like an S, so it's bragging only.
+- **Unlock chain:** IN at an A on HD, AT at an S on IN (V counts as S).
+- **Bests:** keep their judgment counts. On the first load after this change, each stored best is
+  re-ranked: from its counts if it has them, else its score under the new cutoffs (never below C
+  for a clear). Tokens are never taken back.
+
 ## Key zones on the moving line
 
-On **EZ** any bound key hits a line note. On **HD** the screen has 2 zones: the left half takes the
-left keys (D or F), the right half the right keys (J or K). On **IN and AT** it has 4: columns,
-left to right D F J K, or rows of the play area (top to bottom) while the line is steeper than 60°.
-On six lanes, S joins the first zone and L the last. A note's zone is where its hit point is, and
-the keys are the player's binds.
+The moving line's zones are **regions of the keyboard**, matched by physical key (`e.code`), like
+a tablet: where your hand is on the keyboard is where the note is on screen.
+
+| Region | Keys |
+|---|---|
+| 1 | 1 2 3 Q W E A S D Z X C |
+| 2 | 4 5 R T F G V B |
+| 3 | 6 7 Y U H J N M |
+| 4 | 8 9 0 - I O P [ K L ; ' , . / |
+
+- **IN and AT:** 4 zones (columns, or rows while the line is steeper than 60°).
+- **HD:** 2 zones: keyboard columns 1-5 (left hand) and 6 on (right hand).
+- **EZ:** any of these keys or Space.
+- **Never a zone key:** Esc, Tab, Caps Lock, Enter, Shift, Ctrl, Alt, the OS keys and the arrows.
+- **R:** it's in region 2, so in play it's a note key. Retry (R) works only on the pause and
+  results screens.
+- **Options → Keyboard:** pick **Default (4 columns)** or **Mirrored**; see the regions on a
+  keyboard diagram (it's also the key test: held keys light up in their zone's colour); and turn
+  on **Wide lanes**. With Wide lanes on, the highway's lanes use these regions too (six-lane
+  charts split into 6, outer columns to the outer lanes). Off, the default, the highway uses the
+  exact keybinds.
+
+**Where notes go:** anywhere inside their zone, by the music: higher pitches further right (a note
+with no pitch goes by its lane), plus a little spread so repeats don't stack. Chords spread across
+zones.
+
+**Leniency:**
+- **Margin:** a chart keeps notes 8% of a zone's width from its borders.
+- **Border bands:** a note within 15% of a border takes the neighbouring zone's keys too. At the
+  middle border (left hand | right hand) the band is 20%.
+- **Timing:** the band is judged by the note's place at its hit.
+- **One key, one note:** a chord still needs separate keys.
+
+**Zone hints:** each line note has a soft pastel pip just above its bar (or its ends tinted:
+`ZONE_HINT`). It's in the notes' own glow at 80%, and never changes the note's colour. A lenient
+note blends its two zones' colours. The zone grid (faint borders and region labels) shows for a
+bar as the line takes over. Tips and the first-flip cue are small banners under the combo, and
+battle text sits bottom left, so nothing sits over the playfield.
 
 The chart builder (`zones()`) moves each line note along its line so its hit point lands in its
 lane's zone, or the nearest one that works:
