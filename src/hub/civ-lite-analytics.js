@@ -169,7 +169,7 @@ async function load() {
       throw error;
     }
     syncGames(access.games);
-    $('#idle-progress-link').hidden = !access.games.includes('poke-idle');
+    $('#idle-progress-link').hidden = !access.games.includes('poke-idle') || access.userId !== 'da33b6a3-0eae-48b9-9bd0-82d49f36c8c6';
     const game = $('#game').value;
     const from = $('#from').value, through = $('#through').value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(through)
