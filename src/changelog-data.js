@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1055,
+  "count": 1056,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -12,6 +12,7 @@ export const CHANGELOG = [
   {"sha":"eb5f4098","date":"2026-11-28","author":"Codebuff","subject":"Make Battleship's shot one continuous take"},
   {"sha":"98bba617","date":"2026-11-28","author":"Codebuff","subject":"Give Battleship's your-turn camera a ship and the board back its mouse"},
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
+  {"sha":"6b5332b6","date":"2026-11-27","author":"bassdrum4","subject":"Fix homepage boot after display name locking"},
   {"sha":"4083a550","date":"2026-11-27","author":"bassdrum4","subject":"Record Vettel-only snapshot policy"},
   {"sha":"2e78080a","date":"2026-11-27","author":"bassdrum4","subject":"Finish Vettel-only Poke Idle progress dashboard"},
   {"sha":"7ebbc2d9","date":"2026-11-27","author":"Daniel Lowe","subject":"Notify online players of chat mentions over existing presence transport"},
