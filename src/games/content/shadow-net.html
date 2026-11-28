@@ -40,7 +40,7 @@ body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;heig
 #terminal-output::-webkit-scrollbar-track{background:var(--terminal-bg)}
 #terminal-output::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 #terminal-output .line{min-height:1.1em}
-.c-default{color:var(--fg)}.c-error{color:var(--error)}.c-warning{color:var(--accent)}.c-info{color:var(--info)}.c-success{color:var(--success)}.c-muted{color:var(--muted)}.c-highlight{color:#fff}.c-accent{color:var(--accent)}
+.c-default{color:var(--fg)}.c-error{color:var(--error)}.c-warning{color:var(--accent)}.c-info{color:var(--info)}.c-success{color:var(--success)}.c-muted{color:var(--muted)}.c-downloaded{color:#bd93f9}.c-highlight{color:#fff}.c-accent{color:var(--accent)}
 #input-line{display:flex;align-items:center;padding:8px 20px;background:var(--card);border-top:1px solid var(--border);flex-shrink:0}
 #prompt{color:var(--fg);font-size:13px;white-space:nowrap;margin-right:4px;max-width:65%;overflow:hidden;text-overflow:ellipsis}
 #mobile-hud{display:none}
@@ -1044,7 +1044,8 @@ function cmdLs(){
     if(isDir(child)) output_str += `<span class="c-info">${e}/</span>  `;
     else {
       const enc = typeof child==='object' && child.encrypted && !isDecrypted(srv, state.currentDir+'/'+e);
-      output_str += enc ? `<span class="c-warning">${e} [ENC]</span>  ` : `<span class="c-default">${e}</span>  `;
+      const taken = state.taken.includes(srv + ':' + resolvePath(state.currentDir, e));
+      output_str += enc ? `<span class="c-warning">${e} [ENC]</span>  ` : `<span class="${taken ? 'c-downloaded' : 'c-default'}">${e}</span>  `;
     }
   });
   printHTML(output_str);
