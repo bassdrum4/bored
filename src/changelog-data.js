@@ -2,13 +2,17 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1033,
+  "count": 1037,
   "newest": "2026-11-27",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"acc198a2","date":"2026-11-27","author":"Claude","subject":"Relic Song: Phigros choreography on the moving line"},
+  {"sha":"84ca4806","date":"2026-11-27","author":"Claude","subject":"Relic Song: more Phigros on the line"},
+  {"sha":"b19483fb","date":"2026-11-27","author":"Claude","subject":"Relic Song: custom keybinds"},
+  {"sha":"4391ce61","date":"2026-11-27","author":"Claude","subject":"Relic Song: round 4 (calibration, chord colours, real difficulty, key test, coins)"},
   {"sha":"f9a969af","date":"2026-11-27","author":"Codebuff","subject":"Give Battleship's shots a film camera, slow motion and real impact"},
   {"sha":"a7086cca","date":"2026-11-27","author":"Claude","subject":"Relic Song: real gameplay preview"},
   {"sha":"d336393e","date":"2026-11-27","author":"Daniel Lowe","subject":"Add Duck Life 3 Evolution with self-hosted Ruffle","pr":381},
