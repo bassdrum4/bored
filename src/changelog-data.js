@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1074,
+  "count": 1075,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c959d0e8","date":"2026-11-28","author":"bassdrum4","subject":"Broadcast new leaderboard leaders through existing presence stream"},
   {"sha":"4c0cd787","date":"2026-11-28","author":"bassdrum4","subject":"Improve announcement composer and poll preview"},
   {"sha":"ff590635","date":"2026-11-28","author":"Daniel Lowe","subject":"Unpublish announcements without confirmation","pr":391},
   {"sha":"2cc921bd","date":"2026-11-28","author":"Daniel Lowe","subject":"Use Duck Life 3 title screen for game preview"},
