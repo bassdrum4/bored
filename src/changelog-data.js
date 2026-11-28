@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1064,
+  "count": 1065,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"e069086b","date":"2026-11-28","author":"Daniel Lowe","subject":"Add chat mention autocomplete and highlighted names"},
   {"sha":"3a16bfaa","date":"2026-11-28","author":"Codebuff","subject":"Play the enemy reply as one continuous take into the waterline"},
   {"sha":"4944f365","date":"2026-11-28","author":"Codebuff","subject":"Grade Battleship's sea for late sun and rebuild the hit"},
   {"sha":"9f5464c5","date":"2026-11-28","author":"Claude","subject":"Relic Song: Kanto remaster, Champion Blue, and a fresh start"},
