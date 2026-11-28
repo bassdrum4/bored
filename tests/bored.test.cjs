@@ -1752,7 +1752,7 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelectorAll('.memory-card').length === 16);
     await page.waitForFunction(() => document.querySelector('#getaway-loading').hidden);
     const frame = await (await page.$('#frame')).contentFrame();
-    assert.equal(await page.evaluate(() => readDaily(currentDaily)), null);
+    assert.equal(await page.evaluate(day => readDaily(dailyChallenge(day)), date), null);
     for (let i = 1; i <= 8; i++) {
       await frame.click('.memory-card:nth-child(' + i + ')');
       await frame.click('.memory-card:nth-child(' + (i + 8) + ')');
@@ -1760,7 +1760,7 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#challenge-progress').textContent.startsWith('✓'));
     await close();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'daily-play');
-    assert.ok(await page.evaluate(() => readDaily(currentDaily)));
+    assert.ok(await page.evaluate(day => readDaily(dailyChallenge(day)), date));
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Denied'); } }, configurable: true }));
     await page.click('#daily-details summary');
      await page.click('#daily-share');
@@ -1772,16 +1772,16 @@ test('browser regressions', async t => {
     await page.reload();
     await page.waitForFunction(() => document.querySelector('#hub-loading')?.hidden === true);
     await page.evaluate(day => { window.originalDailyDate = dailyDate; dailyDate = () => day; renderDaily(); }, date);
-    assert.ok(await page.evaluate(() => readDaily(currentDaily)));
+    assert.ok(await page.evaluate(day => readDaily(dailyChallenge(day)), date));
     await page.click('#daily-play');
     await page.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function');
     await restart();
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#stats')?.textContent.includes('Moves 0'));
     await close();
-    assert.ok(await page.evaluate(() => readDaily(currentDaily)), 'retry cannot erase earned completion');
+    assert.ok(await page.evaluate(day => readDaily(dailyChallenge(day)), date), 'retry cannot erase earned completion');
     const tomorrow = new Date(Date.parse(date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
     await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, tomorrow);
-    assert.equal(await page.evaluate(() => readDaily(currentDaily)), null);
+    assert.equal(await page.evaluate(day => readDaily(dailyChallenge(day)), tomorrow), null);
     assert.equal(await page.$eval('#daily-share', el => el.hidden), true);
     assert.equal(await page.$eval('#daily-result', el => el.hidden), true);
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
