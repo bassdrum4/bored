@@ -126,6 +126,8 @@
   .binds .reset { margin-left: 8px; font-size: 12px; padding: 4px 8px }
   .mix { display: flex; gap: 14px; align-items: center }
   .card .mix input[type=range] { width: 200px }
+  .card .hitmix { gap: 10px }
+  .card .hitmix input[type=range] { width: 150px }
   .help { gap: 6px }
   .help button { font-size: 12px; padding: 4px 8px }
   .keytest { display: flex; gap: 4px; align-items: center }
@@ -313,7 +315,7 @@
   <section class="screen" id="map">
     <div class="hud caps">
       <h1 style="text-transform:none;letter-spacing:0">Relic Song</h1><span class="grow"></span>
-      <span>Coins <b id="m-coins">—</b></span><span>Badges <b id="m-badges">0/4</b></span><span>Total <b id="m-total">0</b></span>
+      <span>Tokens <b id="m-coins">—</b></span><span>Badges <b id="m-badges">0/4</b></span><span>Total <b id="m-total">0</b></span>
       <span id="m-test" hidden><b>Test mode</b></span>
       <button id="b-opts" type="button">Options</button>
     </div>
@@ -365,7 +367,7 @@
 
   <div class="over" id="opts" hidden><div class="card"><h2>Options</h2>
     <div class="line"><span>Sound</span><span class="mix"><span class="seg" id="o-sound"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Muted</button></span><input id="o-vol" type="range" min="0" max="100" step="5" aria-label="Volume"></span></div>
-    <div class="line"><span>Hitsounds <span class="dim">(a click when you hit)</span></span><span class="mix"><span class="seg" id="o-hits"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Off</button></span><input id="o-hitvol" type="range" min="0" max="100" step="5" aria-label="Hitsound volume"></span></div>
+    <div class="line"><span>Hitsounds</span><span class="mix hitmix"><span class="seg" id="o-hits"><button type="button" data-v="1">On</button> <button type="button" data-v="0">Off</button></span><span class="seg" id="o-hitkind" aria-label="Hitsound"><button type="button" data-v="tick">Tick</button> <button type="button" data-v="wood">Wood</button> <button type="button" data-v="clap">Clap</button></span><input id="o-hitvol" type="range" min="0" max="100" step="5" aria-label="Hitsound volume"></span></div>
     <div class="line"><span>Audio offset <b id="o-off-v"></b></span><input id="o-off" type="range" min="-250" max="250" step="1"></div>
     <div class="line"><span class="dim">Notes late? Raise it. Early? Lower it.</span><button id="o-cal" type="button">Tap to calibrate</button></div>
     <div class="line"><span>Scroll speed <b id="o-speed-v"></b></span><input id="o-speed" type="range" min="5" max="20" step="1"></div>
@@ -378,7 +380,7 @@
     <div class="line"><span>Key test <span class="dim">(hold keys down)</span></span><span class="keytest" id="o-keys"></span></div>
     <p class="dim" style="margin-top:6px">Keys that won't light up together can't be pressed at once. Stick to EZ/HD.</p>
     <div class="line"><span>Help</span><span class="mix help"><button id="o-lesson" type="button">Replay the lesson</button><button id="o-bosscard" type="button">Boss fight card</button><button id="o-tips" type="button">Reset tips</button><button id="o-sound-test" type="button">Sound test</button></span></div>
-    <div class="line"><span>Test mode <span class="dim">(every song open; no coins, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
+    <div class="line"><span>Test mode <span class="dim">(every song open; no tokens, no board)</span></span><span class="seg" id="o-test"><button type="button" data-v="0">Off</button> <button type="button" data-v="1">On</button></span></div>
     <div class="btns"><button id="o-close" type="button">Done (Esc)</button></div></div></div>
 
   <div class="over" id="calib" hidden><div class="card"><h2>Tap to calibrate</h2>
@@ -390,7 +392,7 @@
   <!-- Once, after the remaster reset an old save. -->
   <div class="over" id="remaster" hidden><div class="card"><h2>Remastered</h2>
     <p>Relic Song got remastered! Your progress was reset so everyone starts fresh.</p>
-    <p class="dim" style="margin-top:8px">Your options, keybinds, note skin and audio offset are kept. Coins you've earned stay yours, and the new charts pay again.</p>
+    <p class="dim" style="margin-top:8px">Your options, keybinds, note skin and audio offset are kept. Anything you've earned stays yours, and the new charts pay tokens fresh.</p>
     <div class="btns"><button id="rm-ok" type="button">OK (Enter)</button></div></div></div>
 
   <!-- The sound test: music only, for reviewing songs. -->
@@ -435,21 +437,22 @@
    The audio clock is the only clock: notes, judgments and the line all read
    ctx.currentTime, so the picture never drifts from the music.
 
-   Coins go through the hub (parent.__boredGacha.relic, src/hub/relic-song.js)
+   Tokens go through the hub (parent.__boredGacha.relic, src/hub/relic-song.js)
    into the same ledger Poké Gacha uses. Sprites come from the shared Poké set
-   (pokedoku/sprites). Opened on its own, every song plays; coins and the board
+   (pokedoku/sprites). Opened on its own, every song plays; tokens and the board
    wait for the arcade. */
 {
-/* ── Coins: tune these ─────────────────────────────────────────────────── */
-// Coins follow the chart's real level, not its difficulty's name: an EZ Lv.2 clears first try, an
+/* ── Tokens: tune these ────────────────────────────────────────────────── */
+// Relic Song pays tokens (the arcade's chips, the ones Shotgun Roulette and the Collector use; it paid
+// TD coins before, and those stay where they are). Tokens follow the chart's real level, not its difficulty's name: an EZ Lv.2 clears first try, an
 // AT Lv.15 takes hours. Every amount is paid once, through the hub's ledger (src/hub/relic-song.js);
 // replays pay nothing. Anything the ledger already paid, under this table or an older one, stays
 // paid and pays nothing more: changing a number here only changes what new entries pay.
 const PAY = {
   // The first clear of a chart: perLevel x level squared, from its measured level (rate()), to the
-  // nearest `round` coins and never less than that. Lv.2 10, Lv.6 70, Lv.10 200, Lv.15 450.
+  // nearest `round` tokens and never less than that. Lv.2 10, Lv.6 70, Lv.10 200, Lv.15 450.
   perLevel: 2, round: 5,
-  // Rank coins, on IN and AT only: the first A and the first S on a chart, each a share of its clear pay.
+  // Rank tokens, on IN and AT only: the first A and the first S on a chart, each a share of its clear pay.
   rank: { a: 0.25, s: 0.5 }, rankDiffs: ["in", "at"],
   // A gym boss's first clear on any difficulty (its badge), a region champion's, and the final boss's.
   badge: 100,
@@ -459,8 +462,9 @@ const PAY = {
   lesson: 50
 };
 // The ledger version of the charts' entries (rs:r2:clear:..., src/hub/relic-song.js): the Kanto remaster rewrote
-// every chart, so each pays again once under its new entry. Entries paid before stay paid; nobody loses coins.
-const LEDGER = "r2";
+// every chart, so each pays again once under its new entry. Entries paid before stay paid. Tokens are
+// paid under their own entries (rt:, UNIT), apart from the coins paid before them.
+const LEDGER = "r2", UNIT = "chips";
 const toRound = v => Math.round(v / PAY.round) * PAY.round;
 const clearPay = level => Math.max(PAY.round, toRound(PAY.perLevel * level * level));
 const rankPay = (level, diff, rank) => PAY.rankDiffs.includes(diff) && PAY.rank[rank] ? toRound(clearPay(level) * PAY.rank[rank]) : 0;
@@ -566,7 +570,7 @@ const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringi
 // Reduce motion starts on when the system asks for less motion.
 // lesson: Meloetta's Lesson is finished or skipped. tips: the one-time help already seen (six, lines,
 // below, speed: the tips; boss: the first boss card; flip: the first moving line's two-bar cue).
-const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitVol: 60,
+const opts = Object.assign({ asked: 0, lesson: 0, tips: {}, sound: 1, vol: 70, offset: 0, speed: 10, skin: "classic", test: 0, jtext: 0, hits: 1, hitKind: "tick", hitVol: 60,
   calm: matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0 }, readJSON(OPTS_KEY) || {});
 // Saved binds are kept only if each row is whole, has no repeats and no reserved key.
 {
@@ -622,22 +626,47 @@ function voices(c) {
   }
 }
 function setVolume() { if (master) master.gain.value = opts.sound ? 0.32 * opts.vol / 100 : 0; }
-// Hitsounds: a short soft click the moment a key hits a note, on its own volume, straight to the
-// speakers (not through the song's master, which a song's end cuts). Muted mode has none. A chord's
-// keys land within a few ms of each other, so a click within 35 ms of the last one is skipped: one
-// click a chord. `level` is 1 for Perfect and Great, less for Good, least for a drag's tick.
+// Hitsounds: a click the moment a key hits a note, on its own volume, straight to the speakers (not
+// through the song's master, which a song's end cuts). Muted mode has none, and neither does the
+// calibration (its clicks are the beat to tap to). A chord's keys land within a few ms of each other,
+// so a click within 35 ms of the last one is skipped: one click a chord. `level` is 1 for Perfect and
+// Great, less for Good, least for a drag. Three clicks to pick from, none of them pitched or swept
+// (a sweep is a chirp): a noise tick, a woodblock, a clap.
+const HITSOUNDS = {
+  // Tick: 12 ms of noise through a band high up, like a rhythm game's.
+  tick: (out, w, level) => {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = 5200; f.Q.value = 0.9;
+    g.gain.setValueAtTime(1.6 * level, w); g.gain.exponentialRampToValueAtTime(0.001, w + 0.012);
+    s.connect(f); f.connect(g); g.connect(out); s.start(w, Math.random() * 0.5); s.stop(w + 0.02);
+  },
+  // Wood: a woodblock's tock, a sine at a fixed 900 Hz with a quieter overtone, gone in 25 ms.
+  wood: (out, w, level) => {
+    for (const [f, a] of [[900, 0.9], [2340, 0.25]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(a * level, w + 0.001); g.gain.exponentialRampToValueAtTime(0.001, w + 0.025);
+      o.connect(g); g.connect(out); o.start(w); o.stop(w + 0.03);
+    }
+  },
+  // Clap: filtered noise with two quick attacks 8 ms apart, then a short tail.
+  clap: (out, w, level) => {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = 1400; f.Q.value = 1.1;
+    g.gain.setValueAtTime(3 * level, w); g.gain.exponentialRampToValueAtTime(0.6 * level, w + 0.006);
+    g.gain.setValueAtTime(2.6 * level, w + 0.008); g.gain.exponentialRampToValueAtTime(0.001, w + 0.05);
+    s.connect(f); f.connect(g); g.connect(out); s.start(w, Math.random() * 0.5); s.stop(w + 0.06);
+  }
+};
 let hitOut = null, lastHit = -1;
-function hitsound(level) {
-  if (!ctx || !opts.sound || !opts.hits) return;
-  const w = ctx.currentTime;
+function hitsound(level, at = null) {
+  if (!ctx || !noiseBuf || !opts.sound || !opts.hits || cal) return;
+  const w = at == null ? ctx.currentTime : at;
   if (w - lastHit < 0.035) return;
   lastHit = w;
   if (!hitOut) { hitOut = ctx.createGain(); hitOut.connect(ctx.destination); }
   hitOut.gain.value = 0.5 * opts.hitVol / 100;
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = "triangle"; o.frequency.setValueAtTime(2400, w); o.frequency.exponentialRampToValueAtTime(1000, w + 0.03);
-  g.gain.setValueAtTime(0.6 * level, w); g.gain.exponentialRampToValueAtTime(0.001, w + 0.05);
-  o.connect(g); g.connect(hitOut); o.start(w); o.stop(w + 0.06);
+  (HITSOUNDS[opts.hitKind] || HITSOUNDS.tick)(hitOut, w, level);
 }
 const hz = midi => 440 * Math.pow(2, (midi - 69) / 12);
 // An instrument: wave, envelope (seconds), level, and optional vibrato, detune pair and filter,
@@ -2034,7 +2063,7 @@ function drawMap() {
   showScreen("map");
   backdrop(MELOETTA, save.badges[4] ? TINT.pirouette : TINT.aria);
   const h = hub();
-  $("#m-coins").textContent = h ? fmt(h.coins) : "—";
+  $("#m-coins").textContent = h && Number.isSafeInteger(h.chips) ? fmt(h.chips) : "—";
   $("#m-badges").textContent = badges() + "/4";
   $("#m-total").textContent = fmt(total());
   $("#m-test").hidden = !opts.test;
@@ -2102,6 +2131,8 @@ function drawOpts() {
   seg($("#o-jtext"), opts.jtext, v => { opts.jtext = Number(v); keepOpts(); });
   seg($("#o-calm"), opts.calm, v => { opts.calm = Number(v); keepOpts(); });
   seg($("#o-hits"), opts.hits, v => { opts.hits = Number(v); keepOpts(); });
+  // Picking a hitsound plays it, at its volume.
+  seg($("#o-hitkind"), HITSOUNDS[opts.hitKind] ? opts.hitKind : "tick", v => { opts.hitKind = v; keepOpts(); audio().resume(); lastHit = -1; hitsound(1); });
   $("#o-hitvol").value = opts.hitVol; $("#o-hitvol").oninput = e => { opts.hitVol = Number(e.target.value); keepOpts(); audio().resume(); hitsound(1); };
   seg($("#o-test"), opts.test, v => { opts.test = Number(v); keepOpts(); loadSave(); });
   $("#o-vol").value = opts.vol; $("#o-vol").oninput = e => { opts.vol = Number(e.target.value); setVolume(); keepOpts(); };
@@ -2710,7 +2741,7 @@ function cut() {
 }
 function retry() { const s = P && P.song, d = P && P.B.diff, g = P && P.given; stop(); if (s) start(s, d, g); }
 
-/* ── Results, coins and the board ──────────────────────────────────────── */
+/* ── Results, tokens and the board ─────────────────────────────────────── */
 const clearPayOf = B => clearPay(B.level);
 // What the hub needs to pay: every chart's amounts by its level, the bonuses, and which songs are
 // bosses, champions and the finale. topUp: false, so nothing already in the ledger pays again.
@@ -2718,7 +2749,7 @@ let payCache = null;
 function payTable() {
   if (!payCache) payCache = {
     table: { charts: Object.fromEntries(SONGS.flatMap(s => s.diffs.map(d => { const lv = levelOf(s, d); return [s.id + ":" + d, { clear: clearPay(lv), a: rankPay(lv, d, "a"), s: rankPay(lv, d, "s") }]; }))),
-      badge: PAY.badge, champion: PAY.champion, finale: PAY.finale, lesson: PAY.lesson, topUp: false }, ledger: LEDGER,
+      badge: PAY.badge, champion: PAY.champion, finale: PAY.finale, lesson: PAY.lesson, topUp: false, unit: UNIT }, ledger: LEDGER,
     bosses: Object.fromEntries(SONGS.filter(s => s.boss && !s.final && !s.champion).map(s => [s.id, s.gym])), final: (SONGS.find(s => s.final) || {}).id,
     champions: Object.fromEntries(SONGS.filter(s => s.champion).map(s => [s.id, s.region]))
   };
@@ -2757,7 +2788,7 @@ function showResult({ song, diff, s, rank, won, why }) {
   showScreen("result");
   const key = song.id + ":" + diff, old = save.best[key] || null;
   $("#r-title").textContent = song.title + " · " + DIFF_NAME[diff];
-  $("#r-sub").textContent = P.test ? "Test mode: no coins, no board" : "";
+  $("#r-sub").textContent = P.test ? "Test mode: no tokens, no board" : "";
   $("#r-rank").textContent = won ? rank : "—";
   $("#r-clear").textContent = won ? (song.champion ? "Blue hands back Kanto's verse." : song.boss ? (song.final ? "Kanto's verse, sung whole." : GYMS[song.gym].badge + "!") : "Cleared.") : "Not cleared. " + why;
   const rows = $("#r-table"); rows.replaceChildren();
@@ -2779,19 +2810,19 @@ function showResult({ song, diff, s, rank, won, why }) {
   keep();
   // The finale's flag, for Poké Idle's Story Mail. Real saves only.
   if (song.final && !P.test) { const e = eggs(); if (!e.finale) { e.finale = 1; writeJSON(EGG_KEY, e); } }
-  if (P.test) { $("#r-pay").textContent = "Test mode: no coins, and nothing posted."; return; }
-  // Coins: the first clear, then each new rank step. The hub's ledger makes every one pay once.
+  if (P.test) { $("#r-pay").textContent = "Test mode: no tokens, and nothing posted."; return; }
+  // Tokens: the first clear, then each new rank step. The hub's ledger makes every one pay once.
   if (G) {
     let paid = null;
     try { paid = G.pay({ song: song.id, diff: diff, rank: rank.toLowerCase(), badge: song.boss && !song.final && !song.champion ? song.gym : null, champion: song.champion ? song.region : null, finale: !!song.final, ...payTable() }); }
     catch (error) { console.log("Relic Song: no payout.", error && error.message); }
     if (paid && paid.ok && paid.paid.total > 0) {
       const p = paid.paid;
-      $("#r-pay").textContent = "+" + fmt(p.total) + " coins (" + [p.clear && "first clear " + p.clear, p.rank && "rank up " + p.rank, p.badge && "badge " + p.badge, p.champion && "champion " + p.champion,
-        p.finale && "finale " + p.finale, p.top && "back pay " + p.top].filter(Boolean).join(", ") + "). You have " + fmt(paid.coins) + ".";
+      $("#r-pay").textContent = "+" + fmt(p.total) + " tokens (" + [p.clear && "first clear " + p.clear, p.rank && "rank up " + p.rank, p.badge && "badge " + p.badge, p.champion && "champion " + p.champion,
+        p.finale && "finale " + p.finale, p.top && "back pay " + p.top].filter(Boolean).join(", ") + "). You have " + fmt(paid.chips) + ".";
     }
-    else $("#r-pay").textContent = "No coins this time: this song and rank have already paid.";
-  } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn coins and post scores.";
+    else $("#r-pay").textContent = "No tokens this time: this song and rank have already paid.";
+  } else $("#r-pay").textContent = "Open Relic Song from the arcade to earn tokens and post scores.";
 }
 $("#r-retry").onclick = () => { if (P) start(P.song, P.B.diff, P.given); };
 $("#r-map").onclick = () => drawMap();
@@ -2872,7 +2903,7 @@ function lessonCard(i) {
     // The end: the lesson counts as done, and pays its bonus once (not in test mode).
     opts.lesson = 1; keepOpts();
     if (!opts.test && G && G.lesson) {
-      try { const r = G.lesson({ table: PAY }); if (r && r.paid > 0) text += " +" + fmt(r.paid) + " coins for finishing."; }
+      try { const r = G.lesson({ table: { lesson: PAY.lesson, unit: UNIT } }); if (r && r.paid > 0) text += " +" + fmt(r.paid) + " tokens for finishing."; }
       catch (error) { console.log("Relic Song: no lesson payout.", error && error.message); }
     }
     drawMap();
@@ -3008,6 +3039,16 @@ window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s
       for (const v of d) { const a = Math.abs(v); peak = Math.max(peak, a); sum += v * v; if (a >= 1) clip++; }
       return { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / d.length).toFixed(4), clip: clip / d.length };
     } finally { [ctx, master, noiseBuf] = live; Object.assign(waves, live[3]); }
+  },
+  // For tests: a hitsound rendered offline, as play would sound it: Perfect, Good, a drag, then a chord
+  // (two keys 4 ms apart: one click). Returns the samples, 44.1 kHz.
+  hitTest: async (kind, vol = 60) => {
+    const off = new OfflineAudioContext(1, 44100 * 1.4, 44100), live = [ctx, noiseBuf, hitOut, lastHit, opts.hitKind, opts.hitVol, opts.sound, opts.hits];
+    ctx = off; hitOut = null; lastHit = -1; voices(off); Object.assign(opts, { hitKind: kind, hitVol: vol, sound: 1, hits: 1 });
+    try {
+      for (const [t, level] of [[0.1, 1], [0.4, 0.45], [0.7, 0.2], [1.0, 1], [1.004, 1]]) hitsound(level, t);
+      return Array.from((await off.startRendering()).getChannelData(0));
+    } finally { [ctx, noiseBuf, hitOut, lastHit] = live; Object.assign(opts, { hitKind: live[4], hitVol: live[5], sound: live[6], hits: live[7] }); }
   },
   charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
     seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), rankPay: rankPay(b.level, d, "a") + rankPay(b.level, d, "s"), ...b.stats }; })) };

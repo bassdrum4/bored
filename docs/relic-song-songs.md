@@ -2,20 +2,21 @@
 
 This is the template every new Relic Song song is written to, so that the nine regions (about 117
 songs) stay playable and don't all sound the same. All of it lives in
-`src/games/content/relic-song.html`. Coins go through `src/hub/relic-song.js`.
+`src/games/content/relic-song.html`. Tokens go through `src/hub/relic-song.js`.
 
 To review a song, use **Options → Help → Sound test**. It plays every open song (all of them in
 test mode) and the 18 type styles' demos, music only. To check a song, run:
 
 ```bash
-CHROME_PATH=/path/to/chrome node scripts/relic-song-table.mjs          # the table, the flags, the coin totals
+CHROME_PATH=/path/to/chrome node scripts/relic-song-table.mjs          # the table, the flags, the token totals
 CHROME_PATH=/path/to/chrome node scripts/relic-song-table.mjs --strict # exits 1 if a recipe song, a demo or a pay rule fails
 ```
 
 The script prints one row per song: type, key, BPM, bars, length, hook repeats, the level of each
 difficulty, the clear pay and the most its ranks pay. Each row lists what's off the recipe. After
 the songs come each region's variety, the demos (held to the recipe and to the moving line's
-readability rules), the pay rules run through the hub's ledger, and the coin totals.
+readability rules), the pay rules run through the hub's ledger, and the token totals (the script still labels them
+"COINS"; the amounts are tokens).
 
 **Kanto follows the recipe too** (the Kanto remaster, save v2). All 12 gym songs, Champion Blue,
 the final, The Dealer and Sssssssnakes were rewritten to it; each kept its old tune as its hook.
@@ -175,40 +176,52 @@ chords: Em C G D            key: Em
 
 For now, the final is the ending. It opens after Champion Blue, and Sssssssnakes opens after it.
 
-## 4. Coins
+## 4. Tokens
 
-Coins follow the chart's real level, not its difficulty's name. `PAY` at the top of the game is
+Relic Song pays **tokens**: `chips`, the arcade's collection tokens that Shotgun Roulette bets and
+the Collector uses, shown to players as "tokens". The map's header shows the balance the way
+Shotgun Roulette does ("Tokens N"). It paid Poké Gacha TD coins until the token switch. Those stay
+with the players who earned them, and nothing converts them: coins never turn into chips.
+
+Tokens follow the chart's real level, not its difficulty's name. `PAY` at the top of the game is
 the one place to tune it.
 
 - **First clear of a chart:** 2 × level², to the nearest 5, from the measured level, and never
   less than 5. Lv.1 5, Lv.2 10, Lv.6 70, Lv.10 200, Lv.15 450.
-- **Rank coins, IN and AT only:**
+- **Rank tokens, IN and AT only:**
   - First A: +25% of that chart's clear pay.
   - First S: +50%.
   - An S that skips A pays both.
-  - EZ and HD pay no rank coins.
+  - EZ and HD pay no rank tokens.
 - **Bonuses:** badge +100, a champion's first clear +250, the final boss's first clear +500.
 - **Meloetta's Lesson:** 50, once.
 - **Hidden tracks** use the same formula, by level.
+- **Test mode** pays nothing.
 
 **Payment.** Every amount is paid once, through the hub's ledger (`grantOnce`); replays pay
 nothing. The page sends a table that names every chart's amounts (`payTable()`) and says
 `topUp: false`. Anything the ledger already paid, under this table or an older one, stays paid
-and pays nothing more, so nobody loses coins and nothing is paid twice. Only new entries pay, at
+and pays nothing more, so nobody loses anything and nothing is paid twice. Only new entries pay, at
 today's amounts.
 
-Ledger entries:
+**Tokens and coins are separate entries.** The table says `unit: "chips"` (`UNIT` in the game), and
+the hub pays it in chips under `rt:` entries. A table without a unit pays coins under `rs:`
+entries, the way it did before tokens. A coin entry never stops a token entry, so every chart,
+rank, badge, champion, the finale and the lesson paid tokens once, fresh, when the switch came in.
+Every coin paid before stays where it is.
+
+Ledger entries (tokens; `rs:` in place of `rt:` for the coins paid before):
 
 | Entry | For |
 |---|---|
-| `rs:clear:<song>:<diff>` | a chart's first clear |
-| `rs:rank:<song>:<diff>:<a\|s>` | a chart's first A or S |
-| `rs:badge:<gym>` | a gym badge |
-| `rs:champion:<region>` | a champion's first clear |
-| `rs:finale` | the final boss's first clear |
-| `rs:lesson` | Meloetta's Lesson |
+| `rt:r2:clear:<song>:<diff>` | a chart's first clear |
+| `rt:r2:rank:<song>:<diff>:<a\|s>` | a chart's first A or S |
+| `rt:badge:<gym>` | a gym badge |
+| `rt:champion:<region>` | a champion's first clear |
+| `rt:finale` | the final boss's first clear |
+| `rt:lesson` | Meloetta's Lesson |
 
-**Ledger versions.** A chart's entries can carry a version: `rs:r2:clear:<song>:<diff>`. The game
+**Ledger versions.** A chart's entries can carry a version: `rt:r2:clear:<song>:<diff>`. The game
 sends `ledger: LEDGER` (now `"r2"`, the Kanto remaster). A rewritten chart then pays again once
 under its new entry, while the old entries stay paid. Bump `LEDGER` only when charts are rewritten
 and the save is reset with them. Badges, champions, the finale and the lesson have no version.
@@ -218,7 +231,7 @@ and the save is reset with them. Badges, champions, the finale and the lesson ha
   (bests, ranks, clears, badges, and with them the difficulty chain). The map then says
   "Relic Song got remastered! Your progress was reset so everyone starts fresh." once.
 - **Kept:** the options save (keybinds, note skin, offset, the lesson, the tips).
-- **Coins:** none are taken back.
+- **Coins and tokens:** none are taken back.
 - **The board:** the arcade lets go of its cached Relic Song best once per browser
   (`resetBoard` in `src/hub/relic-song.js`). `sql/relic-song-reset.sql` empties the board and
   each account's cloud copy of the best. Run it by hand, before the deploy.
@@ -267,6 +280,6 @@ part of adding the second region.
 
 Champion Blue is 5 / 9 / 12 / 14, and the final 4 / 10 / 13 / 15.
 
-**Coins a region adds.** Projected by the script from the level targets: about 840 for its story
+**Tokens a region adds.** Projected by the script from the level targets: about 840 for its story
 on EZ and about 4,835 for 100% of it, against the remastered Kanto's 1,505 and 9,570 (the lesson,
 Blue and the finale included).
