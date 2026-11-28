@@ -135,7 +135,7 @@ let ships = [], occupied = new Map(), busy = false, cinematic = true, soundOn = 
 let ownModels = [], ownKey = '', clock = new T.Clock(), elapsed = 0, ac = null, shake = 0;
 // slow: the world clock during an impact. whip / fovKick / blowout are the camera and flash impulses.
 let slow = 1, fovKick = 0, whip = 0, blowout = 0, cineMode = 'full', lastFlash = -1;
-let turnAim = false, aimYaw = null, aimRoom = false;
+let turnAim = false, aimYaw = null, aimRoom = false, holdPose = null;
 const aimPos = new T.Vector3(), aimFocus = new T.Vector3();
 const particles = [], billows = [], rings = [], flashes = [], scorches = [], burns = [];
 const burnPulse = { at: 0, index: 0 };
@@ -477,9 +477,11 @@ function startShot(kind, cell, hit, sunk) {
     finish = resolve;
     slow = 1; blowout = 0; fovKick = 0; whip = 0;
     // Brief plays the same beats on a compressed clock; skip and the 9 s guard are untouched.
-    shot = { kind, cell, hit, sunk, gun, target, start, ctrl, dir, yaw, t: 0, impacted: false, fired: false, cut: false, rate: (kind === 'in' ? 1.2 : 1) * (cineMode === 'brief' ? 2.15 : 1) };
+    // from: where the player left the camera, so the take opens on that exact frame.
+    shot = { kind, cell, hit, sunk, gun, target, start, ctrl, dir, yaw, from: { p: camPos.clone(), l: look.clone() }, t: 0, impacted: false, fired: false, cut: false, rate: (kind === 'in' ? 1.2 : 1) * (cineMode === 'brief' ? 2.15 : 1) };
     if (kind === 'in') { battery.visible = true; grid.visible = false }
     reticle.position.copy(target);
+    holdPose = null;
     reticle.visible = kind === 'out'; retPulse.material.opacity = 0;
     bearingLine.visible = kind === 'out';
     if (kind === 'out') layBearing(start, target);
@@ -547,6 +549,8 @@ function impact(s) {
 }
 
 function finishShot() {
+  // Park on the last frame so the pause after a hit keeps its smoke, not the overview.
+  holdPose = { p: camPos.clone(), l: look.clone(), until: elapsed + 1.4 };
   shot = null;
   slow = 1; fovKick = 0; whip = 0; blowout = 0;
   if (flashEl) flashEl.style.opacity = '0';
@@ -733,36 +737,92 @@ function update(now = 0) {
       if (turret.userData.barrels) for (const b of turret.userData.barrels) b.rotation.x = damp(b.rotation.x, Math.PI / 2 - .3, 1.6, dt);
     }
   } else if (shot) {
-    const s = shot; s.t += sdt * (s.rate || 1); const t = s.t; action = 1;
+    const s = shot; s.t += sdt * (s.rate || 1); const t = s.t; action = 1; holdPose = null;
     for (const turret of (s.gun.userData.turrets || [])) {
       turret.rotation.y = turn(turret.rotation.y, s.yaw, 1 - Math.exp(-dt * 5.5));
       if (turret.userData.barrels) for (const b of turret.userData.barrels) b.rotation.x = damp(b.rotation.x, Math.PI / 2 - .2, 4, dt);
     }
 
-    if (t < T_FIRE) {
-      /* --- guns train, camera down at the waterline ----------------------- */
-      const k = smooth(clamp(t / T_AIM, 0, 1));
-      // Narrow portrait screens see a much thinner slice of the world, so pull back.
+    if (s.kind === 'out') {
+      /* --- your shot: one take, board to hit ------------------------------ */
+      // Nothing cuts: the take opens on the camera the player was holding, eases down
+      // onto the bow as the guns train, rides out with the shell, then peels back into
+      // the impact orbit. Each rig is blended into the next over a window, never snapped.
       const fit = clamp(1.45 / camera.aspect, 1, 2);
-      if (s.kind === 'in') {
-        // Waterline cam: the enemy's guns come to bear seen from just above the swell.
-        const b = s.gun.position;
-        // Port broadside: the sun is north-west, so this is the lit side of the enemy ship.
-        desired.copy(b).add(new T.Vector3(-58 * fit, 2.8 * fit, 7 * fit).lerp(new T.Vector3(-45 * fit, 8 * fit, 5 * fit), k));
-        focus.copy(b).add(new T.Vector3(0, 8.5, .5));
-        lambda = 4.6; fovGoal = 46;
-        if (!s.aimCut) { s.aimCut = true; snap = true }
-      } else {
-        const lift = 1 + (fit - 1) * .5;
-        // Low off the bow so the hull fills the frame, then rise into the firing angle.
-        desired.copy(player.position).add(new T.Vector3(31 * fit, 3.3 * lift, 27 * fit).lerp(new T.Vector3(22 * fit, 10 * lift, 16 * fit), k));
-        focus.copy(player.position).add(new T.Vector3(0, 7, -7)).lerp(s.target, .22 * k);
-        lambda = 5.5; fovGoal = 42;
-        reticle.visible = true;
+      const lift = 1 + (fit - 1) * .5;
+      const aimK = smooth(clamp(t / T_AIM, 0, 1));
+      const gunPos = player.position.clone().add(new T.Vector3(31 * fit, 3.3 * lift, 27 * fit).lerp(new T.Vector3(22 * fit, 10 * lift, 16 * fit), aimK));
+      const gunFocus = player.position.clone().add(new T.Vector3(0, 7, -7)).lerp(s.target, .22 * aimK);
+      if (s.from) { gunPos.lerp(s.from.p, 1 - aimK); gunFocus.lerp(s.from.l, 1 - aimK) }
+
+      const u = clamp((t - T_FIRE) / (T_HIT - T_FIRE), 0, 1);
+      const p = bezier(s.start, s.ctrl, s.target, u);
+      const tan = tangent(s.start, s.ctrl, s.target, u);
+      const side = new T.Vector3().crossVectors(tan, UP).normalize();
+      const shellPos = p.clone().addScaledVector(tan, -6 * clamp(1.3 / camera.aspect, 1, 1.5)).addScaledVector(UP, 4.4 - u * 1.4).addScaledVector(side, 5);
+      const shellFocus = p.clone().lerp(s.target, .42 + u * .25);
+
+      const k = clamp((t - T_HIT) / (T_END - T_HIT), 0, 1);
+      const a = .55 + k * 1.35, orbit = (42 - k * 8) * clamp(1.3 / camera.aspect, 1, 1.6);
+      const h = (s.hit ? 5.5 : 4.5) + k * k * 21;
+      const hitPos = s.target.clone().add(new T.Vector3(Math.cos(a) * orbit, h, Math.sin(a) * orbit));
+      const hitFocus = s.target.clone().add(new T.Vector3(0, (s.hit ? 3.5 : 1.5) + k * 2, 0));
+
+      // Windows overlap the beats they join, so the camera is always mid-move, never cut.
+      const onShell = smooth(clamp((t - T_FIRE + .6) / 1, 0, 1));
+      const onHit = smooth(clamp((t - T_HIT + .45) / 1.05, 0, 1));
+      desired.copy(gunPos).lerp(shellPos, onShell).lerp(hitPos, onHit);
+      focus.copy(gunFocus).lerp(shellFocus, onShell).lerp(hitFocus, onHit);
+      lambda = 2.6 + 5.4 * onShell * (1 - onHit);
+      fovGoal = 42 + 13 * onShell * (1 - onHit) + 8 * onHit;
+      bank = .1 * onShell * (1 - onHit);
+
+      reticle.visible = t < T_FIRE;
+      if (t < T_FIRE) {
         const pulse = .5 + .5 * Math.sin(elapsed * 6);
         retPulse.material.opacity = .18 + pulse * .35;
         retPulse.scale.setScalar(1 + pulse * .25);
       }
+      if (t >= T_FIRE && t < T_HIT) {
+        if (!s.fired) {
+          s.fired = true; whip = .8; fovKick = -3.5;
+          muzzleFlash(s.start);
+          sound('fire');
+          for (const turret of (s.gun.userData.turrets || [])) {
+            if (turret.userData.restZ != null) turret.position.z = turret.userData.restZ + 1.1;
+          }
+        }
+        projectile.visible = true;
+        projectile.position.copy(p);
+        projectile.quaternion.setFromUnitVectors(UP, tan);
+        trailTimer += dt;
+        if (trailTimer > .028) {
+          trailTimer = 0;
+          const sprite = new T.Sprite(trailGlow.clone());
+          sprite.position.copy(p).addScaledVector(tan, -.75);
+          scene.add(sprite);
+          flashes.push({ sprite, t: 0, life: .16, size: .42, alpha: .3 });
+          if (Math.random() < .4) puff(p.clone().addScaledVector(tan, -.95), { color: 0xd9d6c4, size: .38, life: .6, rise: 0, spread: .5, gravity: 1.1, grow: 2.6, opacity: .13 });
+        }
+      }
+      if (t >= T_HIT) {
+        if (!s.impacted) impact(s);
+        reticle.visible = false;
+        if (s.hit && Math.random() < .5) puff(s.target.clone().add(new T.Vector3((Math.random() - .5) * 6, 1, (Math.random() - .5) * 6)), { color: 0x3a4046, size: 3, life: 2.2, rise: 3 + Math.random() * 4, gravity: -.8, grow: 2.4, opacity: .35 });
+      }
+      if (t >= T_END) finishShot();
+    } else if (t < T_FIRE) {
+      /* --- enemy guns train, waterline cam -------------------------------- */
+      const k = smooth(clamp(t / T_AIM, 0, 1));
+      // Narrow portrait screens see a much thinner slice of the world, so pull back.
+      const fit = clamp(1.45 / camera.aspect, 1, 2);
+      // Waterline cam: the enemy's guns come to bear seen from just above the swell.
+      const b = s.gun.position;
+      // Port broadside: the sun is north-west, so this is the lit side of the enemy ship.
+      desired.copy(b).add(new T.Vector3(-58 * fit, 2.8 * fit, 7 * fit).lerp(new T.Vector3(-45 * fit, 8 * fit, 5 * fit), k));
+      focus.copy(b).add(new T.Vector3(0, 8.5, .5));
+      lambda = 4.6; fovGoal = 46;
+      if (!s.aimCut) { s.aimCut = true; snap = true }
     } else if (t < T_HIT) {
       /* --- chase cam behind the shell ------------------------------------- */
       const u = clamp((t - T_FIRE) / (T_HIT - T_FIRE), 0, 1);
@@ -796,7 +856,7 @@ function update(now = 0) {
       lambda = 9; fovGoal = 55; bank = .1;
       reticle.visible = false;
       // Hard cut into the chase position, hidden by the muzzle flash.
-      if (s.kind === 'in' && !s.cut) { s.cut = true; snap = true }
+      if (!s.cut) { s.cut = true; snap = true }
     } else if (t < T_END) {
       /* --- reveal: orbit the impact point -------------------------------- */
       // Cut on the hit, under the flash, from the shell's view to the impact.
@@ -813,6 +873,11 @@ function update(now = 0) {
     } else {
       finishShot();
     }
+  } else if (holdPose && elapsed < holdPose.until) {
+    /* --- between your shot and the reply: stay on the hit ------------------ */
+    desired.copy(holdPose.p);
+    focus.copy(holdPose.l);
+    lambda = 1.4; fovGoal = 50; action = .3;
   }
 
   for (const turret of (player.userData.turrets || [])) {
