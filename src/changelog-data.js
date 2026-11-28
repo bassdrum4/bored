@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1088,
+  "count": 1089,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2fdbcbff","date":"2026-11-28","author":"bassdrum4","subject":"Simplify game library and settings"},
   {"sha":"d524765f","date":"2026-11-28","author":"Daniel Lowe","subject":"Verify daily completion by date after closing the game"},
   {"sha":"49c78ec2","date":"2026-11-28","author":"Bored maintenance","subject":"Prune cosmetic and redundant tests; fix Vettel filter regression test"},
   {"sha":"5a64da54","date":"2026-11-28","author":"Daniel Lowe","subject":"Add leftmost Vettels! library filter"},
