@@ -6,6 +6,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
   const sessions=new Map(), auth=new Map(), pending=new Map();
   let generation=0, closed=false;
   const mentions=new Map();
+  let record=null;
   const tokenKey=t=>createHash('sha256').update(t).digest('hex');
   async function profile(token){
     const key=tokenKey(token),now=Date.now(),cached=auth.get(key);
@@ -27,7 +28,8 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     try{return await task;}finally{pending.delete(key);}
   }
   function snapshot(s){
-    const value={t:'ok',...roster.counts()};
+    const value={t:'ok',...(s.identity.observer?{a:0,g:0}:roster.counts())};
+    if(record&&Date.now()-record.at<20000)value.record=record;
     if(!s.identity.guest&&s.watch)value.n=roster.names();
     const mention=!s.identity.guest&&mentions.get(s.identity.id);
     if(mention&&Date.now()-mention.at<86400000)value.mention=mention.id;
@@ -53,10 +55,10 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     for(const s of sessions.values())if(!s.identity.guest&&s.identity.id===id)remove(s,{t:'off'});
   }
   function flush(){
-    let countsFrame,namedFrame;
+    let countsFrame,namedFrame,observerFrame;
     for(const s of sessions.values()){
       const c=s.connection;if(!c)continue;
-      const frame=!s.identity.guest&&mentions.has(s.identity.id)?snapshot(s):s.watch?(namedFrame??=snapshot(s)):(countsFrame??=snapshot(s));
+      const frame=s.identity.observer?(observerFrame??=snapshot(s)):!s.identity.guest&&mentions.has(s.identity.id)?snapshot(s):s.watch?(namedFrame??=snapshot(s)):(countsFrame??=snapshot(s));
       if(frame.cursor===c.cursor)continue;
       c.cursor=frame.cursor;
       if(c.mode==='poll')detach(s,frame);
@@ -96,7 +98,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     try{m=JSON.parse(await readBody(req));}catch{reply(res,400,{t:'err'},origin);return;}
     if(!UUID.test(m?.sid||'')||!['sse','poll','leave','hide'].includes(m.mode)){reply(res,400,{t:'err'},origin);return;}
     let identity;
-    if(m.t==='guest'&&UUID.test(m.id||''))identity={guest:true,id:m.id};
+    if((m.t==='guest'||m.t==='observer')&&UUID.test(m.id||''))identity={guest:true,id:m.id,observer:m.t==='observer'};
     else if(m.t==='auth'&&typeof m.jwt==='string'&&m.jwt.length<=7000&&m.jwt.split('.').length===3){
       let p;try{p=await profile(m.jwt);}catch{reply(res,401,{t:'err'},origin);return;}
       if(m.mode==='hide'){hideAccount(p.id);reply(res,200,{t:'off'},origin);return;}
@@ -106,7 +108,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     }else{reply(res,400,{t:'err'},origin);return;}
     if(res.destroyed)return;
     let s=sessions.get(m.sid);
-    if(s&&(s.identity.id!==identity.id||s.identity.guest!==identity.guest)){reply(res,403,{t:'err'},origin);return;}
+    if(s&&(s.identity.id!==identity.id||s.identity.guest!==identity.guest||s.identity.observer!==identity.observer)){reply(res,403,{t:'err'},origin);return;}
     if(m.mode==='leave'||m.mode==='hide'){
       if(s)remove(s);
       reply(res,200,{t:'ok'},origin);return;
@@ -117,7 +119,7 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
       s={id:m.sid,identity,ip,watch:false,at:Date.now(),connection:null};sessions.set(s.id,s);
     }
     detach(s);s.identity=identity;s.watch=m.watch===true&&!identity.guest;s.at=Date.now();
-    roster.add(s,identity);changed();
+    if(!identity.observer){roster.add(s,identity);changed();}
     const frame=snapshot(s);
     const cursor=typeof m.cursor==='string'?m.cursor:'';
     if(m.mode==='poll'&&cursor!==frame.cursor){reply(res,200,frame,origin);return;}
@@ -145,5 +147,6 @@ export function createEventPresence({roster,verify,changed,hideAccount,reply,rea
     for(const [key,value] of auth)if(value.until<=now)auth.delete(key);
     for(const [id,value] of mentions)if(now-value.at>=86400000)mentions.delete(id);
   },Math.min(5000,keepaliveMs));sweep.unref?.();
-  return {handle,flush,evict,mention,close(){closed=true;clearInterval(sweep);for(const s of sessions.values())remove(s);auth.clear();}};
+  function announce(next){if(record?.id===next.id)return;record=next;flush();}
+  return {handle,flush,evict,mention,announce,close(){closed=true;clearInterval(sweep);for(const s of sessions.values())remove(s);auth.clear();}};
 }

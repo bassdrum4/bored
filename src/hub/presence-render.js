@@ -1,3 +1,4 @@
+import { showRecordToast } from './record-toast.js';
 import { PRESENCE_ORIGIN } from './presence-endpoint.js';
 import { backendReady, freshSession, getSession, hasIdentity, request } from './backend.js';
 
@@ -43,6 +44,7 @@ export function mountRenderPresence(){
   const eligible=backendReady()&&liveSite()&&typeof fetch==='function';
   const endpoint=renderEventUrl(PRESENCE_ORIGIN);
   let owner=null,epoch=0,visible=null,ready=false,paused=false,suspended=false,saving=false;
+  let observerId='';
   let retry=0,pollFail=0,pollMode=false,controller=null,sid='',cursor='',lastCredentials=null;
   let counts=null,names=[],namesReady=false,reading=false,chatOpen=false;
   const current=(id,v)=>!suspended&&owner===id&&epoch===v&&viewer()===id;
@@ -88,10 +90,11 @@ export function mountRenderPresence(){
     privacy.firstChild.textContent=value===false?'Your online status is hidden. You can turn it back on in ':
       owner===GUEST?'You are counted anonymously. You can turn it off in ':
       'Your online status is visible to other participating players. You can turn it off in ';
-    if(value!==true)stop();
+    if(value===null)stop();
     render();
   }
   async function credentials(id,v){
+    if(visible===false)return {t:'observer',id:observerId||(observerId=crypto.randomUUID())};
     if(id===GUEST)return {t:'guest',id:guestId()};
     const s=await freshSession();
     if(!current(id,v)||s?.user?.id!==id||!s.access_token)throw Error('Session unavailable');
@@ -99,19 +102,22 @@ export function mountRenderPresence(){
   }
   function accept(m,id,v){
     if(!current(id,v))return;
-    if(m?.t==='off'){stop();showPreference(false);note.textContent='Online status is off.';return;}
+    if(m?.t==='off'){stop();showPreference(false);note.textContent='Online status is off.';void connect(id,v);return;}
     if(m?.t==='renew'||m?.t==='idle')return;
     if(m?.t!=='ok'||!Number.isInteger(m.a)||!Number.isInteger(m.g)||m.a<0||m.g<0||m.a+m.g>1000||typeof m.cursor!=='string')throw Error('Invalid presence frame');
-    cursor=m.cursor;counts={a:m.a,g:m.g};ready=true;pollFail=0;
+    cursor=m.cursor;pollFail=0;
+    if(m.record)showRecordToast(m.record);
+    if(visible===false)return;
+    counts={a:m.a,g:m.g};ready=true;
     if(id!==GUEST&&typeof m.mention==='string')window.dispatchEvent(new CustomEvent('bored:chat-mention',{detail:{account:id,mention:m.mention}}));
     if(id!==GUEST&&Array.isArray(m.n)){if(details.open){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}if(chatOpen)window.dispatchEvent(new CustomEvent('bored:chat-roster',{detail:{account:id,names:m.n}}));}
     render();
   }
   async function connect(id,v){
-    if(!current(id,v)||!eligible||!endpoint||visible!==true||paused||controller)return;
+    if(!current(id,v)||!eligible||!endpoint||visible===null||paused||controller)return;
     if(!sid)sid=crypto.randomUUID();
     const ctl=new AbortController();controller=ctl;
-    const alive=()=>controller===ctl&&current(id,v)&&visible===true&&!paused;
+    const alive=()=>controller===ctl&&current(id,v)&&visible!==null&&!paused;
     let timeout=0,valid=false,renew=false,failed=false;
     const arm=ms=>{clearTimeout(timeout);timeout=setTimeout(()=>ctl.abort(),ms);};
     try{
@@ -119,7 +125,7 @@ export function mountRenderPresence(){
       if(!alive())return;
       lastCredentials=auth;
       arm(pollMode?POLL_TIMEOUT:CONNECT_TIMEOUT);
-      const res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid,mode:pollMode?'poll':'sse',watch:id!==GUEST&&(details.open||chatOpen),cursor}),cache:'no-store',signal:ctl.signal});
+      const res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid,mode:pollMode?'poll':'sse',watch:visible===true&&id!==GUEST&&(details.open||chatOpen),cursor}),cache:'no-store',signal:ctl.signal});
       if(!alive())return;
       if(!res.ok)throw Error('Presence unavailable');
       if(pollMode){
@@ -153,7 +159,7 @@ export function mountRenderPresence(){
       clearTimeout(timeout);
       if(controller===ctl){
         controller=null;ctl.abort();
-        if(current(id,v)&&visible===true&&!paused){
+        if(current(id,v)&&visible!==null&&!paused){
           const wait=failed?(pollFail===1?250:Math.min(1000*2**Math.min(pollFail,6),60000)):0;
           retry=setTimeout(()=>{retry=0;void connect(id,v);},wait+Math.random()*Math.min(wait*.3,1000));
         }
@@ -161,7 +167,7 @@ export function mountRenderPresence(){
     }
   }
   function reconnect(){
-    if(visible!==true||paused||!owner)return;
+    if(visible===null||paused||!owner)return;
     cancel();cursor='';void connect(owner,epoch);
   }
   async function refreshPreference(){
@@ -170,14 +176,14 @@ export function mountRenderPresence(){
     if(id===GUEST){
       const value=guestVisible();showPreference(value);
       note.textContent=value?'Guests are counted anonymously on this browser.':'Online status is off on this browser.';
-      if(value)void connect(id,v);return;
+      void connect(id,v);return;
     }
     reading=true;
     try{
       const p=await account(id);
       if(!current(id,v)||saving)return;
       showPreference(p.visible);note.textContent=p.visible?'':'Online status is off.';
-      if(p.visible)void connect(id,v);
+      void connect(id,v);
     }catch{
       if(current(id,v)&&!saving){showPreference(null);note.textContent='Could not load online status.';}
     }finally{if(current(id,v))reading=false;}
@@ -210,8 +216,9 @@ export function mountRenderPresence(){
       saving=false;showPreference(desired);note.textContent=desired?'Online status is on.':'Online status is off.';
       if(desired)void connect(id,v);
       else{
+        void connect(id,v);
         // Persist privacy first, then invalidate all active server sessions for this account.
-        const auth=await credentials(id,v).catch(()=>hideCredentials);
+        const auth=hideCredentials?.t==='auth'?hideCredentials:await freshSession().then(s=>s?.access_token?{t:'auth',jwt:s.access_token}:null).catch(()=>null);
         if(!auth)return;
         if(current(id,v))void fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid:hideSid||crypto.randomUUID(),mode:'hide'}),keepalive:true,cache:'no-store'}).catch(()=>{});
       }
@@ -241,7 +248,7 @@ export function mountRenderPresence(){
   });
   window.addEventListener('online',()=>{
     if(visible===null)void refreshPreference();
-    else if(visible===true)reconnect();
+    else if(visible!==null)reconnect();
   });
   window.addEventListener('pagehide',()=>{suspended=true;epoch++;stop();owner=null;});
   window.addEventListener('pageshow',e=>{if(e.persisted){suspended=false;identityChanged();}});

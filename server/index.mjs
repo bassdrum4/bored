@@ -159,10 +159,37 @@ async function chatAdmin(token){
   return r.ok&&(await r.json())?.admin===true;
 }
 const chat=createChat({verify,isAdmin:chatAdmin,store:chatRpc,configured:Boolean(process.env.OPENAI_API_KEY&&chatRpc),reply,readBody,origins:ORIGINS,source:clientSource,onMention:events.mention,onlineNames:()=>roster.names()});
+// A database-generated, short-lived opaque record ID is the only way to publish.
+const seenRecords=new Map(); let recordBudget=12, recordBudgetAt=Date.now();
+async function recordEvent(req,res){
+  const now=Date.now();
+  recordBudget=Math.min(12,recordBudget+(now-recordBudgetAt)/1000*2);recordBudgetAt=now;
+  if(recordBudget<1){res.writeHead(429);res.end();return;}
+  recordBudget--;
+  let id;try{id=JSON.parse(await readBody(req)).id;}catch{}
+  const key=process.env.SUPABASE_SECRET_KEY;
+  if(!key||!UUID.test(id||'')){res.writeHead(400);res.end();return;}
+  for(const [old,at] of seenRecords)if(now-at>60000)seenRecords.delete(old);
+  if(seenRecords.has(id)){res.writeHead(204);res.end();return;}
+  seenRecords.set(id,now);
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/leaderboard_record_events?id=eq.'+id+'&select=id,game,handle,value,created_at',{
+      headers:{apikey:key},signal:AbortSignal.timeout(5000),redirect:'error'
+    });
+    const rows=r.ok?await r.json():[];
+    const row=rows[0],at=Date.parse(row?.created_at);
+    if(row&&Number.isFinite(at)&&Date.now()-at<20000&&at<=Date.now()+5000){
+      events.announce({id:row.id,game:row.game,handle:row.handle,value:row.value,at});
+    }
+    res.writeHead(204);res.end();
+  }catch{seenRecords.delete(id);res.writeHead(503);res.end();}
+}
 const server = http.createServer((req,res)=>{
   if (req.method==='GET' && req.url==='/health') {
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
     res.end(JSON.stringify({ok:true,service:'bored-presence',version:1}));
+  } else if (req.method==='POST' && req.url==='/leaderboard-record') {
+    void recordEvent(req,res).catch(()=>{if(!res.headersSent){res.writeHead(500);res.end();}else res.destroy();});
   } else if (['POST','OPTIONS'].includes(req.method) && req.url==='/chat') {
     void chat.handle(req,res).catch(()=>{if(!res.headersSent)reply(res,500,{error:'Chat unavailable'},req.headers.origin);else res.destroy();});
   } else if (['POST','OPTIONS'].includes(req.method) && req.url==='/presence/events') {

@@ -80,3 +80,20 @@ test('mentions use existing presence frames and never reach guests or self',asyn
   assert.equal(guest.mention,undefined);
   assert.equal((await (await f.post({...f.account,mode:'poll',cursor:frame.cursor})).json()).t,'idle');
 });
+
+test('record notifications reach visible and anonymous offline players without counting observers',async t=>{
+  const f=await fixture(t);
+  const observer={t:'observer',id:randomUUID(),sid:randomUUID()};
+  const o=await (await f.post({...observer,mode:'poll',watch:true})).json();
+  const g=await (await f.post({...f.guest,mode:'poll'})).json();
+  assert.deepEqual(f.roster.counts(),{a:0,g:1});
+  assert.equal(o.a,0);assert.equal(o.g,0);assert.equal(o.n,undefined);
+  const pending=f.post({...observer,mode:'poll',cursor:o.cursor});
+  const record={id:randomUUID(),game:'snake',handle:'Penguin',value:23,at:Date.now()};
+  f.events.announce(record);
+  assert.deepEqual((await (await pending).json()).record,record);
+  assert.deepEqual((await (await f.post({...f.guest,mode:'poll',cursor:g.cursor})).json()).record,record);
+  const latest=await (await f.post({...observer,mode:'poll'})).json();
+  f.events.announce(record);
+  assert.equal((await (await f.post({...observer,mode:'poll',cursor:latest.cursor})).json()).t,'idle');
+});
