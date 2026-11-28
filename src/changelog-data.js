@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1044,
+  "count": 1045,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"98bba617","date":"2026-11-28","author":"Codebuff","subject":"Give Battleship's your-turn camera a ship and the board back its mouse"},
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
   {"sha":"0589a966","date":"2026-11-27","author":"Daniel Lowe","subject":"Add developer notes for nine games"},
   {"sha":"f5f9ae0d","date":"2026-11-27","author":"Daniel Lowe","subject":"Use red hover accents for Vettel game cards"},
