@@ -29,7 +29,7 @@ export async function moderate(text,{key=process.env.OPENAI_API_KEY,fetcher=fetc
   if(typeof result?.flagged!=='boolean')throw Error('Moderation unavailable');
   return !result.flagged;
 }
-export function createChat({verify,isAdmin,store,configured,moderateText=moderate,reply,readBody,origins,source,onMention=()=>{},waitMs=25000,keepaliveMs=25000}){
+export function createChat({verify,isAdmin,store,configured,moderateText=moderate,reply,readBody,origins,source,onMention=()=>{},onlineNames=()=>[],waitMs=25000,keepaliveMs=25000}){
   const messages=[],events=[],peers=new Set(),auth=new Map(),rates=new Map(),ipRates=new Map(),inflight=new Set();
   const epoch=randomUUID();let seq=0,state=null,stateAt=0,loading=null,flushTimer=null,closed=false;
   const hash=t=>createHash('sha256').update(t).digest('hex');
@@ -106,9 +106,9 @@ export function createChat({verify,isAdmin,store,configured,moderateText=moderat
     if(!configured)return out(503,{error:'Chat is not configured yet.'});
     let s;try{s=await control();}catch{return out(503,{error:'Chat is unavailable.'});}
     if(mode==='status'){
-      let admin=false;
-      if(m.jwt)try{await account(m.jwt);admin=await isAdmin(m.jwt);}catch{}
-      return out(200,{enabled:s.enabled,admin});
+      let admin=false,names;
+      if(m.jwt)try{await account(m.jwt);names=onlineNames();admin=await isAdmin(m.jwt);}catch{}
+      return out(200,{enabled:s.enabled,admin,...(names?{names}:{})});
     }
     if(mode==='admin'){
       let a;try{a=await account(m.jwt);if(!await isAdmin(m.jwt))throw Error();}catch{return out(403,{error:'Forbidden'});}

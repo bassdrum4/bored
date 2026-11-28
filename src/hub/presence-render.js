@@ -44,7 +44,7 @@ export function mountRenderPresence(){
   const endpoint=renderEventUrl(PRESENCE_ORIGIN);
   let owner=null,epoch=0,visible=null,ready=false,paused=false,suspended=false,saving=false;
   let retry=0,pollFail=0,pollMode=false,controller=null,sid='',cursor='',lastCredentials=null;
-  let counts=null,names=[],namesReady=false,reading=false;
+  let counts=null,names=[],namesReady=false,reading=false,chatOpen=false;
   const current=(id,v)=>!suspended&&owner===id&&epoch===v&&viewer()===id;
   async function account(id,action='get',args={}){
     const s=await freshSession();
@@ -104,7 +104,7 @@ export function mountRenderPresence(){
     if(m?.t!=='ok'||!Number.isInteger(m.a)||!Number.isInteger(m.g)||m.a<0||m.g<0||m.a+m.g>1000||typeof m.cursor!=='string')throw Error('Invalid presence frame');
     cursor=m.cursor;counts={a:m.a,g:m.g};ready=true;pollFail=0;
     if(id!==GUEST&&typeof m.mention==='string')window.dispatchEvent(new CustomEvent('bored:chat-mention',{detail:{account:id,mention:m.mention}}));
-    if(id!==GUEST&&details.open&&Array.isArray(m.n)){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}
+    if(id!==GUEST&&Array.isArray(m.n)){if(details.open){names=m.n.filter(n=>typeof n==='string'&&n.length<=160);namesReady=true;}if(chatOpen)window.dispatchEvent(new CustomEvent('bored:chat-roster',{detail:{account:id,names:m.n}}));}
     render();
   }
   async function connect(id,v){
@@ -119,7 +119,7 @@ export function mountRenderPresence(){
       if(!alive())return;
       lastCredentials=auth;
       arm(pollMode?POLL_TIMEOUT:CONNECT_TIMEOUT);
-      const res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid,mode:pollMode?'poll':'sse',watch:id!==GUEST&&details.open,cursor}),cache:'no-store',signal:ctl.signal});
+      const res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...auth,sid,mode:pollMode?'poll':'sse',watch:id!==GUEST&&(details.open||chatOpen),cursor}),cache:'no-store',signal:ctl.signal});
       if(!alive())return;
       if(!res.ok)throw Error('Presence unavailable');
       if(pollMode){
@@ -221,6 +221,7 @@ export function mountRenderPresence(){
       note.textContent='Could not save. Presence paused here; try again.';render();
     }
   });
+  window.addEventListener('bored:chat-open',e=>{const next=e.detail===true;if(next===chatOpen)return;chatOpen=next;if(owner!==GUEST&&!details.open)reconnect();});
   details.addEventListener('toggle',()=>{
     names=[];namesReady=false;
     if(owner!==GUEST)reconnect();

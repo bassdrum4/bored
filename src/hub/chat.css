@@ -26,3 +26,9 @@
 
 .bored-chat-toggle.has-mention {position:relative}
 .bored-chat-toggle.has-mention::after {content:'';position:absolute;right:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#d92735;pointer-events:none}
+
+#bored-chat-form {position:relative}
+.bored-chat-mentions {position:absolute;bottom:calc(100% + .35rem);left:0;right:0;max-height:13rem;overflow:auto;background:var(--paper,#f5f2ea);color:var(--ink,#242019);border:1px solid currentColor;border-radius:4px;box-shadow:0 4px 12px #0002;z-index:2;padding:.2rem}
+.bored-chat-mentions [role=option] {padding:.4rem .55rem;cursor:pointer;border-radius:3px;overflow-wrap:anywhere;font-size:.85rem}
+.bored-chat-mentions [role=option]:hover,.bored-chat-mentions [aria-selected=true] {background:#4875b326}
+.bored-chat-mention {color:#285da3;background:#4875b31a;border-radius:3px;padding:0 .15em;font-weight:600}

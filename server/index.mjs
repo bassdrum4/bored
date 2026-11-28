@@ -158,7 +158,7 @@ async function chatAdmin(token){
   const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/my_analytics_access',{method:'POST',headers:{apikey:API_KEY,authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(8000)});
   return r.ok&&(await r.json())?.admin===true;
 }
-const chat=createChat({verify,isAdmin:chatAdmin,store:chatRpc,configured:Boolean(process.env.OPENAI_API_KEY&&chatRpc),reply,readBody,origins:ORIGINS,source:clientSource,onMention:events.mention});
+const chat=createChat({verify,isAdmin:chatAdmin,store:chatRpc,configured:Boolean(process.env.OPENAI_API_KEY&&chatRpc),reply,readBody,origins:ORIGINS,source:clientSource,onMention:events.mention,onlineNames:()=>roster.names()});
 const server = http.createServer((req,res)=>{
   if (req.method==='GET' && req.url==='/health') {
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
