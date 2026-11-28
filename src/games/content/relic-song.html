@@ -798,7 +798,11 @@ const INSTRUMENTS = {
   zip:     { wave: "sawtooth", a: 0.002, d: 0.05, s: 0.2, r: 0.03, gain: 0.07, detune: 7, cut: 3200 },
   low:     { wave: "triangle", a: 0.002, d: 0.1, s: 0.15, r: 0.05, gain: 0.3 },
   // A band song's legato lead: a short soft attack on each onset, an octave up.
-  attack:  { wave: 0.25, a: 0.002, d: 0.04, s: 0, r: 0.03, gain: 0.1 },
+  attack:  { wave: 0.125, a: 0.001, d: 0.05, s: 0, r: 0.03, gain: 0.24 },
+  // A band song's arpeggio: charted on IN and AT, so it sits above the pads with a sharper front.
+  bandarp: { wave: 0.125, a: 0.001, d: 0.06, s: 0.2, r: 0.03, gain: 0.3 },
+  // A band song's water lead: the same voice with a short tail, so the arp between its notes is heard.
+  flowband:{ wave: "triangle", a: 0.02, d: 0.2, s: 0.45, r: 0.08, gain: 0.28, vib: [5, 6] },
   // The type styles' voices (TYPE_STYLES below).
   square:  { wave: 0.5, a: 0.004, d: 0.08, s: 0.55, r: 0.05, gain: 0.2 },                        // Normal's bouncy lead
   drive:   { wave: "sawtooth", a: 0.004, d: 0.1, s: 0.6, r: 0.05, gain: 0.12, detune: 12, cut: 1800 }, // Fire's rock lead
@@ -1139,12 +1143,18 @@ const SONGS = [
   // A band song (the new model): one arrangement on every difficulty, the chart taken from what it plays.
   // The tide's drums come in by section (busier in A and B), and its arp is the AT run.
   { id: "cerulean-current", region: "kanto", key: "D", band: true, gym: 1, title: "Cerulean Current", bpm: 96, bar: 4, style: "Water", diffs: ["ez", "hd", "in", "at"],
-    parts: { I: { lead: "d5 - - - a4 - - - | d5 - - - f#5 - . .", chords: "D A", drums: { k: [0], m: "off" } },
-             H: { lead: "d5 - - - - - f#5 - | e5 - - - - - . . | b4 - - - d5 - e5 - | f#5 - - - - - . .", chords: "D A Bm G", drums: { k: [0, 3], s: [4], h: "off" } },
-             A: { lead: "g5 - - - f#5 - e5 - | f#5 - - - - - . . | e5 - - - d5 - c#5 - | d5 - - - - - . .", chords: "G D A D", hint: "arp", drums: { k: [0, 5], s: [4], h: "off" } },
-             B: { lead: "a4 - b4 - . . . . | d5 - e5 - . . . . | f#5 - e5 - . . . . | d5 - - - . . . .",
-                  answer: ". . . . f#5 e5 d5 - | . . . . a5 g5 f#5 - | . . . . d5 c#5 b4 - | . . . . a4 b4 c#5 -", chords: "Bm G A D", drums: { k: [0, 3], s: [4, 7], h: "off" } },
-             O: { lead: "e5 - - - c#5 - - - | d5 - - - - - . .", chords: "A D", drums: { k: [0] } } },
+    // A flowing melody in eighths (EZ's whole chart); the snare on 3 and a kick in A and B (HD); the arp off the beat,
+    // in sixteenths in A and B, and a bass on 1 and 3 (IN); chord stabs in H and A (AT).
+    ezBusy: 3, tune: { ez: { holdMin: 2, jack: 0.3 }, at: { chord: 3, step: 0.16 } },
+    parts: { I: { lead: "d5 - e5 - f#5 - a5 - | d5 e5 f#5 - a5 - . .", chords: "D A", drums: { k: [0], m: "off" }, arpRun: "sway", bassRun: "oneThree" },
+             H: { lead: "d5 e5 f#5 e5 a5 - f#5 e5 | e5 d5 d5 c#5 d5 - e5 - | b4 c#5 d5 c#5 e5 - d5 e5 | f#5 e5 e5 d5 c#5 - d5 -", chords: "D A Bm G",
+                  drums: { s: [4], h: "off" }, arpRun: "sway", bassRun: "oneThree", stab: "stab" },
+             A: { lead: "g5 f#5 a5 g5 f#5 e5 e5 - | f#5 e5 d5 c#5 e5 - d5 - | e5 d5 f#5 e5 d5 c#5 c#5 - | d5 c#5 b4 c#5 d5 - . .", chords: "G D A D", hint: "arp",
+                  drums: { k: [0], s: [4], h: "off" }, arpRun: "flow16", bassRun: "oneThree", stab: "stab" },
+             B: { lead: "a4 b4 c#5 d5 c#5 . . . | d5 e5 f#5 e5 d5 . . . | f#5 e5 d5 c#5 b4 . . . | d5 - c#5 - a4 . . .",
+                  answer: ". . . . . f#5 e5 d5 | . . . . . a5 g5 f#5 | . . . . . c#5 b4 a4 | . . . . . b4 c#5 d5", chords: "Bm G A D",
+                  drums: { k: [0], s: [4], h: "off" }, arpRun: "flow16", bassRun: "oneThree" },
+             O: { lead: "e5 d5 c#5 - b4 - c#5 - | d5 - - - - - . .", chords: "A D", drums: { k: [0] }, arpRun: "sway", bassRun: "oneThree" } },
     form: "I H A H B H A H B H O" },
   { id: "tidepool-waltz", region: "kanto", key: "A", heat: { ez: 0.44, hd: 0.28 }, gym: 1, title: "Tidepool Waltz", bpm: 116, bar: 3, style: "Water",
     parts: { I: { lead: "a4 - - - e5 - | a4 - - - - -", chords: "A E" },
@@ -1196,13 +1206,16 @@ const SONGS = [
     form: "I H A H B H A H B H A H B H A H O" },
   // A band song (the new model): one arrangement on every difficulty, the chart taken from what it plays.
   { id: "raichu-overload", region: "kanto", key: "Am", band: true, at: true, gym: 2, boss: true, title: "Raichu Overload", bpm: 170, bar: 4, style: "Electric",
-    parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E" },
-             H: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - - - d5 - - -", chords: "Am C F G" },
-             A: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true, hint: "bass" },
+    // The melody runs in eighths (EZ, every note of it); kick on 1 and snare on 3, the whole kit in C (HD); the arp off
+    // the beat, eighths in C (drags on the line), the bass on 1 and 3 (IN); chord stabs in B and C (AT).
+    ezBusy: 9, tune: { ez: { step: 0.16, jack: 0.25, holdMin: 2 }, hd: { step: 0.18 }, at: { chord: 3, step: 0.18, jack: 0.36 } },
+    parts: { I: { lead: "a4 . . . e5 . . . | a4 . c5 . e5 . . .", chords: "Am E", drums: { k: [0], h: "16" }, bassRun: "oneThree", arpRun: "sway" },
+             H: { lead: "a4 . e5 . a4 . e5 . | g5 . e5 . d5 . c5 . | f4 . c5 . f4 . c5 . | e5 - d5 - c5 - d5 -", chords: "Am C F G", drums: { k: [0], s: [4], h: "16" }, bassRun: "oneThree", arpRun: "sway" },
+             A: { lead: "a5 g5 e5 d5 e5 g5 a5 . | g5 e5 d5 c5 d5 e5 g5 . | f5 e5 c5 a4 c5 e5 f5 . | e5 - - - g5 - - -", chords: "Am C F G", burst: true, hint: "bass", drums: { k: [0], s: [4], h: "16" }, bassRun: "rootfifth", arpRun: "sway" },
              B: { lead: "a4 . c5 . . . . . | g4 . b4 . . . . . | f4 . a4 . . . . . | e5 - - - . . . .",
-                  answer: ". . . . e5 d5 c5 . | . . . . d5 c5 b4 . | . . . . c5 b4 a4 . | . . . . g#4 a4 b4 .", chords: "Am G F E", stab: "stab" },
-             C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true, stab: "stab" },
-             O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am" } },
+                  answer: ". . . . e5 d5 c5 . | . . . . d5 c5 b4 . | . . . . c5 b4 a4 . | . . . . g#4 a4 b4 .", chords: "Am G F E", stab: "stab", drums: { k: [0], s: [4], h: "16" }, bassRun: "oneThree", arpRun: "sway" },
+             C: { lead: "c6 . b5 . a5 . e5 . | a5 . g5 . e5 . d5 . | c5 d5 e5 g5 a5 g5 e5 d5 | e5 - - - . . . .", chords: "Am G F E", burst: true, stab: "stab", drums: { k: [0, 4], s: [2, 6], h: "16" }, bassRun: "rootfifth", arpRun: "up8" },
+             O: { lead: "e5 . d5 . c5 . b4 . | a4 - - - - - . .", chords: "E Am", drums: { k: [0], h: "16" }, bassRun: "oneThree", arpRun: "sway" } },
     form: "I H A H B H A H B H A H relic C H C H C O",
     // Raichu: every bar the line teleports somewhere new; mid-bar it zig-zags the other way. Every
     // chord flashes. In the last stretch two more lines cross it like lightning, swapping angles,
@@ -1532,7 +1545,7 @@ function build(song, diff = "hd") {
       let len = 1;
       while (i + len < lead.length && lead[i + len] === "-") len++;
       const b = at + i / 2;
-      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : own.lead, midi: m, dur: len / 2, role: verse ? "verse" : "lead" });
+      ev.push({ b, kind: "tone", inst: verse && !song.verse ? "voice" : band && own.lead === "flow" ? "flowband" : own.lead, midi: m, dur: len / 2, role: verse ? "verse" : "lead" });
       // A band song's legato lead gets a short soft attack on top, so every onset is heard.
       if (band && !verse && own.holds) ev.push({ b, kind: "tone", inst: "attack", midi: m + 12, dur: 0.05 });
       if (!chartOn) continue;
@@ -1585,7 +1598,7 @@ function build(song, diff = "hd") {
           if (run === "sway" && k % 2 === 0) continue;   // off-beats only
           const idx = run === "flow16" ? [0, 1, 2, 3, 2, 1][k % 6] : run === "box" ? [0, 1, 2, 3, 4, 5, 4, 3][k % 8] : wide ? k % 6 : run === "sparse" ? [3, 2][k % 2] : k % 4;
           const b = b0 + k / per;
-          ev.push({ b, kind: "tone", inst: own.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per, role: "arp", burst });
+          ev.push({ b, kind: "tone", inst: band && own.arp === "arp" ? "bandarp" : own.arp, midi: tones[idx] + (run === "up8" || run === "sparse" ? 12 : 0), dur: run === "sparse" ? 1.5 : 0.9 / per, role: "arp", burst });
           if (chartOn) spot(b, mode, per === 4 && k % 2 ? 1 : 2, burst, six);
           // A burst part's arpeggio is the chart's speed run (drag notes on the line).
           if (chartOn && burst && run !== "sway" && k % (per === 4 ? 2 : 1) === 0)
@@ -1706,9 +1719,16 @@ function build(song, diff = "hd") {
       seen.add(key);
       const m = modeAt(e.b), want = role === "kick" ? 0 : laneFor(role, e.midi);
       // A burst's arp on the line is a run of drags (hold any key in its zone through it).
-      if (role === "arp" && e.burst && m === "line") { if (!moment(e.b).length && !placed.some(o => isDrag(o) && Math.abs(o.b - e.b) < E)) put({ b: e.b, lane: want, len: 0, mode: m, run: true }); continue; }
+      if (role === "arp" && e.burst && m === "line") { if (!moment(e.b).length && !placed.some(o => isDrag(o) && Math.abs(o.b - e.b) < E)) put({ b: e.b, lane: want, len: 0, mode: m, run: true, midi: e.midi }); continue; }
+      // Below AT the runs (arp, bass) fill the gaps between the melody and the drums, and chords stay two keys;
+      // AT chords what the band plays together, a run joining in on each bar's downbeat and filling the gaps between.
+      const here = moment(e.b).length;
+      const run = role === "arp" || role === "bass";
+      if (diff !== "at" ? here >= 2 || (run && here) : run && here && Math.abs(e.b / song.bar - Math.round(e.b / song.bar)) > E) continue;
       const len = role === "lead" && !song.noHolds && e.dur * 2 >= D.holdMin + (style.holds ? 0 : 1) ? e.dur - 0.5 : 0;
-      const order = [...Array(L).keys()].sort((x, y) => Math.abs(x - want) - Math.abs(y - want));
+      // Its lane: near the one its part wants, but away from a lane hit in the last 0.4 s (no jacks if it can help it).
+      const near = around(e.b, 0), recent = l => near.some(o => o.lane === l && o.b < e.b - E && (e.b - o.b - o.len) * spb < 0.4);
+      const order = [...Array(L).keys()].sort((x, y) => Math.abs(x - want) + (recent(x) ? 3 : 0) - Math.abs(y - want) - (recent(y) ? 3 : 0) || x - y);
       let lane = order.find(l => fits(e.b, l, len)), hold = len;
       if (lane == null && len) { lane = order.find(l => fits(e.b, l, 0)); hold = 0; }
       if (lane == null) continue;
@@ -3654,6 +3674,7 @@ window.__relicSong = { auto: false, start: (id, diff) => start(SONGS.find(s => s
     } finally { [ctx, noiseBuf, hitOut, lastHit] = live; Object.assign(opts, { hitKind: live[4], hitVol: live[5], sound: live[6], hits: live[7] }); }
   },
   onsetCheck: (id, diff) => onsetCheck(SONGS.find(s => s.id === id), diff),
+  renderSong: B => renderSong(B),
   charts: () => SONGS.flatMap(s => s.diffs.map(d => { const b = built(s, d); return { id: s.id, title: s.title, diff: d, lanes: b.lanes, notes: b.chart.length,
     seconds: Math.round(b.seconds), level: b.level, clearPay: clearPayOf(b), rankPay: rankPay(b.level, d, "a") + rankPay(b.level, d, "s"), ...b.stats }; })) };
 }
