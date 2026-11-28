@@ -1888,3 +1888,39 @@ test('Year 3, the whole year on a real Story save (YEAR3_READY): Begin Year 3, a
   assert.deepEqual([got.main.ach, got.main.letter, got.main.look, got.main.slot, got.main.year], [true, true, 'griseous-giratina', 'bored.poke-idle.story', 3], 'You Went There Too: the achievement, the letter and the Griseous Orb look, on the real save');
   assert.deepEqual(errors, []);
 });
+
+
+test('portable save codes compress losslessly and accept legacy codes', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-20');
+  const samples = await tab.evaluate(async () => {
+    const result = [];
+    for (const count of [6, 150, 600, 1025]) {
+      const state = fresh();
+      for (let n = 1; n <= count; n++) state.box[n] = { xp: (n * 7919) % 1000000, shiny: n % 47 === 0, from: n % 9 };
+      state.party = [1, 2, 3, 4, 5, 6];
+      state.note = "Poké ✨";
+      const json = JSON.stringify(state);
+      const legacy = btoa(unescape(encodeURIComponent(json)));
+      const code = await encodeSaveCode(state);
+      result.push({ count, old: legacy.length, packed: code.length, prefix: code.startsWith("PI2:"), same: JSON.stringify(await decodeSaveCode(code)) === json, legacy: JSON.stringify(await decodeSaveCode(legacy)) === json });
+    }
+    return result;
+  });
+  for (const s of samples) {
+    assert.ok(s.prefix && s.packed < s.old);
+    assert.ok(s.same && s.legacy);
+  }
+  console.log('Save code lengths:', JSON.stringify(samples));
+  await setup(tab, 'low');
+  const result = await tab.evaluate(async () => {
+    const old = S;
+    const bad = await loadCode("PI2:AAAA");
+    const unchanged = S === old;
+    const state = fresh(); state.box[25] = { xp: 125, shiny: false }; state.party = [25];
+    const code = await encodeSaveCode(state);
+    const loaded = await loadCode(code);
+    return { bad, unchanged, loaded, party: S.party };
+  });
+  assert.deepEqual(result, { bad: false, unchanged: true, loaded: true, party: [25] });
+  assert.deepEqual(errors, []);
+});
