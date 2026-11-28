@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 1051,
+  "count": 1052,
   "newest": "2026-11-28",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -12,6 +12,7 @@ export const CHANGELOG = [
   {"sha":"eb5f4098","date":"2026-11-28","author":"Codebuff","subject":"Make Battleship's shot one continuous take"},
   {"sha":"98bba617","date":"2026-11-28","author":"Codebuff","subject":"Give Battleship's your-turn camera a ship and the board back its mouse"},
   {"sha":"e2e582b4","date":"2026-11-28","author":"Codebuff","subject":"Keep Battleship's shot frame up for the whole turn"},
+  {"sha":"7968aa50","date":"2026-11-27","author":"bassdrum4","subject":"Lock display names and warn during signup"},
   {"sha":"95bd2882","date":"2026-11-27","author":"Daniel Lowe","subject":"Replace public tracks banner with prominent library selector"},
   {"sha":"4520e503","date":"2026-11-27","author":"bassdrum4","subject":"Remove account display name editing"},
   {"sha":"bbe80e03","date":"2026-11-27","author":"Daniel Lowe","subject":"Feature community tracks on Trackbound main menu"},
