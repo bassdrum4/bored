@@ -7,10 +7,17 @@
 //   rs:rank:<song>:<diff>:<rank>    the first time the best rank reached b, a or s
 //   rs:badge:<gym>                  a gym boss's first clear, on any difficulty (gyms 0-3)
 //   rs:finale                       the final boss's first clear
+//   rs:champion:<region>            a region champion's first clear
 //   rs:lesson                       finishing Meloetta's Lesson, the tutorial (once, however often it's replayed)
 //   rs:top:<entry without rs:>      once only: the rest of an entry that paid under today's table
 // A rank reached again, or a lower one, finds its entry already there and pays nothing.
 // The amounts come from the game's PAY table; this side caps each one.
+//
+// Two shapes of table. The old one names amounts by difficulty ({ clear: {ez..}, rank: {b,a,s},
+// mult: {ez..} }) and tops up entries paid under a smaller one. Today's names every chart
+// ({ charts: { 'song:diff': { clear, a, s } } }, paid by the chart's measured level) and says
+// topUp: false: an entry already in the ledger, under any table, is paid and pays nothing more,
+// so nobody loses coins and nothing is paid twice; only new entries pay, at today's amounts.
 import { readWallet, writeWallet, grantOnce, walletBalance } from './rewards.js';
 import { storedBuddy } from './gacha.js';
 import { DEX, DEX_TYPES, DEX_CHART } from './gacha-dex.js';
@@ -18,8 +25,8 @@ import { rouletteGames } from './roulette.js';
 import { hasIdentity } from './backend.js';
 
 export const RELIC = Object.freeze({
-  // The most one ledger entry may pay, whatever the page asks for. It is also the most one
-  // run can pay: the finale's first AT clear at S is 400 + 100 + 200 + 400 + 500.
+  // The most one ledger entry may pay, whatever the page asks for. It is also more than one run can
+  // pay: the finale's first AT clear at S, at Lv.15, is 450 + 115 + 225 + 500.
   maxPay: 1600,
   ranks: Object.freeze(['c', 'b', 'a', 's']),
   diffs: Object.freeze(['ez', 'hd', 'in', 'at'])
@@ -27,14 +34,16 @@ export const RELIC = Object.freeze({
 const SONG = /^[a-z0-9-]{1,32}$/;
 const coinsIn = n => Math.max(0, Math.min(RELIC.maxPay, Math.floor(Number(n) || 0)));
 
-// What an entry is worth under the page's table: { clear: {ez..}, rank: {b,a,s}, mult: {ez..}, badge, finale }.
+// What an entry is worth under the page's table (either shape, above).
 function worth(table, id) {
   const t = table || {};
-  let m = /^rs:clear:[a-z0-9-]+:(ez|hd|in|at)$/.exec(id);
-  if (m) return coinsIn((t.clear || {})[m[1]]);
-  m = /^rs:rank:[a-z0-9-]+:(ez|hd|in|at):(b|a|s)$/.exec(id);
-  if (m) return coinsIn(Math.round(((t.rank || {})[m[2]] || 0) * ((t.mult || {})[m[1]] || 0)));
+  const chart = (song, diff) => (t.charts && t.charts[song + ':' + diff]) || {};
+  let m = /^rs:clear:([a-z0-9-]+):(ez|hd|in|at)$/.exec(id);
+  if (m) return coinsIn(t.charts ? chart(m[1], m[2]).clear : (t.clear || {})[m[2]]);
+  m = /^rs:rank:([a-z0-9-]+):(ez|hd|in|at):(b|a|s)$/.exec(id);
+  if (m) return coinsIn(t.charts ? chart(m[1], m[2])[m[3]] : Math.round(((t.rank || {})[m[3]] || 0) * ((t.mult || {})[m[2]] || 0)));
   if (/^rs:badge:[0-3]$/.test(id)) return coinsIn(t.badge);
+  if (/^rs:champion:[a-z0-9-]{1,32}$/.test(id)) return coinsIn(t.champion);
   if (id === 'rs:finale') return coinsIn(t.finale);
   if (id === 'rs:lesson') return coinsIn(t.lesson);
   return 0;
@@ -49,6 +58,7 @@ function settle(wallet, id, table, now) {
     const g = grantOnce(wallet, id, { coins: want }, { now });
     return { wallet: g.wallet, paid: g.changed ? want : 0 };
   }
+  if (table && table.topUp === false) return { wallet, paid: 0 };
   const rest = want - Math.max(0, Number(had.g && had.g.coins) || 0);
   if (rest <= 0) return { wallet, paid: 0 };
   const g = grantOnce(wallet, 'rs:top:' + id.slice(3), { coins: rest }, { now });
@@ -57,10 +67,11 @@ function settle(wallet, id, table, now) {
 
 /**
  * Bring old entries up to today's table: top up every rs:clear / rs:rank entry that
- * paid less, and pay the badge (and finale) for every boss whose clear is already in
- * the ledger. `bosses` maps a boss song to its gym (0-3); `final` is the finale's song.
+ * paid less (old-shape tables only), and pay the badge (and finale, and champion) for every
+ * boss whose clear is already in the ledger but whose bonus isn't. `bosses` maps a boss song to
+ * its gym (0-3); `final` is the finale's song; `champions` maps a champion song to its region.
  */
-export function topUpRelicSong(wallet, { table, bosses = {}, final = '' } = {}, { now = Date.now() } = {}) {
+export function topUpRelicSong(wallet, { table, bosses = {}, final = '', champions = {} } = {}, { now = Date.now() } = {}) {
   let next = wallet;
   let paid = 0;
   const ids = Object.keys((next && next.entries) || {}).filter(id => /^rs:(clear|rank):/.test(id));
@@ -69,6 +80,7 @@ export function topUpRelicSong(wallet, { table, bosses = {}, final = '' } = {}, 
     const song = id.split(':')[2];
     if (Object.prototype.hasOwnProperty.call(bosses, song)) due.add('rs:badge:' + bosses[song]);
     if (song && song === final) due.add('rs:finale');
+    if (Object.prototype.hasOwnProperty.call(champions, song) && SONG.test(String(champions[song]))) due.add('rs:champion:' + champions[song]);
   }
   for (const id of due) { const r = settle(next, id, table, now); next = r.wallet; paid += r.paid; }
   return { wallet: next, paid };
@@ -80,14 +92,15 @@ export function topUpRelicSong(wallet, { table, bosses = {}, final = '' } = {}, 
  * boss's first clear, the finale's bonus. Older, smaller entries are topped up on the way.
  * Returns the wallet and what was paid this time ({ clear, rank, badge, finale, top, total }).
  */
-export function payRelicSong(wallet, { song, diff, rank, table, badge = null, finale = false, bosses = {}, final = '' } = {}, { now = Date.now() } = {}) {
+export function payRelicSong(wallet, { song, diff, rank, table, badge = null, finale = false, champion = null, bosses = {}, final = '', champions = {} } = {}, { now = Date.now() } = {}) {
   let next = wallet;
-  const paid = { clear: 0, rank: 0, badge: 0, finale: 0, top: 0, total: 0 };
+  const paid = { clear: 0, rank: 0, badge: 0, champion: 0, finale: 0, top: 0, total: 0 };
   const r = RELIC.ranks.indexOf(rank);
   if (!SONG.test(String(song || '')) || !RELIC.diffs.includes(diff) || r < 0) return { wallet: next, ok: false, reason: 'song', paid };
   const run = [['clear', 'rs:clear:' + song + ':' + diff]];
   for (let k = 1; k <= r; k++) run.push(['rank', 'rs:rank:' + song + ':' + diff + ':' + RELIC.ranks[k]]);
   if (Number.isInteger(badge) && badge >= 0 && badge <= 3) run.push(['badge', 'rs:badge:' + badge]);
+  if (champion && SONG.test(String(champion))) run.push(['champion', 'rs:champion:' + champion]);
   if (finale) run.push(['finale', 'rs:finale']);
   for (const [kind, id] of run) {
     const fresh = !(next.entries && next.entries[id]);
@@ -95,9 +108,9 @@ export function payRelicSong(wallet, { song, diff, rank, table, badge = null, fi
     next = s.wallet;
     paid[fresh ? kind : 'top'] += s.paid;
   }
-  const up = topUpRelicSong(next, { table, bosses, final }, { now });
+  const up = topUpRelicSong(next, { table, bosses, final, champions }, { now });
   next = up.wallet; paid.top += up.paid;
-  paid.total = paid.clear + paid.rank + paid.badge + paid.finale + paid.top;
+  paid.total = paid.clear + paid.rank + paid.badge + paid.champion + paid.finale + paid.top;
   return { wallet: next, ok: true, paid };
 }
 
